@@ -94,10 +94,6 @@ final class PlayerStateManager {
     private var itemErrorLogObservation: NSObjectProtocol?
     private var playerErrorObservation: NSKeyValueObservation?
     private var defaultRateObservation: NSKeyValueObservation?
-    /// Instrumentation for the initial candidate start. Cleared after the periodic observer sees
-    /// playback time advance, so pause/resume and seeking do not masquerade as startup samples.
-    private var startupItem: AVPlayerItem?
-    private var startupRequestedAt: Date?
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
@@ -115,9 +111,13 @@ final class PlayerStateManager {
         // to `false` looks like the obvious way to make the optimistic start in `resolveAndPlay`
         // start sooner, and it does the exact opposite.
         //
-        // Initial autoplay uses `playImmediately(atRate:)`, but every ordinary play/resume path
-        // still calls `play()`. Keeping this enabled preserves AVPlayer's safe buffering behavior
-        // for those later calls; startup opts out explicitly without changing the global policy.
+        // `resolveAndPlay` calls `play()` the moment a candidate URL is installed, while the item
+        // is still `.unknown`. `AVPlayer.rate` ignores a nonzero rate set before the current item
+        // is ready to play, so the *only* thing that makes that early request survive to readiness
+        // is this property: with `true` the player enters `.waitingToPlayAtSpecifiedRate` and
+        // begins on its own the instant the item is ready. With `false` there is no such holding
+        // state, the request is dropped on the floor, and playback never starts — the video sits
+        // on its thumbnail until the user pauses and plays again.
         player.automaticallyWaitsToMinimizeStalling = true
         // Restore the last-used playback speed. `defaultRate` is what `AVPlayerViewController`'s
         // speed menu writes, and `AVPlayer.play()` resumes at this rate (not the transient `rate`).
@@ -207,8 +207,6 @@ final class PlayerStateManager {
     func load(_ video: Video, autoplay: Bool = true, skipRecommendations: Bool = false) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
         resolutionTask?.cancel()
-        startupItem = nil
-        startupRequestedAt = nil
         queueAcceptsRecommendations = !skipRecommendations
         // Pause and tear down anything currently playing. Otherwise we'd keep streaming audio from
         // the previous video while the new one's file is downloading — which is what the user kept
@@ -264,17 +262,6 @@ final class PlayerStateManager {
     func play() {
         log.info("play()")
         player.play()
-        isPlaying = true
-    }
-
-    /// Starts a newly-installed network candidate without AVPlayer's normal stall-minimization
-    /// delay. Deliberately private: user-driven resume and remote commands should retain the safer
-    /// `play()` behavior after a pause or interruption.
-    private func playImmediatelyForStartup(item: AVPlayerItem, strategy: PlaybackStrategy) {
-        startupItem = item
-        startupRequestedAt = Date()
-        log.info("playImmediately: candidate=\(strategy.rawValue, privacy: .public) rate=\(self.player.defaultRate, privacy: .public)")
-        player.playImmediately(atRate: player.defaultRate)
         isPlaying = true
     }
 
@@ -344,8 +331,6 @@ final class PlayerStateManager {
         log.info("dismiss()")
         resolutionTask?.cancel()
         resolutionTask = nil
-        startupItem = nil
-        startupRequestedAt = nil
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -456,8 +441,8 @@ final class PlayerStateManager {
             loadState = .buffering
             updateNowPlaying()
             if autoplay {
-                log.info("resolveAndPlay: immediate play issued for candidate=\(candidate.strategy.rawValue, privacy: .public) at \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-                playImmediatelyForStartup(item: item, strategy: candidate.strategy)
+                log.info("resolveAndPlay: optimistic play issued for candidate=\(candidate.strategy.rawValue, privacy: .public) at \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
+                play()
             }
 
             let readiness = await waitForReadiness(
@@ -476,8 +461,8 @@ final class PlayerStateManager {
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 loadState = .readyToPlay
                 updateNowPlaying()
-                // Usually redundant — the immediate start above has either started the item or
-                // left it waiting for its first media data, and this covers the case
+                // Usually redundant — the optimistic `play()` above has either started the item or
+                // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
                 // where a rejected candidate left the transport paused.
                 //
                 // Ask the player, not `isPlaying`. That flag is a prediction written by `play()`
@@ -494,15 +479,13 @@ final class PlayerStateManager {
             }
 
             excludedStrategies.insert(candidate.strategy)
-            // The immediate start left the transport running (possibly stalled) on a
+            // The optimistic `play()` left the transport running (rate 1, possibly stalled) on a
             // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`
             // and the Now Playing rate don't advertise playback for a rejected candidate while the
             // next one resolves.
             if isPlaying { pause() }
             player.removeAllItems()
             itemLoadStartedAt = nil
-            startupItem = nil
-            startupRequestedAt = nil
             loadState = .resolving
             updateNowPlaying()
         }
@@ -685,14 +668,6 @@ final class PlayerStateManager {
             guard let self else { return }
             Task { @MainActor in
                 self.elapsed = time.seconds.isFinite ? time.seconds : 0
-                if time.seconds.isFinite,
-                   time.seconds > 0,
-                   self.startupItem === self.player.currentItem,
-                   let startupRequestedAt = self.startupRequestedAt {
-                    self.log.info("AVPlayer first playback progress after \(Date().timeIntervalSince(startupRequestedAt), privacy: .public)s (mediaTime=\(time.seconds, privacy: .public)s)")
-                    self.startupItem = nil
-                    self.startupRequestedAt = nil
-                }
                 if let item = self.player.currentItem {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
@@ -744,10 +719,8 @@ final class PlayerStateManager {
                 // Playing rate) describing a candidate we already rejected.
                 switch self.player.timeControlStatus {
                 case .playing:
-                    if let startupRequestedAt = self.startupRequestedAt {
-                        self.log.info("KVO timeControlStatus → playing after \(Date().timeIntervalSince(startupRequestedAt), privacy: .public)s from immediate start")
-                    }
                     if !self.isPlaying {
+                        self.log.info("KVO timeControlStatus → playing (sync isPlaying=true)")
                         self.isPlaying = true
                     }
                 case .paused:
