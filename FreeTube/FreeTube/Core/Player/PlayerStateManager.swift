@@ -64,14 +64,13 @@ final class PlayerStateManager {
     private let preferences: UserPreferences
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
-    /// Sticky "this queue is endless" intent. Set to `true` whenever the user loads a video
-    /// without explicitly skipping recommendations (Home / Search / Mini-player / row taps),
-    /// and `false` for curated batch actions like playlist's Play all / Shuffle all. Drives:
+    /// Sticky "this queue accepts recommendations" intent. Set to `true` whenever the user loads
+    /// a standalone video and `false` for curated Play all / Shuffle all batches. Drives:
     ///   1. The per-load `fillQueueWithRecommendations` call in `resolveAndPlay`.
     ///   2. The auto-advance dead-end recovery in `playNext()` — when the queue runs out and
     ///      repeat is off, we fire a fresh recs fetch using the queue's last item as a seed,
-    ///      then advance once new items land. That gives the requested "endless queue" feel:
-    ///      whenever you reach the latest item, recommendations refill behind it.
+    ///      then advance once new items land. Each standalone load replaces the old queue, so
+    ///      these refills never retain previously played videos.
     private var queueAcceptsRecommendations = true
 
     private var timeObserver: Any?
@@ -160,6 +159,7 @@ final class PlayerStateManager {
         // player we're about to hand a local file, and its readiness wait would sit out its full
         // timeout. Cancelling settles that wait immediately.
         resolutionTask?.cancel()
+        recommendationTask?.cancel()
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -215,6 +215,7 @@ final class PlayerStateManager {
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
         resolutionTask?.cancel()
+        recommendationTask?.cancel()
         queueAcceptsRecommendations = !skipRecommendations
         // Pause and tear down anything currently playing. Otherwise we'd keep streaming audio from
         // the previous video while the new one's file is downloading — which is what the user kept
@@ -228,9 +229,13 @@ final class PlayerStateManager {
             player.removeAllItems()
         }
         currentVideo = video
-        // Keep the queue coherent. Fresh taps from search/home append the video; subsequent calls
-        // from `playNext()` / `playPrevious()` find it already there and just update `currentIndex`.
-        queue.setCurrent(video)
+        // Ordinary playback gets a fresh, bounded recommendation set for each video and retains no
+        // history. Explicit playlist batches keep their curated order and skip recommendations.
+        if skipRecommendations {
+            queue.setCurrent(video)
+        } else {
+            queue.replace(with: [video])
+        }
         miniPlayerVisible = true
         if expandPlayer {
             fullScreenPresented = true
@@ -250,6 +255,7 @@ final class PlayerStateManager {
     }
 
     private var resolutionTask: Task<Void, Never>?
+    private var recommendationTask: Task<Void, Never>?
 
     /// Upserts a `WatchHistoryEntry` so the Library's "Recents" section reflects what the user
     /// played. Same-id taps just bump `watchedAt` so the row floats to the top. The actor hop keeps
@@ -342,6 +348,8 @@ final class PlayerStateManager {
         log.info("dismiss()")
         resolutionTask?.cancel()
         resolutionTask = nil
+        recommendationTask?.cancel()
+        recommendationTask = nil
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -647,7 +655,7 @@ final class PlayerStateManager {
         // taps, Next/Previous, and even tapping an individual playlist video — gets the
         // autoplay-style recommendation fill, so the player keeps advancing past the seed.
         if !skipRecommendations {
-            Task { [weak self] in
+            recommendationTask = Task { [weak self] in
                 await self?.fillQueueWithRecommendations(for: video)
             }
         }
@@ -657,26 +665,20 @@ final class PlayerStateManager {
     /// the queue. This is what makes the player behave like the YouTube app: tap any video and a
     /// fresh "up next" queue is ready to advance when the current track ends.
     private func fillQueueWithRecommendations(for seed: Video) async {
-        let refillThreshold = 8
-        let targetUpcomingCount = 20
-        let retainedHistoryCount = 10
-
-        // A full-height queue List is part of the observable player view. Letting every playback
-        // append another response indefinitely made each 0.5s elapsed-time update redraw dozens of
-        // extra rows. Bound old/future entries first and avoid a network request while the existing
-        // upcoming buffer is still healthy.
-        queue.trimAroundCurrent(
-            maxHistory: retainedHistoryCount,
-            maxUpcoming: targetUpcomingCount
-        )
+        let targetUpcomingCount = 5
         let upcomingCount = queue.availableUpcomingCount(limit: targetUpcomingCount)
-        guard upcomingCount < refillThreshold else {
+        guard upcomingCount < targetUpcomingCount else {
             log.debug("Recommendation refill skipped for \(seed.id, privacy: .public): \(upcomingCount, privacy: .public) upcoming items remain")
             return
         }
 
         do {
             let info = try await VideoService().fetchMoreInfo(id: seed.id)
+            try Task.checkCancellation()
+            guard currentVideo?.id == seed.id else {
+                log.debug("Discarding stale recommendations for \(seed.id, privacy: .public)")
+                return
+            }
             let existingIDs = Set(queue.items.map(\.id))
             let needed = targetUpcomingCount - upcomingCount
             let toAppend = Array(
@@ -685,11 +687,9 @@ final class PlayerStateManager {
                     .prefix(needed)
             )
             queue.append(contentsOf: toAppend)
-            queue.trimAroundCurrent(
-                maxHistory: retainedHistoryCount,
-                maxUpcoming: targetUpcomingCount
-            )
             log.info("Queued \(toAppend.count, privacy: .public) recommendations for \(seed.id, privacy: .public)")
+        } catch is CancellationError {
+            log.debug("Recommendation fetch cancelled for \(seed.id, privacy: .public)")
         } catch {
             log.notice("Recommendation fetch failed for \(seed.id, privacy: .public): \(String(describing: error), privacy: .public)")
         }

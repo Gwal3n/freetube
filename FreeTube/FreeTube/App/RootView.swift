@@ -1,7 +1,6 @@
 import SwiftUI
 import LNPopupUI
 import Kingfisher
-import OSLog
 import UIKit
 
 /// Top-level tabbed shell. CLAUDE.md §8: mini-player sits above the tab bar and persists across tabs.
@@ -99,7 +98,7 @@ struct RootView: View {
             await SessionManager.shared.bootstrap()
         }
         // Refresh the cached thumbnail whenever the user picks a new video. The mini-player's
-        // `popupImage` reads this so it shows the actual preview instead of a placeholder icon.
+        // `PopupContentWrapper` reads this so the bar shows the actual preview.
         .onChange(of: player.currentVideo?.id, initial: true) {
             loadThumbnailForCurrentVideo()
         }
@@ -174,66 +173,16 @@ struct RootView: View {
         }
     }
 
-    /// Mini-player leading image. The real thumbnail shows from the moment of tap — it's already
-    /// decoded, and replacing it with a glyph for the couple of seconds before playback starts is
-    /// the single most visible "this app is slow" cue the bar has. The download glyph is kept for
-    /// `.downloading`, which is a genuine multi-minute file transfer the user can't preview.
-    private var popupImage: Image {
-        if case .downloading = player.loadState {
-            return Image(systemName: popupImageName)
-        }
-        if let thumbnail {
-            return Image(uiImage: thumbnail)
-        }
-        return Image(systemName: "play.rectangle.fill")
-    }
-
-    private var progressValue: Float {
-        PopupContentWrapper.progress(for: player)
-    }
-
-    private var popupSubtitle: String {
-        switch player.loadState {
-        case .resolving:
-            return "Preparing…"
-        case .downloading(let progress, let phase):
-            guard let progress else { return "Processing…" }
-            let percent = Int(progress * 100)
-            if let phase, phase == "video" || phase == "audio" {
-                return "Downloading \(phase) \(percent)%"
-            }
-            return "Downloading \(percent)%"
-        case .failed(let msg):
-            return msg
-        // `.buffering` reads as the channel name rather than a status: playback has already been
-        // requested at that point, so the bar should look like it's playing, not preparing.
-        case .idle, .buffering, .readyToPlay:
-            return player.currentVideo?.channelName ?? ""
-        }
-    }
-
-    /// Swap the mini-player's leading icon to an arrow.down.circle while we're downloading so it's
-    /// obvious the bar isn't ready to play yet.
-    private var popupImageName: String {
-        switch player.loadState {
-        case .downloading: return "arrow.down.circle.fill"
-        default: return "play.rectangle.fill"
-        }
-    }
 }
 
 /// Hosts the popup's `FullScreenPlayer` and all of its `popup*(...)` metadata modifiers.
 ///
 /// **Why this exists:** `RootView.popup { ... }` calls its content closure once at popup-presentation
-/// time, so any captured value (like `progressValue`) freezes there. Wrapping the content in a real
+/// time, so captured metadata freezes there. Wrapping the content in a real
 /// `View` makes SwiftUI's observation system re-render the body when the player's state changes.
 ///
-/// **Why state-driven progress and not direct read:** even with @Environment observation, in
-/// practice the `.popupProgress(_:)` preference key didn't always re-apply on every body re-render
-/// (suspected: LNPopupUI's preference reducer coalesces same-valued updates, and SwiftUI may skip
-/// modifier re-application when the captured Float equals the previous one byte-for-byte). Driving
-/// it through explicit `@State` mirrors and `.onChange` handlers forces the modifier to see a fresh
-/// captured value every time the player ticks.
+/// Progress is deliberately emitted by the leaf `PopupProgressObserver`; keeping that half-second
+/// observation out of this wrapper prevents the native title labels from being rebuilt every tick.
 /// Made non-private so `MacRootView` can reuse the same popup chrome when running on
 /// Mac via "Designed for iPad" — same look as the iOS mini-bar, same drag-to-expand
 /// behavior, no duplicated styling.
@@ -242,17 +191,16 @@ struct PopupContentWrapper: View {
     @Environment(PlayerStateManager.self) private var player
     let thumbnail: UIImage?
 
-    /// Mirrored progress state so `.popupProgress(_:)` always receives a fresh-captured value.
-    @State private var progress: Float = 0
     @State private var subtitleText: String = ""
-
-    private static let log = AppLog(subsystem: "com.leshko.freetube", category: "PopupProgress")
 
     var body: some View {
         FullScreenPlayer()
             .popupTitle(player.currentVideo?.title ?? "", subtitle: subtitleText)
             .popupImage(image)
-            .popupProgress(progress)
+            // Progress changes every half-second. Isolate that observation from this wrapper so
+            // LNPopupUI does not receive a freshly rebuilt title/subtitle on every playback tick;
+            // repeatedly resetting its native labels made mini-player text distort or disappear.
+            .overlay { PopupProgressObserver() }
             .popupBarButtons {
                 ToolbarItemGroup(placement: .popupBar) {
                     Button {
@@ -269,34 +217,14 @@ struct PopupContentWrapper: View {
                     }
                 }
             }
-            // Pump the mirrored state whenever any input changes. iOS 17's @Observable observation
-            // makes these `onChange` fire reliably even though SwiftUI's modifier diffing wouldn't.
-            .onChange(of: player.elapsed, initial: true) { old, new in
-                // Self.log.debug("onChange.elapsed old=\(old, privacy: .public) new=\(new, privacy: .public)")
-                refreshProgress(trigger: "elapsed")
-            }
-            .onChange(of: player.duration) { old, new in
-                // Self.log.debug("onChange.duration old=\(old, privacy: .public) new=\(new, privacy: .public)")
-                refreshProgress(trigger: "duration")
-            }
             .onChange(of: player.loadState, initial: true) { old, new in
                 // Self.log.info("onChange.loadState old=\(String(describing: old), privacy: .public) new=\(String(describing: new), privacy: .public)")
-                refreshProgress(trigger: "loadState")
                 subtitleText = computedSubtitle
             }
             .onChange(of: player.currentVideo?.id, initial: true) { old, new in
                 // Self.log.info("onChange.video old=\(old ?? "nil", privacy: .public) new=\(new ?? "nil", privacy: .public)")
                 subtitleText = computedSubtitle
             }
-    }
-
-    private func refreshProgress(trigger: String) {
-        let next = Self.progress(for: player)
-        let changed = abs(next - progress) > 0.001
-        // Self.log.debug("refreshProgress[\(trigger, privacy: .public)] prev=\(self.progress, privacy: .public) next=\(next, privacy: .public) changed=\(changed, privacy: .public)")
-        if changed {
-            progress = next
-        }
     }
 
     /// Static helper for the few external callers that still want a snapshot.

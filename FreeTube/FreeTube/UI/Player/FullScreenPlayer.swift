@@ -15,10 +15,11 @@ struct FullScreenPlayer: View {
     /// every redraw (which was the bug DownloadsScreen had: per-row SQL on the main queue).
     @Query private var favorites: [FavoriteVideo]
 
-    /// What's shown in the lower panel. Default is `.queue` so the user can see what's coming up
-    /// without an extra tap; they can switch to `.comments` via the toggle on the right of the
-    /// transport row.
+    /// What's shown in the lower panel. The queue header is the lightweight default, with its rows
+    /// collapsed; the user can expand it or switch to comments from the transport row.
     @State private var panel: Panel = .queue
+    /// Keep recommendation rows out of the render tree until the user asks to inspect them.
+    @State private var isQueueExpanded = false
     /// Async-loaded description / details for the currently-playing video. Fetched on demand when
     /// the user taps "More" under the channel row.
     @State private var details: VideoInfo?
@@ -259,6 +260,7 @@ struct FullScreenPlayer: View {
                 switch self.panel {
                 case .comments:
                     CommentsSection(videoID: video.id)
+                        .id(video.id)
                 case .queue:
                     queuePanel
                 }
@@ -820,40 +822,52 @@ struct FullScreenPlayer: View {
             HStack {
                 SectionHeader(title: "Up next")
                 Spacer()
-                shuffleButton
-                repeatButton
+                if isQueueExpanded {
+                    shuffleButton
+                    repeatButton
+                }
+                Button {
+                    isQueueExpanded.toggle()
+                } label: {
+                    Image(systemName: isQueueExpanded ? "chevron.up" : "chevron.down")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal)
             // `List` is the cleanest source of drag-to-reorder + swipe-to-delete in SwiftUI. We're
             // already inside a ScrollView, so we cap the list with a generous fixed height so it
             // doesn't try to consume the outer scroll's gesture space.
-            List {
-                ForEach(player.queue.items) { video in
-                    queueRow(video)
-                        .listRowBackground(Color.clear)
-                        // Pin a deterministic row height so the outer `.frame(height:)` below can
-                        // calculate the exact List size — otherwise iOS's auto-sized rows end up
-                        // slightly taller than our estimate and the last row gets clipped.
-                        .frame(height: Self.queueRowHeight)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                }
-                .onMove { source, destination in
-                    let from = source.first ?? 0
-                    player.queue.move(from: from, to: destination)
-                }
-                .onDelete { offsets in
-                    for index in offsets.sorted(by: >) {
-                        player.queue.remove(at: index)
+            if isQueueExpanded {
+                List {
+                    ForEach(player.queue.items) { video in
+                        queueRow(video)
+                            .listRowBackground(Color.clear)
+                            .frame(height: Self.queueRowHeight)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    }
+                    .onMove { source, destination in
+                        let from = source.first ?? 0
+                        player.queue.move(from: from, to: destination)
+                    }
+                    .onDelete { offsets in
+                        for index in offsets.sorted(by: >) {
+                            player.queue.remove(at: index)
+                        }
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.editMode, .constant(.active))
+                .scrollDisabled(true)
+                .frame(height: queueListHeight)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .environment(\.editMode, .constant(.active))
-            .scrollDisabled(true)
-            // Row height (`queueRowHeight`) + insets (`4+4`) + a tail margin so the last row's
-            // bottom edge isn't flush with the next sibling view in the outer scroll.
-            .frame(height: queueListHeight)
+        }
+        .onChange(of: player.currentVideo?.id) {
+            isQueueExpanded = false
         }
     }
 

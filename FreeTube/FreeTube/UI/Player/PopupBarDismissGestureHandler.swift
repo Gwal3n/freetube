@@ -2,9 +2,8 @@ import UIKit
 
 /// Adds swipe-to-dismiss to LNPopupUI's native bar without replacing its carefully styled content.
 ///
-/// LNPopupUI already owns the bar's vertical pan for expanding the player. Horizontal swipes are
-/// deliberately used here so dismissal does not compete with that gesture: either direction feels
-/// like swiping the mini-player away, while an upward drag continues to open the full player.
+/// LNPopupUI already owns the bar's upward pan for expanding the player. A downward swipe dismisses
+/// it, matching the direction used to collapse the expanded popup while leaving upward drags free.
 @available(iOS 17.0, *)
 @MainActor
 final class PopupBarDismissGestureHandler: NSObject, UIGestureRecognizerDelegate {
@@ -18,12 +17,10 @@ final class PopupBarDismissGestureHandler: NSObject, UIGestureRecognizerDelegate
         removeInstalledGestures()
         installedView = view
 
-        for direction in [UISwipeGestureRecognizer.Direction.left, .right] {
-            let gesture = UISwipeGestureRecognizer(target: self, action: #selector(didSwipe))
-            gesture.direction = direction
-            gesture.delegate = self
-            view.addGestureRecognizer(gesture)
-        }
+        let gesture = UISwipeGestureRecognizer(target: self, action: #selector(didSwipe))
+        gesture.direction = .down
+        gesture.delegate = self
+        view.addGestureRecognizer(gesture)
     }
 
     private func removeInstalledGestures() {

@@ -14,7 +14,7 @@ struct CommentsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        LazyVStack(alignment: .leading, spacing: 8) {
             header
 
             if isExpanded {
@@ -22,7 +22,7 @@ struct CommentsSection: View {
                     LoadingView()
                         .padding(.vertical, 12)
                 } else {
-                    ForEach(Array(model.comments.enumerated()), id: \.element.id) { index, comment in
+                    ForEach(model.comments) { comment in
                         CommentRow(
                             comment: comment,
                             onLike: { Task { await model.toggleLike(comment) } },
@@ -36,19 +36,19 @@ struct CommentsSection: View {
                                 .padding(.horizontal)
                                 .padding(.bottom, 4)
                         }
-                        // Infinite scroll: trigger pagination when the user is within 5 rows of the
-                        // bottom, so the next page is ready before they hit it.
-                        if index == max(0, model.comments.count - 5) {
-                            Color.clear.frame(height: 1)
-                                .onAppear {
-                                    if model.continuationToken != nil && !model.isLoading {
-                                        Task { await model.loadMore() }
-                                    }
-                                }
-                        }
                     }
                     if model.isLoading {
                         LoadingView()
+                    } else if model.continuationToken != nil {
+                        Button {
+                            Task { await model.loadMore() }
+                        } label: {
+                            Label("Load more comments", systemImage: "chevron.down")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
                     }
                 }
             }
