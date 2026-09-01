@@ -29,8 +29,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     func install(on controller: AVPlayerViewController) {
-        let rootView = controller.view
-        guard let overlay = controller.contentOverlayView, gestureView !== rootView else { return }
+        guard let rootView = controller.view,
+              let overlay = controller.contentOverlayView,
+              gestureView !== rootView else { return }
         uninstall()
         gestureView = rootView
         feedbackView = overlay
