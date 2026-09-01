@@ -179,24 +179,26 @@ Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
 setting still bounds ABR variant selection. `.auto` stays uncapped.
 
 **Playback starts optimistically.** `resolveAndPlay` installs the candidate, sets
-`loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`. This
+`loadState = .buffering`, and calls `playImmediately(atRate:)` right away instead of waiting for
+`.readyToPlay`. This
 is purely about perceived latency: warm resolution is ~0.4s but AVPlayer readiness is ~2s, i.e. ~80%
-of the tap-to-video wait, and AVPlayer exposes no "first frame rendered" signal to key off.
+of the tap-to-video wait, and AVPlayer exposes no "first frame rendered" signal to key off. This
+immediate path is used only for initial autoplay; ordinary pause/resume and remote commands keep
+using `play()` so they retain AVPlayer's normal stall-minimization behavior. Startup timing is
+measured through the transition to `.playing` and the first periodic time-observer value above zero.
 
 **`automaticallyWaitsToMinimizeStalling` must stay `true`, and setting it to `false` breaks
-playback outright.** It reads like the lever that makes an optimistic start take effect sooner; it is
-the opposite. `AVPlayer.rate` ignores a nonzero rate set while the current item isn't ready, so the
-only reason the early `play()` survives to readiness is that `true` parks the player in
-`.waitingToPlayAtSpecifiedRate`, from which it starts on its own. With `false` there is no holding
-state: the call is discarded, `timeControlStatus` never changes, and — because `play()` sets
-`isPlaying = true` as a UI prediction — nothing downstream notices. The video sits on its thumbnail
-until the user pauses and plays again. Correspondingly, the `.readyToPlay` retry is gated on
+playback outright for ordinary `play()`.** Initial autoplay now uses the purpose-built
+`playImmediately(atRate:)`, which attempts playback with whatever media is available and can trade
+some stall resistance for a faster first frame. The global property stays `true` for every normal
+`play()` call: with `false`, an ordinary early play request can be discarded while the item is
+`.unknown`. Correspondingly, the `.readyToPlay` retry is gated on
 `player.timeControlStatus == .paused`, never on `isPlaying`, which is a prediction rather than an
 observation and reads `true` whether or not AVPlayer honoured the request.
 
 **Validation is unchanged.** A candidate is still only *accepted* on `.readyToPlay`; on `.failed` or
 a readiness timeout the strategy goes into `excludedStrategies`, the transport is paused (the
-optimistic `play()` left it playing or waiting-to-play on a stream we're abandoning, and `isPlaying`
+the immediate start left it playing or stalled on a stream we're abandoning, and `isPlaying`
 / NowPlaying must not keep advertising it), the queue is emptied, and the loop asks for the next
 candidate. Readiness
 is observed through KVO on `AVPlayerItem.status` — the single observation installed by
