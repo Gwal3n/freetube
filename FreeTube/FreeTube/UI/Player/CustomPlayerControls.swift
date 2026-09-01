@@ -24,7 +24,7 @@ struct CustomPlayerControls: View {
                     HStack {
                         Button(action: onCollapse) {
                             Image(systemName: "chevron.down")
-                                .playerControlCircle()
+                                .playerTopControl()
                         }
                         Spacer()
                         Menu {
@@ -44,7 +44,7 @@ struct CustomPlayerControls: View {
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.white)
                                 .frame(minWidth: 42, minHeight: 36)
-                                .background(.black.opacity(0.55), in: Capsule())
+                                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -58,10 +58,11 @@ struct CustomPlayerControls: View {
                         }
                         Button(action: onTogglePlayPause) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 27, weight: .semibold))
+                                .font(.system(size: 34, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .frame(width: 58, height: 58)
-                                .background(.black.opacity(0.62), in: Circle())
+                                .frame(width: 68, height: 68)
+                                .contentShape(Circle())
+                                .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
                         }
                         Button { onSeekRelative(10) } label: {
                             Image(systemName: "goforward.10").playerCenterControl()
@@ -93,11 +94,12 @@ struct CustomPlayerControls: View {
 }
 
 private extension Image {
-    func playerControlCircle() -> some View {
+    func playerTopControl() -> some View {
         font(.body.weight(.bold))
             .foregroundStyle(.white)
             .frame(width: 36, height: 36)
-            .background(.black.opacity(0.55), in: Circle())
+            .contentShape(Circle())
+            .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
     }
 
     func playerCenterControl() -> some View {

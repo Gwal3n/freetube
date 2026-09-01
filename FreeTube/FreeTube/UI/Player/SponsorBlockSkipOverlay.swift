@@ -28,7 +28,7 @@ struct SponsorBlockSkipOverlay: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(.black.opacity(0.88), in: Capsule())
-            .padding(.bottom, 14)
+            .padding(.bottom, 64)
         }
         .padding(.horizontal)
         .transition(.move(edge: .bottom).combined(with: .opacity))

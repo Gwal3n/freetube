@@ -101,6 +101,8 @@ final class PlayerStateManager {
     private var sponsorBlockBoundaryObservers: [Any] = []
     private var handledSponsorBlockSegmentIDs = Set<String>()
     private var sponsorBlockNoticeTask: Task<Void, Never>?
+    private var pendingSeekTarget: TimeInterval?
+    private var seekRequestID = 0
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
@@ -202,6 +204,8 @@ final class PlayerStateManager {
         fullScreenPresented = true
         elapsed = 0
         duration = 0
+        pendingSeekTarget = nil
+        seekRequestID += 1
         refreshArtwork(for: synthetic)
 
         let item = AVPlayerItem(url: fileURL)
@@ -261,6 +265,8 @@ final class PlayerStateManager {
         // that's what showed phantom progress bars on cells the user never played.
         elapsed = 0
         duration = 0
+        pendingSeekTarget = nil
+        seekRequestID += 1
         recordWatchHistory(video: video)
         refreshArtwork(for: video)
         loadSponsorBlockSegments(for: video.id)
@@ -321,8 +327,23 @@ final class PlayerStateManager {
         // Update optimistically so rapid continuation taps accumulate from the last requested
         // target instead of the periodic observer's up-to-0.5-second-old playback position.
         elapsed = boundedSeconds
+        pendingSeekTarget = boundedSeconds
+        seekRequestID += 1
+        let requestID = seekRequestID
         let time = CMTime(seconds: boundedSeconds, preferredTimescale: 600)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            guard finished else { return }
+            Task { @MainActor in
+                // Let any periodic callback queued just before seek completion drain while the
+                // optimistic target is still pinned. Otherwise that stale tick briefly paints the
+                // scrubber at its pre-seek position before the next AVPlayer tick corrects it.
+                try? await Task.sleep(for: .milliseconds(120))
+                guard let self, self.seekRequestID == requestID else { return }
+                self.pendingSeekTarget = nil
+                let settledTime = self.player.currentTime().seconds
+                if settledTime.isFinite { self.elapsed = settledTime }
+            }
+        }
     }
 
     func seekRelative(by delta: TimeInterval) {
@@ -827,7 +848,11 @@ final class PlayerStateManager {
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
             Task { @MainActor in
-                self.elapsed = time.seconds.isFinite ? time.seconds : 0
+                if let pendingSeekTarget = self.pendingSeekTarget {
+                    self.elapsed = pendingSeekTarget
+                } else {
+                    self.elapsed = time.seconds.isFinite ? time.seconds : 0
+                }
                 if let item = self.player.currentItem {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }

@@ -13,6 +13,14 @@ struct SponsorBlockTimeline: View {
 
     var body: some View {
         VStack(spacing: 4) {
+            HStack {
+                Text(verbatim: format(displayedTime))
+                Spacer()
+                Text(verbatim: format(duration))
+            }
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.white)
+
             GeometryReader { proxy in
                 let width = max(proxy.size.width, 1)
                 let progress = fraction(for: displayedTime)
@@ -26,7 +34,7 @@ struct SponsorBlockTimeline: View {
                             .fill(color(for: segment.category))
                             .frame(
                                 width: max(2, width * fraction(for: segment.endTime - segment.startTime)),
-                                height: 6
+                                height: 4
                             )
                             .offset(x: width * fraction(for: segment.startTime))
                     }
@@ -53,14 +61,6 @@ struct SponsorBlockTimeline: View {
                 )
             }
             .frame(height: 24)
-
-            HStack {
-                Text(verbatim: format(displayedTime))
-                Spacer()
-                Text(verbatim: format(duration))
-            }
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(.white)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Playback position")
