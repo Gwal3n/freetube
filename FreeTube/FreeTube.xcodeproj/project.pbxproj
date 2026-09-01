@@ -471,7 +471,7 @@
 			repositoryURL = "https://github.com/LeoNatan/LNPopupUI.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 3.0.2;
+				minimumVersion = 4.0.1;
 			};
 		};
 		AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */ = {
