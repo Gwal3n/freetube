@@ -388,6 +388,7 @@ final class PlayerStateManager {
 
             log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
             let item = AVPlayerItem(url: candidate.source.url)
+            applyQualityCap(to: item)
             itemLoadStartedAt = Date()
             loadItem(item)
 
@@ -420,6 +421,23 @@ final class PlayerStateManager {
         }
 
         log.debug("resolveAndPlay: ended after cancellation or video change for \(video.id, privacy: .public)")
+    }
+
+    /// Caps HLS variant selection to the user's preferred quality.
+    ///
+    /// The resolver now hands back a master playlist for most videos rather than a single
+    /// progressive stream, and a master playlist advertises YouTube's whole variant ladder. Without
+    /// a ceiling AVPlayer's ABR logic is free to climb past the user's setting — previously the
+    /// height cap was applied when picking a progressive format, so this keeps that preference
+    /// meaningful. It also shortens time-to-first-frame, since AVPlayer no longer pulls a large
+    /// segment before reporting `.readyToPlay`. `.auto` stays uncapped so ABR can use the full
+    /// ladder, and this is a no-op for progressive and local-file candidates.
+    private func applyQualityCap(to item: AVPlayerItem) {
+        let quality = preferences.preferredQuality
+        guard quality != .auto, let heightCap = quality.heightCap, heightCap > 0 else { return }
+        // AVPlayer treats this as an upper bound on a variant's frame size, not an exact match,
+        // so deriving the width from 16:9 is safe for taller and wider aspect ratios alike.
+        item.preferredMaximumResolution = CGSize(width: heightCap * 16 / 9, height: heightCap)
     }
 
     private enum ItemReadiness {

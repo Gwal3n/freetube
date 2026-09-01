@@ -170,9 +170,13 @@ Playback is stream-first. `PlayerStateManager` calls `PlaybackResolver`, install
 in an `AVPlayerItem`, and never imports either extraction library itself. Resolution order is:
 
 1. **Existing local file.** `DownloadManager.localFile(for:)` wins immediately, preserving offline playback.
-2. **b5i direct streams, validated by AVPlayer.** `PlaybackResolver` produces iOS and then TVHTML5 HLS/progressive candidates through `VideoService`. `PlayerStateManager` only accepts a candidate after its `AVPlayerItem` reaches `.readyToPlay`; failure or a four-second readiness timeout advances to the next strategy.
-3. **Native local extraction.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. Known livestreams prefer HLS; ordinary videos skip the up-front HLS probe and select a natively playable progressive audio+video stream within `preferredQuality.heightCap` (or an audio-only stream for that preference). HLS remains a fallback when progressive selection is empty, covering incorrectly classified live content. The dependency's hosted remote extractor is never enabled. Native candidates are also AVPlayer-validated.
+2. **Native local extraction, HLS-first.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It reads the InnerTube player response's `hlsManifestUrl` **before** touching `youtube.streams`, for live and on-demand alike. That path never runs the JavaScriptCore signature/n-parameter solver, which re-parses the whole ~2.5 MB player.js once per InnerTube client and was costing ~4s per play for a result the resolver then discarded in favour of this same HLS URL. Progressive selection (natively playable audio+video within `preferredQuality.heightCap`) runs only when no HLS manifest exists, and remains the sole path for the `audioOnly` preference since a master playlist always carries video. The dependency's hosted remote extractor is never enabled. Candidates are AVPlayer-validated.
+3. **b5i direct streams, validated by AVPlayer.** `PlaybackResolver` produces iOS and then TVHTML5 HLS/progressive candidates through `VideoService`. These sit *behind* the native resolver: for ordinary VOD, `VideoInfosResponse` reports no HLS URL and its formats carry metadata without usable URLs (upstream documents that real URLs require `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running them first spent ~1.5s per play on candidates that could not be produced. `PlayerStateManager` only accepts a candidate after its `AVPlayerItem` reaches `.readyToPlay`; failure or a four-second readiness timeout advances to the next strategy.
 4. **Legacy download fallback.** Only after every direct resolver fails, `DownloadManager.ensureDownloaded` runs the existing yt-dlp → YouTubeKit download pipeline. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
+
+Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
+`AVPlayerItem.preferredMaximumResolution` from `preferredQuality.heightCap` so the user's quality
+setting still bounds ABR variant selection. `.auto` stays uncapped.
 
 Automatic next-item download prefetch is disabled. Recommendation queue filling remains independent
 and still runs after playback begins. Signed URLs are used immediately or stored only in
@@ -479,7 +483,7 @@ If asked to "make it more robust" or "production-ready", point to these realitie
 - yt-dlp's HLS downloader needs ffmpeg, which is blocked by §15.3 — yt-dlp picking an HLS-only format fails on iOS. Tier 2/3 take over.
 - IP-level rate limiting from YouTube can hit users on shared networks (CGNAT, VPN). No client-side fix.
 - This codebase intentionally does not implement App Store evasion techniques. Sideload distribution is the assumption.
-- Variant selection in tier 3 HLS streaming honors `preferredQuality.heightCap` only when AVPlayer's adaptive bitrate logic agrees; we don't pre-pick a variant.
+- HLS variant selection is bounded by `preferredQuality.heightCap` via `AVPlayerItem.preferredMaximumResolution`, but we don't pre-pick a variant — AVPlayer's adaptive bitrate logic still chooses freely below that ceiling, so the played resolution can sit under the user's setting on a weak connection.
 
 ---
 

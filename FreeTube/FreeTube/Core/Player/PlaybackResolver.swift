@@ -2,9 +2,15 @@ import Foundation
 import OSLog
 
 /// Stream-first playback resolver. An already-downloaded file remains the fastest and only offline
-/// source. Otherwise the inexpensive b5i streaming endpoints are tried before the heavier native
-/// extractor. The download pipeline remains a final compatibility fallback
-/// and explicit Download actions continue to use `DownloadManager` directly.
+/// source. Otherwise the native extractor runs first — it now returns the InnerTube HLS manifest
+/// without any signature deciphering, which makes it both the fastest and the most reliable
+/// candidate. The b5i streaming endpoints follow as a safety net: for ordinary VOD their
+/// `VideoInfosResponse` reports no HLS URL and its formats carry metadata only (upstream documents
+/// that real URLs need `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running
+/// them first was spending ~1.5s per play on candidates that could not be produced. They still earn
+/// their place behind the native resolver for the cases where it comes back empty.
+/// The download pipeline remains a final compatibility fallback and explicit Download actions
+/// continue to use `DownloadManager` directly.
 final class PlaybackResolver: PlaybackResolving {
     private let downloads: DownloadManagerLike
     private let nativeStreams: any NativeStreamServicing
@@ -33,6 +39,17 @@ final class PlaybackResolver: PlaybackResolving {
             return PlaybackCandidate(source: .localFile(local), strategy: .localFile)
         }
 
+        if !strategies.contains(.native) {
+            do {
+                let url = try await nativeStreams.resolve(video: video, quality: quality)
+                return PlaybackCandidate(source: .direct(url), strategy: .native)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                log.notice("Native resolver failed for \(videoID, privacy: .public)")
+            }
+        }
+
         if !strategies.contains(.b5iIOS) {
             do {
                 if let url = try await resolveB5IStream(videoID: videoID, quality: quality, client: .iOS) {
@@ -53,17 +70,6 @@ final class PlaybackResolver: PlaybackResolving {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {}
-        }
-
-        if !strategies.contains(.native) {
-            do {
-                let url = try await nativeStreams.resolve(video: video, quality: quality)
-                return PlaybackCandidate(source: .direct(url), strategy: .native)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                log.notice("Native resolver failed for \(videoID, privacy: .public)")
-            }
         }
 
         guard !strategies.contains(.legacyDownload) else {
