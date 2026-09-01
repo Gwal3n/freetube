@@ -7,7 +7,7 @@ import FreeTubeStreamKit
 /// The extractor's hosted remote fallback is deliberately disabled: all requests and cipher
 /// processing happen on the device, and signed URLs are cached in memory for at most 30 minutes.
 protocol NativeStreamServicing: Sendable {
-    func resolve(videoID: String, quality: VideoQuality) async throws -> URL
+    func resolve(video: Video, quality: VideoQuality) async throws -> URL
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -19,21 +19,26 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
     }
 
     /// Returns an HLS, progressive video, or audio-only URL suitable for `AVPlayer`.
-    func resolve(videoID: String, quality: VideoQuality) async throws -> URL {
+    func resolve(video: Video, quality: VideoQuality) async throws -> URL {
+        let videoID = video.id
         let cacheKey = "native-\(quality.rawValue)"
         if let cached = await cache.get(videoID: videoID, formatID: cacheKey) {
             log.debug("Native stream cache hit for \(videoID, privacy: .public)")
             return cached
         }
 
-        log.info("Resolving native stream for \(videoID, privacy: .public) at \(quality.rawValue, privacy: .public)")
+        let startedAt = Date()
+        log.info("Resolving native stream for \(videoID, privacy: .public) at \(quality.rawValue, privacy: .public) live=\(video.isLive, privacy: .public)")
         let youtube = YouTube(videoID: videoID, methods: [.local])
 
         do {
-            if quality != .audioOnly,
+            // `livestreams` performs player-response work. Skip that up-front probe for ordinary
+            // videos; it was adding a redundant request before every progressive resolution.
+            if video.isLive,
+               quality != .audioOnly,
                let hls = try await youtube.livestreams.first {
                 await cache.set(videoID: videoID, formatID: cacheKey, url: hls.url)
-                log.info("Resolved native HLS for \(videoID, privacy: .public)")
+                log.info("Resolved native HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 return hls.url
             }
 
@@ -53,14 +58,25 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                     .highestResolutionStream()
             }
 
-            guard let selected else {
-                log.notice("Native extractor returned no playable stream for \(videoID, privacy: .public)")
-                throw YouTubeServiceError.streamExtractionFailed
+            if let selected {
+                await cache.set(videoID: videoID, formatID: cacheKey, url: selected.url)
+                log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
+                return selected.url
             }
 
-            await cache.set(videoID: videoID, formatID: cacheKey, url: selected.url)
-            log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public)")
-            return selected.url
+            // Some sources fail to mark a livestream in list/search metadata. Retain HLS as a
+            // last native-extractor fallback, but only pay for it after progressive selection
+            // produced nothing.
+            if !video.isLive,
+               quality != .audioOnly,
+               let hls = try await youtube.livestreams.first {
+                await cache.set(videoID: videoID, formatID: cacheKey, url: hls.url)
+                log.info("Resolved fallback native HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
+                return hls.url
+            }
+
+            log.notice("Native extractor returned no playable stream for \(videoID, privacy: .public) after \(Date().timeIntervalSince(startedAt), privacy: .public)s")
+            throw YouTubeServiceError.streamExtractionFailed
         } catch is CancellationError {
             throw CancellationError()
         } catch {

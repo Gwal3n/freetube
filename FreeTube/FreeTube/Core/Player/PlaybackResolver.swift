@@ -29,7 +29,7 @@ final class PlaybackResolver: PlaybackResolving {
             return .localFile(local)
         }
         do {
-            let url = try await nativeStreams.resolve(videoID: videoID, quality: quality)
+            let url = try await nativeStreams.resolve(video: video, quality: quality)
             return .direct(url)
         } catch is CancellationError {
             throw CancellationError()

@@ -69,6 +69,7 @@ final class PlayerStateManager {
     private var statusCancellable: AnyCancellable?
     private var endObserver: NSObjectProtocol?
     private var itemStatusObservation: NSKeyValueObservation?
+    private var itemLoadStartedAt: Date?
     private var itemErrorLogObservation: NSObjectProtocol?
     private var playerErrorObservation: NSKeyValueObservation?
     private var defaultRateObservation: NSKeyValueObservation?
@@ -330,7 +331,9 @@ final class PlayerStateManager {
                 case .unknown:
                     self.log.info("AVPlayerItem status: unknown")
                 case .readyToPlay:
-                    self.log.info("AVPlayerItem status: readyToPlay (duration=\(item.duration.seconds, privacy: .public)s)")
+                    let preparationTime = self.itemLoadStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+                    self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
+                    self.itemLoadStartedAt = nil
                 case .failed:
                     let err = item.error as NSError?
                     self.log.error("AVPlayerItem status: FAILED domain=\(err?.domain ?? "?", privacy: .public) code=\(err?.code ?? 0, privacy: .public) info=\(String(describing: err?.userInfo), privacy: .public)")
@@ -352,6 +355,7 @@ final class PlayerStateManager {
 
     private func resolveAndPlay(video: Video, autoplay: Bool, skipRecommendations: Bool = false) async {
         log.info("resolveAndPlay: start for \(video.id, privacy: .public)")
+        let resolutionStartedAt = Date()
         loadState = .resolving
 
         let source: PlaybackSource
@@ -372,7 +376,9 @@ final class PlayerStateManager {
             return
         }
 
+        log.info("resolveAndPlay: resolved \(video.id, privacy: .public) in \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
         let item = AVPlayerItem(url: source.url)
+        itemLoadStartedAt = Date()
         loadItem(item)
         loadState = .readyToPlay
         updateNowPlaying()

@@ -166,7 +166,7 @@ Playback is stream-first. `PlayerStateManager` calls `PlaybackResolver`, install
 in an `AVPlayerItem`, and never imports either extraction library itself. Resolution order is:
 
 1. **Existing local file.** `DownloadManager.localFile(for:)` wins immediately, preserving offline playback.
-2. **Native local extraction.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It prefers HLS, then a natively playable progressive audio+video stream within `preferredQuality.heightCap` (or an audio-only stream for that preference). The dependency's hosted remote extractor is never enabled.
+2. **Native local extraction.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. Known livestreams prefer HLS; ordinary videos skip the up-front HLS probe and select a natively playable progressive audio+video stream within `preferredQuality.heightCap` (or an audio-only stream for that preference). HLS remains a fallback when progressive selection is empty, covering incorrectly classified live content. The dependency's hosted remote extractor is never enabled.
 3. **b5i direct-stream fallback.** `PlaybackResolver` tries iOS HLS/progressive and then TVHTML5 HLS/progressive through `VideoService`.
 4. **Legacy download fallback.** Only after every direct resolver fails, `DownloadManager.ensureDownloaded` runs the existing yt-dlp → YouTubeKit download pipeline. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
 
