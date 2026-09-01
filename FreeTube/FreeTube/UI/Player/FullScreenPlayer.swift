@@ -81,7 +81,12 @@ struct FullScreenPlayer: View {
                 // on the container is what turns that hand-off into a crossfade instead of a cut.
                 ZStack {
                     Color.black
-                    PlayerSurface(player: player.player)
+                    PlayerSurface(
+                        player: player.player,
+                        onSeekRelative: { seconds in
+                            player.seekRelative(by: seconds)
+                        }
+                    )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
                 }
