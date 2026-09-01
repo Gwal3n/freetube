@@ -39,6 +39,12 @@ struct UserPreferences {
     /// `PlayerStateManager` reads this on init and observes the player's `defaultRate` to write
     /// changes back here — so a relaunch picks up where the last session left off.
     @AppStorage("playbackRate") var playbackRate: Double = 1.0
+    @AppStorage("sponsorBlockEnabled") var sponsorBlockEnabled: Bool = false
+    @AppStorage("sponsorBlockSponsor") var sponsorBlockSponsor: Bool = true
+    @AppStorage("sponsorBlockSelfPromotion") var sponsorBlockSelfPromotion: Bool = false
+    @AppStorage("sponsorBlockInteraction") var sponsorBlockInteraction: Bool = false
+    @AppStorage("sponsorBlockIntro") var sponsorBlockIntro: Bool = false
+    @AppStorage("sponsorBlockOutro") var sponsorBlockOutro: Bool = false
 
     /// yt-dlp `__version__` from the last successful download/load (e.g. `"2026.3.17"`).
     /// Empty until `YtDlpUpdater` has loaded the module at least once. Displayed in Settings so
@@ -60,6 +66,16 @@ struct UserPreferences {
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var sponsorBlockCategories: Set<SponsorBlockCategory> {
+        var categories = Set<SponsorBlockCategory>()
+        if sponsorBlockSponsor { categories.insert(.sponsor) }
+        if sponsorBlockSelfPromotion { categories.insert(.selfPromotion) }
+        if sponsorBlockInteraction { categories.insert(.interaction) }
+        if sponsorBlockIntro { categories.insert(.intro) }
+        if sponsorBlockOutro { categories.insert(.outro) }
+        return categories
     }
 
     var appearanceMode: AppearanceMode {

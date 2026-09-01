@@ -89,6 +89,13 @@ struct FullScreenPlayer: View {
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
+                    if let notice = player.sponsorBlockNotice {
+                        SponsorBlockSkipOverlay(
+                            notice: notice,
+                            onUndo: { player.undoSponsorBlockSkip() },
+                            onDismiss: { player.dismissSponsorBlockNotice() }
+                        )
+                    }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.width * 9 / 16)
                 .animation(.easeOut(duration: 0.2), value: player.loadState)

@@ -46,6 +46,7 @@ final class PlayerStateManager {
     private(set) var isPlaying: Bool = false
     private(set) var elapsed: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
+    private(set) var sponsorBlockNotice: SponsorBlockNotice?
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
 
@@ -61,6 +62,7 @@ final class PlayerStateManager {
 
     let queue: QueueManager
     private let resolver: any PlaybackResolving
+    private let sponsorBlockService: any SponsorBlockServicing
     private let preferences: UserPreferences
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
@@ -93,13 +95,19 @@ final class PlayerStateManager {
     private var itemErrorLogObservation: NSObjectProtocol?
     private var playerErrorObservation: NSKeyValueObservation?
     private var defaultRateObservation: NSKeyValueObservation?
+    private var sponsorBlockTask: Task<Void, Never>?
+    private var sponsorBlockBoundaryObservers: [Any] = []
+    private var handledSponsorBlockSegmentIDs = Set<String>()
+    private var sponsorBlockNoticeTask: Task<Void, Never>?
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
+        sponsorBlockService: any SponsorBlockServicing = SponsorBlockService(),
         preferences: UserPreferences = UserPreferences()
     ) {
         self.queue = queue
         self.resolver = resolver
+        self.sponsorBlockService = sponsorBlockService
         self.preferences = preferences
         // Keep the audio track running when the player view goes off-screen (popup minimize, app
         // backgrounded). Without this, AVPlayer pauses video tracks as soon as their pixel buffer
@@ -133,6 +141,7 @@ final class PlayerStateManager {
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         timeObserver = nil
         endObserver = nil
+        clearSponsorBlockState()
     }
 
     // MARK: - Public commands
@@ -160,6 +169,7 @@ final class PlayerStateManager {
         // timeout. Cancelling settles that wait immediately.
         resolutionTask?.cancel()
         recommendationTask?.cancel()
+        clearSponsorBlockState()
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -216,6 +226,7 @@ final class PlayerStateManager {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
         resolutionTask?.cancel()
         recommendationTask?.cancel()
+        clearSponsorBlockState()
         queueAcceptsRecommendations = !skipRecommendations
         // Pause and tear down anything currently playing. Otherwise we'd keep streaming audio from
         // the previous video while the new one's file is downloading — which is what the user kept
@@ -249,6 +260,7 @@ final class PlayerStateManager {
         duration = 0
         recordWatchHistory(video: video)
         refreshArtwork(for: video)
+        loadSponsorBlockSegments(for: video.id)
         resolutionTask = Task { [weak self] in
             await self?.resolveAndPlay(video: video, autoplay: autoplay, skipRecommendations: skipRecommendations)
         }
@@ -354,6 +366,7 @@ final class PlayerStateManager {
         resolutionTask = nil
         recommendationTask?.cancel()
         recommendationTask = nil
+        clearSponsorBlockState()
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -363,7 +376,104 @@ final class PlayerStateManager {
         NowPlayingCenter.clear()
     }
 
+    func undoSponsorBlockSkip() {
+        guard let notice = sponsorBlockNotice else { return }
+        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockNotice = nil
+        seek(to: notice.originalStartTime)
+    }
+
+    func dismissSponsorBlockNotice() {
+        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockNotice = nil
+    }
+
     // MARK: - Internals
+
+    private func loadSponsorBlockSegments(for videoID: String) {
+        guard preferences.sponsorBlockEnabled else { return }
+        let categories = preferences.sponsorBlockCategories
+        guard !categories.isEmpty else { return }
+        sponsorBlockTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let segments = try await sponsorBlockService.fetchSegments(
+                    videoID: videoID,
+                    categories: categories
+                )
+                try Task.checkCancellation()
+                guard currentVideo?.id == videoID else { return }
+                installSponsorBlockObservers(for: segments)
+                log.info("SponsorBlock loaded \(segments.count, privacy: .public) segments for \(videoID, privacy: .public)")
+            } catch is CancellationError {
+                log.debug("SponsorBlock lookup cancelled for \(videoID, privacy: .public)")
+            } catch {
+                // SponsorBlock is an optional enhancement. Network or decoding failures must never
+                // interrupt playback or surface as a player failure.
+                log.notice("SponsorBlock lookup failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    private func installSponsorBlockObservers(for segments: [SponsorBlockSegment]) {
+        removeSponsorBlockBoundaryObservers()
+        handledSponsorBlockSegmentIDs.removeAll()
+
+        for segment in segments {
+            let boundary = NSValue(time: CMTime(seconds: segment.startTime, preferredTimescale: 600))
+            let observer = player.addBoundaryTimeObserver(forTimes: [boundary], queue: .main) { [weak self] in
+                Task { @MainActor in self?.skipSponsorBlockSegmentIfNeeded(segment) }
+            }
+            sponsorBlockBoundaryObservers.append(observer)
+        }
+
+        // The lookup may finish after playback has already entered a segment. Boundary observers
+        // cannot fire retroactively, so evaluate the current position once immediately.
+        if let current = segments.first(where: { elapsed >= $0.startTime && elapsed < $0.endTime }) {
+            skipSponsorBlockSegmentIfNeeded(current)
+        }
+    }
+
+    private func skipSponsorBlockSegmentIfNeeded(_ segment: SponsorBlockSegment) {
+        guard preferences.sponsorBlockEnabled,
+              preferences.sponsorBlockCategories.contains(segment.category),
+              !handledSponsorBlockSegmentIDs.contains(segment.id),
+              currentVideo != nil else { return }
+        let currentTime = player.currentTime().seconds
+        guard currentTime.isFinite,
+              currentTime >= segment.startTime - 0.5,
+              currentTime < segment.endTime - 0.1 else { return }
+
+        handledSponsorBlockSegmentIDs.insert(segment.id)
+        log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
+        seek(to: segment.endTime)
+        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockNotice = SponsorBlockNotice(
+            category: segment.category,
+            originalStartTime: segment.startTime
+        )
+        sponsorBlockNoticeTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            self?.sponsorBlockNotice = nil
+        }
+    }
+
+    private func clearSponsorBlockState() {
+        sponsorBlockTask?.cancel()
+        sponsorBlockTask = nil
+        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockNoticeTask = nil
+        sponsorBlockNotice = nil
+        handledSponsorBlockSegmentIDs.removeAll()
+        removeSponsorBlockBoundaryObservers()
+    }
+
+    private func removeSponsorBlockBoundaryObservers() {
+        for observer in sponsorBlockBoundaryObservers {
+            player.removeTimeObserver(observer)
+        }
+        sponsorBlockBoundaryObservers.removeAll()
+    }
 
     /// Swap the player to a new item using the `AVQueuePlayer`-correct pattern. `replaceCurrentItem`
     /// is documented to be a no-op when the player's internal queue is empty (which is our usual

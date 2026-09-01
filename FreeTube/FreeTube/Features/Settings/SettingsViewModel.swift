@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 @available(iOS 17.0, *)
 @Observable
@@ -30,6 +31,38 @@ final class SettingsViewModel {
     var autoplayNext: Bool {
         get { preferences.autoplayNext }
         set { preferences.autoplayNext = newValue }
+    }
+
+    var sponsorBlockEnabled: Bool {
+        get { preferences.sponsorBlockEnabled }
+        set { preferences.sponsorBlockEnabled = newValue }
+    }
+
+    func isSponsorBlockCategoryEnabled(_ category: SponsorBlockCategory) -> Bool {
+        switch category {
+        case .sponsor: return preferences.sponsorBlockSponsor
+        case .selfPromotion: return preferences.sponsorBlockSelfPromotion
+        case .interaction: return preferences.sponsorBlockInteraction
+        case .intro: return preferences.sponsorBlockIntro
+        case .outro: return preferences.sponsorBlockOutro
+        }
+    }
+
+    func setSponsorBlockCategory(_ category: SponsorBlockCategory, enabled: Bool) {
+        switch category {
+        case .sponsor: preferences.sponsorBlockSponsor = enabled
+        case .selfPromotion: preferences.sponsorBlockSelfPromotion = enabled
+        case .interaction: preferences.sponsorBlockInteraction = enabled
+        case .intro: preferences.sponsorBlockIntro = enabled
+        case .outro: preferences.sponsorBlockOutro = enabled
+        }
+    }
+
+    func binding(for category: SponsorBlockCategory) -> Binding<Bool> {
+        Binding(
+            get: { self.isSponsorBlockCategoryEnabled(category) },
+            set: { self.setSponsorBlockCategory(category, enabled: $0) }
+        )
     }
 
     // MARK: - Diagnostics

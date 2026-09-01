@@ -53,6 +53,21 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        SponsorBlockSettingsScreen(model: model)
+                    } label: {
+                        LabeledContent("SponsorBlock") {
+                            Text(model.sponsorBlockEnabled ? "On" : "Off")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Playback enhancements")
+                } footer: {
+                    Text("Automatically skip community-identified sponsor segments without delaying playback.")
+                }
+
+                Section {
                     Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
                     Picker("Cache limit", selection: Bindable(model).downloadCacheLimit) {
                         ForEach(DownloadCacheLimit.allCases) { option in
