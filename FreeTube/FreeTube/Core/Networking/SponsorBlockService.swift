@@ -61,7 +61,7 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
         ) else { throw URLError(.badURL) }
         let categoriesData = try JSONEncoder().encode(categoryValues)
         guard let categoriesJSON = String(data: categoriesData, encoding: .utf8) else {
-            throw URLError(.cannotEncodeContentData)
+            throw URLError(.badURL)
         }
         components.queryItems = [URLQueryItem(name: "categories", value: categoriesJSON)]
         guard let url = components.url else { throw URLError(.badURL) }
