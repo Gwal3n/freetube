@@ -152,24 +152,26 @@ class Extraction {
         return nil
     }
 
-    struct YtCfg: Decodable {
+    /// - Note: `Sendable` so `PlayerContextCache` can hand a decoded config back across its actor
+    ///   boundary. Every stored property is an immutable value type, so the conformance is free.
+    struct YtCfg: Decodable, Sendable {
         let VISITOR_DATA: String?
         let INNERTUBE_CONTEXT: Context?
         let WEB_PLAYER_CONTEXT_CONFIGS: WebPlayerContextConfigs?
 
-        struct Context: Decodable {
+        struct Context: Decodable, Sendable {
             let client: Client
 
-            struct Client: Decodable {
+            struct Client: Decodable, Sendable {
                 let visitorData: String?
                 let userAgent: String?
             }
         }
 
-        struct WebPlayerContextConfigs: Decodable {
+        struct WebPlayerContextConfigs: Decodable, Sendable {
             let WEB_PLAYER_CONTEXT_CONFIG_ID_EMBEDDED_PLAYER: EmbeddedPlayer?
 
-            struct EmbeddedPlayer: Decodable {
+            struct EmbeddedPlayer: Decodable, Sendable {
                 let encryptedHostFlags: String?
             }
         }

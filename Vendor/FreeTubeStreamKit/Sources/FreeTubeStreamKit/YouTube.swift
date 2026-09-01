@@ -11,16 +11,10 @@ import Foundation
 @available(iOS 13.0, watchOS 6.0, tvOS 13.0, macOS 10.15, *)
 public class YouTube {
 
-    private var _js: String?
-    private var _jsURL: URL?
-
-#if swift(>=5.10)
-    nonisolated(unsafe) private static var __js: String? // caches js between calls
-    nonisolated(unsafe) private static var __jsURL: URL?
-#else
-    private static var __js: String? // caches js between calls
-    private static var __jsURL: URL?
-#endif
+    /// Player-scoped values for this instance. Backed by ``PlayerContextCache`` so the watch-page
+    /// download and script scans they require are paid once per player rotation rather than once
+    /// per video.
+    private var _playerContext: PlayerContextCache.Context?
 
     private var _videoInfos: [InnerTube.VideoInfo]?
 
@@ -28,8 +22,6 @@ public class YouTube {
     private var _embedHTML: String?
     private var playerConfigArgs: [String: Any]?
     private var _ageRestricted: Bool?
-    private var _signatureTimestamp: Int?
-    private var _ytcfg: Extraction.YtCfg?
 
     private var _fmtStreams: [Stream]?
 
@@ -168,61 +160,80 @@ public class YouTube {
         }
     }
 
-    var jsURL: URL {
+    /// The player script URL, its source, the signature timestamp, and the watch-page `ytcfg`.
+    ///
+    /// Served from ``PlayerContextCache`` whenever a fresh entry exists, which is the common case:
+    /// none of these values depend on the video being played. On a hit this instance never touches
+    /// ``watchHTML`` at all, which is what removes the per-playback 1–2 MB page download.
+    private var playerContext: PlayerContextCache.Context {
         get async throws {
-            if let cached = _jsURL {
+            if let cached = _playerContext {
                 return cached
             }
-
-            if try await ageRestricted {
-                _jsURL = try await URL(string: Extraction.jsURL(html: embedHTML))!
-            } else {
-                _jsURL = try await URL(string: Extraction.jsURL(html: watchHTML))!
+            if let shared = await PlayerContextCache.shared.current {
+                _playerContext = shared
+                return shared
             }
-            return _jsURL!
+            let context = try await loadPlayerContext()
+            await PlayerContextCache.shared.store(context)
+            _playerContext = context
+            return context
         }
+    }
+
+    /// Derives a fresh player context from the watch page. Only runs on a cache miss.
+    ///
+    /// - Note: the age-restricted branch reads the player URL from the embed page instead, because
+    ///   an age-gated watch page may not carry the player config. A context cached from an ordinary
+    ///   video is still reused for age-restricted ones — YouTube serves the same `base.js` to both,
+    ///   and a genuine mismatch surfaces as a deciphering failure, which invalidates the cache and
+    ///   retries.
+    private func loadPlayerContext() async throws -> PlayerContextCache.Context {
+        let playerHTML: String
+        if try await ageRestricted {
+            playerHTML = try await embedHTML
+        } else {
+            playerHTML = try await watchHTML
+        }
+
+        let jsURLString = try Extraction.jsURL(html: playerHTML)
+        guard let jsURL = URL(string: jsURLString) else {
+            throw YouTubeKitError.extractError
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: jsURL)
+        let js = String(data: data, encoding: .utf8) ?? ""
+        let ytcfg = try await Extraction.extractYtCfg(from: watchHTML)
+
+        return PlayerContextCache.Context(
+            jsURL: jsURL,
+            js: js,
+            signatureTimestamp: Extraction.extractSignatureTimestamp(fromJS: js),
+            ytcfg: ytcfg
+        )
+    }
+
+    /// Drops this instance's player context and the shared one, forcing the next access to
+    /// re-derive both from a freshly downloaded watch page.
+    private func invalidatePlayerContext() async {
+        _playerContext = nil
+        await PlayerContextCache.shared.invalidate()
+    }
+
+    var jsURL: URL {
+        get async throws { try await playerContext.jsURL }
     }
 
     var js: String {
-        get async throws {
-            if let cached = _js {
-                return cached
-            }
-
-            let jsURL = try await jsURL
-
-            if YouTube.__jsURL != jsURL {
-                let (data, _) = try await URLSession.shared.data(from: jsURL)
-                _js = String(data: data, encoding: .utf8) ?? ""
-                YouTube.__js = _js
-                YouTube.__jsURL = jsURL
-            } else {
-                _js = YouTube.__js
-            }
-            return _js!
-        }
+        get async throws { try await playerContext.js }
     }
 
     var signatureTimestamp: Int? {
-        get async throws {
-            if let cached = _signatureTimestamp {
-                return cached
-            }
-
-            _signatureTimestamp = try await Extraction.extractSignatureTimestamp(fromJS: js)
-            return _signatureTimestamp
-        }
+        get async throws { try await playerContext.signatureTimestamp }
     }
 
     var ytcfg: Extraction.YtCfg {
-        get async throws {
-            if let cached = _ytcfg {
-                return cached
-            }
-
-            _ytcfg = try await Extraction.extractYtCfg(from: watchHTML)
-            return _ytcfg!
-        }
+        get async throws { try await playerContext.ytcfg }
     }
 
     /// Interface to query both adaptive (DASH) and progressive streams.
@@ -252,11 +263,10 @@ public class YouTube {
                         do {
                             try await Extraction.applySignature(streamManifest: &streamManifest, videoInfo: videoInfo, js: js)
                         } catch {
-                            // to force an update to the js file, we clear the cache and retry
-                            _js = nil
-                            _jsURL = nil
-                            YouTube.__js = nil
-                            YouTube.__jsURL = nil
+                            // Most likely the cached player script was rotated out from under us.
+                            // Drop the whole context — URL, source, timestamp and config all come
+                            // from the same player — and retry against a freshly derived one.
+                            await self.invalidatePlayerContext()
                             try await Extraction.applySignature(streamManifest: &streamManifest, videoInfo: videoInfo, js: js)
                         }
 
