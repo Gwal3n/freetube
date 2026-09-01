@@ -67,15 +67,18 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         continuationTapGesture = continuationTap
         gestures = [doubleTap, continuationTap, longPress]
         gestures.forEach { rootView.addGestureRecognizer($0) }
-        deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap])
+        deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap, longPress])
         // AVKit may finish installing its private control hierarchy after `makeUIViewController`
         // returns. Re-scan on the next main-actor turn so those late recognizers get the same
         // failure dependency.
-        Task { @MainActor [weak self, weak rootView, weak doubleTap] in
+        Task { @MainActor [weak self, weak rootView, weak doubleTap, weak longPress] in
             await Task.yield()
-            guard let self, let rootView, let doubleTap else { return }
+            guard let self, let rootView, let doubleTap, let longPress else { return }
             guard let continuationTap = self.continuationTapGesture else { return }
-            self.deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap])
+            self.deferNativeSingleTaps(
+                in: rootView,
+                until: [doubleTap, continuationTap, longPress]
+            )
         }
         log.info("Installed double-tap and hold gestures on AVPlayerViewController root view")
     }
@@ -166,7 +169,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             self?.endSeekSession(hideFeedback: true)
         }
         seekSessionWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
     }
 
     private func endSeekSession(hideFeedback: Bool) {
@@ -231,11 +234,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     /// Delays AVKit's tap-to-toggle-controls recognizer just long enough to determine whether the
-    /// user is double tapping. If our recognizer succeeds, the native single tap fails and controls
-    /// stay hidden; if there is only one tap, AVKit proceeds normally after the short delay.
+    /// user is double tapping or holding. If one of our recognizers succeeds, the native single tap
+    /// fails and controls stay hidden; an ordinary quick single tap still proceeds normally.
     private func deferNativeSingleTaps(
         in rootView: UIView,
-        until customTaps: [UITapGestureRecognizer]
+        until customGestures: [UIGestureRecognizer]
     ) {
         var deferredCount = 0
         var pendingViews = [rootView]
@@ -245,10 +248,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             guard !(view is UIControl) else { continue }
 
             for case let nativeTap as UITapGestureRecognizer in view.gestureRecognizers ?? [] {
-                guard !customTaps.contains(where: { $0 === nativeTap }),
+                guard !customGestures.contains(where: { $0 === nativeTap }),
                       nativeTap.numberOfTapsRequired == 1,
                       nativeTap.numberOfTouchesRequired == 1 else { continue }
-                customTaps.forEach { nativeTap.require(toFail: $0) }
+                customGestures.forEach { nativeTap.require(toFail: $0) }
                 deferredCount += 1
             }
         }
