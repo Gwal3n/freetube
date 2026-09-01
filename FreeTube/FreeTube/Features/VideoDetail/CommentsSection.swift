@@ -3,11 +3,9 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct CommentsSection: View {
     @State private var model: CommentsViewModel
-    /// Expanded by default. The CommentsSection is only mounted when the player's lower panel is
-    /// switched to `.comments`, so this is *not* a per-video-view load — it fires exactly once
-    /// when the user moves away from the queue to look at comments, which is what they wanted.
-    /// The chevron pill still lets them collapse the body if they need the room back.
-    @State private var isExpanded = true
+    /// Permanently mounted below Up Next, but collapsed and unloaded by default so showing the
+    /// header never brings the comment tree (or its network work) into play until the user asks.
+    @State private var isExpanded = false
 
     init(videoID: String) {
         _model = State(wrappedValue: CommentsViewModel(videoID: videoID))
@@ -54,10 +52,8 @@ struct CommentsSection: View {
             }
         }
         .errorToast(Bindable(model).errorState)
-        // Mount-time load. Since `CommentsSection` only mounts when the panel toggles to
-        // `.comments`, this fires the first time the user switches away from the queue, not on
-        // every video view. Cheap re-mounts (same videoID) short-circuit because comments are
-        // already cached on the view model.
+        // Covers state restoration where the section mounts expanded. The normal collapsed state
+        // performs no request; the header button lazily loads on first expansion.
         .task {
             if isExpanded && model.comments.isEmpty && !model.isLoading {
                 await model.load()

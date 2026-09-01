@@ -8,9 +8,13 @@ struct CustomPlayerControls: View {
     let duration: TimeInterval
     let playbackRate: Double
     let sponsorSegments: [SponsorBlockSegment]
+    let hasPrevious: Bool
+    let hasNext: Bool
+    let additionalTopControls: AnyView
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
-    let onSeekRelative: (TimeInterval) -> Void
+    let onPrevious: () -> Void
+    let onNext: () -> Void
     let onSetRate: (Double) -> Void
     let onCollapse: () -> Void
 
@@ -27,6 +31,7 @@ struct CustomPlayerControls: View {
                                 .playerTopControl()
                         }
                         Spacer()
+                        additionalTopControls
                         Menu {
                             ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
                                 Button {
@@ -53,9 +58,10 @@ struct CustomPlayerControls: View {
                     Spacer()
 
                     HStack(spacing: 42) {
-                        Button { onSeekRelative(-10) } label: {
-                            Image(systemName: "gobackward.10").playerCenterControl()
+                        Button(action: onPrevious) {
+                            Image(systemName: "backward.end.fill").playerCenterControl()
                         }
+                        .disabled(!hasPrevious)
                         Button(action: onTogglePlayPause) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                 .font(.system(size: 34, weight: .semibold))
@@ -64,9 +70,10 @@ struct CustomPlayerControls: View {
                                 .contentShape(Circle())
                                 .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
                         }
-                        Button { onSeekRelative(10) } label: {
-                            Image(systemName: "goforward.10").playerCenterControl()
+                        Button(action: onNext) {
+                            Image(systemName: "forward.end.fill").playerCenterControl()
                         }
+                        .disabled(!hasNext)
                     }
                     .buttonStyle(.plain)
 
