@@ -86,6 +86,11 @@ struct RootView: View {
         .popupInteractionStyle(UIViewController.PopupInteractionStyle.drag)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)
         .popupBarStyle(LNPopupBar.Style.prominent)
+        // LNPopupUI renders the title with MarqueeLabel. On long video names its scrolling
+        // animation progressively clipped the glyphs above/below their line box and could leave
+        // the title entirely blank, while the shorter uploader subtitle remained intact. Keep the
+        // native label static; long titles truncate normally and remain readable.
+        .popupBarMarqueeScrollEnabled(false)
         // Explicitly enable the thin progress line at the bottom of the popup bar so playback
         // and download progress are always visible without expanding the player.
         .popupBarProgressViewStyle(.bottom)
