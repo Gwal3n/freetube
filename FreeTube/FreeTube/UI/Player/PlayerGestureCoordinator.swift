@@ -1,19 +1,22 @@
 import AVFoundation
 import AVKit
+import OSLog
 import UIKit
 
-/// Installs YouTube-style gestures in `AVPlayerViewController.contentOverlayView` while leaving
-/// the controller's native playback controls, AirPlay, PiP, and accessibility behavior intact.
+/// Installs YouTube-style gestures on `AVPlayerViewController.view` while using its
+/// `contentOverlayView` only for feedback. Native controls, AirPlay, PiP, and accessibility remain.
 @available(iOS 17.0, *)
 @MainActor
 final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private weak var player: AVPlayer?
-    private weak var installedView: UIView?
+    private weak var gestureView: UIView?
+    private weak var feedbackView: UIView?
     private var onSeekRelative: (TimeInterval) -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var feedbackLabel: UILabel?
     private var feedbackWorkItem: DispatchWorkItem?
     private var rateBeforeBoost: Float?
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
     init(player: AVPlayer, onSeekRelative: @escaping (TimeInterval) -> Void) {
         self.player = player
@@ -26,41 +29,49 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     func install(on controller: AVPlayerViewController) {
-        guard let overlay = controller.contentOverlayView, installedView !== overlay else { return }
+        let rootView = controller.view
+        guard let overlay = controller.contentOverlayView, gestureView !== rootView else { return }
         uninstall()
-        installedView = overlay
+        gestureView = rootView
+        feedbackView = overlay
 
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(didDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         doubleTap.cancelsTouchesInView = false
+        doubleTap.delaysTouchesEnded = false
         doubleTap.delegate = self
 
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(didLongPress(_:)))
         longPress.minimumPressDuration = 0.35
         longPress.cancelsTouchesInView = false
+        longPress.delaysTouchesBegan = false
+        longPress.delaysTouchesEnded = false
         longPress.delegate = self
 
         gestures = [doubleTap, longPress]
-        gestures.forEach { overlay.addGestureRecognizer($0) }
+        gestures.forEach { rootView.addGestureRecognizer($0) }
+        log.info("Installed double-tap and hold gestures on AVPlayerViewController root view")
     }
 
     func uninstall() {
         feedbackWorkItem?.cancel()
         feedbackWorkItem = nil
         restorePlaybackRateIfNeeded()
-        if let installedView {
-            gestures.forEach { installedView.removeGestureRecognizer($0) }
+        if let gestureView {
+            gestures.forEach { gestureView.removeGestureRecognizer($0) }
         }
         gestures.removeAll()
         feedbackLabel?.removeFromSuperview()
         feedbackLabel = nil
-        installedView = nil
+        feedbackView = nil
+        gestureView = nil
     }
 
     @objc private func didDoubleTap(_ gesture: UITapGestureRecognizer) {
-        guard let view = installedView else { return }
+        guard let view = gestureView else { return }
         let isForward = gesture.location(in: view).x >= view.bounds.midX
         let interval: TimeInterval = isForward ? 10 : -10
+        log.info("Double tap recognized; seeking \(interval, privacy: .public)s")
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showFeedback(isForward ? "+10s" : "−10s", horizontalFraction: isForward ? 0.72 : 0.28)
@@ -74,10 +85,12 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                   player.timeControlStatus != .paused else { return }
             rateBeforeBoost = player.rate > 0 ? player.rate : player.defaultRate
             player.rate = 2
+            log.info("Hold recognized; temporary rate=2x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showFeedback("2×", horizontalFraction: 0.5, automaticallyHide: false)
         case .ended, .cancelled, .failed:
             restorePlaybackRateIfNeeded()
+            log.info("Hold ended; restored playback rate")
             hideFeedback()
         default:
             break
@@ -96,7 +109,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         horizontalFraction: CGFloat,
         automaticallyHide: Bool = true
     ) {
-        guard let view = installedView else { return }
+        guard let view = feedbackView else { return }
         feedbackWorkItem?.cancel()
 
         let label = feedbackLabel ?? makeFeedbackLabel(in: view)
