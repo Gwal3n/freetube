@@ -30,8 +30,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     func install(on controller: AVPlayerViewController) {
         guard let rootView = controller.view,
-              let overlay = controller.contentOverlayView,
-              gestureView !== rootView else { return }
+              let overlay = controller.contentOverlayView else { return }
+        guard gestureView !== rootView else { return }
         uninstall()
         gestureView = rootView
         feedbackView = overlay
@@ -51,6 +51,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         gestures = [doubleTap, longPress]
         gestures.forEach { rootView.addGestureRecognizer($0) }
+        deferNativeSingleTaps(in: rootView, until: doubleTap)
+        // AVKit may finish installing its private control hierarchy after `makeUIViewController`
+        // returns. Re-scan on the next main-actor turn so those late recognizers get the same
+        // failure dependency.
+        Task { @MainActor [weak self, weak rootView, weak doubleTap] in
+            await Task.yield()
+            guard let self, let rootView, let doubleTap else { return }
+            self.deferNativeSingleTaps(in: rootView, until: doubleTap)
+        }
         log.info("Installed double-tap and hold gestures on AVPlayerViewController root view")
     }
 
@@ -145,6 +154,34 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         feedbackWorkItem = nil
         UIView.animate(withDuration: 0.2) { [weak self] in
             self?.feedbackLabel?.alpha = 0
+        }
+    }
+
+    /// Delays AVKit's tap-to-toggle-controls recognizer just long enough to determine whether the
+    /// user is double tapping. If our recognizer succeeds, the native single tap fails and controls
+    /// stay hidden; if there is only one tap, AVKit proceeds normally after the short delay.
+    private func deferNativeSingleTaps(
+        in rootView: UIView,
+        until doubleTap: UITapGestureRecognizer
+    ) {
+        var deferredCount = 0
+        var pendingViews = [rootView]
+
+        while let view = pendingViews.popLast() {
+            pendingViews.append(contentsOf: view.subviews)
+            guard !(view is UIControl) else { continue }
+
+            for case let nativeTap as UITapGestureRecognizer in view.gestureRecognizers ?? [] {
+                guard nativeTap !== doubleTap,
+                      nativeTap.numberOfTapsRequired == 1,
+                      nativeTap.numberOfTouchesRequired == 1 else { continue }
+                nativeTap.require(toFail: doubleTap)
+                deferredCount += 1
+            }
+        }
+
+        if deferredCount > 0 {
+            log.debug("Deferred \(deferredCount, privacy: .public) native single-tap recognizer(s)")
         }
     }
 
