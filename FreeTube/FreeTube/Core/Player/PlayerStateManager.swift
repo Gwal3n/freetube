@@ -349,7 +349,9 @@ final class PlayerStateManager {
             queue: .main
         ) { [weak self, weak item] _ in
             guard let entry = item?.errorLog()?.events.last else { return }
-            self?.log.error("AVPlayerItem error-log: domain=\(entry.errorDomain, privacy: .public) code=\(entry.errorStatusCode, privacy: .public) comment=\(entry.errorComment ?? "", privacy: .public) URI=\(entry.uri ?? "", privacy: .public)")
+            // Never include `entry.uri`: YouTube playback URLs are signed, sensitive, and
+            // short-lived. Resolver identity is enough to correlate this with candidate logs.
+            self?.log.error("AVPlayerItem error-log: domain=\(entry.errorDomain, privacy: .public) code=\(entry.errorStatusCode, privacy: .public) comment=\(entry.errorComment ?? "", privacy: .public)")
         }
     }
 
@@ -357,32 +359,104 @@ final class PlayerStateManager {
         log.info("resolveAndPlay: start for \(video.id, privacy: .public)")
         let resolutionStartedAt = Date()
         loadState = .resolving
+        var excludedStrategies = Set<PlaybackStrategy>()
 
-        let source: PlaybackSource
-        do {
-            source = try await resolver.resolve(video: video, quality: preferences.preferredQuality)
-        } catch is CancellationError {
-            log.debug("resolveAndPlay: cancelled for \(video.id, privacy: .public)")
-            return
-        } catch {
-            guard currentVideo?.id == video.id else { return }
-            log.error("resolveAndPlay: all resolvers failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
-            loadState = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
-            return
+        while !Task.isCancelled, currentVideo?.id == video.id {
+            let candidate: PlaybackCandidate
+            do {
+                candidate = try await resolver.resolve(
+                    video: video,
+                    quality: preferences.preferredQuality,
+                    excluding: excludedStrategies
+                )
+            } catch is CancellationError {
+                log.debug("resolveAndPlay: cancelled for \(video.id, privacy: .public)")
+                return
+            } catch {
+                guard currentVideo?.id == video.id else { return }
+                log.error("resolveAndPlay: all resolvers failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
+                loadState = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+                return
+            }
+
+            guard !Task.isCancelled, currentVideo?.id == video.id else {
+                log.debug("resolveAndPlay: discarded stale result for \(video.id, privacy: .public)")
+                return
+            }
+
+            log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
+            let item = AVPlayerItem(url: candidate.source.url)
+            itemLoadStartedAt = Date()
+            loadItem(item)
+
+            let readiness = await waitForReadiness(
+                of: item,
+                timeout: readinessTimeout(for: candidate.strategy)
+            )
+            guard !Task.isCancelled, currentVideo?.id == video.id else {
+                log.debug("resolveAndPlay: discarded candidate result for stale video \(video.id, privacy: .public)")
+                return
+            }
+
+            switch readiness {
+            case .ready:
+                log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
+                loadState = .readyToPlay
+                updateNowPlaying()
+                if autoplay { play() }
+                finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
+                return
+            case .failed(let description):
+                log.notice("resolveAndPlay: rejected candidate=\(candidate.strategy.rawValue, privacy: .public) reason=failed detail=\(description, privacy: .public)")
+            case .timedOut:
+                log.notice("resolveAndPlay: rejected candidate=\(candidate.strategy.rawValue, privacy: .public) reason=readiness-timeout")
+            }
+
+            excludedStrategies.insert(candidate.strategy)
+            player.removeAllItems()
+            loadState = .resolving
         }
 
-        guard !Task.isCancelled, currentVideo?.id == video.id else {
-            log.debug("resolveAndPlay: discarded stale result for \(video.id, privacy: .public)")
-            return
-        }
+        log.debug("resolveAndPlay: ended after cancellation or video change for \(video.id, privacy: .public)")
+    }
 
-        log.info("resolveAndPlay: resolved \(video.id, privacy: .public) in \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-        let item = AVPlayerItem(url: source.url)
-        itemLoadStartedAt = Date()
-        loadItem(item)
-        loadState = .readyToPlay
-        updateNowPlaying()
-        if autoplay { play() }
+    private enum ItemReadiness {
+        case ready
+        case failed(String)
+        case timedOut
+    }
+
+    private func waitForReadiness(of item: AVPlayerItem, timeout: Duration) async -> ItemReadiness {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while clock.now < deadline {
+            if Task.isCancelled { return .failed("cancelled") }
+            switch item.status {
+            case .readyToPlay:
+                return .ready
+            case .failed:
+                let error = item.error as NSError?
+                return .failed("domain=\(error?.domain ?? "?") code=\(error?.code ?? 0)")
+            case .unknown:
+                break
+            @unknown default:
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return .timedOut
+    }
+
+    private func readinessTimeout(for strategy: PlaybackStrategy) -> Duration {
+        switch strategy {
+        case .b5iIOS, .b5iTVHTML5:
+            return .seconds(4)
+        case .localFile, .native, .legacyDownload:
+            return .seconds(12)
+        }
+    }
+
+    private func finishPlaybackSetup(video: Video, skipRecommendations: Bool) {
         log.info("resolveAndPlay: finished happy-path for \(video.id, privacy: .public)")
         // Fire-and-forget queue fill — uses YouTube's `/next` (WEB) endpoint, independent of the
         // resolver's `/player` (IOS) endpoint, so it can't interfere with playback that's already

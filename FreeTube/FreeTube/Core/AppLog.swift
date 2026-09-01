@@ -1,35 +1,72 @@
 import Foundation
 import OSLog
 
-/// Factory that returns a real `Logger` writing to the unified log on every configuration.
-///
-/// **History.** This used to return `Logger(.disabled)` in Release as a battery / log-volume
-/// optimization (commit `0cb0506`). That was reverted once `LogFileWriter` shipped: the writer
-/// polls `OSLogStore` and gets nothing when the loggers are disabled, so TestFlight users who
-/// enable "Save logs to file" in Settings (the primary diagnostic channel for sideloaded /
-/// TestFlight installs) ended up with header-only log files.
-///
-/// **Trade-off accepted.** `Logger.info/.notice/.error` calls now hit the unified log in
-/// Release. Cost is small in practice:
-///   - Each call is one syscall via `os_log_internal`.
-///   - String interpolation args are `@autoclosure @escaping` in `OSLogInterpolation`, so
-///     expensive interpolations (`\(myArray.count, privacy: .public)`) still aren't evaluated
-///     until the underlying log level fires.
-///   - Privacy markers (`privacy: .public` / `.private`) gate what shows up in any sysdiagnose;
-///     audit call sites to keep PII out of `.public` slots.
-///
-/// **If you want to mute logging again** without breaking `LogFileWriter`, the right approach
-/// is not flipping this factory back to `Logger(.disabled)` — it's adding a runtime gate
-/// inside `LogFileWriter.flushPass()` so the writer skips reading OSLogStore when the user
-/// hasn't enabled file logging. The unified-log side then becomes a self-cleaning ring buffer
-/// that costs nothing visible.
-///
-/// **Why a function and not a typealias.** The original attempt at a no-op `AppLog` struct
-/// (mirroring `Logger`'s API with `@autoclosure () -> OSLogMessage`) fails to compile because
-/// `OSLogMessage`'s string interpolation only works when the compiler recognizes the receiver
-/// as a direct `os_log` call. Passing it through an autoclosure triggers "string interpolation
-/// cannot be used in this context."
-@inlinable
-public nonisolated func AppLog(subsystem: String, category: String) -> Logger {
-    Logger(subsystem: subsystem, category: category)
+public enum AppLogPrivacy: Sendable {
+    case `public`
+    case `private`
+}
+
+/// A rendered message suitable for both the unified log and the optional diagnostic file.
+public struct AppLogMessage: ExpressibleByStringLiteral, ExpressibleByStringInterpolation, Sendable {
+    fileprivate let text: String
+
+    public init(stringLiteral value: String) { text = value }
+    public init(stringInterpolation: StringInterpolation) { text = stringInterpolation.output }
+
+    public struct StringInterpolation: StringInterpolationProtocol, Sendable {
+        fileprivate var output: String
+
+        public init(literalCapacity: Int, interpolationCount: Int) {
+            output = ""
+            output.reserveCapacity(literalCapacity + interpolationCount * 8)
+        }
+
+        public mutating func appendLiteral(_ literal: String) { output.append(literal) }
+        public mutating func appendInterpolation<T>(_ value: T) {
+            output.append(String(describing: value))
+        }
+        public mutating func appendInterpolation<T>(_ value: T, privacy: AppLogPrivacy) {
+            switch privacy {
+            case .public: output.append(String(describing: value))
+            case .private: output.append("<private>")
+            }
+        }
+    }
+}
+
+/// `os.Logger` facade that directly mirrors rendered messages to `LogFileWriter`. This avoids
+/// `OSLogStore.composedMessage`, which can produce `<compose failure […]>` on iOS.
+public struct AppLog: Sendable {
+    private let logger: Logger
+    private let category: String
+
+    public init(subsystem: String, category: String) {
+        logger = Logger(subsystem: subsystem, category: category)
+        self.category = category
+    }
+
+    public func debug(_ message: AppLogMessage) {
+        logger.debug("\(message.text, privacy: .public)")
+        mirror(message, level: "DEBUG")
+    }
+    public func info(_ message: AppLogMessage) {
+        logger.info("\(message.text, privacy: .public)")
+        mirror(message, level: "INFO")
+    }
+    public func notice(_ message: AppLogMessage) {
+        logger.notice("\(message.text, privacy: .public)")
+        mirror(message, level: "NOTICE")
+    }
+    public func error(_ message: AppLogMessage) {
+        logger.error("\(message.text, privacy: .public)")
+        mirror(message, level: "ERROR")
+    }
+    public func fault(_ message: AppLogMessage) {
+        logger.fault("\(message.text, privacy: .public)")
+        mirror(message, level: "FAULT")
+    }
+
+    private func mirror(_ message: AppLogMessage, level: String) {
+        LogFileWriter.record(category: category, level: level, message: message.text)
+    }
 }

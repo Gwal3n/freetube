@@ -2,8 +2,8 @@ import Foundation
 import OSLog
 
 /// Stream-first playback resolver. An already-downloaded file remains the fastest and only offline
-/// source. Otherwise alexeichhorn/YouTubeKit resolves a native direct stream, followed by the
-/// existing b5i streaming endpoints. The download pipeline remains a final compatibility fallback
+/// source. Otherwise the inexpensive b5i streaming endpoints are tried before the heavier native
+/// extractor. The download pipeline remains a final compatibility fallback
 /// and explicit Download actions continue to use `DownloadManager` directly.
 final class PlaybackResolver: PlaybackResolving {
     private let downloads: DownloadManagerLike
@@ -21,43 +21,68 @@ final class PlaybackResolver: PlaybackResolving {
         self.videoService = videoService
     }
 
-    func resolve(video: Video, quality: VideoQuality) async throws -> PlaybackSource {
+    func resolve(
+        video: Video,
+        quality: VideoQuality,
+        excluding strategies: Set<PlaybackStrategy> = []
+    ) async throws -> PlaybackCandidate {
         let videoID = video.id
-        log.info("resolve(\(videoID, privacy: .public)) — checking cache")
-        if let local = downloads.localFile(for: videoID) {
+        log.info("resolve(\(videoID, privacy: .public)) excluded=\(strategies.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+        if !strategies.contains(.localFile), let local = downloads.localFile(for: videoID) {
             log.info("resolve: cache hit → \(local.path, privacy: .public)")
-            return .localFile(local)
-        }
-        do {
-            let url = try await nativeStreams.resolve(video: video, quality: quality)
-            return .direct(url)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            log.notice("Native resolver failed for \(videoID, privacy: .public); trying b5i streams")
+            return PlaybackCandidate(source: .localFile(local), strategy: .localFile)
         }
 
-        if let url = await resolveB5IStream(videoID: videoID, quality: quality) {
-            return .direct(url)
+        if !strategies.contains(.b5iIOS) {
+            do {
+                if let url = try await resolveB5IStream(videoID: videoID, quality: quality, client: .iOS) {
+                    log.info("resolve: produced b5i iOS candidate for \(videoID, privacy: .public)")
+                    return PlaybackCandidate(source: .direct(url), strategy: .b5iIOS)
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {}
         }
 
-        log.notice("Direct resolvers failed for \(videoID, privacy: .public); using legacy download fallback")
-        let url = try await downloads.ensureDownloaded(video: video, quality: quality, priority: .userInitiated)
-        return .localFile(url)
-    }
+        if !strategies.contains(.b5iTVHTML5) {
+            do {
+                if let url = try await resolveB5IStream(videoID: videoID, quality: quality, client: .tvHTML5) {
+                    log.info("resolve: produced b5i TVHTML5 candidate for \(videoID, privacy: .public)")
+                    return PlaybackCandidate(source: .direct(url), strategy: .b5iTVHTML5)
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {}
+        }
 
-    private func resolveB5IStream(videoID: String, quality: VideoQuality) async -> URL? {
-        if let info = try? await videoService.fetchInfo(id: videoID) {
-            if let hls = info.streamingURL { return hls }
-            if let progressive = Self.pickProgressiveURL(from: info.formats, quality: quality) {
-                return progressive
+        if !strategies.contains(.native) {
+            do {
+                let url = try await nativeStreams.resolve(video: video, quality: quality)
+                return PlaybackCandidate(source: .direct(url), strategy: .native)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                log.notice("Native resolver failed for \(videoID, privacy: .public)")
             }
         }
-        if let info = try? await videoService.fetchInfoViaTVHTML5(id: videoID) {
-            if let hls = info.streamingURL { return hls }
-            return Self.pickProgressiveURL(from: info.formats, quality: quality)
+
+        guard !strategies.contains(.legacyDownload) else {
+            throw PlaybackResolverError.noRemainingCandidates
         }
-        return nil
+        log.notice("Direct resolvers failed for \(videoID, privacy: .public); using legacy download fallback")
+        let url = try await downloads.ensureDownloaded(video: video, quality: quality, priority: .userInitiated)
+        return PlaybackCandidate(source: .localFile(url), strategy: .legacyDownload)
+    }
+
+    private enum B5IClient { case iOS, tvHTML5 }
+
+    private func resolveB5IStream(videoID: String, quality: VideoQuality, client: B5IClient) async throws -> URL? {
+        let info = switch client {
+        case .iOS: try await videoService.fetchInfo(id: videoID)
+        case .tvHTML5: try await videoService.fetchInfoViaTVHTML5(id: videoID)
+        }
+        if let hls = info.streamingURL { return hls }
+        return Self.pickProgressiveURL(from: info.formats, quality: quality)
     }
 
     private static func pickProgressiveURL(from formats: [VideoFormat], quality: VideoQuality) -> URL? {
@@ -69,6 +94,12 @@ final class PlaybackResolver: PlaybackResolving {
             .first?
             .url
     }
+}
+
+private enum PlaybackResolverError: LocalizedError {
+    case noRemainingCandidates
+
+    var errorDescription: String? { "No playable stream candidate remained." }
 }
 
 /// Subset of `DownloadManager` the resolver depends on. Allows tests to swap a mock.

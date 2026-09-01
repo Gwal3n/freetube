@@ -166,8 +166,8 @@ Playback is stream-first. `PlayerStateManager` calls `PlaybackResolver`, install
 in an `AVPlayerItem`, and never imports either extraction library itself. Resolution order is:
 
 1. **Existing local file.** `DownloadManager.localFile(for:)` wins immediately, preserving offline playback.
-2. **Native local extraction.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. Known livestreams prefer HLS; ordinary videos skip the up-front HLS probe and select a natively playable progressive audio+video stream within `preferredQuality.heightCap` (or an audio-only stream for that preference). HLS remains a fallback when progressive selection is empty, covering incorrectly classified live content. The dependency's hosted remote extractor is never enabled.
-3. **b5i direct-stream fallback.** `PlaybackResolver` tries iOS HLS/progressive and then TVHTML5 HLS/progressive through `VideoService`.
+2. **b5i direct streams, validated by AVPlayer.** `PlaybackResolver` produces iOS and then TVHTML5 HLS/progressive candidates through `VideoService`. `PlayerStateManager` only accepts a candidate after its `AVPlayerItem` reaches `.readyToPlay`; failure or a four-second readiness timeout advances to the next strategy.
+3. **Native local extraction.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. Known livestreams prefer HLS; ordinary videos skip the up-front HLS probe and select a natively playable progressive audio+video stream within `preferredQuality.heightCap` (or an audio-only stream for that preference). HLS remains a fallback when progressive selection is empty, covering incorrectly classified live content. The dependency's hosted remote extractor is never enabled. Native candidates are also AVPlayer-validated.
 4. **Legacy download fallback.** Only after every direct resolver fails, `DownloadManager.ensureDownloaded` runs the existing yt-dlp → YouTubeKit download pipeline. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
 
 Automatic next-item download prefetch is disabled. Recommendation queue filling remains independent
@@ -184,7 +184,9 @@ enum PlaybackSource {
 }
 ```
 
-`AVQueuePlayer` accepts both cases identically; the player consumes `PlaybackSource.url`.
+`AVQueuePlayer` accepts both cases identically; the player consumes `PlaybackSource.url`. A returned
+URL is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
+and a rejected strategy is excluded before requesting the next candidate.
 
 ---
 
@@ -228,11 +230,11 @@ enum PlaybackSource {
 - Files go to `Documents/Downloads/<videoID>.mp4` and are tracked in SwiftData as `DownloadedVideo`.
 - Visible in the Downloads screen, playable offline.
 
-### Playback-side download (the implicit case)
+### Playback-side download (compatibility fallback)
 
-- Same `ensureDownloaded` call, priority `.userInitiated`, fired by `PlayerStateManager.resolveAndPlay` whenever a user taps Play.
-- This is why every successful playback also produces an offline file — the player's "fetch" *is* a download. Quirk of the architecture, intentional, makes the Downloads tab self-populate as the user watches.
-- Next-up prefetch: `prefetchNextUpcoming()` fires `ensureDownloaded` for the next queue item at `.background` priority. Just one — we don't chain a long preload that would block user taps behind the `PythonRunner` queue.
+- `PlaybackResolver` calls `ensureDownloaded` at `.userInitiated` priority only after every direct candidate has failed AVPlayer validation.
+- Successful direct playback does not create an offline file. The Downloads tab changes only after an explicit download or a legacy playback fallback.
+- Automatic next-item download prefetch is disabled; recommendation queue filling does not initiate downloads.
 
 ### PythonRunner priority queue
 
@@ -286,16 +288,17 @@ Preferences live in `UserDefaults` via a `@AppStorage`-backed `UserPreferences` 
 
 ## 13. Logging
 
-Use `os.Logger`:
+Use the `AppLog` facade, which writes to `os.Logger` and optionally mirrors a rendered diagnostic file:
 
 ```swift
-private let log = Logger(subsystem: "com.leshko.freetube", category: "PlaybackResolver")
+private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlaybackResolver")
 log.info("Resolving \(videoID, privacy: .public) at quality \(quality.rawValue, privacy: .public)")
 log.error("Stream extraction failed: \(error.localizedDescription, privacy: .public)")
 ```
 
 - Cookie values, signed URLs, user emails: `privacy: .private` or omit entirely.
 - Public IDs, response status, timing: `privacy: .public` is fine.
+- Do not reconstruct file logs through `OSLogStore`; deferred interpolation can produce `<compose failure […]>`. `AppLog` mirrors already-rendered, privacy-filtered messages directly.
 - **Do not log from SwiftUI body re-evaluation paths.** `DownloadManager.localFile(for:)` is called from `Menu` bodies that re-evaluate every player time tick; even a `log.debug` line floods the device log with hundreds of "miss" lines per second.
 
 ---

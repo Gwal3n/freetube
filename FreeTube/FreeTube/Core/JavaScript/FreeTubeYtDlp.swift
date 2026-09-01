@@ -138,8 +138,8 @@ public nonisolated func freetube_yt_dlp_extract_info(url: String) async throws -
     bridgeLog.info("extract_info: Python stdout/stderr redirected to \(stderrPath, privacy: .public)")
 
     // Tail task — reads the stderr file every second, emits each new line into the
-    // `ytdlp` os.Logger category. `LogFileWriter` picks them up because they share the
-    // same `subsystem == com.leshko.freetube` predicate. Detached + `.utility` so the
+    // `ytdlp` AppLog category. `LogFileWriter` receives the rendered lines directly.
+    // Detached + `.utility` so the
     // poll never competes with the Python interpreter for the calling cooperative-pool
     // worker thread.
     let tailTask = Task.detached(priority: .utility) {

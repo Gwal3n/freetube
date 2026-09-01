@@ -17,6 +17,26 @@ enum PlaybackSource: Sendable, Hashable {
     }
 }
 
+/// Identifies the resolver that produced a candidate without exposing its signed URL.
+enum PlaybackStrategy: String, Sendable, Hashable {
+    case localFile = "local-file"
+    case b5iIOS = "b5i-ios"
+    case b5iTVHTML5 = "b5i-tvhtml5"
+    case native = "native-youtubekit"
+    case legacyDownload = "legacy-download"
+}
+
+struct PlaybackCandidate: Sendable, Hashable {
+    let source: PlaybackSource
+    let strategy: PlaybackStrategy
+}
+
 protocol PlaybackResolving {
-    func resolve(video: Video, quality: VideoQuality) async throws -> PlaybackSource
+    /// Returns the next usable candidate. A URL is only considered proven after AVPlayer reports
+    /// `.readyToPlay`; callers exclude rejected strategies and ask again for the fallback.
+    func resolve(
+        video: Video,
+        quality: VideoQuality,
+        excluding strategies: Set<PlaybackStrategy>
+    ) async throws -> PlaybackCandidate
 }

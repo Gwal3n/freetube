@@ -3,235 +3,138 @@ import Observation
 import OSLog
 import UIKit
 
-/// Optional file mirror of the app's `os.Logger` output. Toggled from Settings; on TestFlight
-/// or sideload installs (where the user can't run `Console.app` against a real device easily)
-/// this is the only practical way to capture a diagnostic trail.
-///
-/// **How it works.** Each launch with the feature enabled opens a new file under
-/// `Documents/Logs/` named `flux-YYYYMMDDTHHmmss-v<version>-b<build>.log` and writes a
-/// header (app version, build, iOS version, device model, launch timestamp). Then it polls
-/// the OSLogStore every 5 seconds, filters by `subsystem == "com.leshko.freetube"`, and
-/// appends new entries to the file.
-///
-/// **Why poll instead of intercept**: there's no public API to attach a sink to
-/// `os.Logger` — the Logger writes straight to the unified log facility (`os_log`). The
-/// `OSLogStore` API (iOS 15+) lets us read back our own process's entries by timestamp,
-/// which gives us the file mirror without touching the 257-call-site `AppLog(...)` wrapper.
-///
-/// **Storage location.** Documents root → visible in the Files app under "On My iPhone"
-/// (gated by Info.plist's `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`).
-/// Users can grab logs out without going through a Share sheet.
+/// Optional direct file mirror of `AppLog` output. Direct mirroring avoids the deferred unified-log
+/// interpolation payloads that sometimes appear as `<compose failure […]>` when read via OSLogStore.
 @available(iOS 17.0, *)
 @Observable
 @MainActor
 final class LogFileWriter {
     static let shared = LogFileWriter()
 
-    /// xattr / Settings-visible state. Mutates only on the main actor.
     private(set) var isEnabled: Bool
-    /// Path of the active log file when `isEnabled == true`. nil when disabled or when the
-    /// file couldn't be opened.
     private(set) var currentLogFileURL: URL?
 
     @ObservationIgnored private var fileHandle: FileHandle?
-    @ObservationIgnored private var lastEntryDate: Date = .distantPast
-    @ObservationIgnored private var flushTask: Task<Void, Never>?
     @ObservationIgnored private let preferences = UserPreferences()
-    @ObservationIgnored private let log = AppLog(subsystem: "com.leshko.freetube", category: "LogFileWriter")
+    @ObservationIgnored private let systemLog = Logger(
+        subsystem: "com.leshko.freetube",
+        category: "LogFileWriter"
+    )
 
-    /// Subsystem we filter the OSLogStore by. The app uses one subsystem; keeping the
-    /// filter to it avoids dumping iOS system noise into the user's log files.
     nonisolated static let subsystem = "com.leshko.freetube"
-    /// Poll interval. 5s is a compromise: short enough that logs land near the event,
-    /// long enough that the OSLogStore query doesn't run constantly.
-    nonisolated static let flushInterval: Duration = .seconds(5)
 
     private init() {
-        // Read the persisted flag synchronously so the writer starts immediately on first
-        // launch if the user had it enabled previously.
         isEnabled = UserPreferences().logToFile
-        if isEnabled {
-            start()
+        if isEnabled { start() }
+    }
+
+    // MARK: - Direct mirror
+
+    nonisolated static func record(category: String, level: String, message: String) {
+        // Avoid allocating a Task for every ordinary app log when file diagnostics are off.
+        guard UserDefaults.standard.bool(forKey: "logToFile") else { return }
+        Task { @MainActor in
+            shared.append(category: category, level: level, message: message)
+        }
+    }
+
+    private func append(category: String, level: String, message: String) {
+        guard isEnabled, let fileHandle else { return }
+        let timestamp = Self.isoTimestampFormatter.string(from: Date())
+        let line = "[\(timestamp)] [\(level)] [\(category)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        do {
+            try fileHandle.write(contentsOf: data)
+        } catch {
+            systemLog.error("failed to append diagnostic log: \(String(describing: error), privacy: .public)")
         }
     }
 
     // MARK: - Public
 
-    /// Toggle file logging on or off. Persists the flag and starts/stops the writer.
     func setEnabled(_ enabled: Bool) {
         guard enabled != isEnabled else { return }
         isEnabled = enabled
         preferences.logToFile = enabled
-        if enabled {
-            start()
-        } else {
-            stop()
-        }
+        enabled ? start() : stop()
     }
 
-    /// All log files in `Documents/Logs/`, newest first by filename (which sorts
-    /// chronologically since names start with ISO date).
     nonisolated static func allLogFiles() -> [URL] {
-        let urls = (try? FileManager.default.contentsOfDirectory(at: logsDirectory(), includingPropertiesForKeys: nil)) ?? []
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: logsDirectory(),
+            includingPropertiesForKeys: nil
+        )) ?? []
         return urls
             .filter { $0.pathExtension.lowercased() == "log" }
             .sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
-    /// Where the writer keeps log files. Exposed for the "Reveal in Finder" button.
     nonisolated static func logsDirectory() -> URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
         return docs.appendingPathComponent("Logs", isDirectory: true)
     }
 
-    /// Removes every log file (current + historical). If logging is still enabled, opens
-    /// a fresh file so the next entries have somewhere to land.
     func clearAllLogs() {
         stop()
         for url in Self.allLogFiles() {
             try? FileManager.default.removeItem(at: url)
         }
-        if isEnabled {
-            start()
-        }
+        if isEnabled { start() }
     }
 
     // MARK: - Lifecycle
 
     private func start() {
-        stop()
+        closeFile()
         do {
-            let dir = Self.logsDirectory()
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = dir.appendingPathComponent(Self.makeFilename())
+            let directory = Self.logsDirectory()
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let url = directory.appendingPathComponent(Self.makeFilename())
             FileManager.default.createFile(atPath: url.path, contents: nil)
             let handle = try FileHandle(forWritingTo: url)
             try handle.seekToEnd()
             fileHandle = handle
             currentLogFileURL = url
             writeHeader(to: handle)
-            // Capture the last minute of pre-start logs too — `AppEnvironment.init` runs
-            // before this on cold launch, and we want those early lines (SessionManager
-            // bootstrap, audio session setup) in the file.
-            lastEntryDate = Date(timeIntervalSinceNow: -60)
-            log.info("file logging started: \(url.lastPathComponent, privacy: .public)")
-
-            flushTask = Task { [weak self] in
-                // First flush comes near-immediately so the user doesn't stare at a
-                // header-only file for 5 seconds wondering whether logging is working.
-                // Subsequent flushes settle into the regular `flushInterval` cadence.
-                try? await Task.sleep(for: .milliseconds(500))
-                await self?.flushPass()
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: Self.flushInterval)
-                    await self?.flushPass()
-                }
-            }
+            append(category: "LogFileWriter", level: "INFO", message: "file logging started: \(url.lastPathComponent)")
+            systemLog.info("file logging started: \(url.lastPathComponent, privacy: .public)")
         } catch {
-            log.error("failed to start file logging: \(String(describing: error), privacy: .public)")
-            currentLogFileURL = nil
-            fileHandle = nil
+            systemLog.error("failed to start file logging: \(String(describing: error), privacy: .public)")
+            closeFile()
         }
     }
 
-    private func stop() {
-        flushTask?.cancel()
-        flushTask = nil
-        // Last drain so any final entries make it to disk before the file closes.
-        if fileHandle != nil {
-            Task { @MainActor in
-                await self.flushPass()
-                try? self.fileHandle?.close()
-                self.fileHandle = nil
-                self.currentLogFileURL = nil
-            }
-        }
+    private func stop() { closeFile() }
+
+    private func closeFile() {
+        try? fileHandle?.synchronize()
+        try? fileHandle?.close()
+        fileHandle = nil
+        currentLogFileURL = nil
     }
 
-    // MARK: - Flush
-
-    /// Read new OSLogStore entries since `lastEntryDate` and append them to the file. The
-    /// `OSLogStore.getEntries` call can be slow on log-heavy launches (it scans the
-    /// in-memory log buffer), so it runs on a detached `.utility` task; only the file
-    /// write happens on main.
-    private func flushPass() async {
-        guard fileHandle != nil else { return }
-        let sinceDate = lastEntryDate
-        let result = await Task.detached(priority: .utility) {
-            Self.queryAndFormat(since: sinceDate)
-        }.value
-        guard !result.text.isEmpty else { return }
-        if let data = result.text.data(using: .utf8) {
-            try? fileHandle?.write(contentsOf: data)
-        }
-        if let last = result.lastDate {
-            lastEntryDate = last
-        }
-    }
-
-    /// Pure function over the OSLogStore — runs on the detached task. Returns the
-    /// formatted text plus the timestamp of the last entry seen, so the caller can
-    /// advance `lastEntryDate` exactly to that point (avoids re-fetching the same entry
-    /// on the next pass).
-    private nonisolated static func queryAndFormat(since: Date) -> (text: String, lastDate: Date?) {
-        do {
-            let store = try OSLogStore(scope: .currentProcessIdentifier)
-            let position = store.position(date: since)
-            let entries = try store.getEntries(
-                at: position,
-                matching: NSPredicate(format: "subsystem == %@", subsystem)
-            )
-            var lines = ""
-            var lastDate: Date?
-            for entry in entries {
-                guard let log = entry as? OSLogEntryLog else { continue }
-                // OSLogStore is inclusive of the boundary timestamp; skip anything we
-                // already wrote on the previous pass.
-                if log.date <= since { continue }
-                lines += format(entry: log)
-                lastDate = log.date
-            }
-            return (lines, lastDate)
-        } catch {
-            return ("", nil)
-        }
-    }
-
-    private nonisolated static func format(entry: OSLogEntryLog) -> String {
-        let level: String
-        switch entry.level {
-        case .debug: level = "DEBUG"
-        case .info: level = "INFO"
-        case .notice: level = "NOTICE"
-        case .error: level = "ERROR"
-        case .fault: level = "FAULT"
-        @unknown default: level = "?"
-        }
-        let ts = isoTimestampFormatter.string(from: entry.date)
-        return "[\(ts)] [\(level)] [\(entry.category)] \(entry.composedMessage)\n"
-    }
+    // MARK: - Formatting
 
     private nonisolated static let isoTimestampFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 
-    // MARK: - File header
-
     private nonisolated static func makeFilename() -> String {
-        let dateStr = filenameDateFormatter.string(from: Date())
+        let date = filenameDateFormatter.string(from: Date())
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        return "flux-\(dateStr)-v\(version)-b\(build).log"
+        return "flux-\(date)-v\(version)-b\(build).log"
     }
 
     private nonisolated static let filenameDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyyMMdd'T'HHmmss"
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
     }()
 
     private func writeHeader(to handle: FileHandle) {

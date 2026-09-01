@@ -19,7 +19,7 @@ struct UserPreferences {
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
     /// When true, `LogFileWriter` opens a new file under `Documents/Logs/` on every app
-    /// launch and mirrors the unified-log entries for our subsystem into it. Useful for
+    /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app
     /// access isn't practical. Defaults off — only a handful of users will ever flip this.
     @AppStorage("logToFile") var logToFile: Bool = false
