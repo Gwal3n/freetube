@@ -23,6 +23,8 @@ struct RootView: View {
     /// Cached thumbnail for the current video so the mini-player bar shows the actual preview instead
     /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
     @State private var thumbnail: UIImage?
+    /// Retained target for the UIKit swipe recognizers installed on LNPopupUI's native bar.
+    @State private var popupBarDismissGesture = PopupBarDismissGestureHandler()
 
     enum Tab: Hashable {
         case search, library, link, downloads, settings
@@ -88,6 +90,11 @@ struct RootView: View {
         // Explicitly enable the thin progress line at the bottom of the popup bar so playback
         // and download progress are always visible without expanding the player.
         .popupBarProgressViewStyle(.bottom)
+        .popupBarCustomizer { popupBar in
+            popupBarDismissGesture.install(on: popupBar) {
+                player.dismiss()
+            }
+        }
         .task {
             await SessionManager.shared.bootstrap()
         }

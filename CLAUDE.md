@@ -229,6 +229,7 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 - **One `PlayerStateManager`** is the single source of truth for current playback. Injected via SwiftUI `@Environment(PlayerStateManager.self)`.
 - **Mini player and full-screen player are both driven by `LNPopupUI`** — the popup bar above the tab bar expands into a full-screen popup. Same `AVQueuePlayer` instance for both views.
+- **Direct video selections open the expanded player immediately.** `PlayerStateManager.load` defaults `expandPlayer` to `true`; automatic next/previous transitions pass `false` so they preserve whatever popup state the user chose. The native mini-player bar can be dismissed with a horizontal swipe, which must call `PlayerStateManager.dismiss()` so playback, resolution, Now Playing, and popup state are torn down together. Keep LNPopupUI's vertical pan free for drag-to-expand.
 - **`AVPlayerViewController`** wrapped in `UIViewControllerRepresentable` (`PlayerSurface.swift`) is the video surface. System controls, AirPlay, PiP for free.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.

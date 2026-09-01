@@ -138,13 +138,6 @@ final class PlayerStateManager {
 
     // MARK: - Public commands
 
-    /// Loads a video for playback.
-    ///
-    /// - Parameter skipRecommendations: when `true`, suppresses the post-play "fill queue with
-    ///   YouTube recommendations" call. Pass this from explicit batch actions that already
-    ///   populated a curated queue — playlist's Play all / Shuffle all — so the user's queue
-    ///   stays exactly what they chose. Default is `false` so single-video taps from Home /
-    ///   Search / Mini-player still get the YouTube-app-style autoplay chain.
     /// Play a local file already on disk — used by the **Link** tab's completed downloads.
     ///
     /// **Why a separate entry point and not `load(video:)`:** the YouTube-shaped resolver in
@@ -193,6 +186,7 @@ final class PlayerStateManager {
         // we just zero it for arbitrary files.
         queueAcceptsRecommendations = false
         miniPlayerVisible = true
+        fullScreenPresented = true
         elapsed = 0
         duration = 0
         refreshArtwork(for: synthetic)
@@ -204,7 +198,21 @@ final class PlayerStateManager {
         play()
     }
 
-    func load(_ video: Video, autoplay: Bool = true, skipRecommendations: Bool = false) {
+    /// Loads a video for playback and opens the expanded player for direct selections.
+    ///
+    /// - Parameter skipRecommendations: when `true`, suppresses the post-play "fill queue with
+    ///   YouTube recommendations" call. Pass this from explicit batch actions that already
+    ///   populated a curated queue — playlist's Play all / Shuffle all — so the user's queue
+    ///   stays exactly what they chose. Default is `false` so single-video taps from Home /
+    ///   Search / Mini-player still get the YouTube-app-style autoplay chain.
+    /// - Parameter expandPlayer: when `true`, opens the popup immediately. Automatic queue
+    ///   transitions pass `false` so a user who collapsed the player is not pulled back into it.
+    func load(
+        _ video: Video,
+        autoplay: Bool = true,
+        skipRecommendations: Bool = false,
+        expandPlayer: Bool = true
+    ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
         resolutionTask?.cancel()
         queueAcceptsRecommendations = !skipRecommendations
@@ -224,6 +232,9 @@ final class PlayerStateManager {
         // from `playNext()` / `playPrevious()` find it already there and just update `currentIndex`.
         queue.setCurrent(video)
         miniPlayerVisible = true
+        if expandPlayer {
+            fullScreenPresented = true
+        }
         loadState = .resolving
         // Wipe transport state from the previous video so a stray time-observer tick during the
         // transition (the periodic callback can fire AFTER currentVideo flips but BEFORE the new
@@ -290,7 +301,7 @@ final class PlayerStateManager {
     func playNext() {
         log.info("playNext() — queue size=\(self.queue.items.count, privacy: .public) currentIndex=\(self.queue.currentIndex, privacy: .public)")
         if let next = queue.advance() {
-            load(next)
+            load(next, expandPlayer: false)
             return
         }
         // Queue at end. If this queue accepts recommendations and the user hasn't asked for
@@ -313,7 +324,7 @@ final class PlayerStateManager {
                 return
             }
             if let next = self.queue.advance() {
-                self.load(next)
+                self.load(next, expandPlayer: false)
             }
         }
     }
@@ -324,7 +335,7 @@ final class PlayerStateManager {
             log.notice("playPrevious: at start of queue, nothing to go back to")
             return
         }
-        load(previous)
+        load(previous, expandPlayer: false)
     }
 
     func dismiss() {
