@@ -295,7 +295,11 @@ final class PlayerStateManager {
 
     func seek(to seconds: TimeInterval) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
-        let time = CMTime(seconds: seconds, preferredTimescale: 600)
+        let boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
+        // Update optimistically so rapid continuation taps accumulate from the last requested
+        // target instead of the periodic observer's up-to-0.5-second-old playback position.
+        elapsed = boundedSeconds
+        let time = CMTime(seconds: boundedSeconds, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
