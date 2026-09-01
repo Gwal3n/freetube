@@ -1,16 +1,25 @@
 import SwiftUI
 
-/// Black-translucent overlay rendered on top of the player surface while a video is being fetched
-/// by yt-dlp. Reads `PlayerStateManager.loadState` and only draws itself during `.resolving` and
-/// `.downloading` — once `.readyToPlay` flips on, it disappears.
+/// Overlay rendered on top of the player surface while a video isn't playing yet. Reads
+/// `PlayerStateManager.loadState` and disappears once `.readyToPlay` flips on.
+///
+/// Two visual registers, because the two waits are nothing alike:
+///
+/// - **Startup (`.resolving` / `.buffering`)** — normally under three seconds and covered by
+///   `PlayerArtworkBackdrop`'s thumbnail. All we add is a small spinner, with no scrim and no label:
+///   dimming the artwork and captioning it "Preparing…" is exactly the "this app is loading" tell
+///   the perception pass exists to remove.
+/// - **`.downloading` / `.failed`** — the legacy yt-dlp fallback and hard errors, which can run for
+///   minutes and genuinely need words. These keep the dimmed scrim, the label, and the determinate
+///   bar, now reading over the thumbnail rather than over black.
 @available(iOS 17.0, *)
 struct DownloadProgressOverlay: View {
     let state: PlayerStateManager.LoadState
 
     var body: some View {
         switch state {
-        case .resolving:
-            overlay(label: "Preparing…", progress: nil)
+        case .resolving, .buffering:
+            startupIndicator
         case .downloading(let progress, let phase):
             overlay(label: label(for: progress, phase: phase), progress: progress)
         case .failed(let message):
@@ -18,6 +27,20 @@ struct DownloadProgressOverlay: View {
         case .idle, .readyToPlay:
             EmptyView()
         }
+    }
+
+    /// Unobtrusive "still working" hint over the artwork. `allowsHitTesting(false)` matters: this
+    /// sits above `PlayerSurface`, and a hit-testable layer here would swallow taps meant for
+    /// `AVPlayerViewController`'s controls.
+    @ViewBuilder
+    private var startupIndicator: some View {
+        ProgressView()
+            .progressViewStyle(.circular)
+            .tint(.white)
+            .shadow(color: .black.opacity(0.5), radius: 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(false)
+            .transition(.opacity)
     }
 
     @ViewBuilder

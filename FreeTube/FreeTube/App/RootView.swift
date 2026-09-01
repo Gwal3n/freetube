@@ -167,19 +167,18 @@ struct RootView: View {
         }
     }
 
-    /// Mini-player leading image. While downloading we show a fixed glyph (the user can't see a
-    /// video they don't have yet); once playback is ready we swap in the real video thumbnail; if
-    /// the thumbnail isn't loaded yet (or the video lacks one), fall back to the play-rectangle.
+    /// Mini-player leading image. The real thumbnail shows from the moment of tap — it's already
+    /// decoded, and replacing it with a glyph for the couple of seconds before playback starts is
+    /// the single most visible "this app is slow" cue the bar has. The download glyph is kept for
+    /// `.downloading`, which is a genuine multi-minute file transfer the user can't preview.
     private var popupImage: Image {
-        switch player.loadState {
-        case .resolving, .downloading:
+        if case .downloading = player.loadState {
             return Image(systemName: popupImageName)
-        default:
-            if let thumbnail {
-                return Image(uiImage: thumbnail)
-            }
-            return Image(systemName: "play.rectangle.fill")
         }
+        if let thumbnail {
+            return Image(uiImage: thumbnail)
+        }
+        return Image(systemName: "play.rectangle.fill")
     }
 
     private var progressValue: Float {
@@ -199,7 +198,9 @@ struct RootView: View {
             return "Downloading \(percent)%"
         case .failed(let msg):
             return msg
-        case .idle, .readyToPlay:
+        // `.buffering` reads as the channel name rather than a status: playback has already been
+        // requested at that point, so the bar should look like it's playing, not preparing.
+        case .idle, .buffering, .readyToPlay:
             return player.currentVideo?.channelName ?? ""
         }
     }
@@ -208,7 +209,7 @@ struct RootView: View {
     /// obvious the bar isn't ready to play yet.
     private var popupImageName: String {
         switch player.loadState {
-        case .resolving, .downloading: return "arrow.down.circle.fill"
+        case .downloading: return "arrow.down.circle.fill"
         default: return "play.rectangle.fill"
         }
     }
@@ -315,20 +316,23 @@ struct PopupContentWrapper: View {
             return "Downloading \(percent)%"
         case .failed(let msg):
             return msg
-        case .idle, .readyToPlay:
+        // `.buffering` reads as the channel name rather than a status: playback has already been
+        // requested at that point, so the bar should look like it's playing, not preparing.
+        case .idle, .buffering, .readyToPlay:
             return player.currentVideo?.channelName ?? ""
         }
     }
 
+    /// The real thumbnail from the moment of tap. Only a genuine file transfer (`.downloading`,
+    /// the legacy yt-dlp fallback) swaps in the download glyph — during resolve and buffering the
+    /// thumbnail is already decoded, so showing a placeholder instead only makes the tap feel slow.
     private var image: Image {
-        switch player.loadState {
-        case .resolving, .downloading:
+        if case .downloading = player.loadState {
             return Image(systemName: "arrow.down.circle.fill")
-        default:
-            if let thumbnail {
-                return Image(uiImage: thumbnail)
-            }
-            return Image(systemName: "play.rectangle.fill")
         }
+        if let thumbnail {
+            return Image(uiImage: thumbnail)
+        }
+        return Image(systemName: "play.rectangle.fill")
     }
 }

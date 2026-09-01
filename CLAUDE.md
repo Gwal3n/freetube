@@ -178,6 +178,23 @@ Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
 `AVPlayerItem.preferredMaximumResolution` from `preferredQuality.heightCap` so the user's quality
 setting still bounds ABR variant selection. `.auto` stays uncapped.
 
+**Playback starts optimistically.** `resolveAndPlay` installs the candidate, sets
+`loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`;
+`automaticallyWaitsToMinimizeStalling` is `false` (set once in `init`) so AVPlayer honours that
+request with whatever it has buffered rather than holding it back until it can play through. This is
+purely about perceived latency: warm resolution is ~0.4s but AVPlayer readiness is ~2s, i.e. ~80% of
+the tap-to-video wait, and AVPlayer exposes no "first frame rendered" signal to key off.
+
+**Validation is unchanged.** A candidate is still only *accepted* on `.readyToPlay`; on `.failed` or
+a readiness timeout the strategy goes into `excludedStrategies`, the transport is paused (the
+optimistic `play()` left it running on a stream we're abandoning, and `isPlaying` / NowPlaying must
+not keep advertising it), the queue is emptied, and the loop asks for the next candidate. Readiness
+is observed through KVO on `AVPlayerItem.status` — the single observation installed by
+`observe(item:)`, never a second competing one — feeding a continuation, which replaced a 100ms
+polling loop. That continuation is resumed exactly once, by whichever of KVO, the timeout task, or
+task cancellation arrives first; every path funnels through `finishReadiness(_:token:)` on the main
+actor, and the token exists so a late waker can't settle a newer candidate's wait.
+
 Automatic next-item download prefetch is disabled. Recommendation queue filling remains independent
 and still runs after playback begins. Signed URLs are used immediately or stored only in
 `StreamURLCache` with its 30-minute maximum TTL. Rapid video changes cancel the prior resolution;
@@ -207,6 +224,8 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration.
 - **Remote commands:** `RemoteCommandCenter` wires `MPRemoteCommandCenter` for play/pause/next/previous/skip ±15s/seek.
+- **The player area never shows a spinner on black while starting.** `PlayerArtworkBackdrop` paints `PlayerStateManager.currentArtwork` — the Kingfisher-cached thumbnail the user just tapped — over the video surface for every state except `.idle` / `.readyToPlay`, and `DownloadProgressOverlay` contributes only a small unlabelled spinner during `.resolving` / `.buffering`. Two constraints on that layer: it must sit *above* `PlayerSurface` in the ZStack (`AVPlayerViewController` paints its own opaque black background, so anything below it is invisible), and it must be `.allowsHitTesting(false)` or it swallows taps meant for the system playback controls. The dimmed scrim + text label + determinate bar treatment is reserved for `.downloading` and `.failed`, which are minutes-long or terminal and genuinely need words.
+- **`LoadState.buffering` means "URL installed, `play()` already issued, AVPlayer not ready yet".** In that state the mini-player shows the real thumbnail and the channel name, not a placeholder glyph and "Preparing…" — the point of the state existing is that there is nothing left to prepare. Only `.downloading` (a real yt-dlp file transfer the user can't preview) still swaps in the download glyph.
 - **Endless queue:** when the user taps any video outside a curated batch action (Play all / Shuffle all of a playlist), `queueAcceptsRecommendations` is set and `fillQueueWithRecommendations` runs after playback starts. On end-of-queue with repeat off, `playNext()` re-fires recommendations using the last item as the seed.
 - **Popup body backdrop must stay translucent.** The expanded `FullScreenPlayer` paints a `.thinMaterial` rectangle behind the entire popup body. Anything that introduces an opaque background and turns it black is a regression. Common offenders + neutralizers:
   - **`NavigationStack` inside the popup body:** the nav bar paints an opaque system background even with the title hidden. `.toolbarBackground(.hidden, for: .navigationBar)` is NOT sufficient — use `.toolbar(.hidden, for: .navigationBar)` to remove the bar entirely. Supply your own back/close button.
@@ -483,6 +502,7 @@ If asked to "make it more robust" or "production-ready", point to these realitie
 - yt-dlp's HLS downloader needs ffmpeg, which is blocked by §15.3 — yt-dlp picking an HLS-only format fails on iOS. Tier 2/3 take over.
 - IP-level rate limiting from YouTube can hit users on shared networks (CGNAT, VPN). No client-side fix.
 - This codebase intentionally does not implement App Store evasion techniques. Sideload distribution is the assumption.
+- Playback is started before AVPlayer reports `.readyToPlay` and `automaticallyWaitsToMinimizeStalling` is off (§7), so on a weak connection the first seconds can stall where an earlier build would have sat on the loading overlay for longer instead. That's the deliberate trade: a stall that resolves itself reads better than a spinner that hasn't moved.
 - HLS variant selection is bounded by `preferredQuality.heightCap` via `AVPlayerItem.preferredMaximumResolution`, but we don't pre-pick a variant — AVPlayer's adaptive bitrate logic still chooses freely below that ceiling, so the played resolution can sit under the user's setting on a weak connection.
 
 ---

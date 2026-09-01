@@ -74,12 +74,18 @@ struct FullScreenPlayer: View {
                 // AVPlayerViewController has zero intrinsic size while loading; the explicit
                 // frame here is what stops the layout from jumping when the user taps a queue
                 // item).
+                // Layer order is load-bearing. `AVPlayerViewController` paints an opaque black
+                // background, so the thumbnail has to sit *above* `PlayerSurface` to be visible at
+                // all — it hides itself once `loadState` reaches `.readyToPlay`. The `.animation`
+                // on the container is what turns that hand-off into a crossfade instead of a cut.
                 ZStack {
                     Color.black
                     PlayerSurface(player: player.player)
+                    PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
                 }
                 .frame(width: proxy.size.width, height: proxy.size.width * 9 / 16)
+                .animation(.easeOut(duration: 0.2), value: player.loadState)
             // Pull-down-to-dismiss starting from the video surface.
             //
             // `AVPlayerViewController`'s internal `UIPanGestureRecognizer`s (scrubber, system

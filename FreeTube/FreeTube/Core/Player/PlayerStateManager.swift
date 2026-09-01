@@ -17,6 +17,16 @@ final class PlayerStateManager {
     enum LoadState: Equatable {
         case idle
         case resolving
+        /// A candidate URL is installed in the player and `play()` has already been issued, but
+        /// `AVPlayerItem` hasn't reported `.readyToPlay` yet.
+        ///
+        /// Split out from `.resolving` for the startup-perception pass: both states paint the
+        /// video's thumbnail rather than a spinner, but once we're buffering there is nothing
+        /// left to "prepare" — the mini-player can show the real artwork and channel name
+        /// instead of a placeholder glyph and "Preparing…". Keeping it distinct from
+        /// `.downloading(progress:phase:)` also means the download chrome (percentage label +
+        /// determinate bar) stays reserved for actual file transfers.
+        case buffering
         /// File is being fetched. `progress` is 0…1 when known, nil during yt-dlp's mux/merge phase.
         /// `phase` labels which stream is in flight ("video", "audio", "stream") so the UI can show
         /// "Downloading video 42%" instead of two confusing identical bars in a row.
@@ -28,9 +38,9 @@ final class PlayerStateManager {
     // MARK: - Published state
 
     private(set) var currentVideo: Video?
-    /// Cached artwork for the current video. Used both to populate `MPNowPlayingInfoCenter`
-    /// (lock-screen + Control Center) and (in the future) any in-app UI that wants a UIImage rather
-    /// than the SwiftUI `Image`. Refreshed when the current video changes.
+    /// Cached artwork for the current video. Populates `MPNowPlayingInfoCenter` (lock-screen +
+    /// Control Center) and `PlayerArtworkBackdrop`, which paints it into the video area for as long
+    /// as AVPlayer has no frame to show. Refreshed when the current video changes.
     private(set) var currentArtwork: UIImage?
     private(set) var loadState: LoadState = .idle
     private(set) var isPlaying: Bool = false
@@ -70,6 +80,17 @@ final class PlayerStateManager {
     private var endObserver: NSObjectProtocol?
     private var itemStatusObservation: NSKeyValueObservation?
     private var itemLoadStartedAt: Date?
+    /// KVO-driven readiness handshake for the candidate currently under test.
+    ///
+    /// `waitForReadiness(of:timeout:)` parks a continuation here and the single `\.status`
+    /// observation installed by `observe(item:)` resumes it. Deliberately one observer per item
+    /// and one waiter at a time: a second competing observer would double-resume. `readinessToken`
+    /// is bumped for every wait so a late timeout or cancellation waker can only ever settle the
+    /// wait it was created for, never a newer candidate's. All three are `@MainActor`-isolated,
+    /// which is what makes "resumed exactly once" checkable by reading this file.
+    private var readinessContinuation: CheckedContinuation<ItemReadiness, Never>?
+    private var readinessItem: AVPlayerItem?
+    private var readinessToken = 0
     private var itemErrorLogObservation: NSObjectProtocol?
     private var playerErrorObservation: NSKeyValueObservation?
     private var defaultRateObservation: NSKeyValueObservation?
@@ -86,6 +107,14 @@ final class PlayerStateManager {
         // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
         // the mini-player." Pairs with the `.playback` AVAudioSession configured at launch.
         player.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
+        // Startup perception: `resolveAndPlay` issues `play()` the moment a candidate URL is
+        // installed, before the item reports `.readyToPlay`. With the default `true` AVPlayer
+        // holds that request back until it has buffered enough to play through without
+        // stalling, which re-adds most of the delay we're trying to hide. `false` means "start
+        // with whatever you have" — the trade-off is a higher chance of an early stall on a
+        // weak connection, which is the same bargain ExoPlayer makes on Android. Set once here
+        // rather than per item; the property lives on the player, not the item.
+        player.automaticallyWaitsToMinimizeStalling = false
         // Restore the last-used playback speed. `defaultRate` is what `AVPlayerViewController`'s
         // speed menu writes, and `AVPlayer.play()` resumes at this rate (not the transient `rate`).
         // Setting it *before* installObservers keeps the KVO from firing back and re-saving the
@@ -130,6 +159,10 @@ final class PlayerStateManager {
     /// playback state still surface through the existing UI.
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
         log.info("loadLocalFile path=\(fileURL.path, privacy: .public) title=\"\(title, privacy: .public)\"")
+        // A YouTube resolution still in flight would otherwise keep testing candidates against a
+        // player we're about to hand a local file, and its readiness wait would sit out its full
+        // timeout. Cancelling settles that wait immediately.
+        resolutionTask?.cancel()
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -336,9 +369,11 @@ final class PlayerStateManager {
                     let preparationTime = self.itemLoadStartedAt.map { Date().timeIntervalSince($0) } ?? 0
                     self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
                     self.itemLoadStartedAt = nil
+                    self.finishReadiness(.ready, for: item)
                 case .failed:
                     let err = item.error as NSError?
                     self.log.error("AVPlayerItem status: FAILED domain=\(err?.domain ?? "?", privacy: .public) code=\(err?.code ?? 0, privacy: .public) info=\(String(describing: err?.userInfo), privacy: .public)")
+                    self.finishReadiness(.failed(Self.describe(itemError: item.error)), for: item)
                 @unknown default:
                     break
                 }
@@ -391,6 +426,18 @@ final class PlayerStateManager {
             applyQualityCap(to: item)
             itemLoadStartedAt = Date()
             loadItem(item)
+            // Optimistic start. AVPlayer has no "first frame rendered" signal — only
+            // `.readyToPlay`, which on a warm resolve accounted for ~80% of the tap-to-video
+            // wait. So we stop gating the transport on it: the candidate is still validated
+            // below and still rejected on failure/timeout, but the rate is already 1 when
+            // readiness lands, which removes a whole round trip from the perceived start.
+            // `.buffering` keeps the UI on the video's thumbnail instead of a spinner.
+            loadState = .buffering
+            updateNowPlaying()
+            if autoplay {
+                log.info("resolveAndPlay: optimistic play issued for candidate=\(candidate.strategy.rawValue, privacy: .public) at \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
+                play()
+            }
 
             let readiness = await waitForReadiness(
                 of: item,
@@ -403,10 +450,14 @@ final class PlayerStateManager {
 
             switch readiness {
             case .ready:
+                // `total` still measures resolve → `.readyToPlay`, unchanged, so the number stays
+                // comparable with builds that played only after this point.
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 loadState = .readyToPlay
                 updateNowPlaying()
-                if autoplay { play() }
+                // Normally a no-op now (the optimistic `play()` above already ran); still needed
+                // for the autoplay path where a rejected candidate left the transport paused.
+                if autoplay, !isPlaying { play() }
                 finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
                 return
             case .failed(let description):
@@ -416,8 +467,15 @@ final class PlayerStateManager {
             }
 
             excludedStrategies.insert(candidate.strategy)
+            // The optimistic `play()` left the transport running (rate 1, possibly stalled) on a
+            // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`
+            // and the Now Playing rate don't advertise playback for a rejected candidate while the
+            // next one resolves.
+            if isPlaying { pause() }
             player.removeAllItems()
+            itemLoadStartedAt = nil
             loadState = .resolving
+            updateNowPlaying()
         }
 
         log.debug("resolveAndPlay: ended after cancellation or video change for \(video.id, privacy: .public)")
@@ -446,25 +504,104 @@ final class PlayerStateManager {
         case timedOut
     }
 
+    /// Waits for `item` to reach `.readyToPlay` (accept) or `.failed` (reject), giving up after
+    /// `timeout`.
+    ///
+    /// KVO rather than the 100ms poll this replaced: at ~2s of buffering the poll cost up to half a
+    /// frame of latency on the accept path for no benefit, and it woke the main actor twenty times
+    /// per candidate. The `\.status` observation installed by `observe(item:)` is the *only* status
+    /// observer — it calls `finishReadiness(_:for:)`, which resumes the continuation parked here.
+    ///
+    /// Exactly-once resume: every resume path goes through `finishReadiness(_:token:)` on the main
+    /// actor, which nils the continuation before resuming. The three racers are KVO, the timeout
+    /// task, and task cancellation (`load()` cancelling `resolutionTask` on a rapid video switch);
+    /// whichever arrives first wins and the rest no-op.
     private func waitForReadiness(of item: AVPlayerItem, timeout: Duration) async -> ItemReadiness {
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: timeout)
-        while clock.now < deadline {
-            if Task.isCancelled { return .failed("cancelled") }
-            switch item.status {
-            case .readyToPlay:
-                return .ready
-            case .failed:
-                let error = item.error as NSError?
-                return .failed("domain=\(error?.domain ?? "?") code=\(error?.code ?? 0)")
-            case .unknown:
-                break
-            @unknown default:
-                break
-            }
-            try? await Task.sleep(for: .milliseconds(100))
+        // Defensive: settle any wait that outlived its caller before adopting a new item, so the
+        // "one parked continuation" invariant can't be broken by an unexpected call order.
+        finishReadiness(.failed("superseded"), token: readinessToken)
+
+        // `observe(item:)` runs before we get here, so a status that already settled produced a
+        // KVO callback we can no longer catch. Read it directly instead of waiting for an edge
+        // that will never come — this is also the fast path for local files.
+        switch item.status {
+        case .readyToPlay:
+            return .ready
+        case .failed:
+            return .failed(Self.describe(itemError: item.error))
+        case .unknown:
+            break
+        @unknown default:
+            break
         }
-        return .timedOut
+
+        if Task.isCancelled { return .failed("cancelled") }
+
+        readinessToken += 1
+        let token = readinessToken
+        readinessItem = item
+
+        // Inherits main-actor isolation from this method, so `finishReadiness` is a direct call.
+        let timeoutTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: timeout)
+            } catch {
+                return // Cancelled because the wait already settled.
+            }
+            self?.finishReadiness(.timedOut, token: token)
+        }
+        defer { timeoutTask.cancel() }
+
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                self.readinessContinuation = continuation
+                // The KVO handler hops through a `Task` before it reaches `finishReadiness`, so a
+                // status change can land in the gap between installing the item and parking this
+                // continuation — where it would find nothing to resume and we'd sit out the whole
+                // timeout on an item that is already playable. Re-reading the status here closes
+                // that window; resuming from inside the body is legal.
+                switch item.status {
+                case .readyToPlay:
+                    self.finishReadiness(.ready, for: item)
+                case .failed:
+                    self.finishReadiness(.failed(Self.describe(itemError: item.error)), for: item)
+                case .unknown:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+        } onCancel: {
+            // `onCancel` is nonisolated, hence the explicit hop. Only the token travels — an
+            // `AVPlayerItem` isn't `Sendable`.
+            Task { @MainActor [weak self] in
+                self?.finishReadiness(.failed("cancelled"), token: token)
+            }
+        }
+    }
+
+    /// Resumes the parked readiness continuation if it belongs to `item`. Called from the `\.status`
+    /// KVO handler, which fires for whichever item is currently observed — that may be a newer item
+    /// than the one being waited on, hence the identity check.
+    private func finishReadiness(_ outcome: ItemReadiness, for item: AVPlayerItem) {
+        guard readinessItem === item else { return }
+        finishReadiness(outcome, token: readinessToken)
+    }
+
+    /// Single resume funnel. Nils the continuation before resuming so a re-entrant caller can't
+    /// resume it twice.
+    private func finishReadiness(_ outcome: ItemReadiness, token: Int) {
+        guard token == readinessToken, let continuation = readinessContinuation else { return }
+        readinessContinuation = nil
+        readinessItem = nil
+        continuation.resume(returning: outcome)
+    }
+
+    /// Compact, log-safe rendering of an `AVPlayerItem.error`. Domain + code only: the userInfo of
+    /// a playback failure can carry the signed asset URL.
+    private static func describe(itemError: Error?) -> String {
+        let error = itemError as NSError?
+        return "domain=\(error?.domain ?? "?") code=\(error?.code ?? 0)"
     }
 
     private func readinessTimeout(for strategy: PlaybackStrategy) -> Duration {
@@ -561,11 +698,14 @@ final class PlayerStateManager {
             }
         }
 
-        timeControlStatusObservation = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] avPlayer, _ in
+        timeControlStatusObservation = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] _, _ in
             guard let self else { return }
-            let status = avPlayer.timeControlStatus
             Task { @MainActor in
-                switch status {
+                // Read the status inside the hop rather than capturing it at KVO time. Optimistic
+                // play installs and tears down items in quick succession, so a captured value can
+                // land after a later transition and leave `isPlaying` (and therefore the Now
+                // Playing rate) describing a candidate we already rejected.
+                switch self.player.timeControlStatus {
                 case .playing:
                     if !self.isPlaying {
                         self.log.info("KVO timeControlStatus → playing (sync isPlaying=true)")
