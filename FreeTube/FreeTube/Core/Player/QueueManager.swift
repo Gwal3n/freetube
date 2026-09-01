@@ -36,6 +36,27 @@ final class QueueManager {
         rebuildShuffleOrder()
     }
 
+    func append(contentsOf videos: [Video]) {
+        guard !videos.isEmpty else { return }
+        items.append(contentsOf: videos)
+        rebuildShuffleOrder()
+    }
+
+    /// Bounds an endless recommendation queue while retaining enough history for Previous and a
+    /// healthy upcoming buffer. Curated queues never call this method.
+    func trimAroundCurrent(maxHistory: Int, maxUpcoming: Int) {
+        guard items.indices.contains(currentIndex) else { return }
+        let lowerBound = max(0, currentIndex - max(0, maxHistory))
+        let upperBound = min(items.count, currentIndex + 1 + max(0, maxUpcoming))
+        guard lowerBound > 0 || upperBound < items.count else { return }
+
+        let previousCount = items.count
+        items = Array(items[lowerBound..<upperBound])
+        currentIndex -= lowerBound
+        rebuildShuffleOrder()
+        log.debug("Trimmed endless queue from \(previousCount, privacy: .public) to \(self.items.count, privacy: .public) items")
+    }
+
     func insertNext(_ video: Video) {
         let insertIndex = min(currentIndex + 1, items.count)
         items.insert(video, at: insertIndex)
@@ -73,6 +94,17 @@ final class QueueManager {
     }
 
     // MARK: - Navigation
+
+    /// Number of distinct items remaining before the queue reaches its physical end. Unlike
+    /// `upcomingItems`, this intentionally ignores repeat wrapping so recommendation replenishment
+    /// still works when repeat-all is enabled.
+    func availableUpcomingCount(limit: Int) -> Int {
+        guard limit > 0, items.indices.contains(currentIndex) else { return 0 }
+        if isShuffleOn, let position = shuffleOrder.firstIndex(of: currentIndex) {
+            return min(limit, max(0, shuffleOrder.count - position - 1))
+        }
+        return min(limit, max(0, items.count - currentIndex - 1))
+    }
 
     /// Peeks at the next `count` videos that would play after the current one, honoring shuffle and
     /// `.all` wrap-around. Used by the player's prefetch loop so we can warm up the next couple of

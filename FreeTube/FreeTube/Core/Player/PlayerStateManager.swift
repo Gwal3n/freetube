@@ -646,15 +646,38 @@ final class PlayerStateManager {
     /// the queue. This is what makes the player behave like the YouTube app: tap any video and a
     /// fresh "up next" queue is ready to advance when the current track ends.
     private func fillQueueWithRecommendations(for seed: Video) async {
+        let refillThreshold = 8
+        let targetUpcomingCount = 20
+        let retainedHistoryCount = 10
+
+        // A full-height queue List is part of the observable player view. Letting every playback
+        // append another response indefinitely made each 0.5s elapsed-time update redraw dozens of
+        // extra rows. Bound old/future entries first and avoid a network request while the existing
+        // upcoming buffer is still healthy.
+        queue.trimAroundCurrent(
+            maxHistory: retainedHistoryCount,
+            maxUpcoming: targetUpcomingCount
+        )
+        let upcomingCount = queue.availableUpcomingCount(limit: targetUpcomingCount)
+        guard upcomingCount < refillThreshold else {
+            log.debug("Recommendation refill skipped for \(seed.id, privacy: .public): \(upcomingCount, privacy: .public) upcoming items remain")
+            return
+        }
+
         do {
             let info = try await VideoService().fetchMoreInfo(id: seed.id)
-            // Only append recommendations that aren't already queued, preserving the user's own
-            // ordering if they came from a "Play all" playlist load.
             let existingIDs = Set(queue.items.map(\.id))
-            let toAppend = info.recommended.filter { !existingIDs.contains($0.id) }
-            for rec in toAppend {
-                queue.append(rec)
-            }
+            let needed = targetUpcomingCount - upcomingCount
+            let toAppend = Array(
+                info.recommended
+                    .filter { !existingIDs.contains($0.id) }
+                    .prefix(needed)
+            )
+            queue.append(contentsOf: toAppend)
+            queue.trimAroundCurrent(
+                maxHistory: retainedHistoryCount,
+                maxUpcoming: targetUpcomingCount
+            )
             log.info("Queued \(toAppend.count, privacy: .public) recommendations for \(seed.id, privacy: .public)")
         } catch {
             log.notice("Recommendation fetch failed for \(seed.id, privacy: .public): \(String(describing: error), privacy: .public)")
