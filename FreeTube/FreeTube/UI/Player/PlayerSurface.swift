@@ -1,22 +1,22 @@
 import SwiftUI
 import AVKit
 
-/// CLAUDE.md §8: "Use `AVPlayerViewController` wrapped in `UIViewControllerRepresentable` for the
-/// video surface. Get free system controls, AirPlay, PiP."
+/// AVPlayerViewController remains the video/PiP engine. Its native playback chrome is hidden in
+/// favour of `CustomPlayerControls`, while the underlying controller still owns rendering and PiP.
 @available(iOS 17.0, *)
 struct PlayerSurface: UIViewControllerRepresentable {
     let player: AVPlayer
     var onSeekRelative: (TimeInterval) -> Void
-    var showsControls: Bool = true
-    /// **PiP must be triggered explicitly by the user via the AVPlayerViewController PiP button**
-    /// — never on app backgrounding. The auto-on-background behavior was disorienting (audio
-    /// would continue with a tiny floating window appearing the moment the user switched apps)
-    /// and burned battery. The PiP button itself still works because `allowsPictureInPicturePlayback`
-    /// stays on. Default is `false` for `entersPiPAutomatically`.
-    var entersPiPAutomatically: Bool = false
+    var onToggleControls: () -> Void
+    var showsControls: Bool = false
+    var entersPiPAutomatically: Bool = true
 
     func makeCoordinator() -> PlayerGestureCoordinator {
-        PlayerGestureCoordinator(player: player, onSeekRelative: onSeekRelative)
+        PlayerGestureCoordinator(
+            player: player,
+            onSeekRelative: onSeekRelative,
+            onToggleControls: onToggleControls
+        )
     }
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
@@ -35,7 +35,11 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.player = player
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
-        context.coordinator.update(player: player, onSeekRelative: onSeekRelative)
+        context.coordinator.update(
+            player: player,
+            onSeekRelative: onSeekRelative,
+            onToggleControls: onToggleControls
+        )
         context.coordinator.install(on: controller)
     }
 

@@ -46,6 +46,8 @@ struct FullScreenPlayer: View {
     /// presentation. We capture the whole `Video` (not just the id) so the sheet can show its
     /// title at the top of the picker.
     @State private var addToPlaylistVideo: Video?
+    @State private var playerControlsVisible = true
+    @State private var controlsHideTask: Task<Void, Never>?
 
     /// Hashable wrapper so `.navigationDestination(for:)` can match the channel id and push
     /// `ChannelScreen` onto `channelPath`.
@@ -85,10 +87,39 @@ struct FullScreenPlayer: View {
                         player: player.player,
                         onSeekRelative: { seconds in
                             player.seekRelative(by: seconds)
-                        }
+                        },
+                        onToggleControls: { togglePlayerControls() }
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
+                    CustomPlayerControls(
+                        isVisible: playerControlsVisible,
+                        isPlaying: player.isPlaying,
+                        elapsed: player.elapsed,
+                        duration: player.duration,
+                        playbackRate: player.playbackRate,
+                        sponsorSegments: player.sponsorBlockSegments,
+                        onTogglePlayPause: {
+                            player.togglePlayPause()
+                            showPlayerControls()
+                        },
+                        onSeek: {
+                            player.seek(to: $0)
+                            showPlayerControls()
+                        },
+                        onSeekRelative: {
+                            player.seekRelative(by: $0)
+                            showPlayerControls()
+                        },
+                        onSetRate: {
+                            player.setPlaybackRate($0)
+                            showPlayerControls()
+                        },
+                        onCollapse: {
+                            @Bindable var p = player
+                            p.fullScreenPresented = false
+                        }
+                    )
                     if let notice = player.sponsorBlockNotice {
                         SponsorBlockSkipOverlay(
                             notice: notice,
@@ -99,6 +130,10 @@ struct FullScreenPlayer: View {
                 }
                 .frame(width: proxy.size.width, height: proxy.size.width * 9 / 16)
                 .animation(.easeOut(duration: 0.2), value: player.loadState)
+                .onAppear { showPlayerControls() }
+                .onDisappear { controlsHideTask?.cancel() }
+                .onChange(of: player.currentVideo?.id) { _, _ in showPlayerControls() }
+                .onChange(of: player.isPlaying) { _, _ in showPlayerControls() }
             // Pull-down-to-dismiss starting from the video surface.
             //
             // `AVPlayerViewController`'s internal `UIPanGestureRecognizer`s (scrubber, system
@@ -530,6 +565,27 @@ struct FullScreenPlayer: View {
 
     // MARK: - Transport
 
+    private func togglePlayerControls() {
+        playerControlsVisible ? hidePlayerControls() : showPlayerControls()
+    }
+
+    private func showPlayerControls() {
+        controlsHideTask?.cancel()
+        withAnimation(.easeOut(duration: 0.18)) { playerControlsVisible = true }
+        guard player.isPlaying else { return }
+        controlsHideTask = Task {
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            guard !Task.isCancelled else { return }
+            hidePlayerControls()
+        }
+    }
+
+    private func hidePlayerControls() {
+        controlsHideTask?.cancel()
+        controlsHideTask = nil
+        withAnimation(.easeIn(duration: 0.18)) { playerControlsVisible = false }
+    }
+
     @ViewBuilder
     private var transportRow: some View {
         // Flexible `Spacer()`s on both outer ends AND between every adjacent pair so every gap
@@ -547,25 +603,6 @@ struct FullScreenPlayer: View {
                 Image(systemName: "backward.fill").font(.title3)
             }
             .disabled(!hasPrevious)
-
-            Spacer(minLength: 0)
-
-            Button { player.seekRelative(by: -15) } label: {
-                Image(systemName: "gobackward.15").font(.title3)
-            }
-
-            Spacer(minLength: 0)
-
-            Button { player.togglePlayPause() } label: {
-                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 48))
-            }
-
-            Spacer(minLength: 0)
-
-            Button { player.seekRelative(by: 15) } label: {
-                Image(systemName: "goforward.15").font(.title3)
-            }
 
             Spacer(minLength: 0)
 

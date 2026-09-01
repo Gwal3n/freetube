@@ -46,7 +46,9 @@ final class PlayerStateManager {
     private(set) var isPlaying: Bool = false
     private(set) var elapsed: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
+    private(set) var playbackRate: Double
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
+    private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
 
@@ -109,6 +111,7 @@ final class PlayerStateManager {
         self.resolver = resolver
         self.sponsorBlockService = sponsorBlockService
         self.preferences = preferences
+        self.playbackRate = preferences.playbackRate
         // Keep the audio track running when the player view goes off-screen (popup minimize, app
         // backgrounded). Without this, AVPlayer pauses video tracks as soon as their pixel buffer
         // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
@@ -305,6 +308,13 @@ final class PlayerStateManager {
         isPlaying ? pause() : play()
     }
 
+    func setPlaybackRate(_ rate: Double) {
+        let boundedRate = min(max(rate, 0.25), 2)
+        player.defaultRate = Float(boundedRate)
+        playbackRate = boundedRate
+        if isPlaying { player.rate = Float(boundedRate) }
+    }
+
     func seek(to seconds: TimeInterval) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
         let boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
@@ -417,6 +427,7 @@ final class PlayerStateManager {
 
     private func installSponsorBlockObservers(for segments: [SponsorBlockSegment]) {
         removeSponsorBlockBoundaryObservers()
+        sponsorBlockSegments = segments
         handledSponsorBlockSegmentIDs.removeAll()
 
         for segment in segments {
@@ -464,6 +475,7 @@ final class PlayerStateManager {
         sponsorBlockNoticeTask?.cancel()
         sponsorBlockNoticeTask = nil
         sponsorBlockNotice = nil
+        sponsorBlockSegments = []
         handledSponsorBlockSegmentIDs.removeAll()
         removeSponsorBlockBoundaryObservers()
     }
@@ -855,6 +867,7 @@ final class PlayerStateManager {
                     self.log.info("playbackRate changed → \(rate, privacy: .public) (persisting)")
                     self.preferences.playbackRate = rate
                 }
+                self.playbackRate = rate
             }
         }
 

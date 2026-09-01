@@ -4,7 +4,7 @@ import OSLog
 import UIKit
 
 /// Installs YouTube-style gestures on `AVPlayerViewController.view` while using its
-/// `contentOverlayView` only for feedback. Native controls, AirPlay, PiP, and accessibility remain.
+/// `contentOverlayView` only for gesture feedback. SwiftUI owns the visible playback controls.
 @available(iOS 17.0, *)
 @MainActor
 final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
@@ -12,9 +12,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private weak var gestureView: UIView?
     private weak var feedbackView: UIView?
     private var onSeekRelative: (TimeInterval) -> Void
+    private var onToggleControls: () -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var doubleTapGesture: UITapGestureRecognizer?
     private var continuationTapGesture: UITapGestureRecognizer?
+    private var singleTapGesture: UITapGestureRecognizer?
     private var feedbackLabel: UILabel?
     private var feedbackWorkItem: DispatchWorkItem?
     private var seekSessionWorkItem: DispatchWorkItem?
@@ -22,14 +24,24 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var rateBeforeBoost: Float?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
-    init(player: AVPlayer, onSeekRelative: @escaping (TimeInterval) -> Void) {
+    init(
+        player: AVPlayer,
+        onSeekRelative: @escaping (TimeInterval) -> Void,
+        onToggleControls: @escaping () -> Void
+    ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
+        self.onToggleControls = onToggleControls
     }
 
-    func update(player: AVPlayer, onSeekRelative: @escaping (TimeInterval) -> Void) {
+    func update(
+        player: AVPlayer,
+        onSeekRelative: @escaping (TimeInterval) -> Void,
+        onToggleControls: @escaping () -> Void
+    ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
+        self.onToggleControls = onToggleControls
     }
 
     func install(on controller: AVPlayerViewController) {
@@ -63,9 +75,17 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         longPress.delaysTouchesEnded = false
         longPress.delegate = self
 
+        let singleTap = UITapGestureRecognizer(target: self, action: #selector(didSingleTap(_:)))
+        singleTap.numberOfTapsRequired = 1
+        singleTap.cancelsTouchesInView = false
+        singleTap.delegate = self
+        singleTap.require(toFail: doubleTap)
+        singleTap.require(toFail: longPress)
+
         doubleTapGesture = doubleTap
         continuationTapGesture = continuationTap
-        gestures = [doubleTap, continuationTap, longPress]
+        singleTapGesture = singleTap
+        gestures = [doubleTap, continuationTap, longPress, singleTap]
         gestures.forEach { rootView.addGestureRecognizer($0) }
         deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap, longPress])
         // AVKit may finish installing its private control hierarchy after `makeUIViewController`
@@ -94,6 +114,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         gestures.removeAll()
         doubleTapGesture = nil
         continuationTapGesture = nil
+        singleTapGesture = nil
         feedbackLabel?.removeFromSuperview()
         feedbackLabel = nil
         feedbackView = nil
@@ -108,6 +129,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         beginSeekSession(with: interval, horizontalFraction: isForward ? 0.72 : 0.28)
+    }
+
+    @objc private func didSingleTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        onToggleControls()
     }
 
     @objc private func didContinueSeeking(_ gesture: UITapGestureRecognizer) {
@@ -158,6 +184,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         // Once the initial double tap succeeds, count every following tap individually. Keeping
         // the double-tap recognizer enabled would make taps three and four trigger both recognizers.
         doubleTapGesture?.isEnabled = false
+        singleTapGesture?.isEnabled = false
         continuationTapGesture?.isEnabled = true
         showFeedback(seekFeedbackText, horizontalFraction: horizontalFraction, automaticallyHide: false)
         scheduleSeekSessionEnd()
@@ -178,6 +205,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         seekSessionTotal = 0
         continuationTapGesture?.isEnabled = false
         doubleTapGesture?.isEnabled = true
+        singleTapGesture?.isEnabled = true
         if hideFeedback {
             self.hideFeedback()
         }
