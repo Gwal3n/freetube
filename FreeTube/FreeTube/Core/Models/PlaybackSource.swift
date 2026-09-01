@@ -18,5 +18,5 @@ enum PlaybackSource: Sendable, Hashable {
 }
 
 protocol PlaybackResolving {
-    func resolve(videoID: String, quality: VideoQuality) async throws -> PlaybackSource
+    func resolve(video: Video, quality: VideoQuality) async throws -> PlaybackSource
 }

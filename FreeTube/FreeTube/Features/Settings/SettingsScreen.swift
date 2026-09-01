@@ -54,7 +54,6 @@ struct SettingsScreen: View {
 
                 Section {
                     Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
-                    Toggle("Prefetch next video", isOn: Bindable(model).prefetchNextInQueue)
                     Picker("Cache limit", selection: Bindable(model).downloadCacheLimit) {
                         ForEach(DownloadCacheLimit.allCases) { option in
                             Text(option.displayName).tag(option)

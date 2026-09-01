@@ -20,7 +20,7 @@ This file gives Claude Code the context, constraints, and conventions it must fo
 
 These come first. Violating them breaks the project.
 
-1. **No Google Cloud YouTube Data API.** All YouTube interaction goes through `b5i/YouTubeKit` (cookie-based, no API key). Never suggest `GoogleAPIClientForREST`, `YTPlayerView`, IFrame embeds, or `https://www.googleapis.com/youtube/v3/...`.
+1. **No Google Cloud YouTube Data API.** Feeds, metadata, and account interaction go through `b5i/YouTubeKit`; native playback resolution goes through the vendored `alexeichhorn/YouTubeKit` snapshot exposed as `FreeTubeStreamKit`. Neither requires an API key. Never suggest `GoogleAPIClientForREST`, `YTPlayerView`, IFrame embeds, or `https://www.googleapis.com/youtube/v3/...`.
 2. **No `dimitris-c/AudioStreaming`.** It is for raw audio streams (Icecast/Shoutcast). YouTube serves HLS/DASH. Playback uses `AVPlayer` only.
 3. **No App Store assumptions.** Do not add capabilities, entitlements, or workarounds aimed at App Store review (e.g. avoiding `WKWebView` cookie reads, hiding download functionality). Sideload-honest behavior is expected.
 4. **No telemetry, analytics, or remote logging by default.** Logs go to `os.Logger` only. Never add SDKs that beacon out.
@@ -41,6 +41,7 @@ These come first. Violating them breaks the project.
 | UI | SwiftUI (`@Observable`, iOS 17 APIs) |
 | Async | Swift Concurrency, `AsyncSequence` |
 | Networking (YouTube) | `b5i/YouTubeKit` |
+| Native stream resolution | `alexeichhorn/YouTubeKit` 0.4.9, vendored as `FreeTubeStreamKit` |
 | Stream extraction / download | `kewlbear/YoutubeDL-iOS` (yt-dlp via `PythonKit`) |
 | In-process ffmpeg | `FFmpegSupport` (Swift wrapper around ffmpeg C library) |
 | Playback | `AVFoundation` / `AVKit` (`AVQueuePlayer`, `AVPlayerViewController`, `AVPictureInPictureController`) |
@@ -161,51 +162,18 @@ If a feature seems to need data without a clear mapping above, stop and ask befo
 
 ## 7. Playback pipeline (critical)
 
-This is what the codebase actually does today, not the original v1 design. The flow has three independent tiers — playback starts from whichever tier first succeeds.
+Playback is stream-first. `PlayerStateManager` calls `PlaybackResolver`, installs the returned URL
+in an `AVPlayerItem`, and never imports either extraction library itself. Resolution order is:
 
-### Tier 1 — yt-dlp download (`DownloadManager.runYoutubeDLDownload`)
+1. **Existing local file.** `DownloadManager.localFile(for:)` wins immediately, preserving offline playback.
+2. **Native local extraction.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It prefers HLS, then a natively playable progressive audio+video stream within `preferredQuality.heightCap` (or an audio-only stream for that preference). The dependency's hosted remote extractor is never enabled.
+3. **b5i direct-stream fallback.** `PlaybackResolver` tries iOS HLS/progressive and then TVHTML5 HLS/progressive through `VideoService`.
+4. **Legacy download fallback.** Only after every direct resolver fails, `DownloadManager.ensureDownloaded` runs the existing yt-dlp → YouTubeKit download pipeline. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
 
-1. User taps a video. `PlayerStateManager.resolveAndPlay` calls `DownloadManager.ensureDownloaded(video:quality:priority:)`.
-2. **Cache check first.** `localFile(for:)` returns immediately if the mp4 already exists in `Documents/Downloads/<videoID>.mp4`.
-3. **Network gate.** `waitForAllowedNetwork()` blocks the call until the user-allowed network is up (Wi-Fi if `wifiOnlyDownloads` is set).
-4. **Submit to PythonRunner** with priority `.high` (`.userInitiated`) for play taps, `.low` (`.background`) for prefetch / Download All.
-5. yt-dlp is invoked with a hard-coded set of player clients (`player_client=tv_simply,tv_embedded,web_creator,mweb,web_safari,ios,android_vr;formats=missing_pot`) to maximise chances of getting a non-cipher format.
-6. **Critical: `--ffmpeg-location /dev/null/no-ffmpeg` is forced**, so yt-dlp's Python-side ffmpeg merger never runs. yt-dlp's `subprocess.Popen` against ffmpeg reliably hangs Python in `Popen.communicate` on iOS. We mux ourselves in Swift afterwards (`muxToDestination` → `FFmpegRunner.shared.run`). See §15 on the workaround.
-7. **JS bridge installed before download**: `freetube_yt_dlp` (our forked entry point in `Core/JavaScript/FreeTubeYtDlp.swift`) splices `PythonJSBridge.install()` between YoutubeDL-iOS's `injectFakePopen` and `ydl.download`. This wires `JavaScriptCore` as the `deno` runtime for yt-dlp's EJS-based N/SIG challenge solver — formats that previously hit `n challenge solving failed` now resolve in-process. Full architecture in §15.11.
-8. If yt-dlp produces output, optionally mux video+audio and persist as `DownloadedVideo` row.
-
-### Tier 2 — YouTubeKit fallback (`DownloadManager.runYouTubeKitFallback`)
-
-Reached when tier 1 returns no file (PoT-locked content, n-cipher failures, 403s on signed URLs).
-
-1. `fetchFallbackFormats(videoID:)` walks two sub-tiers:
-   - `VideoService.fetchInfoViaTVHTML5(id:)` — `TVHTML5_SIMPLY_EMBEDDED_PLAYER` client returns URLs not stamped with PoT. Wins for most non-locked content.
-   - If TVHTML5 returns zero usable URLs (cipher-protected), `VideoService.fetchInfoWithFormats(id:)` triggers YouTubeKit's player.js scrape. This is increasingly fragile — YouTube has been breaking the `n` decoder regex and we frequently see `"Could not get n-parameter function."` here.
-2. **Strategy 1 — progressive** (`pickBestProgressive`): pick itag 18 or similar with `containsBothTracks`. Download as single mp4 via `URLSession.bytes(for:)`. No mux needed.
-3. **Strategy 2 — adaptive**: `pickBestVideoOnly` + `pickBestAudioOnly`, download both, mux with in-process `FFmpegRunner` using `ffmpeg -c copy -movflags +faststart`.
-4. If neither strategy finds usable formats, throw `streamExtractionFailed` — tier 1 + 2 fail and we hand off to tier 3.
-
-### Tier 3 — streaming-only fallback (`PlayerStateManager.resolveStreamingURL`)
-
-Reached when `ensureDownloaded` throws. **Produces no local file** — AVPlayer streams a remote URL directly.
-
-Walks four sub-tiers, returns first hit:
-1. iOS-client HLS master playlist URL (from `VideoService.fetchInfo`)
-2. iOS-client progressive MP4 URL (highest format with `containsBothTracks` within `preferredQuality.heightCap`)
-3. TVHTML5-client HLS
-4. TVHTML5-client progressive MP4
-
-If all four miss, `loadState = .failed` and the user sees an error toast.
-
-### Trade-offs
-
-| | Tier 1 (yt-dlp) | Tier 2 (YouTubeKit) | Tier 3 (streaming) |
-|---|---|---|---|
-| Produces file | Yes | Yes | No |
-| Persists to `DownloadedVideo` | Yes | Yes | No |
-| Offline playback | Yes | Yes | No |
-| Works for PoT-locked content | No | No | Often yes (HLS) |
-| Latency (cold) | ~3–10s | ~2–5s | ~1–2s |
+Automatic next-item download prefetch is disabled. Recommendation queue filling remains independent
+and still runs after playback begins. Signed URLs are used immediately or stored only in
+`StreamURLCache` with its 30-minute maximum TTL. Rapid video changes cancel the prior resolution;
+the player also checks the selected video ID before installing a result.
 
 ### Shape
 
@@ -216,7 +184,7 @@ enum PlaybackSource {
 }
 ```
 
-`AVQueuePlayer` accepts both cases identically — the layer above doesn't branch on it.
+`AVQueuePlayer` accepts both cases identically; the player consumes `PlaybackSource.url`.
 
 ---
 

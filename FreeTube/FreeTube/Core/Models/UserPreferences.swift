@@ -27,7 +27,6 @@ struct UserPreferences {
     /// next queue item right after the current video starts playing — so Next-tap is
     /// instant. Users who want to save bandwidth (or who tend not to advance through the
     /// queue) can flip this off in Settings.
-    @AppStorage("prefetchNextInQueue") var prefetchNextInQueue: Bool = true
     @AppStorage("restrictedSearchMode") var restrictedSearchMode: Bool = false
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("downloadCacheLimit") var downloadCacheLimitRaw: String = DownloadCacheLimit.unlimited.rawValue

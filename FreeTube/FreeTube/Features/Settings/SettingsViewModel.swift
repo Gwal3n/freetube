@@ -32,11 +32,6 @@ final class SettingsViewModel {
         set { preferences.autoplayNext = newValue }
     }
 
-    var prefetchNextInQueue: Bool {
-        get { preferences.prefetchNextInQueue }
-        set { preferences.prefetchNextInQueue = newValue }
-    }
-
     // MARK: - Diagnostics
 
     /// Two-way binding for the "Save logs to file" toggle. Routes through

@@ -15,6 +15,7 @@
 		AC591E182FB9F2D7009EE538 /* LNPopupUI in Embed Frameworks */ = {isa = PBXBuildFile; productRef = AC591E142FB9F181009EE538 /* LNPopupUI */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */ = {isa = PBXBuildFile; productRef = AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */; };
 		AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */ = {isa = PBXBuildFile; productRef = AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */; };
+		AC5930012FC00001009EE538 /* FreeTubeStreamKit in Frameworks */ = {isa = PBXBuildFile; productRef = AC5930032FC00001009EE538 /* FreeTubeStreamKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -68,6 +69,7 @@
 				AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */,
 				AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */,
 				AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */,
+				AC5930012FC00001009EE538 /* FreeTubeStreamKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +120,7 @@
 				AC591E142FB9F181009EE538 /* LNPopupUI */,
 				AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */,
 				AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */,
+				AC5930032FC00001009EE538 /* FreeTubeStreamKit */,
 			);
 			productName = FreeTube;
 			productReference = AC591D232FB9BEE5009EE538 /* FreeTube.app */;
@@ -157,6 +160,7 @@
 				AC591E132FB9F181009EE538 /* XCRemoteSwiftPackageReference "LNPopupUI" */,
 				AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */,
 				AC5924CC2FBB5F2B009EE538 /* XCRemoteSwiftPackageReference "SwimplyPlayIndicator" */,
+				AC5930022FC00001009EE538 /* XCLocalSwiftPackageReference "FreeTubeStreamKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AC591D242FB9BEE5009EE538 /* Products */;
@@ -422,6 +426,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		AC5930022FC00001009EE538 /* XCLocalSwiftPackageReference "FreeTubeStreamKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Vendor/FreeTubeStreamKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		AC591D762FB9E26E009EE538 /* XCRemoteSwiftPackageReference "YouTubeKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -516,6 +527,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AC5924CC2FBB5F2B009EE538 /* XCRemoteSwiftPackageReference "SwimplyPlayIndicator" */;
 			productName = SwimplyPlayIndicator;
+		};
+		AC5930032FC00001009EE538 /* FreeTubeStreamKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AC5930022FC00001009EE538 /* XCLocalSwiftPackageReference "FreeTubeStreamKit" */;
+			productName = FreeTubeStreamKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
