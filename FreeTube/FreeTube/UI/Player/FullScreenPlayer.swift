@@ -25,6 +25,7 @@ struct FullScreenPlayer: View {
     @State private var details: VideoInfo?
     /// Are we currently fetching `details`? Drives the spinner in the description area.
     @State private var isLoadingDetails = false
+    @State private var detailsLoadFailed = false
     /// True when the user has expanded the description block — shows full text instead of a
     /// truncated preview, and tries to load extended details (tags etc.) if not yet loaded.
     @State private var isDetailsExpanded = false
@@ -189,9 +190,10 @@ struct FullScreenPlayer: View {
                 // Reset description state, (best-effort) prefetch the snippet, AND pop any
                 // pushed channel screen whenever the user picks a new video — otherwise tapping
                 // the next video in the queue would leave a stale channel push on screen.
-                .onChange(of: video.id, initial: true) { _, _ in
+                .onChange(of: video.id) { _, _ in
                     details = nil
                     isDetailsExpanded = false
+                    detailsLoadFailed = false
                     pushedChannel = nil
                     channelPath = NavigationPath()
                     prefetchDescriptionIfAvailable(for: video)
@@ -462,7 +464,7 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func expandedDetailsBody(video: Video) -> some View {
         // Full description text (from the loaded details, falling back to the search-result snippet).
-        if let text = details?.descriptionText ?? video.descriptionSnippet, !text.isEmpty {
+        if let text = availableDescription(video: video) {
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.primary)
@@ -471,9 +473,13 @@ struct FullScreenPlayer: View {
                 ProgressView().controlSize(.small)
                 Text("Loading details…").font(.caption).foregroundStyle(.secondary)
             }
+        } else if detailsLoadFailed {
+            Text("Description unavailable")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
 
-        // Quick stats line: views • published date • duration.
+        // Quick stats line: views • explicitly labelled upload date.
         let statsRow = detailsStatsRow(video: video)
         if !statsRow.isEmpty {
             Text(statsRow)
@@ -506,24 +512,31 @@ struct FullScreenPlayer: View {
     /// Picks the description text to render in the 2-line collapsed preview. Prefer the loaded
     /// details (more complete), fall back to the search-result snippet.
     private func inlineDescriptionSnippet(video: Video) -> String? {
-        let raw = details?.descriptionText ?? video.descriptionSnippet
-        guard let raw, !raw.isEmpty else { return nil }
-        return raw
+        availableDescription(video: video)
     }
 
-    /// `42K views • 3 days ago • 4:32`, omitting any pieces we don't have.
+    private func availableDescription(video: Video) -> String? {
+        if let fetched = details?.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !fetched.isEmpty {
+            return fetched
+        }
+        if let snippet = video.descriptionSnippet?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !snippet.isEmpty {
+            return snippet
+        }
+        return nil
+    }
+
+    /// `42K views • Uploaded 3 days ago`, omitting any pieces we don't have.
     private func detailsStatsRow(video: Video) -> String {
         var parts: [String] = []
         if let views = video.viewCount, views > 0 {
             parts.append("\(formatCount(views)) views")
         }
         if let published = video.publishedAt {
-            let relative = RelativeDateTimeFormatter()
-            relative.unitsStyle = .short
-            parts.append(relative.localizedString(for: published, relativeTo: .now))
-        }
-        if !video.durationString.isEmpty {
-            parts.append(video.durationString)
+            parts.append("Uploaded \(published.formatted(date: .abbreviated, time: .omitted))")
+        } else if let relative = video.publishedRelative, !relative.isEmpty {
+            parts.append("Uploaded \(relative)")
         }
         return parts.joined(separator: " • ")
     }
@@ -543,22 +556,31 @@ struct FullScreenPlayer: View {
         _ = video
     }
 
-    /// Lazy fetch invoked when the user expands the description. One `VideoService.fetchInfo`
+    /// Lazy fetch invoked when the user expands the description. One `VideoService.fetchMoreInfo`
     /// call per video; subsequent expansions reuse the cached result in `details`.
     private func loadDetailsIfNeeded(for video: Video) {
         guard details == nil, !isLoadingDetails else { return }
         isLoadingDetails = true
+        detailsLoadFailed = false
         Task { [videoID = video.id] in
             defer { Task { @MainActor in isLoadingDetails = false } }
             do {
-                let info = try await VideoService().fetchInfo(id: videoID)
+                let info = try await VideoService().fetchMoreInfo(id: videoID)
                 await MainActor.run {
                     // Drop the result if the user switched videos before this returned.
                     guard player.currentVideo?.id == videoID else { return }
                     details = info
+                    let fetched = info.descriptionText?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    let snippet = video.descriptionSnippet?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    detailsLoadFailed = (fetched?.isEmpty ?? true) && (snippet?.isEmpty ?? true)
                 }
             } catch {
-                // Network failure is non-fatal — collapsed view still shows the snippet if any.
+                await MainActor.run {
+                    guard player.currentVideo?.id == videoID else { return }
+                    detailsLoadFailed = true
+                }
             }
         }
     }

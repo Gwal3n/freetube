@@ -162,7 +162,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             player.rate = 2
             log.info("Hold recognized; temporary rate=2x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            showFeedback("2×", horizontalFraction: 0.5, automaticallyHide: false)
+            showFeedback(
+                "2×",
+                horizontalFraction: 0.5,
+                verticalFraction: 0.16,
+                compact: true,
+                automaticallyHide: false
+            )
         case .ended, .cancelled, .failed:
             restorePlaybackRateIfNeeded()
             log.info("Hold ended; restored playback rate")
@@ -221,6 +227,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private func showFeedback(
         _ text: String,
         horizontalFraction: CGFloat,
+        verticalFraction: CGFloat = 0.5,
+        compact: Bool = false,
         automaticallyHide: Bool = true
     ) {
         guard let view = feedbackView else { return }
@@ -228,7 +236,17 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         let label = feedbackLabel ?? makeFeedbackLabel(in: view)
         label.text = text
-        label.center = CGPoint(x: view.bounds.width * horizontalFraction, y: view.bounds.midY)
+        label.font = compact
+            ? .preferredFont(forTextStyle: .subheadline)
+            : .preferredFont(forTextStyle: .headline)
+        label.bounds.size = compact
+            ? CGSize(width: 64, height: 32)
+            : CGSize(width: 76, height: 44)
+        label.layer.cornerRadius = compact ? 16 : 22
+        label.center = CGPoint(
+            x: view.bounds.width * horizontalFraction,
+            y: view.bounds.height * verticalFraction
+        )
         label.alpha = 1
 
         guard automaticallyHide else { return }
