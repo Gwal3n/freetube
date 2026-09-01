@@ -179,16 +179,26 @@ Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
 setting still bounds ABR variant selection. `.auto` stays uncapped.
 
 **Playback starts optimistically.** `resolveAndPlay` installs the candidate, sets
-`loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`;
-`automaticallyWaitsToMinimizeStalling` is `false` (set once in `init`) so AVPlayer honours that
-request with whatever it has buffered rather than holding it back until it can play through. This is
-purely about perceived latency: warm resolution is ~0.4s but AVPlayer readiness is ~2s, i.e. ~80% of
-the tap-to-video wait, and AVPlayer exposes no "first frame rendered" signal to key off.
+`loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`. This
+is purely about perceived latency: warm resolution is ~0.4s but AVPlayer readiness is ~2s, i.e. ~80%
+of the tap-to-video wait, and AVPlayer exposes no "first frame rendered" signal to key off.
+
+**`automaticallyWaitsToMinimizeStalling` must stay `true`, and setting it to `false` breaks
+playback outright.** It reads like the lever that makes an optimistic start take effect sooner; it is
+the opposite. `AVPlayer.rate` ignores a nonzero rate set while the current item isn't ready, so the
+only reason the early `play()` survives to readiness is that `true` parks the player in
+`.waitingToPlayAtSpecifiedRate`, from which it starts on its own. With `false` there is no holding
+state: the call is discarded, `timeControlStatus` never changes, and — because `play()` sets
+`isPlaying = true` as a UI prediction — nothing downstream notices. The video sits on its thumbnail
+until the user pauses and plays again. Correspondingly, the `.readyToPlay` retry is gated on
+`player.timeControlStatus == .paused`, never on `isPlaying`, which is a prediction rather than an
+observation and reads `true` whether or not AVPlayer honoured the request.
 
 **Validation is unchanged.** A candidate is still only *accepted* on `.readyToPlay`; on `.failed` or
 a readiness timeout the strategy goes into `excludedStrategies`, the transport is paused (the
-optimistic `play()` left it running on a stream we're abandoning, and `isPlaying` / NowPlaying must
-not keep advertising it), the queue is emptied, and the loop asks for the next candidate. Readiness
+optimistic `play()` left it playing or waiting-to-play on a stream we're abandoning, and `isPlaying`
+/ NowPlaying must not keep advertising it), the queue is emptied, and the loop asks for the next
+candidate. Readiness
 is observed through KVO on `AVPlayerItem.status` — the single observation installed by
 `observe(item:)`, never a second competing one — feeding a continuation, which replaced a 100ms
 polling loop. That continuation is resumed exactly once, by whichever of KVO, the timeout task, or
@@ -502,7 +512,7 @@ If asked to "make it more robust" or "production-ready", point to these realitie
 - yt-dlp's HLS downloader needs ffmpeg, which is blocked by §15.3 — yt-dlp picking an HLS-only format fails on iOS. Tier 2/3 take over.
 - IP-level rate limiting from YouTube can hit users on shared networks (CGNAT, VPN). No client-side fix.
 - This codebase intentionally does not implement App Store evasion techniques. Sideload distribution is the assumption.
-- Playback is started before AVPlayer reports `.readyToPlay` and `automaticallyWaitsToMinimizeStalling` is off (§7), so on a weak connection the first seconds can stall where an earlier build would have sat on the loading overlay for longer instead. That's the deliberate trade: a stall that resolves itself reads better than a spinner that hasn't moved.
+- Playback is started before AVPlayer reports `.readyToPlay` (§7), so the transport can sit in `.waitingToPlayAtSpecifiedRate` for a moment after the thumbnail is up. AVPlayer still decides when it has buffered enough to begin, so this brings the start forward to the earliest instant AVPlayer allows rather than overriding its judgement.
 - HLS variant selection is bounded by `preferredQuality.heightCap` via `AVPlayerItem.preferredMaximumResolution`, but we don't pre-pick a variant — AVPlayer's adaptive bitrate logic still chooses freely below that ceiling, so the played resolution can sit under the user's setting on a weak connection.
 
 ---

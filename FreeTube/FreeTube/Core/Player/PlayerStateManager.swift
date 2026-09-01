@@ -107,14 +107,18 @@ final class PlayerStateManager {
         // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
         // the mini-player." Pairs with the `.playback` AVAudioSession configured at launch.
         player.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
-        // Startup perception: `resolveAndPlay` issues `play()` the moment a candidate URL is
-        // installed, before the item reports `.readyToPlay`. With the default `true` AVPlayer
-        // holds that request back until it has buffered enough to play through without
-        // stalling, which re-adds most of the delay we're trying to hide. `false` means "start
-        // with whatever you have" — the trade-off is a higher chance of an early stall on a
-        // weak connection, which is the same bargain ExoPlayer makes on Android. Set once here
-        // rather than per item; the property lives on the player, not the item.
-        player.automaticallyWaitsToMinimizeStalling = false
+        // Must stay `true`, which is also the default — this is spelled out because setting it
+        // to `false` looks like the obvious way to make the optimistic start in `resolveAndPlay`
+        // start sooner, and it does the exact opposite.
+        //
+        // `resolveAndPlay` calls `play()` the moment a candidate URL is installed, while the item
+        // is still `.unknown`. `AVPlayer.rate` ignores a nonzero rate set before the current item
+        // is ready to play, so the *only* thing that makes that early request survive to readiness
+        // is this property: with `true` the player enters `.waitingToPlayAtSpecifiedRate` and
+        // begins on its own the instant the item is ready. With `false` there is no such holding
+        // state, the request is dropped on the floor, and playback never starts — the video sits
+        // on its thumbnail until the user pauses and plays again.
+        player.automaticallyWaitsToMinimizeStalling = true
         // Restore the last-used playback speed. `defaultRate` is what `AVPlayerViewController`'s
         // speed menu writes, and `AVPlayer.play()` resumes at this rate (not the transient `rate`).
         // Setting it *before* installObservers keeps the KVO from firing back and re-saving the
@@ -429,8 +433,10 @@ final class PlayerStateManager {
             // Optimistic start. AVPlayer has no "first frame rendered" signal — only
             // `.readyToPlay`, which on a warm resolve accounted for ~80% of the tap-to-video
             // wait. So we stop gating the transport on it: the candidate is still validated
-            // below and still rejected on failure/timeout, but the rate is already 1 when
-            // readiness lands, which removes a whole round trip from the perceived start.
+            // below and still rejected on failure/timeout, but the player is already holding a
+            // play request when readiness lands, so it starts without waiting for us to notice.
+            // This only works because `automaticallyWaitsToMinimizeStalling` is `true` — see the
+            // note in `init`, where turning it off silently discards this call.
             // `.buffering` keeps the UI on the video's thumbnail instead of a spinner.
             loadState = .buffering
             updateNowPlaying()
@@ -455,9 +461,15 @@ final class PlayerStateManager {
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 loadState = .readyToPlay
                 updateNowPlaying()
-                // Normally a no-op now (the optimistic `play()` above already ran); still needed
-                // for the autoplay path where a rejected candidate left the transport paused.
-                if autoplay, !isPlaying { play() }
+                // Usually redundant — the optimistic `play()` above has either started the item or
+                // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
+                // where a rejected candidate left the transport paused.
+                //
+                // Ask the player, not `isPlaying`. That flag is a prediction written by `play()`
+                // for immediate UI feedback, so after an optimistic start it reads `true` whether
+                // or not AVPlayer honoured the request. Gating this on it means the one situation
+                // that needs a retry is the one situation where the retry is skipped.
+                if autoplay, player.timeControlStatus == .paused { play() }
                 finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
                 return
             case .failed(let description):
