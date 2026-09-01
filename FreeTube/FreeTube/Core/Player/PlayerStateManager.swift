@@ -312,8 +312,10 @@ final class PlayerStateManager {
     /// failures the moment they happen (CoreMedia's `CFByteFlume err=-12939` style messages don't
     /// surface a structured `NSError` otherwise).
     private func loadItem(_ item: AVPlayerItem) {
-        let url = (item.asset as? AVURLAsset)?.url.path ?? "(non-URL asset)"
-        log.info("loadItem: removeAllItems + insert (asset=\(url, privacy: .public))")
+        // Do not log the asset URL or path. Direct YouTube assets contain signed credentials in
+        // both components; the candidate strategy is logged immediately before this method.
+        let assetKind = item.asset is AVURLAsset ? "URL" : "composition"
+        log.info("loadItem: removeAllItems + insert (assetKind=\(assetKind, privacy: .public))")
         player.removeAllItems()
         player.insert(item, after: nil)
         log.debug("loadItem: queue size after insert=\(self.player.items().count, privacy: .public)")

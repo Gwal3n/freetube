@@ -55,6 +55,10 @@ These come first. Violating them breaks the project.
 | Logging | `os.Logger` with subsystem `com.leshko.freetube` |
 | JavaScript runtime | `JavaScriptCore` (`JSContext`) — solves YouTube's N/SIG cipher challenges in-process by faking the `deno` runtime to yt-dlp; see §15.11 |
 
+The `b5i/YouTubeKit` project reference tracks `main`, but Xcode and CI honor the revision in
+`Package.resolved`. When updating playback extraction, update that resolved revision as well;
+otherwise builds silently continue using the older pinned implementation.
+
 Adding any other dependency requires an explicit ask in the PR description with justification.
 
 ---
