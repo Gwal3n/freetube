@@ -3,6 +3,9 @@ import SwiftUI
 struct CommentRow: View {
     let comment: Comment
     var onLike: () -> Void = {}
+    var repliesTitle: String? = nil
+    var repliesExpanded = false
+    var onToggleReplies: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -17,6 +20,16 @@ struct CommentRow: View {
                     Label("\(comment.likeCount)", systemImage: comment.isLikedByUser ? "hand.thumbsup.fill" : "hand.thumbsup")
                         .labelStyle(.titleAndIcon)
                         .font(.caption)
+                }
+                if let repliesTitle, let onToggleReplies {
+                    Button(action: onToggleReplies) {
+                        HStack(spacing: 4) {
+                            Image(systemName: repliesExpanded ? "chevron.up" : "chevron.down")
+                            Text(repliesTitle)
+                        }
+                        .font(.caption)
+                    }
+                    .foregroundStyle(.primary)
                 }
             }
             .buttonStyle(.plain)

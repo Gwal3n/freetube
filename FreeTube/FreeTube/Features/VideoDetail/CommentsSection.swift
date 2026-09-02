@@ -77,28 +77,19 @@ struct CommentsSection: View {
     private func commentThread(_ comment: Comment) -> some View {
         CommentRow(
             comment: comment,
-            onLike: { Task { await model.toggleLike(comment) } }
+            onLike: { Task { await model.toggleLike(comment) } },
+            repliesTitle: comment.replyCount > 0 && comment.replyContinuationToken != nil
+                ? (expandedReplyCommentIDs.contains(comment.id)
+                    ? "Hide replies"
+                    : "View \(comment.replyCount) replies")
+                : nil,
+            repliesExpanded: expandedReplyCommentIDs.contains(comment.id),
+            onToggleReplies: comment.replyCount > 0 && comment.replyContinuationToken != nil
+                ? { toggleReplies(for: comment) }
+                : nil
         )
 
         if comment.replyCount > 0, comment.replyContinuationToken != nil {
-            Button {
-                if expandedReplyCommentIDs.contains(comment.id) {
-                    expandedReplyCommentIDs.remove(comment.id)
-                } else {
-                    expandedReplyCommentIDs.insert(comment.id)
-                    Task { await model.loadReplies(for: comment) }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: expandedReplyCommentIDs.contains(comment.id) ? "chevron.up" : "chevron.down")
-                    Text(expandedReplyCommentIDs.contains(comment.id) ? "Hide replies" : "View \(comment.replyCount) replies")
-                }
-                .font(.caption.weight(.semibold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.blue)
-            .padding(.leading, 16)
-
             if expandedReplyCommentIDs.contains(comment.id) {
                 if model.loadingReplyCommentIDs.contains(comment.id), model.repliesByCommentID[comment.id] == nil {
                     ProgressView()
@@ -128,6 +119,15 @@ struct CommentsSection: View {
                     }
                 }
             }
+        }
+    }
+
+    private func toggleReplies(for comment: Comment) {
+        if expandedReplyCommentIDs.contains(comment.id) {
+            expandedReplyCommentIDs.remove(comment.id)
+        } else {
+            expandedReplyCommentIDs.insert(comment.id)
+            Task { await model.loadReplies(for: comment) }
         }
     }
 }

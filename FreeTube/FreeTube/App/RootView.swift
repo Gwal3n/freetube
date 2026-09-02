@@ -15,6 +15,7 @@ import UIKit
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @State private var selectedTab: Tab = .search
+    @State private var searchActivation = 0
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
     /// (for the list) read the same source of truth.
@@ -109,9 +110,9 @@ struct RootView: View {
     @ViewBuilder
     private var tabShell: some View {
         if #available(iOS 26.0, *) {
-            TabView(selection: $selectedTab) {
+            TabView(selection: tabSelection) {
                 SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search) {
-                    HomeScreen()
+                    HomeScreen(searchActivation: searchActivation)
                 }
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
@@ -139,8 +140,8 @@ struct RootView: View {
     /// iOS 17–25 compatibility. iOS 26 uses the modern `Tab` declarations above for its
     /// native Liquid Glass tab bar, while Search remains an ordinary peer tab on every OS.
     private var legacyTabShell: some View {
-        TabView(selection: $selectedTab) {
-            HomeScreen()
+        TabView(selection: tabSelection) {
+            HomeScreen(searchActivation: searchActivation)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
@@ -161,6 +162,21 @@ struct RootView: View {
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(Tab.settings)
         }
+    }
+
+    /// Keep Search as an ordinary peer tab. SwiftUI writes the selection binding even when an
+    /// already-selected tab item is tapped, which lets us request search activation without the
+    /// detached iOS 26 `.search` tab role or a gesture recognizer on the native tab bar.
+    private var tabSelection: Binding<Tab> {
+        Binding(
+            get: { selectedTab },
+            set: { newTab in
+                if newTab == .search, selectedTab == .search {
+                    searchActivation &+= 1
+                }
+                selectedTab = newTab
+            }
+        )
     }
 
     private func updateStatusBarOverride(forFullScreenOpen open: Bool) {
@@ -261,12 +277,6 @@ struct PopupContentWrapper: View {
                         player.togglePlayPause()
                     } label: {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .foregroundStyle(Color.primary)
-                    }
-                    Button {
-                        player.playNext()
-                    } label: {
-                        Image(systemName: "forward.fill")
                             .foregroundStyle(Color.primary)
                     }
                 }

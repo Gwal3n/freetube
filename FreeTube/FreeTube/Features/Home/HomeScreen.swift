@@ -8,8 +8,10 @@ import SwiftData
 /// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
+    let searchActivation: Int
     @State private var searchModel = SearchViewModel()
     @State private var path = NavigationPath()
+    @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
@@ -32,6 +34,7 @@ struct HomeScreen: View {
             .navigationTitle("Search")
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
+                isPresented: $isSearchPresented,
                 enabled: !MacIntegration.isRunningOnMac,
                 prompt: "Search YouTube"
             ))
@@ -55,6 +58,17 @@ struct HomeScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
                 guard let channelID = note.object as? String, !channelID.isEmpty else { return }
                 path.append(SearchChannelRoute(id: channelID))
+            }
+            .onChange(of: searchActivation) { _, _ in
+                guard !MacIntegration.isRunningOnMac else { return }
+                path = NavigationPath()
+                // Re-present even if Search remained logically active after its keyboard was
+                // resigned, otherwise assigning `true` again would not restore focus.
+                isSearchPresented = false
+                Task { @MainActor in
+                    await Task.yield()
+                    isSearchPresented = true
+                }
             }
         }
     }

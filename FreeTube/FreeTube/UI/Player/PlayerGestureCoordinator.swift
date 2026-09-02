@@ -128,7 +128,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         log.info("Double tap recognized; seeking \(interval, privacy: .public)s")
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        beginSeekSession(with: interval, horizontalFraction: isForward ? 0.72 : 0.28)
+        beginSeekSession(with: interval, horizontalFraction: isForward ? 0.82 : 0.18)
     }
 
     @objc private func didSingleTap(_ gesture: UITapGestureRecognizer) {
@@ -146,7 +146,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showFeedback(
             seekFeedbackText,
-            horizontalFraction: isForward ? 0.72 : 0.28,
+            horizontalFraction: isForward ? 0.82 : 0.18,
             automaticallyHide: false
         )
         scheduleSeekSessionEnd()
@@ -165,7 +165,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             showFeedback(
                 "2×",
                 horizontalFraction: 0.5,
-                verticalFraction: 0.16,
+                verticalFraction: 0.10,
                 compact: true,
                 automaticallyHide: false
             )
@@ -240,9 +240,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             ? .preferredFont(forTextStyle: .subheadline)
             : .preferredFont(forTextStyle: .headline)
         label.bounds.size = compact
-            ? CGSize(width: 64, height: 32)
-            : CGSize(width: 76, height: 44)
-        label.layer.cornerRadius = compact ? 16 : 22
+            ? CGSize(width: 52, height: 26)
+            : CGSize(width: 68, height: 38)
+        label.layer.cornerRadius = compact ? 13 : 19
         label.center = CGPoint(
             x: view.bounds.width * horizontalFraction,
             y: view.bounds.height * verticalFraction
@@ -260,10 +260,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         label.font = .preferredFont(forTextStyle: .headline)
         label.textColor = .white
         label.textAlignment = .center
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.65)
-        label.layer.cornerRadius = 22
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.52)
+        label.layer.cornerRadius = 19
         label.clipsToBounds = true
-        label.bounds.size = CGSize(width: 76, height: 44)
+        label.bounds.size = CGSize(width: 68, height: 38)
         label.isUserInteractionEnabled = false
         label.accessibilityElementsHidden = true
         view.addSubview(label)

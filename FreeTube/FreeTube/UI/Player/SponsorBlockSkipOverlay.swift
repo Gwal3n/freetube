@@ -10,29 +10,40 @@ struct SponsorBlockSkipOverlay: View {
     var body: some View {
         VStack {
             Spacer()
-            HStack(spacing: 12) {
-                Image(systemName: notice.kind == .skipped ? "forward.fill" : "sparkles")
-                    .foregroundStyle(categoryColor)
-                Text(message)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Button(actionTitle, action: action)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(categoryColor)
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .foregroundStyle(.secondary)
+            HStack {
+                HStack(spacing: 6) {
+                    Button(action: action) {
+                        HStack(spacing: 6) {
+                            Image(systemName: notice.kind == .skipped ? "arrow.uturn.backward" : "sparkles")
+                                .foregroundStyle(categoryColor)
+                            Text(message)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                        }
+                        .padding(.leading, 9)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(actionAccessibilityLabel)
+
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                    }
+                    .accessibilityLabel("Dismiss")
                 }
-                .accessibilityLabel("Dismiss")
+                .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 8))
+
+                Spacer(minLength: 0)
             }
-            .font(.caption)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.black.opacity(0.68), in: Capsule())
             .padding(.bottom, 20)
         }
-        .padding(.horizontal)
+        .padding(.leading, 10)
+        .padding(.trailing, 40)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
@@ -46,8 +57,8 @@ struct SponsorBlockSkipOverlay: View {
         }
     }
 
-    private var actionTitle: String {
-        notice.kind == .skipped ? "Undo" : "Skip"
+    private var actionAccessibilityLabel: String {
+        notice.kind == .skipped ? "Undo sponsor skip" : "Skip to highlight"
     }
 
     private var action: () -> Void {
