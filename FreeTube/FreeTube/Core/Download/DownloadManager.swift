@@ -333,6 +333,9 @@ final class DownloadManager: TemporaryDownloading {
     private var currentPath: NWPath?
 
     private init() {
+        // Force the lazy static while the app still owns its original container environment;
+        // embedded Python initialization can otherwise affect later directory resolution.
+        _ = Self.downloadsDirectory
         startMonitoringPath()
     }
 
@@ -711,7 +714,7 @@ final class DownloadManager: TemporaryDownloading {
                     id: snapshotID,
                     videoID: video.id,
                     title: video.title,
-                    state: .failed("Download finished but file not found"),
+                    state: .failed("YouTube refused the download stream. Please try again."),
                     createdAt: .now
                 ))
                 throw YouTubeServiceError.streamExtractionFailed
@@ -1249,9 +1252,16 @@ final class DownloadManager: TemporaryDownloading {
     /// in Info.plist). Every video gets a fixed `mp4` extension because yt-dlp's merger
     /// produces an mp4 container.
     static func fileURL(for videoID: String) -> URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return docs.appendingPathComponent("\(videoID).mp4")
+        downloadsDirectory.appendingPathComponent("\(videoID).mp4")
     }
+
+    /// Resolve Documents once, before embedded Python can alter process-level path state.
+    /// Re-evaluating `.documentDirectory` after Python initialization produced a path with an
+    /// obsolete app-container Documents directory appended inside the current container.
+    private static let downloadsDirectory = FileManager.default.urls(
+        for: .documentDirectory,
+        in: .userDomainMask
+    )[0]
 
     /// Builds a yt-dlp `-f` format string honoring the user's quality preference.
     ///

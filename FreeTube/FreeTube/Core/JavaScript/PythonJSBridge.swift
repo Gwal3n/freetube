@@ -8,7 +8,7 @@ import PythonSupport
 /// solved transparently — same as a desktop install with `deno` available, just running
 /// on JavaScriptCore instead of V8.
 ///
-/// **Four pieces, all installed by `install()`:**
+/// **Core pieces, all installed by `install()`:**
 /// 1. `builtins.eval_js(code) -> str` — Python-callable hook that runs JS via
 ///    `JSEvaluator`, wrapping the source so `console.log` output is captured and returned.
 /// 2. **`yt_dlp_ejs` package shim** — three synthetic modules in `sys.modules`
@@ -17,10 +17,12 @@ import PythonSupport
 ///    `_pypackage_source` finds this via `from yt_dlp.dependencies import yt_dlp_ejs` and
 ///    uses the JS content as its challenge-solver script source.
 /// 3. **`DenoJsRuntime._info` stub** — replaces the real binary-probe with a function that
-///    returns `JsRuntimeInfo(name='deno', path=..., version='2.0.0', version_tuple=(2,0,0),
+///    returns a supported `JsRuntimeInfo(name='deno', path=..., version='2.3.0', ...,
 ///    supported=True)`. Without this, yt-dlp's `_js_runtimes['deno'].info` would be `None`
 ///    (no deno binary on iOS) and the whole EJS path gets skipped.
-/// 4. **`subprocess.Popen` extension** — the YoutubeDL-iOS package already replaced
+/// 4. **Direct `DenoJCP` runner** — current yt-dlp's complete EJS payload is passed straight
+///    to JavaScriptCore, without emulating subprocess stdout.
+/// 5. **`subprocess.Popen` compatibility extension** — the YoutubeDL-iOS package already replaced
 ///    `subprocess.Popen` with its ffmpeg-only `Pop` class. We monkey-patch `Pop.__init__`
 ///    and `Pop.communicate` to also recognize argv starting with our fake deno path
 ///    (`/dev/null/freetube-deno`), route stdin through `eval_js`, and return the JS result
@@ -57,8 +59,9 @@ nonisolated enum PythonJSBridge {
         installEvalJSBuiltin()
         installEJSPackageShim()
         installRuntimeStub()
+        installDirectChallengeRunner()
         installPopenExtension()
-        log.info("PythonJSBridge installed (eval_js + yt_dlp_ejs shim + deno stub + Popen ext)")
+        log.info("PythonJSBridge installed (eval_js + yt_dlp_ejs shim + direct JSC runner + deno fallback)")
     }
 
     // MARK: - 1. eval_js builtin
@@ -225,7 +228,7 @@ nonisolated enum PythonJSBridge {
             path = _determine_runtime_path(self._path, 'deno')
             return JsRuntimeInfo(
                 name='deno', path=path,
-                version='2.0.0', version_tuple=(2, 0, 0),
+                version='2.3.0', version_tuple=(2, 3, 0),
                 supported=True,
             )
 
@@ -238,7 +241,38 @@ nonisolated enum PythonJSBridge {
         print('PythonJSBridge: DenoJsRuntime patch failed:', _e, file=sys.stderr)
     """
 
-    // MARK: - 4. Pop extension (subprocess.Popen monkey-patch)
+    // MARK: - 4. Direct yt-dlp challenge runner
+
+    /// Current yt-dlp funnels the complete, self-contained EJS payload through
+    /// `DenoJCP._run_js_runtime`. Calling JavaScriptCore at that boundary is both simpler and
+    /// more reliable than pretending to be a subprocess and reconstructing stdout through
+    /// `Popen.communicate`. Keep the Popen extension below for older yt-dlp releases whose
+    /// provider implementation does not expose this method in the same place.
+    private static func installDirectChallengeRunner() {
+        runSimpleString(directChallengeRunnerPython)
+        log.info("DenoJCP._run_js_runtime routed directly to JavaScriptCore")
+    }
+
+    private static let directChallengeRunnerPython = """
+    try:
+        import builtins
+        from yt_dlp.extractor.youtube.jsc._builtin.deno import DenoJCP
+
+        if not getattr(DenoJCP, '_freetube_jsc_patched', False):
+            def _freetube_run_js_runtime(self, stdin):
+                output = builtins.eval_js(stdin)
+                if not output or not str(output).strip():
+                    raise RuntimeError('JavaScriptCore challenge solver returned empty output')
+                return str(output)
+
+            DenoJCP._run_js_runtime = _freetube_run_js_runtime
+            DenoJCP._freetube_jsc_patched = True
+    except Exception as _e:
+        import sys
+        print('PythonJSBridge: direct DenoJCP patch unavailable:', _e, file=sys.stderr)
+    """
+
+    // MARK: - 5. Pop extension (subprocess.Popen monkey-patch)
 
     /// Extends the YoutubeDL-iOS `Pop` class (already installed as `subprocess.Popen` by
     /// `injectFakePopen`) to also handle the fake-deno argv path. `yt_dlp.utils.Popen` is

@@ -406,7 +406,7 @@ YouTube has been enforcing Proof-of-Origin Tokens and rotating the `n`-parameter
 - `Could not get n-parameter function.`
 - `HTTP Error 403: Forbidden` on download.
 
-**N-cipher: solved in-process via JavaScriptCore.** See §15.11 — `PythonJSBridge` fakes a `deno` runtime to yt-dlp using `JSContext`, and ships `yt-dlp-ejs` solver scripts in `Resources/`. The "n challenge solving failed" warnings should no longer fire for normal videos. The solver bundle (`yt-dlp-ejs 0.8.0`) needs re-pulling when YouTube rotates the cipher faster than yt-dlp's vendored regexes can match.
+**N-cipher: solved in-process via JavaScriptCore.** See §15.11 — `PythonJSBridge` routes current yt-dlp's `DenoJCP._run_js_runtime` directly through `JSContext` (with the older fake-`Popen` route retained as a compatibility fallback), and ships `yt-dlp-ejs` solver scripts in `Resources/`. The "n challenge solving failed" warnings should no longer fire for normal videos. The solver bundle (`yt-dlp-ejs 0.8.0`) needs re-pulling when YouTube rotates the cipher faster than yt-dlp's vendored regexes can match.
 
 **PoT: still unsolved.** Proof-of-Origin Tokens require attesting to YouTube via a Play Integrity / DroidGuard / WidevineCDM challenge — not something a JS runtime alone can answer. Tier 3 streaming (HLS or direct progressive URL from `VideoInfosResponse`) remains the user-facing safety net for PoT-locked content (typically kids/family videos, some music labels).
 
@@ -438,17 +438,19 @@ YouTubeKit's `subscribeStatus` doesn't follow `pageHeaderRenderer` entity-key in
 
 YouTube serves stream URLs whose `n` parameter is obfuscated by a transform function defined in player.js. yt-dlp's solver (the `EJS` framework, package `yt-dlp-ejs`) extracts that JS, builds a script, and pipes it to an external JS runtime — `deno`, `node`, `bun`, or `qjs`. No such binary exists on iOS. Without intercepting this, the user sees `n challenge solving failed` followed by 403s at the CDN.
 
-We fake `deno` to yt-dlp using `JavaScriptCore`. The bridge is **five pieces**, all installed by `PythonJSBridge.install()` at exactly one splice point inside our forked `freetube_yt_dlp(...)` entry — between `YtDlp()`'s init (which runs YoutubeDL-iOS's `injectFakePopen`) and `ydl.download` (which triggers JSC provider registration):
+We route yt-dlp's `deno` provider through `JavaScriptCore`. The bridge is **six pieces**, all installed by `PythonJSBridge.install()` at exactly one splice point inside our forked `freetube_yt_dlp(...)` entry — between `YtDlp()`'s init (which runs YoutubeDL-iOS's `injectFakePopen`) and `ydl.download` (which triggers JSC provider registration):
 
 1. **`builtins.eval_js(code: str) -> str`** — Python-callable hook that runs JS via `JSEvaluator.evaluate(_:)`. The caller's source is wrapped in an IIFE that fakes a `console` global (capturing `console.log` args to an array) and returns the joined captures, so yt-dlp's `console.log(JSON.stringify(jsc({...})))` payload works unchanged.
 
 2. **`yt_dlp_ejs` sys.modules shim** — yt-dlp gates the whole EJS path on `from yt_dlp.dependencies import yt_dlp_ejs as _has_ejs` being truthy. We synthesize three modules (`yt_dlp_ejs`, `.yt`, `.yt.solver`) in `sys.modules` with the package's exact API — `version`, `core()`, `lib()` — reading from our bundled `core.min.js` (the N/SIG solver, ~7 KB) and `lib.min.js` (meriyah + astring bundle, ~152 KB) via `EJSResources`. We also rebind `yt_dlp.dependencies.yt_dlp_ejs` after the fact in case it was imported before us.
 
-3. **`DenoJsRuntime._info` monkey-patch** — yt-dlp normally spawns `deno --version` and parses stdout to populate `_js_runtimes['deno'].info`. We replace `_info` to return `JsRuntimeInfo(name='deno', version='2.0.0', version_tuple=(2,0,0), supported=True)` without any subprocess call.
+3. **`DenoJsRuntime._info` monkey-patch** — yt-dlp normally spawns `deno --version` and parses stdout to populate `_js_runtimes['deno'].info`. We replace `_info` to return a supported `JsRuntimeInfo` without any subprocess call.
 
-4. **Pop class monkey-patch (not `subprocess.Popen`)** — YoutubeDL-iOS replaces `subprocess.Popen` with its ffmpeg-only `Pop` class at init time. Then `yt_dlp.utils.Popen` declares `class Popen(subprocess.Popen):` — which captures `Pop` as its base **at class definition time, frozen**. Rebinding `subprocess.Popen` later would NOT change that MRO. The fix is to monkey-patch `Pop.__init__` and `Pop.communicate` directly; `yt_dlp.utils.Popen` looks up methods dynamically via `super()`, so calls now hit our extended handlers. For argv[0] equal to our fake path (`/dev/null/freetube-deno`), we capture stdin, pass to `builtins.eval_js`, return the JS result on stdout. Everything else falls through to the original `Pop` (preserving ffmpeg passthrough).
+4. **Direct `DenoJCP._run_js_runtime` monkey-patch** — current yt-dlp exposes the complete EJS payload at this boundary. We pass it straight to `builtins.eval_js` and return the JSON result, avoiding the fragile subprocess/stdout emulation that produced empty output with yt-dlp 2026.08.19.
 
-5. **`js_runtimes` ydl_opt** — even with the runtime detection stubbed, yt-dlp's `_js_runtimes` dict only gets populated from the `js_runtimes` ydl_opt. `FreeTubeYtDlp.swift` adds `ydl_opts["js_runtimes"] = {"deno": {"path": fakeDenoPath}}` so the dict has an entry to apply (3) to.
+5. **Pop class compatibility monkey-patch (not `subprocess.Popen`)** — retained for older yt-dlp providers. YoutubeDL-iOS replaces `subprocess.Popen` with its ffmpeg-only `Pop` class at init time, so the bridge extends that existing class and intercepts only our fake deno path. Everything else falls through to the original `Pop`.
+
+6. **`js_runtimes` ydl_opt** — even with the runtime detection stubbed, yt-dlp's `_js_runtimes` dict only gets populated from the `js_runtimes` ydl_opt. `FreeTubeYtDlp.swift` adds `ydl_opts["js_runtimes"] = {"deno": {"path": fakeDenoPath}}` so the dict has an entry to apply (3) to.
 
 **Maintenance:** when YoutubeDL-iOS bumps its yt-dlp version, re-pull `yt-dlp-ejs` from PyPI to match (check upstream `vendor.HASHES`), update `EJSResources.version`, drop new `core.min.js`/`lib.min.js` into `Resources/`. yt-dlp validates major/minor version of the script against its embedded `_SCRIPT_VERSION`; mismatch silently disables the EJS path.
 

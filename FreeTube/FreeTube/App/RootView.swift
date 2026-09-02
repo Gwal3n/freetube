@@ -15,6 +15,10 @@ import UIKit
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @State private var selectedTab: Tab = .search
+    /// iOS 26 requires the search binding on the tab container for a search-role tab to
+    /// morph into the native search field and focus the keyboard when tapped. The content
+    /// and container share this model so results, suggestions, and submission stay unchanged.
+    @State private var searchModel = SearchViewModel()
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
     /// (for the list) read the same source of truth.
@@ -41,30 +45,7 @@ struct RootView: View {
     var body: some View {
         @Bindable var player = player
 
-        TabView(selection: $selectedTab) {
-            HomeScreen()
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(Tab.search)
-
-            LibraryScreen()
-                .tabItem { Label("Library", systemImage: "play.square.stack") }
-                .tag(Tab.library)
-
-            FetchScreen()
-                .tabItem { Label("Link", systemImage: "link") }
-                .tag(Tab.link)
-
-            DownloadsScreen()
-                .tabItem {
-                    Label("Downloads", systemImage: "arrow.down.circle")
-                }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-                .tag(Tab.downloads)
-
-            SettingsScreen()
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                .tag(Tab.settings)
-        }
+        tabShell
         .popup(
             isBarPresented: $player.miniPlayerVisible,
             isPopupOpen: $player.fullScreenPresented
@@ -118,6 +99,66 @@ struct RootView: View {
             if let tab = note.object as? Tab {
                 selectedTab = tab
             }
+        }
+    }
+
+    @ViewBuilder
+    private var tabShell: some View {
+        if #available(iOS 26.0, *) {
+            @Bindable var searchModel = searchModel
+
+            TabView(selection: $selectedTab) {
+                SwiftUI.Tab(value: Tab.search, role: .search) {
+                    HomeScreen(searchModel: searchModel, usesContainerSearch: true)
+                }
+
+                SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
+                    LibraryScreen()
+                }
+
+                SwiftUI.Tab("Link", systemImage: "link", value: Tab.link) {
+                    FetchScreen()
+                }
+
+                SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
+                    DownloadsScreen()
+                }
+                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
+
+                SwiftUI.Tab("Settings", systemImage: "gearshape.fill", value: Tab.settings) {
+                    SettingsScreen()
+                }
+            }
+            .searchable(text: $searchModel.query, prompt: Text("Search YouTube"))
+        } else {
+            legacyTabShell
+        }
+    }
+
+    /// iOS 17–25 compatibility. On iOS 26 the search-role branch above is deliberately used
+    /// instead, allowing the system to own the Liquid Glass search-tab animation and focus.
+    private var legacyTabShell: some View {
+        TabView(selection: $selectedTab) {
+            HomeScreen()
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag(Tab.search)
+
+            LibraryScreen()
+                .tabItem { Label("Library", systemImage: "play.square.stack") }
+                .tag(Tab.library)
+
+            FetchScreen()
+                .tabItem { Label("Link", systemImage: "link") }
+                .tag(Tab.link)
+
+            DownloadsScreen()
+                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
+                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
+                .tag(Tab.downloads)
+
+            SettingsScreen()
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(Tab.settings)
         }
     }
 
