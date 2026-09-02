@@ -49,6 +49,7 @@ struct FullScreenPlayer: View {
     @State private var addToPlaylistVideo: Video?
     @State private var playerControlsVisible = true
     @State private var controlsHideTask: Task<Void, Never>?
+    @AppStorage("autoplayNext") private var autoplayNext = true
 
     /// Hashable wrapper so `.navigationDestination(for:)` can match the channel id and push
     /// `ChannelScreen` onto `channelPath`.
@@ -101,7 +102,10 @@ struct FullScreenPlayer: View {
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
                         additionalTopControls: AnyView(
-                            HStack(spacing: 10) { moreActionsMenu }
+                            HStack(spacing: 10) {
+                                fullscreenButton
+                                moreActionsMenu
+                            }
                             .buttonStyle(.plain)
                         ),
                         bottomTimelinePadding: timelineBottomPadding(in: proxy.size),
@@ -258,6 +262,32 @@ struct FullScreenPlayer: View {
         let aspectHeight = availableSize.width * 9 / 16
         guard verticalSizeClass == .compact else { return 8 }
         return max(22, aspectHeight - availableSize.height + 16)
+    }
+
+    @ViewBuilder
+    private var fullscreenButton: some View {
+        Button {
+            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeLeft)
+            showPlayerControls()
+        } label: {
+            Image(systemName: verticalSizeClass == .compact
+                ? "arrow.down.right.and.arrow.up.left"
+                : "arrow.up.left.and.arrow.down.right")
+                .font(.body.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+        }
+        .accessibilityLabel(verticalSizeClass == .compact ? "Exit fullscreen" : "Enter fullscreen")
+    }
+
+    private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) else { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations))
+        UIViewController.attemptRotationToDeviceOrientation()
     }
 
     /// Default panel mode. No NavigationStack wrapping — the outer popup's `.thinMaterial`
@@ -875,6 +905,8 @@ struct FullScreenPlayer: View {
             // already inside a ScrollView, so we cap the list with a generous fixed height so it
             // doesn't try to consume the outer scroll's gesture space.
             if isQueueExpanded {
+                Toggle("Autoplay next", isOn: $autoplayNext)
+                    .padding(.horizontal)
                 List {
                     ForEach(displayedQueueIndices, id: \.self) { queueIndex in
                         queueRow(player.queue.items[queueIndex])

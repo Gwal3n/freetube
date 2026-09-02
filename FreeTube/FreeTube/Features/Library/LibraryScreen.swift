@@ -247,18 +247,24 @@ private struct LocalHistoryScreen: View {
                 )
             } else {
                 List {
-                    ForEach(entries) { entry in
-                        VideoRow(video: video(from: entry), showsMoreMenu: true) {
-                            player.load(video(from: entry))
-                        }
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                Task {
-                                    await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID)
+                    ForEach(dayGroups, id: \.day) { group in
+                        Section {
+                            ForEach(group.entries) { entry in
+                                VideoRow(video: video(from: entry), showsMoreMenu: true) {
+                                    player.load(video(from: entry))
                                 }
-                            } label: {
-                                Label("Remove", systemImage: "trash")
+                                .swipeActions {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID)
+                                        }
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                }
                             }
+                        } header: {
+                            Text(dayTitle(group.day))
                         }
                     }
                 }
@@ -285,6 +291,20 @@ private struct LocalHistoryScreen: View {
         } message: {
             Text("This removes watch history stored by FreeTube on this device.")
         }
+    }
+
+    private var dayGroups: [(day: Date, entries: [WatchHistoryEntry])] {
+        let calendar = Calendar.autoupdatingCurrent
+        return Dictionary(grouping: entries) { calendar.startOfDay(for: $0.watchedAt) }
+            .map { (day: $0.key, entries: $0.value.sorted { $0.watchedAt > $1.watchedAt }) }
+            .sorted { $0.day > $1.day }
+    }
+
+    private func dayTitle(_ day: Date) -> String {
+        let calendar = Calendar.autoupdatingCurrent
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
+        return day.formatted(date: .long, time: .omitted)
     }
 
     private func video(from entry: WatchHistoryEntry) -> Video {

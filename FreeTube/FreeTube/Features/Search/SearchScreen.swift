@@ -183,12 +183,13 @@ struct MacInlineSearchField: View {
 @available(iOS 17.0, *)
 struct ConditionalSearchable: ViewModifier {
     @Binding var text: String
+    @Binding var isPresented: Bool
     let enabled: Bool
     var prompt: String = "Search"
 
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(text: $text, prompt: Text(prompt))
+            content.searchable(text: $text, isPresented: $isPresented, prompt: Text(prompt))
         } else {
             content
         }

@@ -39,7 +39,10 @@ struct SponsorBlockSkipOverlay: View {
     private var message: String {
         switch notice.kind {
         case .skipped: return "\(notice.category.displayName) skipped"
-        case .prompt: return "Skip \(notice.category.displayName.lowercased())?"
+        case .prompt:
+            return notice.category == .highlight
+                ? "Jump to highlight?"
+                : "Skip \(notice.category.displayName.lowercased())?"
         }
     }
 

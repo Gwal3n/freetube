@@ -85,11 +85,13 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
             .compactMap { item -> SponsorBlockSegment? in
                 guard item.segment.count == 2,
                       allowed.contains(item.category),
-                      item.actionType == nil || item.actionType == "skip",
-                      let category = SponsorBlockCategory(rawValue: item.category) else { return nil }
+                      let category = SponsorBlockCategory(rawValue: item.category),
+                      item.actionType == nil || item.actionType == "skip" ||
+                        (category == .highlight && item.actionType == "poi") else { return nil }
                 let start = item.segment[0]
                 let end = item.segment[1]
-                guard start.isFinite, end.isFinite, start >= 0, end > start else { return nil }
+                guard start.isFinite, end.isFinite, start >= 0,
+                      (category == .highlight ? end >= start : end > start) else { return nil }
                 return SponsorBlockSegment(
                     id: item.uuid,
                     startTime: start,

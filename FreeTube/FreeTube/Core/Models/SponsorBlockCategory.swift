@@ -27,6 +27,7 @@ enum SponsorBlockBehavior: String, CaseIterable, Identifiable, Sendable {
     case disabled
     case showOnly
     case autoSkip
+    case ask
 
     var id: String { rawValue }
 
@@ -35,6 +36,11 @@ enum SponsorBlockBehavior: String, CaseIterable, Identifiable, Sendable {
         case .disabled: return String(localized: "Disabled")
         case .showOnly: return String(localized: "Show only")
         case .autoSkip: return String(localized: "Automatically skip")
+        case .ask: return String(localized: "Ask")
         }
+    }
+
+    static func choices(for category: SponsorBlockCategory) -> [SponsorBlockBehavior] {
+        category == .highlight ? [.disabled, .showOnly, .ask] : [.disabled, .showOnly, .autoSkip]
     }
 }

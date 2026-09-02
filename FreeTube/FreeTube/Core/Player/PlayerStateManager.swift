@@ -535,6 +535,22 @@ final class PlayerStateManager {
             sponsorBlockBoundaryObservers.append(observer)
         }
 
+        // A highlight is a point to jump *to*, not a duration to skip once playback reaches it.
+        // Offer it as soon as the lookup finishes while leaving Show only as a marker-only mode.
+        if let highlight = segments.first(where: {
+            $0.category == .highlight
+                && preferences.sponsorBlockBehavior(for: $0.category) == .ask
+                && elapsed < $0.startTime - 0.5
+        }) {
+            handledSponsorBlockSegmentIDs.insert(highlight.id)
+            sponsorBlockNotice = SponsorBlockNotice(
+                category: .highlight,
+                originalStartTime: elapsed,
+                kind: .prompt(endTime: highlight.startTime)
+            )
+            scheduleSponsorBlockNoticeDismissal()
+        }
+
         // The lookup may finish after playback has already entered a segment. Boundary observers
         // cannot fire retroactively, so evaluate the current position once immediately.
         if let current = segments.first(where: { elapsed >= $0.startTime && elapsed < $0.endTime }) {
@@ -544,7 +560,7 @@ final class PlayerStateManager {
 
     private func shouldObserveSponsorBlockSegment(_ segment: SponsorBlockSegment) -> Bool {
         let behavior = preferences.sponsorBlockBehavior(for: segment.category)
-        return behavior == .autoSkip || (segment.category == .highlight && behavior == .showOnly)
+        return behavior == .autoSkip
     }
 
     private func handleSponsorBlockSegment(at time: TimeInterval) {
@@ -567,19 +583,9 @@ final class PlayerStateManager {
               currentTime >= segment.startTime - 0.5,
               currentTime < segment.endTime - 0.1 else { return }
 
-        guard behavior == .autoSkip || segment.category == .highlight else { return }
+        guard behavior == .autoSkip else { return }
         handledSponsorBlockSegmentIDs.insert(segment.id)
         sponsorBlockNoticeTask?.cancel()
-
-        if segment.category == .highlight, behavior == .showOnly {
-            sponsorBlockNotice = SponsorBlockNotice(
-                category: segment.category,
-                originalStartTime: segment.startTime,
-                kind: .prompt(endTime: segment.endTime)
-            )
-            scheduleSponsorBlockNoticeDismissal()
-            return
-        }
 
         log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
         seek(to: segment.endTime)

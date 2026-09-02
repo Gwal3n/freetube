@@ -9,6 +9,8 @@ import SwiftData
 @available(iOS 17.0, *)
 struct HomeScreen: View {
     @State private var searchModel = SearchViewModel()
+    @State private var path = NavigationPath()
+    @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
@@ -16,7 +18,7 @@ struct HomeScreen: View {
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 if MacIntegration.isRunningOnMac {
                     MacInlineSearchField(query: $searchModel.query) {
@@ -31,9 +33,13 @@ struct HomeScreen: View {
             .navigationTitle("Search")
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
+                isPresented: $isSearchPresented,
                 enabled: !MacIntegration.isRunningOnMac,
                 prompt: "Search YouTube"
             ))
+            .navigationDestination(for: SearchChannelRoute.self) { route in
+                ChannelScreen(channelID: route.id)
+            }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
@@ -47,6 +53,15 @@ struct HomeScreen: View {
                 if searchModel.results != nil {
                     await searchModel.submit()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .freetubeFocusSearch)) { _ in
+                guard !MacIntegration.isRunningOnMac else { return }
+                path = NavigationPath()
+                isSearchPresented = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
+                guard let channelID = note.object as? String, !channelID.isEmpty else { return }
+                path.append(SearchChannelRoute(id: channelID))
             }
         }
     }
@@ -64,4 +79,8 @@ struct HomeScreen: View {
         try? modelContext.save()
         await searchModel.submit()
     }
+}
+
+private struct SearchChannelRoute: Hashable {
+    let id: String
 }

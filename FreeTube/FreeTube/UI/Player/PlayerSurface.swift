@@ -25,6 +25,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsPictureInPicturePlayback = true
+        controller.allowsVideoFrameAnalysis = false
         // Force the hierarchy to load before asking for `contentOverlayView`.
         _ = controller.view
         context.coordinator.install(on: controller)
@@ -35,6 +36,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.player = player
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
+        controller.allowsVideoFrameAnalysis = false
         context.coordinator.update(
             player: player,
             onSeekRelative: onSeekRelative,

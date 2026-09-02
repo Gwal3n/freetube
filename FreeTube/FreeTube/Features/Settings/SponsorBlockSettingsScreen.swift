@@ -15,7 +15,7 @@ struct SponsorBlockSettingsScreen: View {
             Section {
                 ForEach(SponsorBlockCategory.allCases) { category in
                     Picker(category.displayName, selection: model.sponsorBlockBehaviorBinding(for: category)) {
-                        ForEach(SponsorBlockBehavior.allCases) { behavior in
+                        ForEach(SponsorBlockBehavior.choices(for: category)) { behavior in
                             Text(behavior.displayName).tag(behavior)
                         }
                     }
@@ -23,7 +23,7 @@ struct SponsorBlockSettingsScreen: View {
             } header: {
                 Text("Categories")
             } footer: {
-                Text("Show only adds a timeline marker without skipping. Highlights shown on the timeline ask before skipping when reached.")
+                Text("Show only adds a timeline marker. Ask offers to jump to the video's highlight when one is available.")
             }
             .disabled(!model.sponsorBlockEnabled)
         }

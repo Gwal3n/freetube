@@ -30,10 +30,11 @@ struct SponsorBlockTimeline: View {
                     Capsule().fill(.red).frame(width: width * progress, height: 4)
 
                     ForEach(segments, id: \.id) { segment in
+                        let segmentWidth = width * fraction(for: segment.endTime - segment.startTime)
                         RoundedRectangle(cornerRadius: 1)
                             .fill(color(for: segment.category))
                             .frame(
-                                width: max(2, width * fraction(for: segment.endTime - segment.startTime)),
+                                width: segment.category == .highlight ? max(3, segmentWidth) : max(2, segmentWidth),
                                 height: 4
                             )
                             .offset(x: width * fraction(for: segment.startTime))

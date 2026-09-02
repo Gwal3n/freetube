@@ -24,11 +24,6 @@ struct RootView: View {
     @State private var thumbnail: UIImage?
     /// Retained target for the UIKit swipe recognizers installed on LNPopupUI's native bar.
     @State private var popupBarDismissGesture = PopupBarDismissGestureHandler()
-    @State private var presentedChannel: PresentedChannel?
-
-    private struct PresentedChannel: Identifiable {
-        let id: String
-    }
 
     enum Tab: Hashable {
         case search, library, link, downloads, settings
@@ -75,6 +70,10 @@ struct RootView: View {
             popupBarDismissGesture.install(on: popupBar) {
                 player.dismiss()
             }
+            PopupBarTextLayoutFix.apply(to: popupBar)
+            DispatchQueue.main.async {
+                PopupBarTextLayoutFix.apply(to: popupBar)
+            }
         }
         .task {
             await SessionManager.shared.bootstrap()
@@ -103,19 +102,7 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
-            presentedChannel = PresentedChannel(id: channelID)
-        }
-        .fullScreenCover(item: $presentedChannel) { channel in
-            NavigationStack {
-                ChannelScreen(channelID: channel.id)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("Close", systemImage: "xmark") {
-                                presentedChannel = nil
-                            }
-                        }
-                    }
-            }
+            selectedTab = .search
         }
     }
 
@@ -143,6 +130,13 @@ struct RootView: View {
                 SwiftUI.Tab("Settings", systemImage: "gearshape.fill", value: Tab.settings) {
                     SettingsScreen()
                 }
+            }
+            .background {
+                TabBarRetapObserver(tabIndex: 0) {
+                    guard selectedTab == .search else { return }
+                    NotificationCenter.default.post(name: .freetubeFocusSearch, object: nil)
+                }
+                .frame(width: 0, height: 0)
             }
         } else {
             legacyTabShell
@@ -173,6 +167,13 @@ struct RootView: View {
             SettingsScreen()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(Tab.settings)
+        }
+        .background {
+            TabBarRetapObserver(tabIndex: 0) {
+                guard selectedTab == .search else { return }
+                NotificationCenter.default.post(name: .freetubeFocusSearch, object: nil)
+            }
+            .frame(width: 0, height: 0)
         }
     }
 
@@ -228,6 +229,139 @@ struct RootView: View {
         }
     }
 
+}
+
+/// SwiftUI's TabView selection binding does not emit when the selected tab is tapped again.
+/// Observe the native tab bar without cancelling its own touch handling so Search can use the
+/// system `.searchable(isPresented:)` focus API while preserving the standard tab appearance.
+private struct TabBarRetapObserver: UIViewRepresentable {
+    let tabIndex: Int
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(tabIndex: tabIndex, action: action) }
+
+    func makeUIView(context: Context) -> ProbeView {
+        let view = ProbeView()
+        view.onAttach = { [weak coordinator = context.coordinator, weak view] in
+            guard let view else { return }
+            coordinator?.install(from: view)
+        }
+        return view
+    }
+
+    func updateUIView(_ view: ProbeView, context: Context) {
+        context.coordinator.tabIndex = tabIndex
+        context.coordinator.action = action
+        context.coordinator.install(from: view)
+    }
+
+    static func dismantleUIView(_ view: ProbeView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class ProbeView: UIView {
+        var onAttach: (() -> Void)?
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onAttach?()
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var tabIndex: Int
+        var action: () -> Void
+        private weak var installedTabBar: UITabBar?
+        private var touchBeganOnSelectedTab = false
+        private lazy var recognizer = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+
+        init(tabIndex: Int, action: @escaping () -> Void) {
+            self.tabIndex = tabIndex
+            self.action = action
+            super.init()
+            recognizer.cancelsTouchesInView = false
+            recognizer.delegate = self
+        }
+
+        func install(from view: UIView) {
+            DispatchQueue.main.async { [weak self, weak view] in
+                guard let self, let view,
+                      let controller = view.nearestViewController,
+                      let tabBar = controller.tabBarController?.tabBar,
+                      installedTabBar !== tabBar else { return }
+                installedTabBar?.removeGestureRecognizer(recognizer)
+                tabBar.addGestureRecognizer(recognizer)
+                installedTabBar = tabBar
+            }
+        }
+
+        func uninstall() {
+            installedTabBar?.removeGestureRecognizer(recognizer)
+            installedTabBar = nil
+        }
+
+        @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
+            guard recognizer.state == .ended, touchBeganOnSelectedTab,
+                  let tabBar = installedTabBar,
+                  tabBar.selectedItem == tabBar.items?[safe: tabIndex] else { return }
+            let buttons = tabBar.subviews
+                .filter { String(describing: type(of: $0)).contains("UITabBarButton") }
+                .sorted { $0.frame.minX < $1.frame.minX }
+            let point = recognizer.location(in: tabBar)
+            guard buttons.indices.contains(tabIndex), buttons[tabIndex].frame.contains(point) else { return }
+            action()
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            guard let tabBar = installedTabBar else {
+                touchBeganOnSelectedTab = false
+                return true
+            }
+            let buttons = tabBar.subviews
+                .filter { String(describing: type(of: $0)).contains("UITabBarButton") }
+                .sorted { $0.frame.minX < $1.frame.minX }
+            let point = touch.location(in: tabBar)
+            touchBeganOnSelectedTab = buttons.indices.contains(tabIndex)
+                && buttons[tabIndex].frame.contains(point)
+                && tabBar.selectedItem == tabBar.items?[safe: tabIndex]
+            return true
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+    }
+}
+
+private extension UIView {
+    var nearestViewController: UIViewController? {
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let controller = current as? UIViewController { return controller }
+            responder = current.next
+        }
+        return nil
+    }
+}
+
+private extension Collection {
+    subscript(safe index: Index) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+private enum PopupBarTextLayoutFix {
+    static func apply(to view: UIView) {
+        view.clipsToBounds = false
+        unclampText(in: view)
+    }
+
+    private static func unclampText(in view: UIView) {
+        for child in view.subviews {
+            let typeName = String(describing: type(of: child))
+            if child is UILabel || typeName.localizedCaseInsensitiveContains("marquee") {
+                child.clipsToBounds = false
+                child.superview?.clipsToBounds = false
+            }
+            unclampText(in: child)
+        }
+    }
 }
 
 /// Hosts the popup's `FullScreenPlayer` and all of its `popup*(...)` metadata modifiers.
