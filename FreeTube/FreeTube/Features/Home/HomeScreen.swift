@@ -16,10 +16,14 @@ struct HomeScreen: View {
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
 
-    init(
-        searchModel: SearchViewModel = SearchViewModel(),
-        usesContainerSearch: Bool = false
-    ) {
+    @MainActor
+    init() {
+        _searchModel = State(initialValue: SearchViewModel())
+        usesContainerSearch = false
+    }
+
+    @MainActor
+    init(searchModel: SearchViewModel, usesContainerSearch: Bool) {
         _searchModel = State(initialValue: searchModel)
         self.usesContainerSearch = usesContainerSearch
     }
