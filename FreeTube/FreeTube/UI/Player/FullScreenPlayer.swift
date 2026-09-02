@@ -39,6 +39,7 @@ struct FullScreenPlayer: View {
     /// Only meaningful while `pushedChannel != nil`.
     @State private var channelPath = NavigationPath()
     @State private var playerControlsVisible = true
+    @State private var gestureSeekPreview: TimeInterval?
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
 
@@ -82,6 +83,9 @@ struct FullScreenPlayer: View {
                         onSeekAbsolute: { seconds in
                             player.seek(to: seconds)
                         },
+                        onSeekPreview: { seconds in
+                            gestureSeekPreview = seconds
+                        },
                         onTogglePlayback: {
                             player.togglePlayPause()
                         },
@@ -91,8 +95,9 @@ struct FullScreenPlayer: View {
                     DownloadProgressOverlay(state: player.loadState)
                     CustomPlayerControls(
                         isVisible: playerControlsVisible,
+                        isSeekPreviewActive: gestureSeekPreview != nil,
                         isPlaying: player.isPlaying,
-                        elapsed: player.elapsed,
+                        elapsed: gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
                         playbackRate: player.playbackRate,
                         sponsorSegments: player.sponsorBlockSegments,
@@ -142,8 +147,10 @@ struct FullScreenPlayer: View {
                 .animation(.easeOut(duration: 0.2), value: player.loadState)
                 .onAppear { showPlayerControls() }
                 .onDisappear { controlsHideTask?.cancel() }
-                .onChange(of: player.currentVideo?.id) { _, _ in showPlayerControls() }
-                .onChange(of: player.isPlaying) { _, _ in showPlayerControls() }
+                .onChange(of: player.currentVideo?.id) { _, _ in
+                    gestureSeekPreview = nil
+                    showPlayerControls()
+                }
             // Pull-down-to-dismiss starting from the video surface.
             //
             // `AVPlayerViewController`'s internal `UIPanGestureRecognizer`s (scrubber, system

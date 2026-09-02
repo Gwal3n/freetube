@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct CustomPlayerControls: View {
     let isVisible: Bool
+    let isSeekPreviewActive: Bool
     let isPlaying: Bool
     let elapsed: TimeInterval
     let duration: TimeInterval
@@ -54,6 +55,7 @@ struct CustomPlayerControls: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
+                .opacity(isVisible ? 1 : 0)
 
                 Spacer()
 
@@ -76,6 +78,7 @@ struct CustomPlayerControls: View {
                     .disabled(!hasNext)
                 }
                 .buttonStyle(.plain)
+                .opacity(isVisible ? 1 : 0)
 
                 Spacer()
 
@@ -87,12 +90,13 @@ struct CustomPlayerControls: View {
                 )
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomTimelinePadding)
+                .opacity(isVisible || isSeekPreviewActive ? 1 : 0)
             }
-            .opacity(isVisible ? 1 : 0)
         }
         .allowsHitTesting(isVisible)
-        .accessibilityHidden(!isVisible)
+        .accessibilityHidden(!isVisible && !isSeekPreviewActive)
         .animation(.easeInOut(duration: 0.24), value: isVisible)
+        .animation(.easeInOut(duration: 0.12), value: isSeekPreviewActive)
     }
 
     private func rateLabel(_ rate: Double) -> String {

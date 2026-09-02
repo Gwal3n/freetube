@@ -8,6 +8,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     let player: AVPlayer
     var onSeekRelative: (TimeInterval) -> Void
     var onSeekAbsolute: (TimeInterval) -> Void
+    var onSeekPreview: (TimeInterval?) -> Void
     var onTogglePlayback: () -> Void
     var onToggleControls: () -> Void
     var showsControls: Bool = false
@@ -18,6 +19,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             player: player,
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
+            onSeekPreview: onSeekPreview,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls
         )
@@ -45,6 +47,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             player: player,
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
+            onSeekPreview: onSeekPreview,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls
         )

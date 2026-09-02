@@ -13,16 +13,17 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private weak var feedbackView: UIView?
     private var onSeekRelative: (TimeInterval) -> Void
     private var onSeekAbsolute: (TimeInterval) -> Void
+    private var onSeekPreview: (TimeInterval?) -> Void
     private var onTogglePlayback: () -> Void
     private var onToggleControls: () -> Void
     private var gestures: [UIGestureRecognizer] = []
-    private var doubleTapGesture: UITapGestureRecognizer?
     private var continuationTapGesture: UITapGestureRecognizer?
     private var twoFingerTapGesture: UITapGestureRecognizer?
     private var singleTapGesture: UITapGestureRecognizer?
     private var horizontalPanGesture: UIPanGestureRecognizer?
     private var feedbackLabel: UILabel?
     private var feedbackWorkItem: DispatchWorkItem?
+    private var pendingSingleTapWorkItem: DispatchWorkItem?
     private var seekSessionWorkItem: DispatchWorkItem?
     private var seekSessionTotal: TimeInterval = 0
     private var horizontalSeekStart: TimeInterval?
@@ -36,12 +37,14 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
+        onSeekPreview: @escaping (TimeInterval?) -> Void,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
+        self.onSeekPreview = onSeekPreview
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
     }
@@ -50,12 +53,14 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
+        onSeekPreview: @escaping (TimeInterval?) -> Void,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
+        self.onSeekPreview = onSeekPreview
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
     }
@@ -67,12 +72,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         uninstall()
         gestureView = rootView
         feedbackView = overlay
-
-        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(didDoubleTap(_:)))
-        doubleTap.numberOfTapsRequired = 2
-        doubleTap.cancelsTouchesInView = false
-        doubleTap.delaysTouchesEnded = false
-        doubleTap.delegate = self
 
         let continuationTap = UITapGestureRecognizer(
             target: self,
@@ -103,32 +102,31 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         twoFingerTap.delaysTouchesEnded = false
         twoFingerTap.delegate = self
 
-        let singleTap = UITapGestureRecognizer(target: self, action: #selector(didSingleTap(_:)))
+        let singleTap = UITapGestureRecognizer(target: self, action: #selector(didPrimaryTap(_:)))
         singleTap.numberOfTapsRequired = 1
         singleTap.cancelsTouchesInView = false
+        singleTap.delaysTouchesEnded = false
         singleTap.delegate = self
-        singleTap.require(toFail: doubleTap)
         singleTap.require(toFail: longPress)
         singleTap.require(toFail: horizontalPan)
 
-        doubleTapGesture = doubleTap
         continuationTapGesture = continuationTap
         twoFingerTapGesture = twoFingerTap
         singleTapGesture = singleTap
         horizontalPanGesture = horizontalPan
-        gestures = [doubleTap, continuationTap, longPress, horizontalPan, twoFingerTap, singleTap]
+        gestures = [continuationTap, longPress, horizontalPan, twoFingerTap, singleTap]
         gestures.forEach { rootView.addGestureRecognizer($0) }
-        deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap, longPress, horizontalPan])
+        deferNativeSingleTaps(in: rootView, until: [singleTap, continuationTap, longPress, horizontalPan])
         // AVKit may finish installing its private control hierarchy after `makeUIViewController`
         // returns. Re-scan on the next main-actor turn so those late recognizers get the same
         // failure dependency.
-        Task { @MainActor [weak self, weak rootView, weak doubleTap, weak longPress, weak horizontalPan] in
+        Task { @MainActor [weak self, weak rootView, weak singleTap, weak longPress, weak horizontalPan] in
             await Task.yield()
-            guard let self, let rootView, let doubleTap, let longPress, let horizontalPan else { return }
+            guard let self, let rootView, let singleTap, let longPress, let horizontalPan else { return }
             guard let continuationTap = self.continuationTapGesture else { return }
             self.deferNativeSingleTaps(
                 in: rootView,
-                until: [doubleTap, continuationTap, longPress, horizontalPan]
+                until: [singleTap, continuationTap, longPress, horizontalPan]
             )
         }
         log.info("Installed tap, hold, and horizontal-seek gestures on AVPlayerViewController root view")
@@ -137,13 +135,14 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     func uninstall() {
         feedbackWorkItem?.cancel()
         feedbackWorkItem = nil
+        pendingSingleTapWorkItem?.cancel()
+        pendingSingleTapWorkItem = nil
         endSeekSession(hideFeedback: false)
         restorePlaybackRateIfNeeded()
         if let gestureView {
             gestures.forEach { gestureView.removeGestureRecognizer($0) }
         }
         gestures.removeAll()
-        doubleTapGesture = nil
         continuationTapGesture = nil
         twoFingerTapGesture = nil
         singleTapGesture = nil
@@ -155,19 +154,31 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         gestureView = nil
     }
 
-    @objc private func didDoubleTap(_ gesture: UITapGestureRecognizer) {
+    @objc private func didPrimaryTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        if let pendingSingleTapWorkItem {
+            pendingSingleTapWorkItem.cancel()
+            self.pendingSingleTapWorkItem = nil
+            performDoubleTapSeek(at: gesture.location(in: gestureView))
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.pendingSingleTapWorkItem = nil
+            self?.onToggleControls()
+        }
+        pendingSingleTapWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: workItem)
+    }
+
+    private func performDoubleTapSeek(at location: CGPoint) {
         guard let view = gestureView else { return }
-        let isForward = gesture.location(in: view).x >= view.bounds.midX
+        let isForward = location.x >= view.bounds.midX
         let interval: TimeInterval = isForward ? 10 : -10
         log.info("Double tap recognized; seeking \(interval, privacy: .public)s")
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         beginSeekSession(with: interval, horizontalFraction: isForward ? 0.82 : 0.18)
-    }
-
-    @objc private func didSingleTap(_ gesture: UITapGestureRecognizer) {
-        guard gesture.state == .ended else { return }
-        onToggleControls()
     }
 
     @objc private func didTwoFingerTap(_ gesture: UITapGestureRecognizer) {
@@ -237,6 +248,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             horizontalSeekTarget = horizontalSeekStart
             horizontalSeekDuration = duration
             horizontalSeekPeakVelocity = 0
+            onSeekPreview(horizontalSeekStart)
         case .changed:
             guard let start = horizontalSeekStart,
                   let duration = horizontalSeekDuration,
@@ -267,6 +279,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                 duration
             )
             horizontalSeekTarget = target
+            onSeekPreview(target)
             showFeedback(
                 horizontalSeekText(offset: target - start),
                 horizontalFraction: 0.5,
@@ -281,9 +294,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                 onSeekAbsolute(target)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
+            onSeekPreview(nil)
             resetHorizontalSeek()
             hideFeedback()
         case .cancelled, .failed:
+            onSeekPreview(nil)
             resetHorizontalSeek()
             hideFeedback()
         default:
@@ -302,7 +317,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         seekSessionTotal = interval
         // Once the initial double tap succeeds, count every following tap individually. Keeping
         // the double-tap recognizer enabled would make taps three and four trigger both recognizers.
-        doubleTapGesture?.isEnabled = false
         singleTapGesture?.isEnabled = false
         continuationTapGesture?.isEnabled = true
         showFeedback(seekFeedbackText, horizontalFraction: horizontalFraction, automaticallyHide: false)
@@ -315,7 +329,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             self?.endSeekSession(hideFeedback: true)
         }
         seekSessionWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: workItem)
     }
 
     private func endSeekSession(hideFeedback: Bool) {
@@ -323,7 +337,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         seekSessionWorkItem = nil
         seekSessionTotal = 0
         continuationTapGesture?.isEnabled = false
-        doubleTapGesture?.isEnabled = true
         singleTapGesture?.isEnabled = true
         if hideFeedback {
             self.hideFeedback()
