@@ -26,6 +26,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var horizontalSeekStart: TimeInterval?
     private var horizontalSeekTarget: TimeInterval?
     private var horizontalSeekDuration: TimeInterval?
+    private var horizontalSeekPeakVelocity: CGFloat = 0
     private var rateBeforeBoost: Float?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
@@ -213,6 +214,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             horizontalSeekStart = min(max(current, 0), duration)
             horizontalSeekTarget = horizontalSeekStart
             horizontalSeekDuration = duration
+            horizontalSeekPeakVelocity = 0
         case .changed:
             guard let start = horizontalSeekStart,
                   let duration = horizontalSeekDuration,
@@ -226,12 +228,28 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             } else {
                 sensitivity = 60
             }
+            horizontalSeekPeakVelocity = max(
+                horizontalSeekPeakVelocity,
+                abs(gesture.velocity(in: view).x)
+            )
+            // Slow drags retain the base scale for precise positioning. Faster swipes smoothly
+            // increase that range up to 3×, while peak velocity keeps the preview from snapping
+            // backwards merely because the finger decelerates before release.
+            let velocityBoost = min(
+                max((TimeInterval(horizontalSeekPeakVelocity) - 300) / 1_200, 0),
+                2
+            )
             let dragFraction = TimeInterval(translation / view.bounds.width)
-            let target = min(max(start + dragFraction * sensitivity, 0), duration)
+            let target = min(
+                max(start + dragFraction * sensitivity * (1 + velocityBoost), 0),
+                duration
+            )
             horizontalSeekTarget = target
             showFeedback(
-                horizontalSeekText(target: target, offset: target - start),
+                horizontalSeekText(offset: target - start),
                 horizontalFraction: 0.5,
+                verticalFraction: 0.10,
+                compact: true,
                 wide: true,
                 automaticallyHide: false
             )
@@ -297,25 +315,18 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return "0s"
     }
 
-    private func horizontalSeekText(target: TimeInterval, offset: TimeInterval) -> String {
-        let sign = offset >= 0 ? "+" : "−"
-        return "\(formatTime(target))  \(sign)\(Int(abs(offset)))s"
-    }
-
-    private func formatTime(_ seconds: TimeInterval) -> String {
-        let total = max(Int(seconds), 0)
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let remainder = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, remainder)
-            : String(format: "%d:%02d", minutes, remainder)
+    private func horizontalSeekText(offset: TimeInterval) -> String {
+        let seconds = Int(abs(offset).rounded())
+        guard seconds > 0 else { return "0 seconds" }
+        let sign = offset > 0 ? "+" : "−"
+        return "\(sign)\(seconds) \(seconds == 1 ? "second" : "seconds")"
     }
 
     private func resetHorizontalSeek() {
         horizontalSeekStart = nil
         horizontalSeekTarget = nil
         horizontalSeekDuration = nil
+        horizontalSeekPeakVelocity = 0
     }
 
     private func showFeedback(
@@ -335,7 +346,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             ? .preferredFont(forTextStyle: .subheadline)
             : .preferredFont(forTextStyle: .headline)
         label.bounds.size = wide
-            ? CGSize(width: 150, height: 38)
+            ? compact
+                ? CGSize(width: 124, height: 26)
+                : CGSize(width: 150, height: 38)
             : compact
                 ? CGSize(width: 52, height: 26)
                 : CGSize(width: 68, height: 38)

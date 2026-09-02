@@ -7,7 +7,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
-    let onRunSearch: () -> Void
+    let onRunSearch: (String) -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
 
@@ -24,7 +24,7 @@ struct SearchContent: View {
                         suggestions: model.suggestions,
                         onSelect: { suggestion in
                             model.query = suggestion.text
-                            onRunSearch()
+                            onRunSearch(suggestion.text)
                             dismissKeyboard()
                         },
                         onFill: { suggestion in
@@ -46,12 +46,11 @@ struct SearchContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Lists and ScrollViews cover the background, so a background-only tap never receives
-        // most empty-area touches. Simultaneous gestures observe them without taking row/button
-        // actions away from the native controls.
-        .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+        // Observe only this container's empty-area taps. Including subviews here can consume native
+        // List row buttons, including recent-search selection.
         .simultaneousGesture(
-            DragGesture(minimumDistance: 4).onChanged { _ in dismissKeyboard() }
+            TapGesture().onEnded { dismissKeyboard() },
+            including: .gesture
         )
         .errorToast($model.errorState)
     }
@@ -63,7 +62,7 @@ struct SearchContent: View {
                 ForEach(history) { entry in
                     Button {
                         model.query = entry.query
-                        onRunSearch()
+                        onRunSearch(entry.query)
                         dismissKeyboard()
                     } label: {
                         HStack {

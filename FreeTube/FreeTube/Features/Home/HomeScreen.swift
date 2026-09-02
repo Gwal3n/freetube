@@ -27,8 +27,8 @@ struct HomeScreen: View {
                     }
                 }
 
-                SearchContent(model: searchModel) {
-                    Task { await runSearch() }
+                SearchContent(model: searchModel) { query in
+                    Task { await runSearch(query: query) }
                 }
             }
             .navigationTitle("Search")
@@ -76,8 +76,14 @@ struct HomeScreen: View {
     /// Persists the trimmed query to history (upsert by query string) then fires
     /// `searchModel.submit()`. Same logic the dedicated Search tab used to run.
     private func runSearch() async {
-        let trimmed = searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        await runSearch(query: searchModel.query)
+    }
+
+    /// Runs the explicitly selected value so row taps cannot race focus or presentation updates.
+    private func runSearch(query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        searchModel.query = trimmed
         if let existing = history.first(where: { $0.query == trimmed }) {
             existing.searchedAt = .now
         } else {
