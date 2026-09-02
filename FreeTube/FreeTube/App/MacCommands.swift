@@ -106,6 +106,4 @@ extension Notification.Name {
     /// Requests app-level channel presentation after the expanded player has collapsed.
     /// The object is a channel ID string.
     static let freetubeOpenChannel = Notification.Name("com.leshko.freetube.openChannel")
-    /// Requests that the native Search field become active and present the keyboard.
-    static let freetubeFocusSearch = Notification.Name("com.leshko.freetube.focusSearch")
 }

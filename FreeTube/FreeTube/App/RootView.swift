@@ -63,6 +63,10 @@ struct RootView: View {
         .popupInteractionStyle(UIViewController.PopupInteractionStyle.drag)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)
         .popupBarStyle(LNPopupBar.Style.prominent)
+        // LNPopupController's marquee animation corrupts the native title/subtitle layout on
+        // iOS 26. Static native labels are the last known-good configuration: they truncate long
+        // text but remain vertically centred and never animate out of the bar.
+        .popupBarMarqueeScrollEnabled(false)
         // Explicitly enable the thin progress line at the bottom of the popup bar so playback
         // and download progress are always visible without expanding the player.
         .popupBarProgressViewStyle(.bottom)
@@ -127,13 +131,6 @@ struct RootView: View {
                     SettingsScreen()
                 }
             }
-            .background {
-                TabBarRetapObserver(tabIndex: 0) {
-                    guard selectedTab == .search else { return }
-                    NotificationCenter.default.post(name: .freetubeFocusSearch, object: nil)
-                }
-                .frame(width: 0, height: 0)
-            }
         } else {
             legacyTabShell
         }
@@ -163,13 +160,6 @@ struct RootView: View {
             SettingsScreen()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(Tab.settings)
-        }
-        .background {
-            TabBarRetapObserver(tabIndex: 0) {
-                guard selectedTab == .search else { return }
-                NotificationCenter.default.post(name: .freetubeFocusSearch, object: nil)
-            }
-            .frame(width: 0, height: 0)
         }
     }
 
@@ -227,124 +217,6 @@ struct RootView: View {
 
 }
 
-/// SwiftUI's TabView selection binding does not emit when the selected tab is tapped again.
-/// Observe the native tab bar without cancelling its own touch handling so Search can use the
-/// system `.searchable(isPresented:)` focus API while preserving the standard tab appearance.
-private struct TabBarRetapObserver: UIViewRepresentable {
-    let tabIndex: Int
-    let action: () -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(tabIndex: tabIndex, action: action) }
-
-    func makeUIView(context: Context) -> ProbeView {
-        let view = ProbeView()
-        view.onAttach = { [weak coordinator = context.coordinator, weak view] in
-            guard let view else { return }
-            coordinator?.install(from: view)
-        }
-        return view
-    }
-
-    func updateUIView(_ view: ProbeView, context: Context) {
-        context.coordinator.tabIndex = tabIndex
-        context.coordinator.action = action
-        context.coordinator.install(from: view)
-    }
-
-    static func dismantleUIView(_ view: ProbeView, coordinator: Coordinator) {
-        coordinator.uninstall()
-    }
-
-    final class ProbeView: UIView {
-        var onAttach: (() -> Void)?
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-            onAttach?()
-        }
-    }
-
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var tabIndex: Int
-        var action: () -> Void
-        private weak var installedTabBar: UITabBar?
-        private var touchBeganOnSelectedTab = false
-        private lazy var recognizer = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
-
-        init(tabIndex: Int, action: @escaping () -> Void) {
-            self.tabIndex = tabIndex
-            self.action = action
-            super.init()
-            recognizer.cancelsTouchesInView = false
-            recognizer.delegate = self
-        }
-
-        func install(from view: UIView, attempt: Int = 0) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + (attempt == 0 ? 0 : 0.1)) { [weak self, weak view] in
-                guard let self, let view else { return }
-                guard let tabBar = view.window?.firstDescendant(of: UITabBar.self) else {
-                    if attempt < 10 { install(from: view, attempt: attempt + 1) }
-                    return
-                }
-                guard installedTabBar !== tabBar else { return }
-                installedTabBar?.removeGestureRecognizer(recognizer)
-                tabBar.addGestureRecognizer(recognizer)
-                installedTabBar = tabBar
-            }
-        }
-
-        func uninstall() {
-            installedTabBar?.removeGestureRecognizer(recognizer)
-            installedTabBar = nil
-        }
-
-        @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
-            guard recognizer.state == .ended, touchBeganOnSelectedTab,
-                  let tabBar = installedTabBar,
-                  tabBar.selectedItem == tabBar.items?[safe: tabIndex] else { return }
-            let buttons = tabButtons(in: tabBar)
-            let point = recognizer.location(in: tabBar)
-            guard buttons.indices.contains(tabIndex), buttons[tabIndex].frame.contains(point) else { return }
-            action()
-        }
-
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            guard let tabBar = installedTabBar else {
-                touchBeganOnSelectedTab = false
-                return true
-            }
-            let buttons = tabButtons(in: tabBar)
-            let point = touch.location(in: tabBar)
-            touchBeganOnSelectedTab = buttons.indices.contains(tabIndex)
-                && buttons[tabIndex].frame.contains(point)
-                && tabBar.selectedItem == tabBar.items?[safe: tabIndex]
-            return true
-        }
-
-        private func tabButtons(in tabBar: UITabBar) -> [UIView] {
-            tabBar.subviews
-                .filter { $0 is UIControl && !$0.isHidden && $0.bounds.width > 0 }
-                .sorted { $0.frame.minX < $1.frame.minX }
-        }
-
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
-                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
-    }
-}
-
-private extension UIView {
-    func firstDescendant<T: UIView>(of type: T.Type) -> T? {
-        if let match = self as? T, !match.isHidden { return match }
-        for child in subviews {
-            if let match = child.firstDescendant(of: type) { return match }
-        }
-        return nil
-    }
-}
-
-private extension Collection {
-    subscript(safe index: Index) -> Element? { indices.contains(index) ? self[index] : nil }
-}
-
 /// Hosts the popup's `FullScreenPlayer` and all of its `popup*(...)` metadata modifiers.
 ///
 /// **Why this exists:** `RootView.popup { ... }` calls its content closure once at popup-presentation
@@ -365,21 +237,7 @@ struct PopupContentWrapper: View {
 
     var body: some View {
         FullScreenPlayer()
-            .popupTitle {
-                MiniPlayerMarqueeText(
-                    text: player.currentVideo?.title ?? "",
-                    font: .subheadline.weight(.semibold),
-                    color: .primary,
-                    height: 20
-                )
-            } subtitle: {
-                MiniPlayerMarqueeText(
-                    text: subtitleText,
-                    font: .caption,
-                    color: .secondary,
-                    height: 17
-                )
-            }
+            .popupTitle(player.currentVideo?.title ?? "", subtitle: subtitleText)
             .popupImage(image)
             .popupBarLeadingButtons {
                 ToolbarItemGroup(placement: .popupBar) {

@@ -10,7 +10,6 @@ struct SearchContent: View {
     let onRunSearch: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismissSearch) private var dismissSearch
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
@@ -25,8 +24,8 @@ struct SearchContent: View {
                         suggestions: model.suggestions,
                         onSelect: { suggestion in
                             model.query = suggestion.text
-                            dismissSearch()
                             onRunSearch()
+                            dismissKeyboard()
                         },
                         onFill: { suggestion in
                             model.query = suggestion.text
@@ -55,8 +54,8 @@ struct SearchContent: View {
                 ForEach(history) { entry in
                     Button {
                         model.query = entry.query
-                        dismissSearch()
                         onRunSearch()
+                        dismissKeyboard()
                     } label: {
                         HStack {
                             Image(systemName: "clock.arrow.circlepath")
@@ -186,18 +185,12 @@ struct MacInlineSearchField: View {
 @available(iOS 17.0, *)
 struct ConditionalSearchable: ViewModifier {
     @Binding var text: String
-    @Binding var isPresented: Bool
     let enabled: Bool
     var prompt: String = "Search"
 
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(
-                text: $text,
-                isPresented: $isPresented,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: Text(prompt)
-            )
+            content.searchable(text: $text, prompt: Text(prompt))
         } else {
             content
         }

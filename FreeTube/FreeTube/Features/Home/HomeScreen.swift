@@ -10,7 +10,6 @@ import SwiftData
 struct HomeScreen: View {
     @State private var searchModel = SearchViewModel()
     @State private var path = NavigationPath()
-    @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
@@ -33,7 +32,6 @@ struct HomeScreen: View {
             .navigationTitle("Search")
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
-                isPresented: $isSearchPresented,
                 enabled: !MacIntegration.isRunningOnMac,
                 prompt: "Search YouTube"
             ))
@@ -53,11 +51,6 @@ struct HomeScreen: View {
                 if searchModel.results != nil {
                     await searchModel.submit()
                 }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .freetubeFocusSearch)) { _ in
-                guard !MacIntegration.isRunningOnMac else { return }
-                path = NavigationPath()
-                isSearchPresented = true
             }
             .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
                 guard let channelID = note.object as? String, !channelID.isEmpty else { return }
