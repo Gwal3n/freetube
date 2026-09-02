@@ -178,7 +178,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         log.info("Double tap recognized; seeking \(interval, privacy: .public)s")
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        beginSeekSession(with: interval, horizontalFraction: isForward ? 0.82 : 0.18)
+        beginSeekSession(with: interval, isForward: isForward)
     }
 
     @objc private func didTwoFingerTap(_ gesture: UITapGestureRecognizer) {
@@ -197,8 +197,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showFeedback(
-            seekFeedbackText,
+            doubleTapFeedbackText(isForward: isForward),
             horizontalFraction: isForward ? 0.82 : 0.18,
+            outlined: true,
             automaticallyHide: false
         )
         scheduleSeekSessionEnd()
@@ -313,13 +314,18 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player.rate = priorRate
     }
 
-    private func beginSeekSession(with interval: TimeInterval, horizontalFraction: CGFloat) {
+    private func beginSeekSession(with interval: TimeInterval, isForward: Bool) {
         seekSessionTotal = interval
         // Once the initial double tap succeeds, count every following tap individually. Keeping
         // the double-tap recognizer enabled would make taps three and four trigger both recognizers.
         singleTapGesture?.isEnabled = false
         continuationTapGesture?.isEnabled = true
-        showFeedback(seekFeedbackText, horizontalFraction: horizontalFraction, automaticallyHide: false)
+        showFeedback(
+            doubleTapFeedbackText(isForward: isForward),
+            horizontalFraction: isForward ? 0.82 : 0.18,
+            outlined: true,
+            automaticallyHide: false
+        )
         scheduleSeekSessionEnd()
     }
 
@@ -350,6 +356,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return "0s"
     }
 
+    private func doubleTapFeedbackText(isForward: Bool) -> String {
+        isForward ? "\(seekFeedbackText)  ≫" : "≪  \(seekFeedbackText)"
+    }
+
     private func horizontalSeekText(offset: TimeInterval) -> String {
         let seconds = Int(abs(offset).rounded())
         guard seconds > 0 else { return "0 seconds" }
@@ -370,24 +380,46 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         verticalFraction: CGFloat = 0.5,
         compact: Bool = false,
         wide: Bool = false,
+        outlined: Bool = false,
         automaticallyHide: Bool = true
     ) {
         guard let view = feedbackView else { return }
         feedbackWorkItem?.cancel()
 
         let label = feedbackLabel ?? makeFeedbackLabel(in: view)
-        label.text = text
-        label.font = compact
+        let font: UIFont = outlined
+            ? .systemFont(ofSize: 20, weight: .bold)
+            : compact
             ? .preferredFont(forTextStyle: .subheadline)
             : .preferredFont(forTextStyle: .headline)
-        label.bounds.size = wide
+        label.font = font
+        if outlined {
+            label.text = nil
+            label.attributedText = NSAttributedString(
+                string: text,
+                attributes: [
+                    .font: font,
+                    .foregroundColor: UIColor.white,
+                    .strokeColor: UIColor.black,
+                    .strokeWidth: -4
+                ]
+            )
+            label.backgroundColor = .clear
+        } else {
+            label.attributedText = nil
+            label.text = text
+            label.backgroundColor = UIColor.black.withAlphaComponent(0.52)
+        }
+        label.bounds.size = outlined
+            ? CGSize(width: 104, height: 38)
+            : wide
             ? compact
                 ? CGSize(width: 124, height: 26)
                 : CGSize(width: 150, height: 38)
             : compact
                 ? CGSize(width: 52, height: 26)
                 : CGSize(width: 68, height: 38)
-        label.layer.cornerRadius = compact ? 13 : 19
+        label.layer.cornerRadius = outlined ? 0 : compact ? 13 : 19
         label.center = CGPoint(
             x: view.bounds.width * horizontalFraction,
             y: view.bounds.height * verticalFraction
