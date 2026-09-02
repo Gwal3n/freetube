@@ -12,6 +12,7 @@ struct FullScreenPlayer: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var downloads = DownloadManager.shared
     /// Reactive list of all favorited videos so menu rendering doesn't have to fetch Core Data on
     /// every redraw (which was the bug DownloadsScreen had: per-row SQL on the main queue).
     @Query private var favorites: [FavoriteVideo]
@@ -30,6 +31,7 @@ struct FullScreenPlayer: View {
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
+    @State private var downloadError: ErrorState?
     /// Currently-pushed channel (nil = panel mode). When non-nil, the lower section swaps the
     /// metadata + comments/queue panel for a NavigationStack rooted at `ChannelScreen`. Keeping
     /// the NavigationStack **conditionally mounted** is what makes the panel-mode background
@@ -99,10 +101,7 @@ struct FullScreenPlayer: View {
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
                         additionalTopControls: AnyView(
-                            HStack(spacing: 10) {
-                                copyLinkButton
-                                moreActionsMenu
-                            }
+                            HStack(spacing: 10) { moreActionsMenu }
                             .buttonStyle(.plain)
                         ),
                         bottomTimelinePadding: timelineBottomPadding(in: proxy.size),
@@ -233,6 +232,7 @@ struct FullScreenPlayer: View {
         .sheet(item: $addToPlaylistVideo) { video in
             AddToPlaylistSheet(videoID: video.id, videoTitle: video.title)
         }
+        .errorToast($downloadError)
         // Pull-down-to-dismiss is handled by LNPopupUI via `.popupInteractionStyle(...)` in
         // RootView. We don't install a custom DragGesture here — it would race with the system
         // gesture arbitration the popup hosts (and with AVPlayerViewController's own touch
@@ -266,6 +266,7 @@ struct FullScreenPlayer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 metadata(video)
+                playerActions(video)
                 detailsSection(video: video)
                 queuePanel
                 CommentsSection(videoID: video.id)
@@ -531,6 +532,92 @@ struct FullScreenPlayer: View {
         }
     }
 
+    // MARK: - Player actions
+
+    @ViewBuilder
+    private func playerActions(_ video: Video) -> some View {
+        HStack(spacing: 12) {
+            Menu {
+                if let url = watchURL(video) {
+                    ShareLink(item: url) {
+                        Label("Share…", systemImage: "square.and.arrow.up")
+                    }
+                    Link(destination: url) {
+                        Label("Open in browser", systemImage: "safari")
+                    }
+                    Button {
+                        UIPasteboard.general.string = url.absoluteString
+                    } label: {
+                        Label("Copy URL", systemImage: "link")
+                    }
+                }
+                Button {
+                    if let url = watchURLAtCurrentTime(video) {
+                        UIPasteboard.general.string = url.absoluteString
+                    }
+                } label: {
+                    Label("Copy URL at current time", systemImage: "clock")
+                }
+                if let localFile = downloads.localFile(for: video.id) {
+                    Button {
+                        shareFileURL = localFile
+                    } label: {
+                        Label("Share downloaded file…", systemImage: "doc")
+                    }
+                }
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                startDownload(video)
+            } label: {
+                downloadButtonLabel(for: video)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isDownloadActive(for: video) || downloads.localFile(for: video.id) != nil)
+        }
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func downloadButtonLabel(for video: Video) -> some View {
+        if downloads.localFile(for: video.id) != nil {
+            Label("Downloaded", systemImage: "checkmark.circle.fill")
+        } else if isDownloadActive(for: video) {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Downloading")
+            }
+        } else {
+            Label("Download", systemImage: "arrow.down.circle")
+        }
+    }
+
+    private func isDownloadActive(for video: Video) -> Bool {
+        downloads.activeTasks.contains { snapshot in
+            guard snapshot.videoID == video.id else { return false }
+            switch snapshot.state {
+            case .queued, .downloading, .paused: return true
+            case .completed, .failed: return false
+            }
+        }
+    }
+
+    private func startDownload(_ video: Video) {
+        let quality = UserPreferences().preferredQuality
+        Task {
+            do {
+                _ = try await downloads.ensureDownloaded(video: video, quality: quality)
+            } catch {
+                downloadError = ErrorState(from: error)
+            }
+        }
+    }
+
     // MARK: - Transport
 
     private func togglePlayerControls() {
@@ -567,51 +654,9 @@ struct FullScreenPlayer: View {
     // MARK: - More-actions menu (three dots)
 
     @ViewBuilder
-    private var copyLinkButton: some View {
-        Button {
-            guard let video = player.currentVideo, let url = watchURL(video) else { return }
-            UIPasteboard.general.string = url.absoluteString
-        } label: {
-            Image(systemName: "link")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
-        }
-        .accessibilityLabel("Copy video link")
-    }
-
-    @ViewBuilder
     private var moreActionsMenu: some View {
         Menu {
             if let video = player.currentVideo {
-                Button {
-                    if let url = watchURL(video) {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    Label("Open in browser", systemImage: "safari")
-                }
-                // System "Open in…" share sheet for the downloaded mp4 — only shown when the file
-                // is already on disk. We avoid `ShareLink` here because for `file://` URLs inside
-                // a `Menu` it sometimes serializes the URL as text and the share sheet doesn't
-                // show the apps that handle the mp4 UTType. Going through `UIActivityViewController`
-                // directly is the reliable path for file activity items.
-                if let localFile = DownloadManager.shared.localFile(for: video.id) {
-                    Button {
-                        shareFileURL = localFile
-                    } label: {
-                        Label("Open in…", systemImage: "square.and.arrow.up")
-                    }
-                }
-                Button {
-                    if let url = watchURLAtCurrentTime(video) {
-                        UIPasteboard.general.string = url.absoluteString
-                    }
-                } label: {
-                    Label("Copy URL at current time", systemImage: "clock")
-                }
                 // Favorites + add-to-playlist are auth-gated. When signed out, both actions
                 // are hidden — the YouTube endpoints they call would just throw
                 // `.notAuthenticated` and the user would see a useless error toast.
