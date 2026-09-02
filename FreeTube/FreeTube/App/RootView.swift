@@ -70,10 +70,6 @@ struct RootView: View {
             popupBarDismissGesture.install(on: popupBar) {
                 player.dismiss()
             }
-            PopupBarTextLayoutFix.apply(to: popupBar)
-            DispatchQueue.main.async {
-                PopupBarTextLayoutFix.apply(to: popupBar)
-            }
         }
         .task {
             await SessionManager.shared.bootstrap()
@@ -282,12 +278,14 @@ private struct TabBarRetapObserver: UIViewRepresentable {
             recognizer.delegate = self
         }
 
-        func install(from view: UIView) {
-            DispatchQueue.main.async { [weak self, weak view] in
-                guard let self, let view,
-                      let controller = view.nearestViewController,
-                      let tabBar = controller.tabBarController?.tabBar,
-                      installedTabBar !== tabBar else { return }
+        func install(from view: UIView, attempt: Int = 0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (attempt == 0 ? 0 : 0.1)) { [weak self, weak view] in
+                guard let self, let view else { return }
+                guard let tabBar = view.window?.firstDescendant(of: UITabBar.self) else {
+                    if attempt < 10 { install(from: view, attempt: attempt + 1) }
+                    return
+                }
+                guard installedTabBar !== tabBar else { return }
                 installedTabBar?.removeGestureRecognizer(recognizer)
                 tabBar.addGestureRecognizer(recognizer)
                 installedTabBar = tabBar
@@ -303,9 +301,7 @@ private struct TabBarRetapObserver: UIViewRepresentable {
             guard recognizer.state == .ended, touchBeganOnSelectedTab,
                   let tabBar = installedTabBar,
                   tabBar.selectedItem == tabBar.items?[safe: tabIndex] else { return }
-            let buttons = tabBar.subviews
-                .filter { String(describing: type(of: $0)).contains("UITabBarButton") }
-                .sorted { $0.frame.minX < $1.frame.minX }
+            let buttons = tabButtons(in: tabBar)
             let point = recognizer.location(in: tabBar)
             guard buttons.indices.contains(tabIndex), buttons[tabIndex].frame.contains(point) else { return }
             action()
@@ -316,14 +312,18 @@ private struct TabBarRetapObserver: UIViewRepresentable {
                 touchBeganOnSelectedTab = false
                 return true
             }
-            let buttons = tabBar.subviews
-                .filter { String(describing: type(of: $0)).contains("UITabBarButton") }
-                .sorted { $0.frame.minX < $1.frame.minX }
+            let buttons = tabButtons(in: tabBar)
             let point = touch.location(in: tabBar)
             touchBeganOnSelectedTab = buttons.indices.contains(tabIndex)
                 && buttons[tabIndex].frame.contains(point)
                 && tabBar.selectedItem == tabBar.items?[safe: tabIndex]
             return true
+        }
+
+        private func tabButtons(in tabBar: UITabBar) -> [UIView] {
+            tabBar.subviews
+                .filter { $0 is UIControl && !$0.isHidden && $0.bounds.width > 0 }
+                .sorted { $0.frame.minX < $1.frame.minX }
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
@@ -332,11 +332,10 @@ private struct TabBarRetapObserver: UIViewRepresentable {
 }
 
 private extension UIView {
-    var nearestViewController: UIViewController? {
-        var responder: UIResponder? = self
-        while let current = responder {
-            if let controller = current as? UIViewController { return controller }
-            responder = current.next
+    func firstDescendant<T: UIView>(of type: T.Type) -> T? {
+        if let match = self as? T, !match.isHidden { return match }
+        for child in subviews {
+            if let match = child.firstDescendant(of: type) { return match }
         }
         return nil
     }
@@ -344,24 +343,6 @@ private extension UIView {
 
 private extension Collection {
     subscript(safe index: Index) -> Element? { indices.contains(index) ? self[index] : nil }
-}
-
-private enum PopupBarTextLayoutFix {
-    static func apply(to view: UIView) {
-        view.clipsToBounds = false
-        unclampText(in: view)
-    }
-
-    private static func unclampText(in view: UIView) {
-        for child in view.subviews {
-            let typeName = String(describing: type(of: child))
-            if child is UILabel || typeName.localizedCaseInsensitiveContains("marquee") {
-                child.clipsToBounds = false
-                child.superview?.clipsToBounds = false
-            }
-            unclampText(in: child)
-        }
-    }
 }
 
 /// Hosts the popup's `FullScreenPlayer` and all of its `popup*(...)` metadata modifiers.
@@ -384,7 +365,21 @@ struct PopupContentWrapper: View {
 
     var body: some View {
         FullScreenPlayer()
-            .popupTitle(player.currentVideo?.title ?? "", subtitle: subtitleText)
+            .popupTitle {
+                MiniPlayerMarqueeText(
+                    text: player.currentVideo?.title ?? "",
+                    font: .subheadline.weight(.semibold),
+                    color: .primary,
+                    height: 20
+                )
+            } subtitle: {
+                MiniPlayerMarqueeText(
+                    text: subtitleText,
+                    font: .caption,
+                    color: .secondary,
+                    height: 17
+                )
+            }
             .popupImage(image)
             .popupBarLeadingButtons {
                 ToolbarItemGroup(placement: .popupBar) {

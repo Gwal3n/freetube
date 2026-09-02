@@ -10,6 +10,7 @@ struct SearchContent: View {
     let onRunSearch: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismissSearch) private var dismissSearch
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
@@ -24,6 +25,7 @@ struct SearchContent: View {
                         suggestions: model.suggestions,
                         onSelect: { suggestion in
                             model.query = suggestion.text
+                            dismissSearch()
                             onRunSearch()
                         },
                         onFill: { suggestion in
@@ -53,6 +55,7 @@ struct SearchContent: View {
                 ForEach(history) { entry in
                     Button {
                         model.query = entry.query
+                        dismissSearch()
                         onRunSearch()
                     } label: {
                         HStack {
@@ -189,7 +192,12 @@ struct ConditionalSearchable: ViewModifier {
 
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(text: $text, isPresented: $isPresented, prompt: Text(prompt))
+            content.searchable(
+                text: $text,
+                isPresented: $isPresented,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: Text(prompt)
+            )
         } else {
             content
         }
