@@ -242,8 +242,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   Show only (timeline marker), or Automatically skip. `poi_highlight` is a point marker and instead
   supports Disabled, Show only, or Ask; Ask presents a five-second prompt to jump to that timestamp
   as soon as the lookup returns. Manual seeks
-  immediately evaluate their destination, and rewinding before a handled segment rearms it; Undo
-  is deliberately exempt so it can replay the segment without instantly skipping again. Automatic
+  immediately evaluate their destination, and rewinding before a handled segment rearms it. Undo
+  returns to the settled manual-seek position when the user landed inside a segment, while normal
+  boundary skips return to the segment start; Undo is deliberately exempt from rearming so it can
+  replay the segment without instantly skipping again. Automatic
   skips show the existing five-second Undo banner using the category color.
   Prompt/Undo banners sit above the custom timeline using the same orientation-aware bottom inset,
   so they never cover its time labels.

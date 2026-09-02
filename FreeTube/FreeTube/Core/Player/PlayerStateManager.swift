@@ -554,7 +554,7 @@ final class PlayerStateManager {
         // The lookup may finish after playback has already entered a segment. Boundary observers
         // cannot fire retroactively, so evaluate the current position once immediately.
         if let current = segments.first(where: { elapsed >= $0.startTime && elapsed < $0.endTime }) {
-            handleSponsorBlockSegment(current)
+            handleSponsorBlockSegment(current, enteredAt: elapsed)
         }
     }
 
@@ -569,16 +569,19 @@ final class PlayerStateManager {
                 && time >= $0.startTime - 0.5
                 && time < $0.endTime - 0.1
         }) else { return }
-        handleSponsorBlockSegment(segment)
+        handleSponsorBlockSegment(segment, enteredAt: time)
     }
 
-    private func handleSponsorBlockSegment(_ segment: SponsorBlockSegment) {
+    private func handleSponsorBlockSegment(
+        _ segment: SponsorBlockSegment,
+        enteredAt explicitEntryTime: TimeInterval? = nil
+    ) {
         let behavior = preferences.sponsorBlockBehavior(for: segment.category)
         guard preferences.sponsorBlockEnabled,
               behavior != .disabled,
               !handledSponsorBlockSegmentIDs.contains(segment.id),
               currentVideo != nil else { return }
-        let currentTime = player.currentTime().seconds
+        let currentTime = explicitEntryTime ?? player.currentTime().seconds
         guard currentTime.isFinite,
               currentTime >= segment.startTime - 0.5,
               currentTime < segment.endTime - 0.1 else { return }
@@ -587,11 +590,18 @@ final class PlayerStateManager {
         handledSponsorBlockSegmentIDs.insert(segment.id)
         sponsorBlockNoticeTask?.cancel()
 
+        // Preserve where the viewer actually entered the segment. A boundary observer can fire a
+        // fraction late during ordinary playback, so positions near the beginning normalize to
+        // the true segment start. A manual scrub into the middle retains its settled seek target.
+        let undoPosition = currentTime <= segment.startTime + 0.75
+            ? segment.startTime
+            : min(currentTime, segment.endTime)
+
         log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
         seek(to: segment.endTime)
         sponsorBlockNotice = SponsorBlockNotice(
             category: segment.category,
-            originalStartTime: segment.startTime,
+            originalStartTime: undoPosition,
             kind: .skipped
         )
         scheduleSponsorBlockNoticeDismissal()
