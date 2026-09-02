@@ -271,8 +271,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   `TabRole.search`, which detaches it visually on iOS 26. Re-selecting the ordinary tab increments a
   selection-binding activation token that drives `.searchable(isPresented:)`; no UIKit tab gesture
   observer is installed. Selecting a suggestion, history entry, or video explicitly resigns keyboard
-  focus without dismissing the search UI. Empty-content taps resign focus, and every Search scroll
-  container uses interactive keyboard dismissal for a natural downward swipe.
+  focus without dismissing the search UI. Search content observes simultaneous taps and drags so
+  Lists cannot swallow empty-area dismissal, and every Search scroll container uses immediate
+  keyboard dismissal as soon as scrolling begins.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration. Metadata and `MPMediaItemArtwork` are cached per current image; the 0.5-second playback tick updates only elapsed time and rate.

@@ -32,7 +32,7 @@ struct SearchContent: View {
                         }
                     )
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(.immediately)
             } else if model.isLoading {
                 LoadingView()
             } else if !history.isEmpty {
@@ -46,11 +46,13 @@ struct SearchContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { dismissKeyboard() }
-        }
+        // Lists and ScrollViews cover the background, so a background-only tap never receives
+        // most empty-area touches. Simultaneous gestures observe them without taking row/button
+        // actions away from the native controls.
+        .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 4).onChanged { _ in dismissKeyboard() }
+        )
         .errorToast($model.errorState)
     }
 
@@ -89,7 +91,7 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
-        .scrollDismissesKeyboard(.interactively)
+        .scrollDismissesKeyboard(.immediately)
     }
 
     @ViewBuilder
@@ -145,7 +147,7 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
-        .scrollDismissesKeyboard(.interactively)
+        .scrollDismissesKeyboard(.immediately)
     }
 
     private func dismissKeyboard() {
