@@ -275,8 +275,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   selection-binding activation token that drives `.searchable(isPresented:)`; no UIKit tab gesture
   observer is installed. Selecting a suggestion or history entry passes that row's query explicitly
   to the search submission before resigning keyboard focus; never rely on a later read of field state.
-  Selecting a video also resigns focus without dismissing the search UI. Search content observes an
-  empty-area tap without including subview gestures, so it cannot consume row buttons, and every
+  Selecting a video also resigns focus without dismissing the search UI. Never attach a parent tap
+  or drag recognizer around the search `List`: even a simultaneous gesture mask can consume native
+  row and Clear-all buttons on iOS 26. The true empty state handles its own background tap, and every
   Search scroll container uses immediate keyboard dismissal as soon as scrolling begins.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.

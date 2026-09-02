@@ -43,15 +43,11 @@ struct SearchContent: View {
                     title: "Search YouTube",
                     message: "Find videos, channels, and playlists."
                 )
+                .contentShape(Rectangle())
+                .onTapGesture { dismissKeyboard() }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Observe only this container's empty-area taps. Including subviews here can consume native
-        // List row buttons, including recent-search selection.
-        .simultaneousGesture(
-            TapGesture().onEnded { dismissKeyboard() },
-            including: .gesture
-        )
         .errorToast($model.errorState)
     }
 
