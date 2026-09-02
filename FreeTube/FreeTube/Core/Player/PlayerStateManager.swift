@@ -47,6 +47,7 @@ final class PlayerStateManager {
     private(set) var elapsed: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
     private(set) var playbackRate: Double
+    private(set) var playbackQuality: VideoQuality
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     var miniPlayerVisible: Bool = false
@@ -129,6 +130,7 @@ final class PlayerStateManager {
         self.sponsorBlockService = sponsorBlockService
         self.preferences = preferences
         self.playbackRate = preferences.playbackRate
+        self.playbackQuality = preferences.preferredQuality
         // Keep the audio track running when the player view goes off-screen (popup minimize, app
         // backgrounded). Without this, AVPlayer pauses video tracks as soon as their pixel buffer
         // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
@@ -358,6 +360,19 @@ final class PlayerStateManager {
         player.defaultRate = Float(boundedRate)
         playbackRate = boundedRate
         if isPlaying { player.rate = Float(boundedRate) }
+    }
+
+    /// Updates the HLS adaptive-quality ceiling in place and persists it for future resolutions.
+    /// Fixed progressive/local assets cannot switch representation after loading, but retain the
+    /// new preference for the next video without disrupting current playback.
+    func setPlaybackQuality(_ quality: VideoQuality) {
+        guard quality != playbackQuality else { return }
+        log.info("setPlaybackQuality(\(quality.rawValue, privacy: .public))")
+        playbackQuality = quality
+        preferences.preferredQuality = quality
+        if let item = player.currentItem {
+            applyQualityCap(to: item)
+        }
     }
 
     func seek(to seconds: TimeInterval, rearmSponsorBlock: Bool = true) {
@@ -813,7 +828,10 @@ final class PlayerStateManager {
     /// segment before reporting `.readyToPlay`. `.auto` stays uncapped so ABR can use the full
     /// ladder, and this is a no-op for progressive and local-file candidates.
     private func applyQualityCap(to item: AVPlayerItem) {
-        let quality = preferences.preferredQuality
+        let quality = playbackQuality
+        // `.zero` means unrestricted. Reset first so moving from a capped choice back to Auto
+        // takes effect on the already-playing HLS asset.
+        item.preferredMaximumResolution = .zero
         guard quality != .auto, let heightCap = quality.heightCap, heightCap > 0 else { return }
         // AVPlayer treats this as an upper bound on a variant's frame size, not an exact match,
         // so deriving the width from 16:9 is safe for taller and wider aspect ratios alike.

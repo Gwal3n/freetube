@@ -14,6 +14,14 @@ enum VideoQuality: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    var displayName: String {
+        switch self {
+        case .auto: return "Auto"
+        case .audioOnly: return "Audio"
+        default: return rawValue
+        }
+    }
+
     var heightCap: Int? {
         switch self {
         case .auto: return 1080
