@@ -34,11 +34,19 @@ final class SearchViewModel {
     }
 
     func submit() async {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let submittedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !submittedQuery.isEmpty else { return }
+        // A pending autocomplete request must never win the race with an explicit keyboard or
+        // suggestion submission and put suggestions back over the requested results.
+        if query != submittedQuery {
+            query = submittedQuery
+        }
+        autocompleteTask?.cancel()
+        suggestions = []
         isLoading = true
         defer { isLoading = false }
         do {
-            let result = try await service.search(query: query, restricted: preferences.restrictedSearchMode)
+            let result = try await service.search(query: submittedQuery, restricted: preferences.restrictedSearchMode)
             results = result
             suggestions = []
         } catch {
@@ -77,12 +85,15 @@ final class SearchViewModel {
     }
 
     private func runAutocomplete(_ q: String) async {
+        guard !Task.isCancelled, q == query else { return }
         guard !q.trimmingCharacters(in: .whitespaces).isEmpty else {
             suggestions = []
             return
         }
         do {
-            suggestions = try await service.autocomplete(query: q)
+            let fetched = try await service.autocomplete(query: q)
+            guard !Task.isCancelled, q == query, !isLoading else { return }
+            suggestions = fetched
         } catch {
             // Autocomplete failures are silent.
             log.debug("Autocomplete failed: \(String(describing: error), privacy: .public)")

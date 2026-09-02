@@ -20,10 +20,16 @@ struct SearchContent: View {
                 resultsList(results)
             } else if !model.suggestions.isEmpty {
                 ScrollView {
-                    SearchSuggestionList(suggestions: model.suggestions) { suggestion in
-                        model.query = suggestion.text
-                        onRunSearch()
-                    }
+                    SearchSuggestionList(
+                        suggestions: model.suggestions,
+                        onSelect: { suggestion in
+                            model.query = suggestion.text
+                            onRunSearch()
+                        },
+                        onFill: { suggestion in
+                            model.query = suggestion.text
+                        }
+                    )
                 }
             } else if model.isLoading {
                 LoadingView()

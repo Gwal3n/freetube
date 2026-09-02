@@ -8,25 +8,12 @@ import SwiftData
 /// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
-    @State private var searchModel: SearchViewModel
-    private let usesContainerSearch: Bool
+    @State private var searchModel = SearchViewModel()
     @Environment(\.modelContext) private var modelContext
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
-
-    @MainActor
-    init() {
-        _searchModel = State(initialValue: SearchViewModel())
-        usesContainerSearch = false
-    }
-
-    @MainActor
-    init(searchModel: SearchViewModel, usesContainerSearch: Bool) {
-        _searchModel = State(initialValue: searchModel)
-        self.usesContainerSearch = usesContainerSearch
-    }
 
     var body: some View {
         NavigationStack {
@@ -44,7 +31,7 @@ struct HomeScreen: View {
             .navigationTitle("Search")
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
-                enabled: !MacIntegration.isRunningOnMac && !usesContainerSearch,
+                enabled: !MacIntegration.isRunningOnMac,
                 prompt: "Search YouTube"
             ))
             .onSubmit(of: .search) {
