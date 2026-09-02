@@ -13,10 +13,12 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private weak var feedbackView: UIView?
     private var onSeekRelative: (TimeInterval) -> Void
     private var onSeekAbsolute: (TimeInterval) -> Void
+    private var onTogglePlayback: () -> Void
     private var onToggleControls: () -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var doubleTapGesture: UITapGestureRecognizer?
     private var continuationTapGesture: UITapGestureRecognizer?
+    private var twoFingerTapGesture: UITapGestureRecognizer?
     private var singleTapGesture: UITapGestureRecognizer?
     private var horizontalPanGesture: UIPanGestureRecognizer?
     private var feedbackLabel: UILabel?
@@ -34,11 +36,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
+        onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
+        self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
     }
 
@@ -46,11 +50,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
+        onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
+        self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
     }
 
@@ -90,6 +96,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         horizontalPan.cancelsTouchesInView = false
         horizontalPan.delegate = self
 
+        let twoFingerTap = UITapGestureRecognizer(target: self, action: #selector(didTwoFingerTap(_:)))
+        twoFingerTap.numberOfTapsRequired = 1
+        twoFingerTap.numberOfTouchesRequired = 2
+        twoFingerTap.cancelsTouchesInView = false
+        twoFingerTap.delaysTouchesEnded = false
+        twoFingerTap.delegate = self
+
         let singleTap = UITapGestureRecognizer(target: self, action: #selector(didSingleTap(_:)))
         singleTap.numberOfTapsRequired = 1
         singleTap.cancelsTouchesInView = false
@@ -100,9 +113,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         doubleTapGesture = doubleTap
         continuationTapGesture = continuationTap
+        twoFingerTapGesture = twoFingerTap
         singleTapGesture = singleTap
         horizontalPanGesture = horizontalPan
-        gestures = [doubleTap, continuationTap, longPress, horizontalPan, singleTap]
+        gestures = [doubleTap, continuationTap, longPress, horizontalPan, twoFingerTap, singleTap]
         gestures.forEach { rootView.addGestureRecognizer($0) }
         deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap, longPress, horizontalPan])
         // AVKit may finish installing its private control hierarchy after `makeUIViewController`
@@ -131,6 +145,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         gestures.removeAll()
         doubleTapGesture = nil
         continuationTapGesture = nil
+        twoFingerTapGesture = nil
         singleTapGesture = nil
         horizontalPanGesture = nil
         resetHorizontalSeek()
@@ -153,6 +168,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     @objc private func didSingleTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else { return }
         onToggleControls()
+    }
+
+    @objc private func didTwoFingerTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        log.info("Two-finger tap recognized; toggling playback")
+        onTogglePlayback()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     @objc private func didContinueSeeking(_ gesture: UITapGestureRecognizer) {
