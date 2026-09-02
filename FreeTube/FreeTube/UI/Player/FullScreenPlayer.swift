@@ -105,6 +105,7 @@ struct FullScreenPlayer: View {
                             }
                             .buttonStyle(.plain)
                         ),
+                        bottomTimelinePadding: timelineBottomPadding(in: proxy.size),
                         onTogglePlayPause: {
                             player.togglePlayPause()
                             showPlayerControls()
@@ -138,7 +139,7 @@ struct FullScreenPlayer: View {
                         )
                     }
                 }
-                .frame(width: proxy.size.width, height: playerSurfaceHeight(in: proxy.size))
+                .frame(width: proxy.size.width, height: proxy.size.width * 9 / 16)
                 .animation(.easeOut(duration: 0.2), value: player.loadState)
                 .onAppear { showPlayerControls() }
                 .onDisappear { controlsHideTask?.cancel() }
@@ -250,13 +251,12 @@ struct FullScreenPlayer: View {
 
     // MARK: - Lower section: panel vs channel-push
 
-    /// Portrait uses a full-width 16:9 surface. On short landscape phone screens that computed
-    /// height can exceed the entire viewport, placing the timeline below the visible bounds, so
-    /// constrain the surface to the available height there.
-    private func playerSurfaceHeight(in availableSize: CGSize) -> CGFloat {
+    /// The video remains full-width in landscape. When its 16:9 height exceeds a short phone
+    /// viewport, lift only the timeline by that overflow so the picture geometry does not change.
+    private func timelineBottomPadding(in availableSize: CGSize) -> CGFloat {
         let aspectHeight = availableSize.width * 9 / 16
-        guard verticalSizeClass == .compact else { return aspectHeight }
-        return min(aspectHeight, availableSize.height)
+        guard verticalSizeClass == .compact else { return 8 }
+        return max(22, aspectHeight - availableSize.height + 16)
     }
 
     /// Default panel mode. No NavigationStack wrapping — the outer popup's `.thinMaterial`

@@ -197,19 +197,24 @@ struct PopupContentWrapper: View {
         FullScreenPlayer()
             .popupTitle(player.currentVideo?.title ?? "", subtitle: subtitleText)
             .popupImage(image)
+            .popupBarLeadingButtons {
+                ToolbarItemGroup(placement: .popupBar) {
+                    Button {
+                        player.dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Color.secondary)
+                    }
+                    .accessibilityLabel("Close player")
+                }
+            }
             // Progress changes every half-second. Isolate that observation from this wrapper so
             // LNPopupUI does not receive a freshly rebuilt title/subtitle on every playback tick;
             // repeatedly resetting its native labels made mini-player text distort or disappear.
             .overlay { PopupProgressObserver() }
             .popupBarButtons {
                 ToolbarItemGroup(placement: .popupBar) {
-                    Button {
-                        player.dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .foregroundStyle(Color.primary)
-                    }
-                    .accessibilityLabel("Close player")
                     Button {
                         player.togglePlayPause()
                     } label: {

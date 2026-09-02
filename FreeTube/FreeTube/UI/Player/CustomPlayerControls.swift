@@ -2,8 +2,6 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct CustomPlayerControls: View {
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-
     let isVisible: Bool
     let isPlaying: Bool
     let elapsed: TimeInterval
@@ -13,6 +11,7 @@ struct CustomPlayerControls: View {
     let hasPrevious: Bool
     let hasNext: Bool
     let additionalTopControls: AnyView
+    let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
     let onPrevious: () -> Void
@@ -87,7 +86,7 @@ struct CustomPlayerControls: View {
                     onSeek: onSeek
                 )
                 .padding(.horizontal, 12)
-                .padding(.bottom, verticalSizeClass == .compact ? 22 : 8)
+                .padding(.bottom, bottomTimelinePadding)
             }
             .opacity(isVisible ? 1 : 0)
         }

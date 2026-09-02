@@ -1,15 +1,9 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
-/// Renders the body of the search experience — results / suggestions / history / empty
-/// state — without owning its own navigation stack or search bar. Hosted by `HomeScreen`,
-/// which provides the `.searchable` text input and the `onRunSearch` callback so the
-/// history upsert + submit stay in one place at the host level.
-///
-/// **Why decoupled from the search field:** the host (Home) needs to decide what to show
-/// based on whether a search is active — when the user clears the field, we want the home
-/// feed back, not a stale "Search" screen. Owning the `.searchable` at the host level
-/// makes that flip simple.
+/// Renders search results, suggestions, history, and the empty state. `HomeScreen` owns the
+/// consistently aligned inline search field and the history-upsert submit callback.
 @available(iOS 17.0, *)
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
@@ -114,6 +108,7 @@ struct SearchContent: View {
                     let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
                     ForEach(results.videos) { video in
                         VideoRow(video: video, showsMoreMenu: true) {
+                            dismissKeyboard()
                             player.load(video)
                         }
                         .onAppear {
@@ -135,58 +130,65 @@ struct SearchContent: View {
         }
         .listStyle(.plain)
     }
-}
 
-/// Inline search field used on Mac (Designed-for-iPad-on-Mac or real Catalyst). `.searchable`
-/// collapses to a trailing toolbar button on Mac runtimes — awkward at desktop widths. The
-/// host view embeds this above its content and skips `.searchable` via `ConditionalSearchable`.
-@available(iOS 17.0, *)
-struct MacInlineSearchField: View {
-    @Binding var query: String
-    let onSubmit: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Search", text: $query)
-                .textFieldStyle(.plain)
-                .submitLabel(.search)
-                .onSubmit(onSubmit)
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
-        .background(.quaternary, in: Capsule())
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 }
 
-/// Applies `.searchable` only when `enabled`. We can't put `.searchable` behind a plain
-/// `if` because it returns an opaque `some View` whose type differs between branches,
-/// which breaks SwiftUI identity. A `ViewModifier` keeps the outer type stable across the
-/// runtime toggle (Mac → inline field, iOS → native searchable).
+/// Inline field used on every platform so the clear and close controls keep stable alignment.
 @available(iOS 17.0, *)
-struct ConditionalSearchable: ViewModifier {
-    @Binding var text: String
-    let enabled: Bool
-    var prompt: String = "Search"
+struct InlineSearchField: View {
+    @Binding var query: String
+    let onSubmit: () -> Void
+    @FocusState private var isFocused: Bool
 
-    func body(content: Content) -> some View {
-        if enabled {
-            content.searchable(text: $text, prompt: Text(prompt))
-        } else {
-            content
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search YouTube", text: $query)
+                    .focused($isFocused)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.search)
+                    .onSubmit(onSubmit)
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(.quaternary, in: Capsule())
+
+            if isFocused {
+                Button {
+                    query = ""
+                    isFocused = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 38, height: 38)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close search")
+            }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .animation(.easeInOut(duration: 0.15), value: isFocused)
     }
 }

@@ -4,10 +4,8 @@ import SwiftData
 /// **Search** tab. Search suggestions, results, and local recent searches only; it deliberately
 /// performs no home/trending feed request while idle.
 ///
-/// **Mac runtime** gets a custom inline search field above the content via
-/// `MacInlineSearchField`, because SwiftUI's `.searchable` collapses to a trailing toolbar
-/// button on Designed-for-iPad-on-Mac and real Catalyst, which is awkward at desktop widths.
-/// iOS/iPadOS uses the native `.searchable` modifier as usual.
+/// A consistent inline field is used on every platform so its clear and close controls do not
+/// inherit platform-dependent navigation-bar alignment.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
     @State private var searchModel = SearchViewModel()
@@ -20,10 +18,8 @@ struct HomeScreen: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if MacIntegration.isRunningOnMac {
-                    MacInlineSearchField(query: $searchModel.query) {
-                        Task { await runSearch() }
-                    }
+                InlineSearchField(query: $searchModel.query) {
+                    Task { await runSearch() }
                 }
 
                 SearchContent(model: searchModel) {
@@ -31,14 +27,6 @@ struct HomeScreen: View {
                 }
             }
             .navigationTitle("Search")
-            .modifier(ConditionalSearchable(
-                text: $searchModel.query,
-                enabled: !MacIntegration.isRunningOnMac,
-                prompt: "Search YouTube"
-            ))
-            .onSubmit(of: .search) {
-                Task { await runSearch() }
-            }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in
                 if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
