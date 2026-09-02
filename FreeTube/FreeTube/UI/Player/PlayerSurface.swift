@@ -7,6 +7,7 @@ import AVKit
 struct PlayerSurface: UIViewControllerRepresentable {
     let player: AVPlayer
     var onSeekRelative: (TimeInterval) -> Void
+    var onSeekAbsolute: (TimeInterval) -> Void
     var onToggleControls: () -> Void
     var showsControls: Bool = false
     var entersPiPAutomatically: Bool = true
@@ -15,6 +16,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
         PlayerGestureCoordinator(
             player: player,
             onSeekRelative: onSeekRelative,
+            onSeekAbsolute: onSeekAbsolute,
             onToggleControls: onToggleControls
         )
     }
@@ -40,6 +42,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
         context.coordinator.update(
             player: player,
             onSeekRelative: onSeekRelative,
+            onSeekAbsolute: onSeekAbsolute,
             onToggleControls: onToggleControls
         )
         context.coordinator.install(on: controller)

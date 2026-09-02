@@ -79,6 +79,9 @@ struct FullScreenPlayer: View {
                         onSeekRelative: { seconds in
                             player.seekRelative(by: seconds)
                         },
+                        onSeekAbsolute: { seconds in
+                            player.seek(to: seconds)
+                        },
                         onToggleControls: { togglePlayerControls() }
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)

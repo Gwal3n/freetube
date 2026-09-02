@@ -12,35 +12,44 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private weak var gestureView: UIView?
     private weak var feedbackView: UIView?
     private var onSeekRelative: (TimeInterval) -> Void
+    private var onSeekAbsolute: (TimeInterval) -> Void
     private var onToggleControls: () -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var doubleTapGesture: UITapGestureRecognizer?
     private var continuationTapGesture: UITapGestureRecognizer?
     private var singleTapGesture: UITapGestureRecognizer?
+    private var horizontalPanGesture: UIPanGestureRecognizer?
     private var feedbackLabel: UILabel?
     private var feedbackWorkItem: DispatchWorkItem?
     private var seekSessionWorkItem: DispatchWorkItem?
     private var seekSessionTotal: TimeInterval = 0
+    private var horizontalSeekStart: TimeInterval?
+    private var horizontalSeekTarget: TimeInterval?
+    private var horizontalSeekDuration: TimeInterval?
     private var rateBeforeBoost: Float?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
     init(
         player: AVPlayer,
         onSeekRelative: @escaping (TimeInterval) -> Void,
+        onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
+        self.onSeekAbsolute = onSeekAbsolute
         self.onToggleControls = onToggleControls
     }
 
     func update(
         player: AVPlayer,
         onSeekRelative: @escaping (TimeInterval) -> Void,
+        onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
+        self.onSeekAbsolute = onSeekAbsolute
         self.onToggleControls = onToggleControls
     }
 
@@ -75,32 +84,39 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         longPress.delaysTouchesEnded = false
         longPress.delegate = self
 
+        let horizontalPan = UIPanGestureRecognizer(target: self, action: #selector(didPanHorizontally(_:)))
+        horizontalPan.maximumNumberOfTouches = 1
+        horizontalPan.cancelsTouchesInView = false
+        horizontalPan.delegate = self
+
         let singleTap = UITapGestureRecognizer(target: self, action: #selector(didSingleTap(_:)))
         singleTap.numberOfTapsRequired = 1
         singleTap.cancelsTouchesInView = false
         singleTap.delegate = self
         singleTap.require(toFail: doubleTap)
         singleTap.require(toFail: longPress)
+        singleTap.require(toFail: horizontalPan)
 
         doubleTapGesture = doubleTap
         continuationTapGesture = continuationTap
         singleTapGesture = singleTap
-        gestures = [doubleTap, continuationTap, longPress, singleTap]
+        horizontalPanGesture = horizontalPan
+        gestures = [doubleTap, continuationTap, longPress, horizontalPan, singleTap]
         gestures.forEach { rootView.addGestureRecognizer($0) }
-        deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap, longPress])
+        deferNativeSingleTaps(in: rootView, until: [doubleTap, continuationTap, longPress, horizontalPan])
         // AVKit may finish installing its private control hierarchy after `makeUIViewController`
         // returns. Re-scan on the next main-actor turn so those late recognizers get the same
         // failure dependency.
-        Task { @MainActor [weak self, weak rootView, weak doubleTap, weak longPress] in
+        Task { @MainActor [weak self, weak rootView, weak doubleTap, weak longPress, weak horizontalPan] in
             await Task.yield()
-            guard let self, let rootView, let doubleTap, let longPress else { return }
+            guard let self, let rootView, let doubleTap, let longPress, let horizontalPan else { return }
             guard let continuationTap = self.continuationTapGesture else { return }
             self.deferNativeSingleTaps(
                 in: rootView,
-                until: [doubleTap, continuationTap, longPress]
+                until: [doubleTap, continuationTap, longPress, horizontalPan]
             )
         }
-        log.info("Installed double-tap and hold gestures on AVPlayerViewController root view")
+        log.info("Installed tap, hold, and horizontal-seek gestures on AVPlayerViewController root view")
     }
 
     func uninstall() {
@@ -115,6 +131,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         doubleTapGesture = nil
         continuationTapGesture = nil
         singleTapGesture = nil
+        horizontalPanGesture = nil
+        resetHorizontalSeek()
         feedbackLabel?.removeFromSuperview()
         feedbackLabel = nil
         feedbackView = nil
@@ -178,6 +196,61 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         }
     }
 
+    @objc private func didPanHorizontally(_ gesture: UIPanGestureRecognizer) {
+        guard let view = gestureView else { return }
+
+        switch gesture.state {
+        case .began:
+            endSeekSession(hideFeedback: false)
+            restorePlaybackRateIfNeeded()
+            guard let player else { return }
+            let current = player.currentTime().seconds
+            let duration = player.currentItem?.duration.seconds ?? .nan
+            guard current.isFinite, duration.isFinite, duration > 0 else {
+                resetHorizontalSeek()
+                return
+            }
+            horizontalSeekStart = min(max(current, 0), duration)
+            horizontalSeekTarget = horizontalSeekStart
+            horizontalSeekDuration = duration
+        case .changed:
+            guard let start = horizontalSeekStart,
+                  let duration = horizontalSeekDuration,
+                  view.bounds.width > 0 else { return }
+            let translation = gesture.translation(in: view).x
+            let sensitivity: TimeInterval
+            if duration >= 3_600 {
+                sensitivity = 120
+            } else if duration >= 1_800 {
+                sensitivity = 90
+            } else {
+                sensitivity = 60
+            }
+            let dragFraction = TimeInterval(translation / view.bounds.width)
+            let target = min(max(start + dragFraction * sensitivity, 0), duration)
+            horizontalSeekTarget = target
+            showFeedback(
+                horizontalSeekText(target: target, offset: target - start),
+                horizontalFraction: 0.5,
+                wide: true,
+                automaticallyHide: false
+            )
+        case .ended:
+            if let target = horizontalSeekTarget, horizontalSeekStart != nil {
+                log.info("Horizontal swipe recognized; seeking to \(target, privacy: .public)s")
+                onSeekAbsolute(target)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+            resetHorizontalSeek()
+            hideFeedback()
+        case .cancelled, .failed:
+            resetHorizontalSeek()
+            hideFeedback()
+        default:
+            break
+        }
+    }
+
     private func restorePlaybackRateIfNeeded() {
         guard let priorRate = rateBeforeBoost else { return }
         rateBeforeBoost = nil
@@ -224,11 +297,33 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return "0s"
     }
 
+    private func horizontalSeekText(target: TimeInterval, offset: TimeInterval) -> String {
+        let sign = offset >= 0 ? "+" : "−"
+        return "\(formatTime(target))  \(sign)\(Int(abs(offset)))s"
+    }
+
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        let total = max(Int(seconds), 0)
+        let hours = total / 3_600
+        let minutes = (total % 3_600) / 60
+        let remainder = total % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, remainder)
+            : String(format: "%d:%02d", minutes, remainder)
+    }
+
+    private func resetHorizontalSeek() {
+        horizontalSeekStart = nil
+        horizontalSeekTarget = nil
+        horizontalSeekDuration = nil
+    }
+
     private func showFeedback(
         _ text: String,
         horizontalFraction: CGFloat,
         verticalFraction: CGFloat = 0.5,
         compact: Bool = false,
+        wide: Bool = false,
         automaticallyHide: Bool = true
     ) {
         guard let view = feedbackView else { return }
@@ -239,9 +334,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         label.font = compact
             ? .preferredFont(forTextStyle: .subheadline)
             : .preferredFont(forTextStyle: .headline)
-        label.bounds.size = compact
-            ? CGSize(width: 52, height: 26)
-            : CGSize(width: 68, height: 38)
+        label.bounds.size = wide
+            ? CGSize(width: 150, height: 38)
+            : compact
+                ? CGSize(width: 52, height: 26)
+                : CGSize(width: 68, height: 38)
         label.layer.cornerRadius = compact ? 13 : 19
         label.center = CGPoint(
             x: view.bounds.width * horizontalFraction,
@@ -312,5 +409,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
         true
+    }
+
+    nonisolated func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        MainActor.assumeIsolated {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y) * 1.15
+        }
     }
 }
