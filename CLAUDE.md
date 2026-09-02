@@ -259,8 +259,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   YouTubeKit's reply continuation token and load only when their individual thread is expanded.
 - **Search is search-only.** Its idle state contains local recent searches or the clean empty state;
   it must not request or render a home/trending/discovery feed. Suggestions and submitted search
-  results (videos, channels, and playlists) remain available. A shared inline search field is used
-  on every platform for stable clear/close alignment, and selecting a video resigns keyboard focus.
+  results (videos, channels, and playlists) remain available. iPhone and iPad retain native
+  `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
+  native search collapses awkwardly there. Selecting a video explicitly resigns keyboard focus.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration. Metadata and `MPMediaItemArtwork` are cached per current image; the 0.5-second playback tick updates only elapsed time and rate.

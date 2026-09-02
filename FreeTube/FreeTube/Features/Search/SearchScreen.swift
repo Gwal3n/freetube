@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Renders search results, suggestions, history, and the empty state. `HomeScreen` owns the
-/// consistently aligned inline search field and the history-upsert submit callback.
+/// Renders search results, suggestions, history, and the empty state. `HomeScreen` owns the search
+/// presentation and the history-upsert submit callback.
 @available(iOS 17.0, *)
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
@@ -141,54 +141,50 @@ struct SearchContent: View {
     }
 }
 
-/// Inline field used on every platform so the clear and close controls keep stable alignment.
+/// Inline field used on Mac, where native `.searchable` collapses to a toolbar button.
 @available(iOS 17.0, *)
-struct InlineSearchField: View {
+struct MacInlineSearchField: View {
     @Binding var query: String
     let onSubmit: () -> Void
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search YouTube", text: $query)
-                    .focused($isFocused)
-                    .textFieldStyle(.plain)
-                    .submitLabel(.search)
-                    .onSubmit(onSubmit)
-                if !query.isEmpty {
-                    Button {
-                        query = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 38)
-            .background(.quaternary, in: Capsule())
-
-            if isFocused {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search", text: $query)
+                .textFieldStyle(.plain)
+                .submitLabel(.search)
+                .onSubmit(onSubmit)
+            if !query.isEmpty {
                 Button {
                     query = ""
-                    isFocused = false
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.semibold))
-                        .frame(width: 38, height: 38)
-                        .contentShape(Circle())
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Close search")
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
+        .background(.quaternary, in: Capsule())
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .animation(.easeInOut(duration: 0.15), value: isFocused)
+    }
+}
+
+@available(iOS 17.0, *)
+struct ConditionalSearchable: ViewModifier {
+    @Binding var text: String
+    let enabled: Bool
+    var prompt: String = "Search"
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.searchable(text: $text, prompt: Text(prompt))
+        } else {
+            content
+        }
     }
 }

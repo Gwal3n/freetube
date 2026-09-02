@@ -4,8 +4,8 @@ import SwiftData
 /// **Search** tab. Search suggestions, results, and local recent searches only; it deliberately
 /// performs no home/trending feed request while idle.
 ///
-/// A consistent inline field is used on every platform so its clear and close controls do not
-/// inherit platform-dependent navigation-bar alignment.
+/// Mac uses an inline field because `.searchable` collapses awkwardly there. iPhone and iPad use
+/// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
     @State private var searchModel = SearchViewModel()
@@ -18,8 +18,10 @@ struct HomeScreen: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                InlineSearchField(query: $searchModel.query) {
-                    Task { await runSearch() }
+                if MacIntegration.isRunningOnMac {
+                    MacInlineSearchField(query: $searchModel.query) {
+                        Task { await runSearch() }
+                    }
                 }
 
                 SearchContent(model: searchModel) {
@@ -27,6 +29,14 @@ struct HomeScreen: View {
                 }
             }
             .navigationTitle("Search")
+            .modifier(ConditionalSearchable(
+                text: $searchModel.query,
+                enabled: !MacIntegration.isRunningOnMac,
+                prompt: "Search YouTube"
+            ))
+            .onSubmit(of: .search) {
+                Task { await runSearch() }
+            }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in
                 if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
