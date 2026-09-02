@@ -11,6 +11,7 @@ import Kingfisher
 struct FullScreenPlayer: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// Reactive list of all favorited videos so menu rendering doesn't have to fetch Core Data on
     /// every redraw (which was the bug DownloadsScreen had: per-row SQL on the main queue).
     @Query private var favorites: [FavoriteVideo]
@@ -137,7 +138,7 @@ struct FullScreenPlayer: View {
                         )
                     }
                 }
-                .frame(width: proxy.size.width, height: proxy.size.width * 9 / 16)
+                .frame(width: proxy.size.width, height: playerSurfaceHeight(in: proxy.size))
                 .animation(.easeOut(duration: 0.2), value: player.loadState)
                 .onAppear { showPlayerControls() }
                 .onDisappear { controlsHideTask?.cancel() }
@@ -248,6 +249,15 @@ struct FullScreenPlayer: View {
     }
 
     // MARK: - Lower section: panel vs channel-push
+
+    /// Portrait uses a full-width 16:9 surface. On short landscape phone screens that computed
+    /// height can exceed the entire viewport, placing the timeline below the visible bounds, so
+    /// constrain the surface to the available height there.
+    private func playerSurfaceHeight(in availableSize: CGSize) -> CGFloat {
+        let aspectHeight = availableSize.width * 9 / 16
+        guard verticalSizeClass == .compact else { return aspectHeight }
+        return min(aspectHeight, availableSize.height)
+    }
 
     /// Default panel mode. No NavigationStack wrapping — the outer popup's `.thinMaterial`
     /// shows through directly behind metadata, Up Next, and Comments.

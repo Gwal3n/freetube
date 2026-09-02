@@ -2,8 +2,6 @@
 - The seek bar is too low in landscape mode. The bar itself isn’t even visible, it needs to be higher up.
 - Merge the copy button, open in browser,  copy url at current time into one share button. That button should not be in the player but below
 - Player controls fading animation is not super smooth
-- Replace the More dropdown button action with tapping the video title with a dropdown animation, tapping the title again should collapse it.
-- Comments and Up next should be tappable anywhere instead of only the arrow on the very right.
 - Sponsorblock should also add the “Highlight” option and ask to skip if one is detected.
 - For all the sponsorblock options add a choice to disable, always skip, or just show in player but not skip.
 - Sponsorblock skip segment arrow should match the color of the segment.
@@ -13,19 +11,10 @@
 - It would be nice to have these square video previews when seeking through a video.
 - Add a fullscreen button to the player which rotates the screen notch to the left.
 - Would be nice to add caption and quality selection button to the player. The quality selection should ideally showcase the current quality.
-- The miniplayer should have an x button to close it
-- Remove trending videos completely
 - Add a download button under the player which uses yt-dlp and downloads the video in the downloads tab.
-- Remove the profile photos in the comments, remove the reply, translate and dislike buttons.
-- Show existing comment replies in collapsible threads. Load replies only when a thread is opened; posting replies is not needed.
 - Add a switch for autoplay in the add next dropdown.
-- Remove the - icons on the left of the up next videos.
 - Store the previous videos (up to a certain amount) so that the back button would go to the previous video, but don’t show the video in the up next.
 - Add a history tab which shows the local history but stores it only on device, and has a clear history button.
-- The video titles are disappearing or getting cropped from the top or bottom in the miniplayer. This needs fixing.
 - When tapping the channel name, video should minimize and the channel
 should open in fullscreen. Right now it opens under the video. 
-- Allow option to refetch when the description is unavailable.
-- Remove the red bars for the now playing video in up next. Actually remove the current video from up next all together.
 - Add an extra playlist dropdown for when a video is opened from a playlist, which shows the full playlist.
-- Add playlist results to search

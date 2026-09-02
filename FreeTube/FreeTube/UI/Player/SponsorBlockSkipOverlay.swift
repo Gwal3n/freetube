@@ -11,26 +11,37 @@ struct SponsorBlockSkipOverlay: View {
             Spacer()
             HStack(spacing: 12) {
                 Image(systemName: "forward.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(categoryColor)
                 Text("\(notice.category.displayName) skipped")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Button("Undo", action: onUndo)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.green)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(categoryColor)
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityLabel("Dismiss")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.black.opacity(0.88), in: Capsule())
-            .padding(.bottom, 64)
+            .font(.caption)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.black.opacity(0.68), in: Capsule())
+            .padding(.bottom, 20)
         }
         .padding(.horizontal)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private var categoryColor: Color {
+        switch notice.category {
+        case .sponsor: return .green
+        case .selfPromotion: return .yellow
+        case .interaction: return .pink
+        case .intro: return .cyan
+        case .outro: return .blue
+        }
     }
 }
