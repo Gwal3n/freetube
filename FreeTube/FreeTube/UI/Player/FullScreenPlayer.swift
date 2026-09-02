@@ -127,7 +127,8 @@ struct FullScreenPlayer: View {
                             notice: notice,
                             onUndo: { player.undoSponsorBlockSkip() },
                             onSkip: { player.confirmSponsorBlockSkip() },
-                            onDismiss: { player.dismissSponsorBlockNotice() }
+                            onDismiss: { player.dismissSponsorBlockNotice() },
+                            bottomPadding: timelineBottomPadding(in: proxy.size) + 46
                         )
                     }
                 }
@@ -766,8 +767,8 @@ struct FullScreenPlayer: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                autoplayButton
                 if isQueueExpanded {
+                    autoplayButton
                     repeatButton
                 }
                 Button {

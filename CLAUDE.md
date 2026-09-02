@@ -245,6 +245,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   immediately evaluate their destination, and rewinding before a handled segment rearms it; Undo
   is deliberately exempt so it can replay the segment without instantly skipping again. Automatic
   skips show the existing five-second Undo banner using the category color.
+  Prompt/Undo banners sit above the custom timeline using the same orientation-aware bottom inset,
+  so they never cover its time labels.
   AVKit has no public API for adding ranges to its native scrubber, so do not inspect or mutate its
   private seek-bar hierarchy; markers require a separate public/custom UI in a future change.
 - **Expanded player details are lazy and resilient.** Tapping the video title toggles the description
@@ -257,8 +259,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's
   no-comment-load performance characteristics. Both section headers are tappable across their
-  available width. The current video is hidden from the visible Up Next rows; a compact icon beside
-  the heading toggles autoplay, while repeat remains available only when expanded. Queue deletion
+  available width. The current video is hidden from the visible Up Next rows; compact autoplay and
+  repeat icons appear beside the heading only while Up Next is expanded. Queue deletion
   uses swipe actions rather than permanent edit-mode minus controls. Existing comment replies use
   YouTubeKit's reply continuation token and load only when their inline like-row control is expanded.
 - **Search is search-only.** Its idle state contains local recent searches or the clean empty state;
@@ -269,7 +271,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   `TabRole.search`, which detaches it visually on iOS 26. Re-selecting the ordinary tab increments a
   selection-binding activation token that drives `.searchable(isPresented:)`; no UIKit tab gesture
   observer is installed. Selecting a suggestion, history entry, or video explicitly resigns keyboard
-  focus without dismissing the search UI.
+  focus without dismissing the search UI. Empty-content taps resign focus, and every Search scroll
+  container uses interactive keyboard dismissal for a natural downward swipe.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration. Metadata and `MPMediaItemArtwork` are cached per current image; the 0.5-second playback tick updates only elapsed time and rate.

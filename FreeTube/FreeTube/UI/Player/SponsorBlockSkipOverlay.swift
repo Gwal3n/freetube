@@ -6,6 +6,7 @@ struct SponsorBlockSkipOverlay: View {
     let onUndo: () -> Void
     let onSkip: () -> Void
     let onDismiss: () -> Void
+    let bottomPadding: CGFloat
 
     var body: some View {
         VStack {
@@ -40,7 +41,7 @@ struct SponsorBlockSkipOverlay: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, bottomPadding)
         }
         .padding(.leading, 10)
         .padding(.trailing, 40)

@@ -32,6 +32,7 @@ struct SearchContent: View {
                         }
                     )
                 }
+                .scrollDismissesKeyboard(.interactively)
             } else if model.isLoading {
                 LoadingView()
             } else if !history.isEmpty {
@@ -43,6 +44,12 @@ struct SearchContent: View {
                     message: "Find videos, channels, and playlists."
                 )
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { dismissKeyboard() }
         }
         .errorToast($model.errorState)
     }
@@ -82,6 +89,7 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     @ViewBuilder
@@ -137,6 +145,7 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private func dismissKeyboard() {
