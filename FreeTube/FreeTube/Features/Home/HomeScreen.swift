@@ -13,6 +13,7 @@ struct HomeScreen: View {
     @State private var path = NavigationPath()
     @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
+    @Environment(PlayerStateManager.self) private var player
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
@@ -73,8 +74,7 @@ struct HomeScreen: View {
         }
     }
 
-    /// Persists the trimmed query to history (upsert by query string) then fires
-    /// `searchModel.submit()`. Same logic the dedicated Search tab used to run.
+    /// Persists the trimmed query, then either opens a recognized YouTube URL or performs search.
     private func runSearch() async {
         await runSearch(query: searchModel.query)
     }
@@ -90,6 +90,17 @@ struct HomeScreen: View {
             modelContext.insert(SearchHistoryEntry(query: trimmed))
         }
         try? modelContext.save()
+        if let directVideo = searchModel.directVideo(from: trimmed) {
+            searchModel.clearResults()
+            player.load(directVideo)
+            // Give the resolution task created by `load` the first opportunity to start. Metadata
+            // is useful polish, but it must remain behind the playback-critical request.
+            await Task.yield()
+            if let metadata = await searchModel.metadata(forDirectVideoID: directVideo.id) {
+                player.enrichCurrentVideo(with: metadata)
+            }
+            return
+        }
         await searchModel.submit()
     }
 }

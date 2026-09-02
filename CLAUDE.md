@@ -279,6 +279,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   or drag recognizer around the search `List`: even a simultaneous gesture mask can consume native
   row and Clear-all buttons on iOS 26. The true empty state handles its own background tap, and every
   Search scroll container uses immediate keyboard dismissal as soon as scrolling begins.
+- **Direct YouTube URLs submitted through Search start playback immediately.** Accept `youtu.be`
+  links plus YouTube `/watch?v=`, `/shorts/`, `/embed/`, and `/live/` forms, with or without a scheme.
+  Validate the extracted 11-character ID before creating a lightweight playback seed. Metadata is
+  fetched through `VideoService` only after `PlayerStateManager.load` starts resolution, then applied
+  only if that ID is still current; metadata enrichment must never restart or delay stream resolution.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration. Metadata and `MPMediaItemArtwork` are cached per current image; the 0.5-second playback tick updates only elapsed time and rate.

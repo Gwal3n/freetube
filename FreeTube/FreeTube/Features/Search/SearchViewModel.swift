@@ -15,13 +15,48 @@ final class SearchViewModel {
     var errorState: ErrorState?
 
     private let service: any SearchServicing
+    private let videoService: any VideoServicing
     private let preferences = UserPreferences()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "SearchViewModel")
 
     private var autocompleteTask: Task<Void, Never>?
 
-    init(service: any SearchServicing = SearchService()) {
+    init(
+        service: any SearchServicing = SearchService(),
+        videoService: any VideoServicing = VideoService()
+    ) {
         self.service = service
+        self.videoService = videoService
+    }
+
+    /// Returns an immediately playable seed for supported YouTube URLs. Metadata is deliberately
+    /// filled in separately so parsing a pasted URL never adds a blocking request before playback.
+    func directVideo(from text: String) -> Video? {
+        guard let id = Self.youtubeVideoID(from: text) else { return nil }
+        return Video(
+            id: id,
+            title: "YouTube video",
+            channelID: "",
+            channelName: "YouTube",
+            channelThumbnailURL: nil,
+            thumbnailURL: URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"),
+            duration: nil,
+            viewCount: nil,
+            publishedAt: nil,
+            descriptionSnippet: nil,
+            isLive: false,
+            isShort: false
+        )
+    }
+
+    func metadata(forDirectVideoID id: String) async -> Video? {
+        do {
+            let video = try await videoService.fetchInfo(id: id).video
+            return video.title.isEmpty ? nil : video
+        } catch {
+            log.notice("Direct URL metadata lookup failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     /// Drops the previous search's results + suggestions so the embedding view can fall
@@ -98,5 +133,53 @@ final class SearchViewModel {
             // Autocomplete failures are silent.
             log.debug("Autocomplete failed: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    private static func youtubeVideoID(from text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lowercased = trimmed.lowercased()
+        let candidate: String
+        if lowercased.hasPrefix("youtube.com/")
+            || lowercased.hasPrefix("www.youtube.com/")
+            || lowercased.hasPrefix("m.youtube.com/")
+            || lowercased.hasPrefix("music.youtube.com/")
+            || lowercased.hasPrefix("youtu.be/") {
+            candidate = "https://" + trimmed
+        } else {
+            candidate = trimmed
+        }
+
+        guard let components = URLComponents(string: candidate),
+              let rawHost = components.host?.lowercased() else { return nil }
+        let host = rawHost.hasPrefix("www.") ? String(rawHost.dropFirst(4)) : rawHost
+        let pathParts = components.path.split(separator: "/").map(String.init)
+        let possibleID: String?
+
+        if host == "youtu.be" {
+            possibleID = pathParts.first
+        } else if host == "youtube.com"
+            || host.hasSuffix(".youtube.com")
+            || host == "youtube-nocookie.com"
+            || host.hasSuffix(".youtube-nocookie.com") {
+            if components.path == "/watch" {
+                possibleID = components.queryItems?.first(where: { $0.name == "v" })?.value
+            } else if let route = pathParts.first?.lowercased(),
+                      ["shorts", "embed", "live"].contains(route),
+                      pathParts.count > 1 {
+                possibleID = pathParts[1]
+            } else {
+                possibleID = nil
+            }
+        } else {
+            possibleID = nil
+        }
+
+        guard let id = possibleID, id.count == 11 else { return nil }
+        let allowed = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+        )
+        guard id.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+        return id
     }
 }

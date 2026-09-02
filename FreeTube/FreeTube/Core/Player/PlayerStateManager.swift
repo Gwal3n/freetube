@@ -294,6 +294,26 @@ final class PlayerStateManager {
         }
     }
 
+    /// Replaces the lightweight metadata used to start direct-URL playback. Stream resolution is
+    /// intentionally left untouched: the ID is already resolving, and metadata must never restart
+    /// or delay that path.
+    func enrichCurrentVideo(with video: Video) {
+        guard currentVideo?.id == video.id else { return }
+        currentVideo = video
+        queue.updateVideo(video)
+        if playbackHistory.indices.contains(playbackHistoryIndex),
+           playbackHistory[playbackHistoryIndex].video.id == video.id {
+            let previous = playbackHistory[playbackHistoryIndex]
+            playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
+                video: video,
+                skipRecommendations: previous.skipRecommendations
+            )
+        }
+        refreshArtwork(for: video)
+        recordWatchHistory(video: video)
+        updateNowPlaying()
+    }
+
     private var resolutionTask: Task<Void, Never>?
     private var recommendationTask: Task<Void, Never>?
 

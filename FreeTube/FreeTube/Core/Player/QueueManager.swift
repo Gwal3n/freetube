@@ -42,6 +42,13 @@ final class QueueManager {
         rebuildShuffleOrder()
     }
 
+    /// Replaces metadata for an existing queue item without changing its position or navigation
+    /// state. Direct-URL playback starts from a lightweight seed, then enriches that seed later.
+    func updateVideo(_ video: Video) {
+        guard let index = items.firstIndex(where: { $0.id == video.id }) else { return }
+        items[index] = video
+    }
+
     /// Bounds an endless recommendation queue while retaining enough history for Previous and a
     /// healthy upcoming buffer. Curated queues never call this method.
     func trimAroundCurrent(maxHistory: Int, maxUpcoming: Int) {
