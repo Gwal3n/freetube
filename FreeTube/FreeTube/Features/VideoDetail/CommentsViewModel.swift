@@ -9,6 +9,9 @@ final class CommentsViewModel {
     private(set) var comments: [Comment] = []
     private(set) var continuationToken: String?
     private(set) var isLoading: Bool = false
+    private(set) var repliesByCommentID: [String: [Comment]] = [:]
+    private(set) var replyContinuationTokens: [String: String] = [:]
+    private(set) var loadingReplyCommentIDs: Set<String> = []
     var errorState: ErrorState?
     var translations: [String: String] = [:]
 
@@ -40,6 +43,39 @@ final class CommentsViewModel {
             let thread = try await service.fetchComments(videoID: videoID, continuation: token)
             comments.append(contentsOf: thread.comments)
             continuationToken = thread.continuationToken
+        } catch {
+            errorState = ErrorState(from: error)
+        }
+    }
+
+    func loadReplies(for comment: Comment) async {
+        guard repliesByCommentID[comment.id] == nil,
+              let token = comment.replyContinuationToken,
+              !loadingReplyCommentIDs.contains(comment.id) else { return }
+        await fetchReplies(for: comment.id, continuation: token, appending: false)
+    }
+
+    func loadMoreReplies(for comment: Comment) async {
+        guard let token = replyContinuationTokens[comment.id],
+              !loadingReplyCommentIDs.contains(comment.id) else { return }
+        await fetchReplies(for: comment.id, continuation: token, appending: true)
+    }
+
+    private func fetchReplies(for commentID: String, continuation: String, appending: Bool) async {
+        loadingReplyCommentIDs.insert(commentID)
+        defer { loadingReplyCommentIDs.remove(commentID) }
+        do {
+            let thread = try await service.fetchReplies(continuation: continuation)
+            if appending {
+                repliesByCommentID[commentID, default: []].append(contentsOf: thread.comments)
+            } else {
+                repliesByCommentID[commentID] = thread.comments
+            }
+            if let nextToken = thread.continuationToken {
+                replyContinuationTokens[commentID] = nextToken
+            } else {
+                replyContinuationTokens.removeValue(forKey: commentID)
+            }
         } catch {
             errorState = ErrorState(from: error)
         }

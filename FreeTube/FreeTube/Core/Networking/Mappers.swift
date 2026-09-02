@@ -188,7 +188,7 @@ enum Mappers {
             isAuthoredByUser: isAuthoredByUser,
             publishedRelative: yt.timePosted ?? "",
             replyCount: Int(yt.totalRepliesNumber?.filter(\.isNumber) ?? "") ?? yt.replies.count,
-            replyContinuationToken: nil
+            replyContinuationToken: yt.actionsParams[.repliesContinuation]
         )
     }
 

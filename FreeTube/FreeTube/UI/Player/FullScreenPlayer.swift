@@ -320,8 +320,26 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func metadata(_ video: Video) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(video.title)
-                .font(.title3.weight(.semibold))
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isDetailsExpanded.toggle()
+                }
+                if isDetailsExpanded {
+                    loadDetailsIfNeeded(for: video)
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(video.title)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Image(systemName: isDetailsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             // Tapping anywhere on the channel row pushes the channel detail screen onto the
             // popup's internal NavigationStack — banner, subscribe button, latest videos,
             // shorts, playlists. Pushing (rather than presenting) keeps the video surface and
@@ -359,9 +377,8 @@ struct FullScreenPlayer: View {
 
     // MARK: - Description / details (between channel row and comments)
 
-    /// Shows the video description in a YouTube-like collapsed-by-default block. Snippet first
-    /// (if the model has one), with a "More" button under the channel row that expands the block
-    /// and fetches the full details payload (description text + view count + tags etc.).
+    /// Shows the video description in a YouTube-like collapsed-by-default block. Tapping the video
+    /// title expands it and lazily fetches the full details payload.
     @ViewBuilder
     private func detailsSection(video: Video) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -372,6 +389,7 @@ struct FullScreenPlayer: View {
             }
         }
         .padding(.horizontal)
+        .animation(.easeInOut(duration: 0.2), value: isDetailsExpanded)
     }
 
     @ViewBuilder
@@ -382,20 +400,6 @@ struct FullScreenPlayer: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
         }
-        Button {
-            isDetailsExpanded = true
-            loadDetailsIfNeeded(for: video)
-        } label: {
-            HStack(spacing: 6) {
-                Text("More")
-                Image(systemName: "chevron.down")
-            }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -411,9 +415,17 @@ struct FullScreenPlayer: View {
                 Text("Loading details…").font(.caption).foregroundStyle(.secondary)
             }
         } else if detailsLoadFailed {
-            Text("Description unavailable")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text("Description unavailable")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Retry") {
+                    details = nil
+                    loadDetailsIfNeeded(for: video)
+                }
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
+            }
         }
 
         // Quick stats line: views • explicitly labelled upload date.
@@ -431,19 +443,6 @@ struct FullScreenPlayer: View {
                 .foregroundStyle(.secondary)
         }
 
-        Button {
-            isDetailsExpanded = false
-        } label: {
-            HStack(spacing: 6) {
-                Text("Show less")
-                Image(systemName: "chevron.up")
-            }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     /// Picks the description text to render in the 2-line collapsed preview. Prefer the loaded
@@ -767,8 +766,12 @@ struct FullScreenPlayer: View {
     /// Total height we hand to the queue `List`. Sized for the actual number of items + a 32pt
     /// bottom margin so the last row's edit-handle / swipe affordance isn't truncated.
     private var queueListHeight: CGFloat {
-        let count = max(1, player.queue.items.count)
+        let count = max(1, displayedQueueIndices.count)
         return CGFloat(count) * Self.queueRowFootprint + 32
+    }
+
+    private var displayedQueueIndices: [Int] {
+        player.queue.items.indices.filter { player.queue.items[$0].id != player.currentVideo?.id }
     }
 
     // MARK: - Queue panel
@@ -777,8 +780,16 @@ struct FullScreenPlayer: View {
     private var queuePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                SectionHeader(title: "Up next")
-                Spacer()
+                Button {
+                    isQueueExpanded.toggle()
+                } label: {
+                    HStack {
+                        SectionHeader(title: "Up next")
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 if isQueueExpanded {
                     shuffleButton
                     repeatButton
@@ -800,25 +811,25 @@ struct FullScreenPlayer: View {
             // doesn't try to consume the outer scroll's gesture space.
             if isQueueExpanded {
                 List {
-                    ForEach(player.queue.items) { video in
-                        queueRow(video)
+                    ForEach(displayedQueueIndices, id: \.self) { queueIndex in
+                        queueRow(player.queue.items[queueIndex])
                             .listRowBackground(Color.clear)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
-                    .onMove { source, destination in
-                        let from = source.first ?? 0
-                        player.queue.move(from: from, to: destination)
-                    }
                     .onDelete { offsets in
-                        for index in offsets.sorted(by: >) {
-                            player.queue.remove(at: index)
+                        let queueIndices = offsets.compactMap { displayIndex in
+                            displayedQueueIndices.indices.contains(displayIndex)
+                                ? displayedQueueIndices[displayIndex]
+                                : nil
+                        }
+                        for queueIndex in queueIndices.sorted(by: >) {
+                            player.queue.remove(at: queueIndex)
                         }
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .environment(\.editMode, .constant(.active))
                 .scrollDisabled(true)
                 .frame(height: queueListHeight)
             }

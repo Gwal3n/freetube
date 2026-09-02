@@ -6,6 +6,7 @@ struct CommentsSection: View {
     /// Permanently mounted below Up Next, but collapsed and unloaded by default so showing the
     /// header never brings the comment tree (or its network work) into play until the user asks.
     @State private var isExpanded = false
+    @State private var expandedReplyCommentIDs: Set<String> = []
 
     init(videoID: String) {
         _model = State(wrappedValue: CommentsViewModel(videoID: videoID))
@@ -21,19 +22,7 @@ struct CommentsSection: View {
                         .padding(.vertical, 12)
                 } else {
                     ForEach(model.comments) { comment in
-                        CommentRow(
-                            comment: comment,
-                            onLike: { Task { await model.toggleLike(comment) } },
-                            onDislike: { Task { await model.toggleDislike(comment) } },
-                            onReply: { /* TODO: present reply sheet */ },
-                            onTranslate: { Task { await model.translate(comment) } }
-                        )
-                        if let translation = model.translations[comment.id] {
-                            Text(translation)
-                                .font(.footnote)
-                                .padding(.horizontal)
-                                .padding(.bottom, 4)
-                        }
+                        commentThread(comment)
                     }
                     if model.isLoading {
                         LoadingView()
@@ -63,25 +52,82 @@ struct CommentsSection: View {
 
     @ViewBuilder
     private var header: some View {
-        HStack {
-            SectionHeader(title: "Comments")
-            Spacer()
-            Button {
-                isExpanded.toggle()
-                // Lazy-load on first expand. Subsequent toggles just hide/show what's already
-                // loaded — no extra network calls.
-                if isExpanded && model.comments.isEmpty && !model.isLoading {
-                    Task { await model.load() }
-                }
-            } label: {
+        Button {
+            isExpanded.toggle()
+            if isExpanded && model.comments.isEmpty && !model.isLoading {
+                Task { await model.load() }
+            }
+        } label: {
+            HStack {
+                SectionHeader(title: "Comments")
+                Spacer()
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func commentThread(_ comment: Comment) -> some View {
+        CommentRow(
+            comment: comment,
+            onLike: { Task { await model.toggleLike(comment) } }
+        )
+
+        if comment.replyCount > 0, comment.replyContinuationToken != nil {
+            Button {
+                if expandedReplyCommentIDs.contains(comment.id) {
+                    expandedReplyCommentIDs.remove(comment.id)
+                } else {
+                    expandedReplyCommentIDs.insert(comment.id)
+                    Task { await model.loadReplies(for: comment) }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: expandedReplyCommentIDs.contains(comment.id) ? "chevron.up" : "chevron.down")
+                    Text(expandedReplyCommentIDs.contains(comment.id) ? "Hide replies" : "View \(comment.replyCount) replies")
+                }
+                .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+            .padding(.leading, 16)
+
+            if expandedReplyCommentIDs.contains(comment.id) {
+                if model.loadingReplyCommentIDs.contains(comment.id), model.repliesByCommentID[comment.id] == nil {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.leading, 32)
+                } else {
+                    ForEach(model.repliesByCommentID[comment.id] ?? []) { reply in
+                        CommentRow(
+                            comment: reply,
+                            onLike: { Task { await model.toggleLike(reply) } }
+                        )
+                        .padding(.leading, 20)
+                    }
+
+                    if model.loadingReplyCommentIDs.contains(comment.id) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.leading, 32)
+                    } else if model.replyContinuationTokens[comment.id] != nil {
+                        Button("Load more replies") {
+                            Task { await model.loadMoreReplies(for: comment) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.blue)
+                        .padding(.leading, 32)
+                    }
+                }
+            }
+        }
     }
 }

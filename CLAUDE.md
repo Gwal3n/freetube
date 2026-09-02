@@ -230,7 +230,7 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **One `PlayerStateManager`** is the single source of truth for current playback. Injected via SwiftUI `@Environment(PlayerStateManager.self)`.
 - **Mini player and full-screen player are both driven by `LNPopupUI`** — the popup bar above the tab bar expands into a full-screen popup. Same `AVQueuePlayer` instance for both views.
 - **Direct video selections open the expanded player immediately.** `PlayerStateManager.load` defaults `expandPlayer` to `true`; automatic next/previous transitions pass `false` so they preserve whatever popup state the user chose. The native mini-player bar can be dismissed with a downward swipe, which must call `PlayerStateManager.dismiss()` so playback, resolution, Now Playing, and popup state are torn down together. Upward drags remain available for expansion.
-- **Mini-player title marquee uses LNPopupUI's default scrolling behavior.** The popup packages are pinned to LNPopupUI 4.0.1 / LNPopupController 4.5.9 because the older controller 4.4.1 vertically clipped and eventually hid the title/subtitle on iOS 26; do not downgrade it when resolving packages.
+- **Mini-player title marquee uses LNPopupUI's default scrolling behavior.** The popup packages are pinned to LNPopupUI 4.0.1 / LNPopupController 4.5.9 because the older controller 4.4.1 vertically clipped and eventually hid the title/subtitle on iOS 26; do not downgrade it when resolving packages. Its explicit X button calls `PlayerStateManager.dismiss()` so playback and popup state are torn down together.
 - **`AVPlayerViewController`** wrapped in `UIViewControllerRepresentable` (`PlayerSurface.swift`) remains the video-rendering and automatic-PiP engine, with `showsPlaybackControls = false`. `CustomPlayerControls` owns the visible YouTube-style play/pause, previous/next buttons, speed menu, auto-hide chrome, and `SponsorBlockTimeline`. Controls use unbacked white glyphs with shadows rather than dark button circles. Copy-link and more-actions sit together in the top player chrome; there is no separate transport bar below the video and no bottom Close pill. The timeline seeks only on drag end, places time labels above the track so landscape clipping cannot hide them, and renders enabled SponsorBlock segments at exactly the track's thickness. `PlayerStateManager.seek` pins its optimistic target until AVPlayer confirms the seek (plus a short stale-tick drain), preventing the scrubber from flashing back to the old periodic-observer position. Automatic PiP-on-background is enabled; there is intentionally no AirPlay or manual PiP button.
 - **Player gestures recognize on `AVPlayerViewController.view`.** `contentOverlayView` is used only to draw feedback; it does not receive player touches on iOS 26. `PlayerGestureCoordinator` attaches simultaneous, non-cancelling recognizers to the controller root for single-tap control toggling, double-tap left/right seek −/+10 seconds, and a 0.35-second hold for temporary 2× playback, restoring the prior rate on release. After the initial double tap, a 0.35-second seek session counts each additional tap as another −/+10 seconds and displays the cumulative offset (four taps total = 30 seconds); each tap resets the timeout. The custom single-tap recognizer requires double-tap and long-press to fail so seeking and completed holds do not toggle controls.
 - **Hold feedback is top-centred and compact.** The temporary 2× label uses a 64×32 capsule at
@@ -242,15 +242,22 @@ and a rejected strategy is excluded before requesting the next candidate.
   skipped at most once per playback, and the full-screen surface shows a five-second Undo banner.
   AVKit has no public API for adding ranges to its native scrubber, so do not inspect or mutate its
   private seek-bar hierarchy; markers require a separate public/custom UI in a future change.
-- **Expanded player details are lazy and resilient.** “More” stays expanded while
-  `VideoService.fetchMoreInfo` loads the full description, retains a non-empty feed snippet when
-  the fetched description is empty, and shows “Description unavailable” on a genuine miss/failure.
+- **Expanded player details are lazy and resilient.** Tapping the video title toggles the description
+  with a short animation. It stays expanded while `VideoService.fetchMoreInfo` loads the full
+  description, retains a non-empty feed snippet when the fetched description is empty, shows
+  “Description unavailable” on a genuine miss/failure, and offers an explicit retry.
   The stats row shows views plus an explicitly labelled upload date/relative upload value, never
   the video duration (duration already belongs in the player timeline).
 - **Up Next and Comments are always present as independent collapsed sections.** There is no
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's
-  no-comment-load performance characteristics.
+  no-comment-load performance characteristics. Both section headers are tappable across their
+  available width. The current video is hidden from the visible Up Next rows, and queue deletion
+  uses swipe actions rather than permanent edit-mode minus controls. Existing comment replies use
+  YouTubeKit's reply continuation token and load only when their individual thread is expanded.
+- **Search is search-only.** Its idle state contains local recent searches or the clean empty state;
+  it must not request or render a home/trending/discovery feed. Suggestions and submitted search
+  results (videos, channels, and playlists) remain available.
 - **`AVQueuePlayer`**, not `AVPlayer`. Required for `advanceToNextItem()` and queue introspection. Important: `replaceCurrentItem(with:)` is a no-op on `AVQueuePlayer` when its internal queue is empty (our usual state). Use `removeAllItems()` + `insert(_:after:)` (see the `loadItem` helper).
 - **Background audio:** `AudioSessionConfigurator` runs at app launch with `(.playback, .moviePlayback)`.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration. Metadata and `MPMediaItemArtwork` are cached per current image; the 0.5-second playback tick updates only elapsed time and rate.

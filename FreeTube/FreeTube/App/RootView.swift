@@ -6,7 +6,7 @@ import UIKit
 /// Top-level tabbed shell. CLAUDE.md §8: mini-player sits above the tab bar and persists across tabs.
 ///
 /// Tab layout (5):
-/// - Search (search field, recent searches, and the home video feed in one screen)
+/// - Search (search field, suggestions, results, and local recent searches)
 /// - Library (subsumes the former Account + Subscriptions tabs; includes Favorites/Recents/Playlists/Login)
 /// - Link (yt-dlp-powered universal downloader; pastes any link from ~2,000 supported sites)
 /// - Downloads (saved videos + live transfer queue with progress)
@@ -203,6 +203,13 @@ struct PopupContentWrapper: View {
             .overlay { PopupProgressObserver() }
             .popupBarButtons {
                 ToolbarItemGroup(placement: .popupBar) {
+                    Button {
+                        player.dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .foregroundStyle(Color.primary)
+                    }
+                    .accessibilityLabel("Close player")
                     Button {
                         player.togglePlayPause()
                     } label: {
