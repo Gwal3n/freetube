@@ -18,11 +18,13 @@ struct LibraryScreen: View {
     @State private var libraryModel = LibraryViewModel()
     @State private var accountModel = AccountViewModel()
     @State private var showingLogin = false
+    @Query(sort: \WatchHistoryEntry.watchedAt, order: .reverse) private var localHistory: [WatchHistoryEntry]
 
     var body: some View {
         NavigationStack {
             List {
                 accountSection
+                localHistorySection
                 if accountModel.info != nil {
                     menuSection
                 }
@@ -49,6 +51,28 @@ struct LibraryScreen: View {
                     }
             }
             .errorToast(Bindable(libraryModel).errorState)
+        }
+    }
+
+    @ViewBuilder
+    private var localHistorySection: some View {
+        Section("On this device") {
+            NavigationLink {
+                LocalHistoryScreen()
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Local history")
+                        Text(countSubtitle(localHistory.count, noun: "video"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 
@@ -204,6 +228,83 @@ struct LibraryScreen: View {
     }
 }
 
+/// Device-only watch history. Unlike `HistoryScreen`, this never calls YouTube and is available
+/// without signing in. Rows are backed by `WatchHistoryEntry`, which `PlayerStateManager` updates
+/// whenever a video is opened.
+@available(iOS 17.0, *)
+private struct LocalHistoryScreen: View {
+    @Environment(PlayerStateManager.self) private var player
+    @Query(sort: \WatchHistoryEntry.watchedAt, order: .reverse) private var entries: [WatchHistoryEntry]
+    @State private var confirmsClear = false
+
+    var body: some View {
+        Group {
+            if entries.isEmpty {
+                EmptyStateView(
+                    systemImage: "clock.arrow.circlepath",
+                    title: "No local history",
+                    message: "Videos you watch will appear here only on this device."
+                )
+            } else {
+                List {
+                    ForEach(entries) { entry in
+                        VideoRow(video: video(from: entry), showsMoreMenu: true) {
+                            player.load(video(from: entry))
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                Task {
+                                    await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID)
+                                }
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("Local History")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !entries.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Clear", role: .destructive) { confirmsClear = true }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Clear local history?",
+            isPresented: $confirmsClear,
+            titleVisibility: .visible
+        ) {
+            Button("Clear History", role: .destructive) {
+                Task { await PersistenceWriter.shared.clearWatchHistory() }
+            }
+        } message: {
+            Text("This removes watch history stored by FreeTube on this device.")
+        }
+    }
+
+    private func video(from entry: WatchHistoryEntry) -> Video {
+        Video(
+            id: entry.videoID,
+            title: entry.title,
+            channelID: "",
+            channelName: entry.channelName,
+            channelThumbnailURL: nil,
+            thumbnailURL: entry.thumbnailURL,
+            duration: entry.duration > 0 ? entry.duration : nil,
+            viewCount: nil,
+            publishedAt: nil,
+            descriptionSnippet: nil,
+            isLive: false,
+            isShort: false
+        )
+    }
+}
+
 // MARK: - User playlists list
 
 /// Simple list of user-owned playlists. Each row pushes `PlaylistScreen` for the playlist's
@@ -238,4 +339,3 @@ private struct UserPlaylistsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
-

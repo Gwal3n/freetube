@@ -4,19 +4,20 @@ import SwiftUI
 struct SponsorBlockSkipOverlay: View {
     let notice: SponsorBlockNotice
     let onUndo: () -> Void
+    let onSkip: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
         VStack {
             Spacer()
             HStack(spacing: 12) {
-                Image(systemName: "forward.fill")
+                Image(systemName: notice.kind == .skipped ? "forward.fill" : "sparkles")
                     .foregroundStyle(categoryColor)
-                Text("\(notice.category.displayName) skipped")
+                Text(message)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                Button("Undo", action: onUndo)
+                Button(actionTitle, action: action)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(categoryColor)
                 Button(action: onDismiss) {
@@ -35,6 +36,21 @@ struct SponsorBlockSkipOverlay: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
+    private var message: String {
+        switch notice.kind {
+        case .skipped: return "\(notice.category.displayName) skipped"
+        case .prompt: return "Skip \(notice.category.displayName.lowercased())?"
+        }
+    }
+
+    private var actionTitle: String {
+        notice.kind == .skipped ? "Undo" : "Skip"
+    }
+
+    private var action: () -> Void {
+        notice.kind == .skipped ? onUndo : onSkip
+    }
+
     private var categoryColor: Color {
         switch notice.category {
         case .sponsor: return .green
@@ -42,6 +58,7 @@ struct SponsorBlockSkipOverlay: View {
         case .interaction: return .pink
         case .intro: return .cyan
         case .outro: return .blue
+        case .highlight: return .purple
         }
     }
 }

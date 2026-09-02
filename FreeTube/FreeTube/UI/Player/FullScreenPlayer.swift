@@ -134,6 +134,7 @@ struct FullScreenPlayer: View {
                         SponsorBlockSkipOverlay(
                             notice: notice,
                             onUndo: { player.undoSponsorBlockSkip() },
+                            onSkip: { player.confirmSponsorBlockSkip() },
                             onDismiss: { player.dismissSponsorBlockNotice() }
                         )
                     }
@@ -357,7 +358,18 @@ struct FullScreenPlayer: View {
             // transport controls visible at the top; only the panel area below is replaced.
             if !video.channelID.isEmpty {
                 Button {
-                    pushedChannel = ChannelPresentation(id: video.channelID)
+                    @Bindable var p = player
+                    p.fullScreenPresented = false
+                    let channelID = video.channelID
+                    Task { @MainActor in
+                        // Let LNPopupUI begin its collapse before presenting a new full-screen
+                        // controller; presenting both in the same transaction is ignored by UIKit.
+                        try? await Task.sleep(for: .milliseconds(180))
+                        NotificationCenter.default.post(
+                            name: .freetubeOpenChannel,
+                            object: channelID
+                        )
+                    }
                 } label: {
                     channelRow(video)
                 }
@@ -642,13 +654,11 @@ struct FullScreenPlayer: View {
     }
 
     private var hasPrevious: Bool {
-        guard let current = player.queue.current else { return false }
-        return player.queue.items.firstIndex(of: current).map { $0 > 0 } ?? false
+        player.canPlayPrevious
     }
 
     private var hasNext: Bool {
-        guard let current = player.queue.current else { return false }
-        return player.queue.items.firstIndex(of: current).map { $0 + 1 < player.queue.items.count } ?? false
+        player.canPlayNext
     }
 
     // MARK: - More-actions menu (three dots)

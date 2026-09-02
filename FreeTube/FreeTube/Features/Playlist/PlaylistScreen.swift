@@ -364,7 +364,7 @@ struct PlaylistScreen: View {
                     // Make sure the queue reflects the playlist's order before kicking off
                     // playback, so "next video" actually means the next playlist entry.
                     player.queue.replace(with: videos)
-                    player.load(video)
+                    player.load(video, skipRecommendations: true)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 6)

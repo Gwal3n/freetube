@@ -45,6 +45,12 @@ struct UserPreferences {
     @AppStorage("sponsorBlockInteraction") var sponsorBlockInteraction: Bool = false
     @AppStorage("sponsorBlockIntro") var sponsorBlockIntro: Bool = false
     @AppStorage("sponsorBlockOutro") var sponsorBlockOutro: Bool = false
+    @AppStorage("sponsorBlockSponsorBehavior") var sponsorBlockSponsorBehaviorRaw: String = SponsorBlockBehavior.autoSkip.rawValue
+    @AppStorage("sponsorBlockSelfPromotionBehavior") var sponsorBlockSelfPromotionBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockInteractionBehavior") var sponsorBlockInteractionBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockIntroBehavior") var sponsorBlockIntroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockOutroBehavior") var sponsorBlockOutroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.showOnly.rawValue
 
     /// yt-dlp `__version__` from the last successful download/load (e.g. `"2026.3.17"`).
     /// Empty until `YtDlpUpdater` has loaded the module at least once. Displayed in Settings so
@@ -69,13 +75,31 @@ struct UserPreferences {
     }
 
     var sponsorBlockCategories: Set<SponsorBlockCategory> {
-        var categories = Set<SponsorBlockCategory>()
-        if sponsorBlockSponsor { categories.insert(.sponsor) }
-        if sponsorBlockSelfPromotion { categories.insert(.selfPromotion) }
-        if sponsorBlockInteraction { categories.insert(.interaction) }
-        if sponsorBlockIntro { categories.insert(.intro) }
-        if sponsorBlockOutro { categories.insert(.outro) }
-        return categories
+        Set(SponsorBlockCategory.allCases.filter { sponsorBlockBehavior(for: $0) != .disabled })
+    }
+
+    func sponsorBlockBehavior(for category: SponsorBlockCategory) -> SponsorBlockBehavior {
+        let raw: String
+        switch category {
+        case .sponsor: raw = sponsorBlockSponsorBehaviorRaw
+        case .selfPromotion: raw = sponsorBlockSelfPromotionBehaviorRaw
+        case .interaction: raw = sponsorBlockInteractionBehaviorRaw
+        case .intro: raw = sponsorBlockIntroBehaviorRaw
+        case .outro: raw = sponsorBlockOutroBehaviorRaw
+        case .highlight: raw = sponsorBlockHighlightBehaviorRaw
+        }
+        return SponsorBlockBehavior(rawValue: raw) ?? .disabled
+    }
+
+    mutating func setSponsorBlockBehavior(_ behavior: SponsorBlockBehavior, for category: SponsorBlockCategory) {
+        switch category {
+        case .sponsor: sponsorBlockSponsorBehaviorRaw = behavior.rawValue
+        case .selfPromotion: sponsorBlockSelfPromotionBehaviorRaw = behavior.rawValue
+        case .interaction: sponsorBlockInteractionBehaviorRaw = behavior.rawValue
+        case .intro: sponsorBlockIntroBehaviorRaw = behavior.rawValue
+        case .outro: sponsorBlockOutroBehaviorRaw = behavior.rawValue
+        case .highlight: sponsorBlockHighlightBehaviorRaw = behavior.rawValue
+        }
     }
 
     var appearanceMode: AppearanceMode {

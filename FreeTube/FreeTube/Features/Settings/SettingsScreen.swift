@@ -64,7 +64,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Playback enhancements")
                 } footer: {
-                    Text("Automatically skip community-identified sponsor segments without delaying playback.")
+                    Text("Show or skip community-identified video segments without delaying playback.")
                 }
 
                 Section {

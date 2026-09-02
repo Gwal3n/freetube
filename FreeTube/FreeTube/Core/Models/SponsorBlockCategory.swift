@@ -7,6 +7,7 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
     case interaction
     case intro
     case outro
+    case highlight = "poi_highlight"
 
     var id: String { rawValue }
 
@@ -17,6 +18,23 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
         case .interaction: return String(localized: "Interaction reminders")
         case .intro: return String(localized: "Intros")
         case .outro: return String(localized: "Outros")
+        case .highlight: return String(localized: "Highlights")
+        }
+    }
+}
+
+enum SponsorBlockBehavior: String, CaseIterable, Identifiable, Sendable {
+    case disabled
+    case showOnly
+    case autoSkip
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .disabled: return String(localized: "Disabled")
+        case .showOnly: return String(localized: "Show only")
+        case .autoSkip: return String(localized: "Automatically skip")
         }
     }
 }

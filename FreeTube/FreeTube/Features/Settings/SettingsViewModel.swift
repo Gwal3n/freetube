@@ -38,30 +38,10 @@ final class SettingsViewModel {
         set { preferences.sponsorBlockEnabled = newValue }
     }
 
-    func isSponsorBlockCategoryEnabled(_ category: SponsorBlockCategory) -> Bool {
-        switch category {
-        case .sponsor: return preferences.sponsorBlockSponsor
-        case .selfPromotion: return preferences.sponsorBlockSelfPromotion
-        case .interaction: return preferences.sponsorBlockInteraction
-        case .intro: return preferences.sponsorBlockIntro
-        case .outro: return preferences.sponsorBlockOutro
-        }
-    }
-
-    func setSponsorBlockCategory(_ category: SponsorBlockCategory, enabled: Bool) {
-        switch category {
-        case .sponsor: preferences.sponsorBlockSponsor = enabled
-        case .selfPromotion: preferences.sponsorBlockSelfPromotion = enabled
-        case .interaction: preferences.sponsorBlockInteraction = enabled
-        case .intro: preferences.sponsorBlockIntro = enabled
-        case .outro: preferences.sponsorBlockOutro = enabled
-        }
-    }
-
-    func binding(for category: SponsorBlockCategory) -> Binding<Bool> {
+    func sponsorBlockBehaviorBinding(for category: SponsorBlockCategory) -> Binding<SponsorBlockBehavior> {
         Binding(
-            get: { self.isSponsorBlockCategoryEnabled(category) },
-            set: { self.setSponsorBlockCategory(category, enabled: $0) }
+            get: { self.preferences.sponsorBlockBehavior(for: category) },
+            set: { self.preferences.setSponsorBlockBehavior($0, for: category) }
         )
     }
 

@@ -24,6 +24,11 @@ struct RootView: View {
     @State private var thumbnail: UIImage?
     /// Retained target for the UIKit swipe recognizers installed on LNPopupUI's native bar.
     @State private var popupBarDismissGesture = PopupBarDismissGestureHandler()
+    @State private var presentedChannel: PresentedChannel?
+
+    private struct PresentedChannel: Identifiable {
+        let id: String
+    }
 
     enum Tab: Hashable {
         case search, library, link, downloads, settings
@@ -94,6 +99,22 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
                 selectedTab = tab
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
+            guard let channelID = note.object as? String, !channelID.isEmpty else { return }
+            presentedChannel = PresentedChannel(id: channelID)
+        }
+        .fullScreenCover(item: $presentedChannel) { channel in
+            NavigationStack {
+                ChannelScreen(channelID: channel.id)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close", systemImage: "xmark") {
+                                presentedChannel = nil
+                            }
+                        }
+                    }
             }
         }
     }

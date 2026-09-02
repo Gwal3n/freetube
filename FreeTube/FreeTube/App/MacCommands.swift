@@ -103,4 +103,7 @@ extension Notification.Name {
     /// Posted by `MacCommands` when the user picks a tab via menu / shortcut. `RootView`
     /// listens and updates its `@State selectedTab`. The `object` is a `RootView.Tab`.
     static let freetubeSelectTab = Notification.Name("com.leshko.freetube.selectTab")
+    /// Requests app-level channel presentation after the expanded player has collapsed.
+    /// The object is a channel ID string.
+    static let freetubeOpenChannel = Notification.Name("com.leshko.freetube.openChannel")
 }

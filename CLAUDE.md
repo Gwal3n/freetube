@@ -238,10 +238,12 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **SponsorBlock is opt-in and playback-independent.** `SponsorBlockService` performs a read-only
   k-anonymous hash-prefix lookup for only the selected video; it never submits skip/view telemetry
   and caches segment data in memory only. `PlayerStateManager` installs AVPlayer boundary-time
-  observers and seeks over enabled categories without blocking stream resolution. Each segment is
-  skipped at most once per playback, and the full-screen surface shows a five-second Undo banner.
-  That banner uses the skipped category's color and a compact translucent treatment near the
-  bottom of the player.
+  observers without blocking stream resolution. Every category independently supports Disabled,
+  Show only (timeline marker), or Automatically skip. The `poi_highlight` category is included;
+  its default Show-only behavior presents a five-second Skip prompt when reached. Manual seeks
+  immediately evaluate their destination, and rewinding before a handled segment rearms it; Undo
+  is deliberately exempt so it can replay the segment without instantly skipping again. Automatic
+  skips show the existing five-second Undo banner using the category color.
   AVKit has no public API for adding ranges to its native scrubber, so do not inspect or mutate its
   private seek-bar hierarchy; markers require a separate public/custom UI in a future change.
 - **Expanded player details are lazy and resilient.** Tapping the video title toggles the description
@@ -268,7 +270,7 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **Remote commands:** `RemoteCommandCenter` wires `MPRemoteCommandCenter` for play/pause/next/previous/skip ±15s/seek.
 - **The player area never shows a spinner on black while starting.** `PlayerArtworkBackdrop` paints `PlayerStateManager.currentArtwork` — the Kingfisher-cached thumbnail the user just tapped — over the video surface for every state except `.idle` / `.readyToPlay`, and `DownloadProgressOverlay` contributes only a small unlabelled spinner during `.resolving` / `.buffering`. Two constraints on that layer: it must sit *above* `PlayerSurface` in the ZStack (`AVPlayerViewController` paints its own opaque black background, so anything below it is invisible), and it must be `.allowsHitTesting(false)` or it swallows taps meant for the system playback controls. The dimmed scrim + text label + determinate bar treatment is reserved for `.downloading` and `.failed`, which are minutes-long or terminal and genuinely need words.
 - **`LoadState.buffering` means "URL installed, `play()` already issued, AVPlayer not ready yet".** In that state the mini-player shows the real thumbnail and the channel name, not a placeholder glyph and "Preparing…" — the point of the state existing is that there is nothing left to prepare. Only `.downloading` (a real yt-dlp file transfer the user can't preview) still swaps in the download glyph.
-- **Bounded recommendation queue:** ordinary video loads replace the queue with the current video, retain no playback history, then append at most 5 fresh recommendations. Curated Play all / Shuffle all queues retain their explicit ordering and skip recommendation replacement. The Up next rows are collapsed by default so they do not participate in normal player redraws. On end-of-queue with repeat off, `playNext()` may re-fire recommendations using the current item as the seed.
+- **Queue and navigation history are separate:** ordinary video loads replace the visible queue with the current video, then append at most 5 fresh recommendations. A private, bounded (50 item) browser-style playback history powers Previous/Next: Previous walks backward without adding rows to Up Next, and Next first walks forward to the video the user came from before resuming queue recommendations. Curated Play all / Shuffle all queues retain their explicit ordering and skip recommendation replacement. The Up next rows are collapsed by default so they do not participate in normal player redraws. On end-of-queue with repeat off, `playNext()` may re-fire recommendations using the current item as the seed.
 - **Comments paginate only on explicit request.** `CommentsSection` uses a `LazyVStack` and a Load more button. Do not restore an eager `VStack` plus an `onAppear` pagination sentinel inside the player's outer `ScrollView`: SwiftUI lays out every row immediately there, which chains continuation requests and causes playback UI lag.
 - **Popup body backdrop must stay translucent.** The expanded `FullScreenPlayer` paints a `.thinMaterial` rectangle behind the entire popup body. Anything that introduces an opaque background and turns it black is a regression. Common offenders + neutralizers:
   - **`NavigationStack` inside the popup body:** the nav bar paints an opaque system background even with the title hidden. `.toolbarBackground(.hidden, for: .navigationBar)` is NOT sufficient — use `.toolbar(.hidden, for: .navigationBar)` to remove the bar entirely. Supply your own back/close button.

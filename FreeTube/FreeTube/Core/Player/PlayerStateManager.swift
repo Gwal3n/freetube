@@ -77,6 +77,21 @@ final class PlayerStateManager {
     ///      these refills never retain previously played videos.
     private var queueAcceptsRecommendations = true
 
+    /// Browser-style playback navigation, deliberately separate from the visible recommendation
+    /// queue. Going back does not delete the forward entries, so Next returns to the video the
+    /// user came from before resuming normal recommendations.
+    private struct PlaybackHistoryItem {
+        let video: Video
+        let skipRecommendations: Bool
+    }
+    private var playbackHistory: [PlaybackHistoryItem] = []
+    private var playbackHistoryIndex = -1
+
+    var canPlayPrevious: Bool { playbackHistoryIndex > 0 }
+    var canPlayNext: Bool {
+        playbackHistoryIndex + 1 < playbackHistory.count || queue.availableUpcomingCount(limit: 1) > 0
+    }
+
     private var timeObserver: Any?
     private var timeControlStatusObservation: NSKeyValueObservation?
     private var statusCancellable: AnyCancellable?
@@ -228,12 +243,16 @@ final class PlayerStateManager {
         _ video: Video,
         autoplay: Bool = true,
         skipRecommendations: Bool = false,
-        expandPlayer: Bool = true
+        expandPlayer: Bool = true,
+        recordInPlaybackHistory: Bool = true
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
         resolutionTask?.cancel()
         recommendationTask?.cancel()
         clearSponsorBlockState()
+        if recordInPlaybackHistory {
+            recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
+        }
         queueAcceptsRecommendations = !skipRecommendations
         // Pause and tear down anything currently playing. Otherwise we'd keep streaming audio from
         // the previous video while the new one's file is downloading — which is what the user kept
@@ -321,9 +340,16 @@ final class PlayerStateManager {
         if isPlaying { player.rate = Float(boundedRate) }
     }
 
-    func seek(to seconds: TimeInterval) {
+    func seek(to seconds: TimeInterval, rearmSponsorBlock: Bool = true) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
         let boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
+        // Any segment whose end is still ahead of the new position becomes eligible again. This
+        // makes rewinding before a previously skipped segment behave like a fresh encounter.
+        if rearmSponsorBlock {
+            for segment in sponsorBlockSegments where boundedSeconds < segment.endTime {
+                handledSponsorBlockSegmentIDs.remove(segment.id)
+            }
+        }
         // Update optimistically so rapid continuation taps accumulate from the last requested
         // target instead of the periodic observer's up-to-0.5-second-old playback position.
         elapsed = boundedSeconds
@@ -341,7 +367,10 @@ final class PlayerStateManager {
                 guard let self, self.seekRequestID == requestID else { return }
                 self.pendingSeekTarget = nil
                 let settledTime = self.player.currentTime().seconds
-                if settledTime.isFinite { self.elapsed = settledTime }
+                if settledTime.isFinite {
+                    self.elapsed = settledTime
+                    self.handleSponsorBlockSegment(at: settledTime)
+                }
             }
         }
     }
@@ -353,8 +382,19 @@ final class PlayerStateManager {
 
     func playNext() {
         log.info("playNext() — queue size=\(self.queue.items.count, privacy: .public) currentIndex=\(self.queue.currentIndex, privacy: .public)")
+        if playbackHistoryIndex + 1 < playbackHistory.count {
+            playbackHistoryIndex += 1
+            let item = playbackHistory[playbackHistoryIndex]
+            load(
+                item.video,
+                skipRecommendations: item.skipRecommendations,
+                expandPlayer: false,
+                recordInPlaybackHistory: false
+            )
+            return
+        }
         if let next = queue.advance() {
-            load(next, expandPlayer: false)
+            load(next, skipRecommendations: !queueAcceptsRecommendations, expandPlayer: false)
             return
         }
         // Queue at end. If this queue accepts recommendations and the user hasn't asked for
@@ -377,18 +417,25 @@ final class PlayerStateManager {
                 return
             }
             if let next = self.queue.advance() {
-                self.load(next, expandPlayer: false)
+                self.load(next, skipRecommendations: !self.queueAcceptsRecommendations, expandPlayer: false)
             }
         }
     }
 
     func playPrevious() {
-        log.info("playPrevious() — queue size=\(self.queue.items.count, privacy: .public) currentIndex=\(self.queue.currentIndex, privacy: .public)")
-        guard let previous = queue.previous() else {
-            log.notice("playPrevious: at start of queue, nothing to go back to")
+        log.info("playPrevious() — history size=\(self.playbackHistory.count, privacy: .public) index=\(self.playbackHistoryIndex, privacy: .public)")
+        guard playbackHistoryIndex > 0 else {
+            log.notice("playPrevious: at start of playback history")
             return
         }
-        load(previous, expandPlayer: false)
+        playbackHistoryIndex -= 1
+        let item = playbackHistory[playbackHistoryIndex]
+        load(
+            item.video,
+            skipRecommendations: item.skipRecommendations,
+            expandPlayer: false,
+            recordInPlaybackHistory: false
+        )
     }
 
     func dismiss() {
@@ -404,6 +451,8 @@ final class PlayerStateManager {
         currentVideo = nil
         loadState = .idle
         player.removeAllItems()
+        playbackHistory.removeAll()
+        playbackHistoryIndex = -1
         NowPlayingCenter.clear()
     }
 
@@ -411,12 +460,39 @@ final class PlayerStateManager {
         guard let notice = sponsorBlockNotice else { return }
         sponsorBlockNoticeTask?.cancel()
         sponsorBlockNotice = nil
-        seek(to: notice.originalStartTime)
+        // Undo is the one rewind that should not immediately trigger the same skip again.
+        seek(to: notice.originalStartTime, rearmSponsorBlock: false)
+    }
+
+    func confirmSponsorBlockSkip() {
+        guard let notice = sponsorBlockNotice,
+              case .prompt(let endTime) = notice.kind else { return }
+        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockNotice = nil
+        seek(to: endTime)
     }
 
     func dismissSponsorBlockNotice() {
         sponsorBlockNoticeTask?.cancel()
         sponsorBlockNotice = nil
+    }
+
+    private func recordPlaybackNavigation(video: Video, skipRecommendations: Bool) {
+        if playbackHistory.indices.contains(playbackHistoryIndex),
+           playbackHistory[playbackHistoryIndex].video.id == video.id {
+            return
+        }
+        if playbackHistoryIndex + 1 < playbackHistory.count {
+            playbackHistory.removeSubrange((playbackHistoryIndex + 1)..<playbackHistory.count)
+        }
+        playbackHistory.append(PlaybackHistoryItem(
+            video: video,
+            skipRecommendations: skipRecommendations
+        ))
+        if playbackHistory.count > 50 {
+            playbackHistory.removeFirst(playbackHistory.count - 50)
+        }
+        playbackHistoryIndex = playbackHistory.count - 1
     }
 
     // MARK: - Internals
@@ -451,10 +527,10 @@ final class PlayerStateManager {
         sponsorBlockSegments = segments
         handledSponsorBlockSegmentIDs.removeAll()
 
-        for segment in segments {
+        for segment in segments where shouldObserveSponsorBlockSegment(segment) {
             let boundary = NSValue(time: CMTime(seconds: segment.startTime, preferredTimescale: 600))
             let observer = player.addBoundaryTimeObserver(forTimes: [boundary], queue: .main) { [weak self] in
-                Task { @MainActor in self?.skipSponsorBlockSegmentIfNeeded(segment) }
+                Task { @MainActor in self?.handleSponsorBlockSegment(segment) }
             }
             sponsorBlockBoundaryObservers.append(observer)
         }
@@ -462,13 +538,28 @@ final class PlayerStateManager {
         // The lookup may finish after playback has already entered a segment. Boundary observers
         // cannot fire retroactively, so evaluate the current position once immediately.
         if let current = segments.first(where: { elapsed >= $0.startTime && elapsed < $0.endTime }) {
-            skipSponsorBlockSegmentIfNeeded(current)
+            handleSponsorBlockSegment(current)
         }
     }
 
-    private func skipSponsorBlockSegmentIfNeeded(_ segment: SponsorBlockSegment) {
+    private func shouldObserveSponsorBlockSegment(_ segment: SponsorBlockSegment) -> Bool {
+        let behavior = preferences.sponsorBlockBehavior(for: segment.category)
+        return behavior == .autoSkip || (segment.category == .highlight && behavior == .showOnly)
+    }
+
+    private func handleSponsorBlockSegment(at time: TimeInterval) {
+        guard let segment = sponsorBlockSegments.first(where: {
+            shouldObserveSponsorBlockSegment($0)
+                && time >= $0.startTime - 0.5
+                && time < $0.endTime - 0.1
+        }) else { return }
+        handleSponsorBlockSegment(segment)
+    }
+
+    private func handleSponsorBlockSegment(_ segment: SponsorBlockSegment) {
+        let behavior = preferences.sponsorBlockBehavior(for: segment.category)
         guard preferences.sponsorBlockEnabled,
-              preferences.sponsorBlockCategories.contains(segment.category),
+              behavior != .disabled,
               !handledSponsorBlockSegmentIDs.contains(segment.id),
               currentVideo != nil else { return }
         let currentTime = player.currentTime().seconds
@@ -476,14 +567,31 @@ final class PlayerStateManager {
               currentTime >= segment.startTime - 0.5,
               currentTime < segment.endTime - 0.1 else { return }
 
+        guard behavior == .autoSkip || segment.category == .highlight else { return }
         handledSponsorBlockSegmentIDs.insert(segment.id)
+        sponsorBlockNoticeTask?.cancel()
+
+        if segment.category == .highlight, behavior == .showOnly {
+            sponsorBlockNotice = SponsorBlockNotice(
+                category: segment.category,
+                originalStartTime: segment.startTime,
+                kind: .prompt(endTime: segment.endTime)
+            )
+            scheduleSponsorBlockNoticeDismissal()
+            return
+        }
+
         log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
         seek(to: segment.endTime)
-        sponsorBlockNoticeTask?.cancel()
         sponsorBlockNotice = SponsorBlockNotice(
             category: segment.category,
-            originalStartTime: segment.startTime
+            originalStartTime: segment.startTime,
+            kind: .skipped
         )
+        scheduleSponsorBlockNoticeDismissal()
+    }
+
+    private func scheduleSponsorBlockNoticeDismissal() {
         sponsorBlockNoticeTask = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(5)) } catch { return }
             self?.sponsorBlockNotice = nil

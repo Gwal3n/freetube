@@ -14,12 +14,16 @@ struct SponsorBlockSettingsScreen: View {
 
             Section {
                 ForEach(SponsorBlockCategory.allCases) { category in
-                    Toggle(category.displayName, isOn: model.binding(for: category))
+                    Picker(category.displayName, selection: model.sponsorBlockBehaviorBinding(for: category)) {
+                        ForEach(SponsorBlockBehavior.allCases) { behavior in
+                            Text(behavior.displayName).tag(behavior)
+                        }
+                    }
                 }
             } header: {
-                Text("Automatically skip")
+                Text("Categories")
             } footer: {
-                Text("Categories are based on community submissions. Sponsors are enabled by default; all other categories are optional.")
+                Text("Show only adds a timeline marker without skipping. Highlights shown on the timeline ask before skipping when reached.")
             }
             .disabled(!model.sponsorBlockEnabled)
         }

@@ -83,6 +83,7 @@ struct SponsorBlockTimeline: View {
         case .interaction: return .pink
         case .intro: return .cyan
         case .outro: return .blue
+        case .highlight: return .purple
         }
     }
 

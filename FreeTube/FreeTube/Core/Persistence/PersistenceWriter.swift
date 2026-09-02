@@ -46,4 +46,20 @@ actor PersistenceWriter {
         try? modelContext.save()
     }
 
+    func deleteWatchHistory(videoID: String) {
+        let target = videoID
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+        if let entry = try? modelContext.fetch(descriptor).first {
+            modelContext.delete(entry)
+            try? modelContext.save()
+        }
+    }
+
+    func clearWatchHistory() {
+        let descriptor = FetchDescriptor<WatchHistoryEntry>()
+        guard let entries = try? modelContext.fetch(descriptor) else { return }
+        for entry in entries { modelContext.delete(entry) }
+        try? modelContext.save()
+    }
+
 }
