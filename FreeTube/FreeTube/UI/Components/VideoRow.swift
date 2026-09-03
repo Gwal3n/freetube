@@ -9,9 +9,23 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct VideoRow: View {
     let video: Video
-    var onTap: () -> Void = {}
-    var showsMoreMenu: Bool = false
-    var offersPlayNext = false
+    var showsMoreMenu: Bool
+    var offersPlayNext: Bool
+    var onTap: () -> Void
+
+    /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
+    /// closure syntax as optional row capabilities are added.
+    init(
+        video: Video,
+        showsMoreMenu: Bool = false,
+        offersPlayNext: Bool = false,
+        onTap: @escaping () -> Void = {}
+    ) {
+        self.video = video
+        self.showsMoreMenu = showsMoreMenu
+        self.offersPlayNext = offersPlayNext
+        self.onTap = onTap
+    }
 
     /// Playback count + relative upload date joined by a middle dot. Either half can be empty
     /// (older listings sometimes omit one), so we filter before joining to avoid stray separators.
