@@ -40,6 +40,7 @@ struct FullScreenPlayer: View {
     @State private var channelPath = NavigationPath()
     @State private var playerControlsVisible = true
     @State private var gestureSeekPreview: TimeInterval?
+    @State private var scrubberSeekPreview: TimeInterval?
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -100,10 +101,10 @@ struct FullScreenPlayer: View {
                     DownloadProgressOverlay(state: player.loadState)
                     CustomPlayerControls(
                         isVisible: playerControlsVisible,
-                        isSeekPreviewActive: gestureSeekPreview != nil,
+                        isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
                         isPlaying: player.isPlaying,
                         hasEnded: player.hasEnded,
-                        elapsed: gestureSeekPreview ?? player.elapsed,
+                        elapsed: scrubberSeekPreview ?? gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
                         sponsorSegments: player.sponsorBlockSegments,
                         chapters: player.chapters,
@@ -127,7 +128,7 @@ struct FullScreenPlayer: View {
                             showPlayerControls()
                         },
                         onSeekPreviewChanged: { seconds in
-                            gestureSeekPreview = seconds
+                            scrubberSeekPreview = seconds
                         },
                         onPrevious: {
                             player.playPrevious()
@@ -142,7 +143,7 @@ struct FullScreenPlayer: View {
                             p.fullScreenPresented = false
                         }
                     )
-                    if let previewTime = gestureSeekPreview,
+                    if let previewTime = scrubberSeekPreview,
                        let tile = player.storyboard?.tile(
                            at: previewTime,
                            duration: player.duration,
@@ -150,8 +151,19 @@ struct FullScreenPlayer: View {
                            maximumHeight: 180
                        ) {
                         StoryboardPreview(tile: tile, time: previewTime)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                            .padding(.bottom, timelineBottomPadding(in: proxy.size) + 54)
+                            .position(
+                                x: storyboardPreviewX(
+                                    for: previewTime,
+                                    duration: player.duration,
+                                    surfaceWidth: proxy.size.width
+                                ),
+                                y: max(
+                                    58,
+                                    proxy.size.width * 9 / 16
+                                        - timelineBottomPadding(in: proxy.size)
+                                        - 108
+                                )
+                            )
                             .allowsHitTesting(false)
                     }
                     if let notice = player.sponsorBlockNotice {
@@ -170,6 +182,7 @@ struct FullScreenPlayer: View {
                 .onDisappear { controlsHideTask?.cancel() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
+                    scrubberSeekPreview = nil
                     showPlayerControls()
                 }
                 .onChange(of: player.loadState, initial: true) { _, state in
@@ -290,6 +303,23 @@ struct FullScreenPlayer: View {
         let aspectHeight = availableSize.width * 9 / 16
         guard verticalSizeClass == .compact else { return 8 }
         return max(22, aspectHeight - availableSize.height + 16)
+    }
+
+    /// Tracks the timeline thumb while keeping the 142pt-wide preview (132pt image + padding)
+    /// wholly inside the player surface at both ends of the video.
+    private func storyboardPreviewX(
+        for time: TimeInterval,
+        duration: TimeInterval,
+        surfaceWidth: CGFloat
+    ) -> CGFloat {
+        guard duration.isFinite, duration > 0, time.isFinite, surfaceWidth > 0 else {
+            return surfaceWidth / 2
+        }
+        let fraction = min(max(time / duration, 0), 1)
+        let trackX = 12 + (surfaceWidth - 24) * CGFloat(fraction)
+        let minimumCenterX: CGFloat = 79
+        guard surfaceWidth >= minimumCenterX * 2 else { return surfaceWidth / 2 }
+        return min(max(trackX, minimumCenterX), surfaceWidth - minimumCenterX)
     }
 
     @ViewBuilder

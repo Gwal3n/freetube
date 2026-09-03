@@ -10,6 +10,7 @@ struct SponsorBlockTimeline: View {
     let onPreviewChanged: (TimeInterval?) -> Void
 
     @State private var dragTime: TimeInterval?
+    @State private var isPreviewingDrag = false
 
     private var displayedTime: TimeInterval { dragTime ?? elapsed }
     private var currentChapter: VideoChapter? {
@@ -97,12 +98,23 @@ struct SponsorBlockTimeline: View {
                             guard duration > 0 else { return }
                             let target = min(max(value.location.x / width, 0), 1) * duration
                             dragTime = target
-                            onPreviewChanged(target)
+                            // A tap still seeks on release, but a storyboard should appear only
+                            // once the user deliberately drags the timeline.
+                            if isPreviewingDrag || abs(value.translation.width) >= 3 {
+                                isPreviewingDrag = true
+                                onPreviewChanged(target)
+                            }
                         }
                         .onEnded { value in
-                            guard duration > 0 else { dragTime = nil; return }
+                            guard duration > 0 else {
+                                dragTime = nil
+                                isPreviewingDrag = false
+                                onPreviewChanged(nil)
+                                return
+                            }
                             let target = min(max(value.location.x / width, 0), 1) * duration
                             dragTime = nil
+                            isPreviewingDrag = false
                             onPreviewChanged(nil)
                             onSeek(target)
                         }

@@ -8,11 +8,11 @@ struct StoryboardPreview: View {
     let tile: VideoStoryboard.Tile
     let time: TimeInterval
 
-    private let previewWidth: CGFloat = 160
+    private let previewWidth: CGFloat = 132
 
     private var previewHeight: CGFloat {
         guard tile.width > 0 else { return 90 }
-        return min(previewWidth * CGFloat(tile.height) / CGFloat(tile.width), 100)
+        return min(previewWidth * CGFloat(tile.height) / CGFloat(tile.width), 82)
     }
 
     var body: some View {

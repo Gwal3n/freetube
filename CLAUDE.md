@@ -267,8 +267,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   elapsed time. That label opens a native, scrollable Menu whose rows seek directly to each chapter.
   `VideoInfosResponse.storyboard` is likewise wrapped in an app-owned `VideoStoryboard`; its
   metadata request starts only after AVPlayer accepts a stream and is cached in memory, so seek
-  previews never join the playback-critical path. Horizontal swipe seeking and direct timeline
-  dragging share the same preview target and crop the matching tile from YouTube's sprite sheet.
+  previews never join the playback-critical path. Only a direct drag on the timeline shows the
+  cropped sprite tile, positioned above and following the scrubber while remaining clamped inside
+  the video edges. Horizontal swipe seeking still previews its target on the timeline without a tile.
   The stats row is always visible directly beneath the title, outside the expandable description.
   It shows views plus an explicitly labelled upload date/relative upload value, never the video
   duration (duration already belongs in the player timeline). Prefer the exact display strings from
