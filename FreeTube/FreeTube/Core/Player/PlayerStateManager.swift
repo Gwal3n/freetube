@@ -48,6 +48,7 @@ final class PlayerStateManager {
     private(set) var duration: TimeInterval = 0
     private(set) var playbackRate: Double
     private(set) var playbackQuality: VideoQuality
+    private(set) var isMuted = false
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     var miniPlayerVisible: Bool = false
@@ -382,6 +383,21 @@ final class PlayerStateManager {
         player.defaultRate = Float(boundedRate)
         playbackRate = boundedRate
         if isPlaying { player.rate = Float(boundedRate) }
+    }
+
+    func toggleMute() {
+        isMuted.toggle()
+        player.isMuted = isMuted
+        log.info("Player muted=\(self.isMuted, privacy: .public)")
+    }
+
+    var isLoopingCurrentVideo: Bool {
+        queue.repeatMode == .one
+    }
+
+    func toggleLoopCurrentVideo() {
+        queue.repeatMode = queue.repeatMode == .one ? .off : .one
+        log.info("Loop current video=\(self.queue.repeatMode == .one, privacy: .public)")
     }
 
     /// Updates the HLS adaptive-quality ceiling in place and persists it for future resolutions.

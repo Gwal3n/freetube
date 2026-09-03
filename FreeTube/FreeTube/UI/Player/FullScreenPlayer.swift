@@ -42,6 +42,7 @@ struct FullScreenPlayer: View {
     @State private var gestureSeekPreview: TimeInterval?
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
+    @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
 
     /// Hashable wrapper so `.navigationDestination(for:)` can match the channel id and push
     /// `ChannelScreen` onto `channelPath`.
@@ -104,7 +105,11 @@ struct FullScreenPlayer: View {
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
                         additionalTopControls: AnyView(
-                            fullscreenButton
+                            HStack(spacing: 0) {
+                                loopPlayerButton
+                                mutePlayerButton
+                                fullscreenButton
+                            }
                             .buttonStyle(.plain)
                         ),
                         bottomTimelinePadding: timelineBottomPadding(in: proxy.size),
@@ -214,9 +219,13 @@ struct FullScreenPlayer: View {
         // One continuous material under EVERYTHING, including the top safe-area inset (status bar).
         // VStack content still respects safe area; only the material extends behind the inset.
         .background {
-            Rectangle()
-                .fill(.thinMaterial)
-                .ignoresSafeArea()
+            if oledPlayerBackground {
+                Color.black.ignoresSafeArea()
+            } else {
+                Rectangle()
+                    .fill(.thinMaterial)
+                    .ignoresSafeArea()
+            }
         }
         // Ensure the system status bar stays visible and gets light-content (white) glyphs against
         // the dark material. LNPopupUI's `LNPopupContentHostingController` is a UIHostingController
@@ -702,6 +711,32 @@ struct FullScreenPlayer: View {
         player.canPlayNext
     }
 
+    @ViewBuilder
+    private var mutePlayerButton: some View {
+        Button {
+            player.toggleMute()
+            showPlayerControls()
+        } label: {
+            Image(systemName: player.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                .playerTopControl()
+        }
+        .accessibilityLabel(player.isMuted ? "Unmute" : "Mute")
+    }
+
+    @ViewBuilder
+    private var loopPlayerButton: some View {
+        Button {
+            player.toggleLoopCurrentVideo()
+            showPlayerControls()
+        } label: {
+            Image(systemName: "repeat.1")
+                .playerTopControl()
+                .opacity(player.isLoopingCurrentVideo ? 1 : 0.58)
+        }
+        .accessibilityLabel("Loop video")
+        .accessibilityValue(player.isLoopingCurrentVideo ? "On" : "Off")
+    }
+
     private func watchURL(_ video: Video) -> URL? {
         URL(string: "https://www.youtube.com/watch?v=\(video.id)")
     }
@@ -730,31 +765,6 @@ struct FullScreenPlayer: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Autoplay next")
         .accessibilityValue(autoplayNext ? "On" : "Off")
-    }
-
-    /// Repeat pill — cycles through .off → .all → .one → .off. Active states (.all and .one) get
-    /// the capsule highlight; `.one` swaps to the `repeat.1` SF Symbol so the user can see the
-    /// single-track variant at a glance.
-    @ViewBuilder
-    private var repeatButton: some View {
-        Button {
-            switch player.queue.repeatMode {
-            case .off: player.queue.repeatMode = .all
-            case .all: player.queue.repeatMode = .one
-            case .one: player.queue.repeatMode = .off
-            }
-        } label: {
-            Image(systemName: player.queue.repeatMode == .one ? "repeat.1" : "repeat")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.primary)
-                .frame(width: 36, height: 28)
-                .background {
-                    if player.queue.repeatMode != .off {
-                        Capsule().fill(.ultraThinMaterial)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Queue panel sizing
@@ -796,7 +806,6 @@ struct FullScreenPlayer: View {
                 .buttonStyle(.plain)
                 if isQueueExpanded {
                     autoplayButton
-                    repeatButton
                 }
                 Button {
                     isQueueExpanded.toggle()

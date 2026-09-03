@@ -41,6 +41,11 @@ final class SettingsViewModel {
         }
     }
 
+    var oledPlayerBackground: Bool {
+        get { preferences.oledPlayerBackground }
+        set { preferences.oledPlayerBackground = newValue }
+    }
+
     var sponsorBlockEnabled: Bool {
         get { preferences.sponsorBlockEnabled }
         set { preferences.sponsorBlockEnabled = newValue }

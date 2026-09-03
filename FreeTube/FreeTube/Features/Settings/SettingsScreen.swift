@@ -54,6 +54,14 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("Uses a true black background for video information, Up Next, and comments.")
+                }
+
+                Section {
                     NavigationLink {
                         SponsorBlockSettingsScreen(model: model)
                     } label: {

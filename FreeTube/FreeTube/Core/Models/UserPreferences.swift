@@ -21,6 +21,9 @@ struct UserPreferences {
     /// Lets FreeTube coexist with audio already playing in another app. The default remains the
     /// normal primary-media behavior, where activating FreeTube interrupts other non-mixable audio.
     @AppStorage("allowAudioMixing") var allowAudioMixing: Bool = false
+    /// Uses true black below the video surface for OLED displays instead of the translucent popup
+    /// material. Off by default to preserve the standard native material appearance.
+    @AppStorage("oledPlayerBackground") var oledPlayerBackground: Bool = false
     /// When true, `LogFileWriter` opens a new file under `Documents/Logs/` on every app
     /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app

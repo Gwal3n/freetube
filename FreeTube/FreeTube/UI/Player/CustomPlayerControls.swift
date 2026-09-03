@@ -104,7 +104,7 @@ struct CustomPlayerControls: View {
     }
 }
 
-private extension Image {
+extension Image {
     func playerTopControl() -> some View {
         font(.body.weight(.bold))
             .foregroundStyle(.white)
