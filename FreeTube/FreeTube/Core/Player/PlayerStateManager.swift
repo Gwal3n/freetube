@@ -360,6 +360,14 @@ final class PlayerStateManager {
         isPlaying ? pause() : play()
     }
 
+    /// Republishes the current transport metadata after another app gives up primary-audio
+    /// ownership. The audio-session observer calls this only while FreeTube is actively playing.
+    func reclaimNowPlayingIfActive() {
+        guard currentVideo != nil, isPlaying else { return }
+        log.info("Reclaiming Now Playing after primary audio from another app stopped")
+        updateNowPlaying()
+    }
+
     func setPlaybackRate(_ rate: Double) {
         let boundedRate = min(max(rate, 0.25), 2)
         player.defaultRate = Float(boundedRate)

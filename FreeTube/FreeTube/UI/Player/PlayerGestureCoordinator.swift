@@ -22,6 +22,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var singleTapGesture: UITapGestureRecognizer?
     private var horizontalPanGesture: UIPanGestureRecognizer?
     private var feedbackLabel: UILabel?
+    private var outlinedFeedbackLabel: UILabel?
     private var feedbackWorkItem: DispatchWorkItem?
     private var pendingSingleTapWorkItem: DispatchWorkItem?
     private var seekSessionWorkItem: DispatchWorkItem?
@@ -150,6 +151,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         resetHorizontalSeek()
         feedbackLabel?.removeFromSuperview()
         feedbackLabel = nil
+        outlinedFeedbackLabel?.removeFromSuperview()
+        outlinedFeedbackLabel = nil
         feedbackView = nil
         gestureView = nil
     }
@@ -386,26 +389,21 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         guard let view = feedbackView else { return }
         feedbackWorkItem?.cancel()
 
-        let label = feedbackLabel ?? makeFeedbackLabel(in: view)
+        let label: UILabel
+        if outlined {
+            label = outlinedFeedbackLabel ?? makeOutlinedFeedbackLabel(in: view)
+            feedbackLabel?.alpha = 0
+        } else {
+            label = feedbackLabel ?? makeFeedbackLabel(in: view)
+            outlinedFeedbackLabel?.alpha = 0
+        }
         let font: UIFont = outlined
             ? .systemFont(ofSize: 20, weight: .bold)
             : compact
             ? .preferredFont(forTextStyle: .subheadline)
             : .preferredFont(forTextStyle: .headline)
         label.font = font
-        label.attributedText = nil
         label.text = text
-        label.textColor = .white
-        label.layer.shadowColor = UIColor.black.cgColor
-        label.layer.shadowOpacity = outlined ? 0.95 : 0
-        label.layer.shadowRadius = outlined ? 1.5 : 0
-        label.layer.shadowOffset = .zero
-        label.clipsToBounds = !outlined
-        if outlined {
-            label.backgroundColor = .clear
-        } else {
-            label.backgroundColor = UIColor.black.withAlphaComponent(0.52)
-        }
         label.bounds.size = outlined
             ? CGSize(width: 104, height: 38)
             : wide
@@ -444,11 +442,31 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return label
     }
 
+    /// Double-tap feedback deliberately has its own label. Reusing the capsule label caused its
+    /// outlined styling to leak into the 2× and horizontal-seek notices on later gestures.
+    private func makeOutlinedFeedbackLabel(in view: UIView) -> UILabel {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 20, weight: .bold)
+        label.textColor = .white
+        label.textAlignment = .center
+        label.backgroundColor = .clear
+        label.layer.shadowColor = UIColor.black.cgColor
+        label.layer.shadowOpacity = 0.95
+        label.layer.shadowRadius = 1.5
+        label.layer.shadowOffset = .zero
+        label.isUserInteractionEnabled = false
+        label.accessibilityElementsHidden = true
+        view.addSubview(label)
+        outlinedFeedbackLabel = label
+        return label
+    }
+
     private func hideFeedback() {
         feedbackWorkItem?.cancel()
         feedbackWorkItem = nil
         UIView.animate(withDuration: 0.2) { [weak self] in
             self?.feedbackLabel?.alpha = 0
+            self?.outlinedFeedbackLabel?.alpha = 0
         }
     }
 
