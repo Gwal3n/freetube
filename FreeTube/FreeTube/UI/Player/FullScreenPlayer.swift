@@ -43,6 +43,8 @@ struct FullScreenPlayer: View {
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
+    @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
+    @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
 
     /// Hashable wrapper so `.navigationDestination(for:)` can match the channel id and push
     /// `ChannelScreen` onto `channelPath`.
@@ -100,15 +102,14 @@ struct FullScreenPlayer: View {
                         isPlaying: player.isPlaying,
                         elapsed: gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
-                        playbackRate: player.playbackRate,
                         sponsorSegments: player.sponsorBlockSegments,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
                         additionalTopControls: AnyView(
                             HStack(spacing: 0) {
-                                loopPlayerButton
-                                mutePlayerButton
-                                fullscreenButton
+                                ForEach(visiblePlayerTopControls) { control in
+                                    playerTopControl(control)
+                                }
                             }
                             .buttonStyle(.plain)
                         ),
@@ -127,10 +128,6 @@ struct FullScreenPlayer: View {
                         },
                         onNext: {
                             player.playNext()
-                            showPlayerControls()
-                        },
-                        onSetRate: {
-                            player.setPlaybackRate($0)
                             showPlayerControls()
                         },
                         onCollapse: {
@@ -709,6 +706,53 @@ struct FullScreenPlayer: View {
 
     private var hasNext: Bool {
         player.canPlayNext
+    }
+
+    private var visiblePlayerTopControls: [PlayerTopControl] {
+        let hidden = PlayerTopControl.decodeHidden(hiddenPlayerTopControlsRaw)
+        return PlayerTopControl.decodeOrder(playerTopControlOrderRaw).filter { !hidden.contains($0) }
+    }
+
+    @ViewBuilder
+    private func playerTopControl(_ control: PlayerTopControl) -> some View {
+        switch control {
+        case .speed:
+            speedPlayerMenu
+        case .loop:
+            loopPlayerButton
+        case .mute:
+            mutePlayerButton
+        case .fullscreen:
+            fullscreenButton
+        }
+    }
+
+    @ViewBuilder
+    private var speedPlayerMenu: some View {
+        Menu {
+            ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
+                Button {
+                    player.setPlaybackRate(rate)
+                    showPlayerControls()
+                } label: {
+                    if abs(player.playbackRate - rate) < 0.01 {
+                        Label(rateLabel(rate), systemImage: "checkmark")
+                    } else {
+                        Text(rateLabel(rate))
+                    }
+                }
+            }
+        } label: {
+            Text(rateLabel(player.playbackRate))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(minWidth: 42, minHeight: 36)
+                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+        }
+    }
+
+    private func rateLabel(_ rate: Double) -> String {
+        rate == 1 ? "1×" : "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
 
     @ViewBuilder

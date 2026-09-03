@@ -70,6 +70,11 @@ struct SettingsScreen: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    NavigationLink {
+                        PlayerControlsSettingsScreen(model: model)
+                    } label: {
+                        Label("Player controls", systemImage: "slider.horizontal.3")
+                    }
                 } header: {
                     Text("Playback enhancements")
                 } footer: {

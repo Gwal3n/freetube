@@ -24,6 +24,8 @@ struct UserPreferences {
     /// Uses true black below the video surface for OLED displays instead of the translucent popup
     /// material. Off by default to preserve the standard native material appearance.
     @AppStorage("oledPlayerBackground") var oledPlayerBackground: Bool = false
+    @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
+    @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     /// When true, `LogFileWriter` opens a new file under `Documents/Logs/` on every app
     /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app
@@ -78,6 +80,16 @@ struct UserPreferences {
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var playerTopControls: [PlayerTopControl] {
+        get { PlayerTopControl.decodeOrder(playerTopControlOrderRaw) }
+        nonmutating set { playerTopControlOrderRaw = PlayerTopControl.encodeOrder(newValue) }
+    }
+
+    var hiddenPlayerTopControls: Set<PlayerTopControl> {
+        get { PlayerTopControl.decodeHidden(hiddenPlayerTopControlsRaw) }
+        nonmutating set { hiddenPlayerTopControlsRaw = PlayerTopControl.encodeHidden(newValue) }
     }
 
     var sponsorBlockCategories: Set<SponsorBlockCategory> {

@@ -46,6 +46,31 @@ final class SettingsViewModel {
         set { preferences.oledPlayerBackground = newValue }
     }
 
+    var playerTopControls: [PlayerTopControl] {
+        get { preferences.playerTopControls }
+        set { preferences.playerTopControls = newValue }
+    }
+
+    func isPlayerTopControlVisible(_ control: PlayerTopControl) -> Bool {
+        !preferences.hiddenPlayerTopControls.contains(control)
+    }
+
+    func setPlayerTopControlVisible(_ isVisible: Bool, control: PlayerTopControl) {
+        var hidden = preferences.hiddenPlayerTopControls
+        if isVisible {
+            hidden.remove(control)
+        } else {
+            hidden.insert(control)
+        }
+        preferences.hiddenPlayerTopControls = hidden
+    }
+
+    func movePlayerTopControls(from source: IndexSet, to destination: Int) {
+        var controls = playerTopControls
+        controls.move(fromOffsets: source, toOffset: destination)
+        playerTopControls = controls
+    }
+
     var sponsorBlockEnabled: Bool {
         get { preferences.sponsorBlockEnabled }
         set { preferences.sponsorBlockEnabled = newValue }
