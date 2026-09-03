@@ -139,6 +139,11 @@ final class PlayerStateManager {
         self.preferences = preferences
         self.playbackRate = preferences.playbackRate
         self.playbackQuality = preferences.preferredQuality
+        // AVQueuePlayer defaults to `.advance`, which removes the finished item before our
+        // end-of-playback UI can replay or seek it. We manage queue transitions ourselves in the
+        // end observer, so pause on the final frame and retain the item until that decision is
+        // made. This is also what keeps the video surface from turning black at natural end.
+        player.actionAtItemEnd = .pause
         // Keep the audio track running when the player view goes off-screen (popup minimize, app
         // backgrounded). Without this, AVPlayer pauses video tracks as soon as their pixel buffer
         // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
@@ -1113,7 +1118,8 @@ final class PlayerStateManager {
             }
         }
 
-        // Auto-advance on item end.
+        // Handle the retained item at natural end. `actionAtItemEnd = .pause` prevents
+        // AVQueuePlayer from removing it before replay/backward-seek can reuse it.
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: nil,
