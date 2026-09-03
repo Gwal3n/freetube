@@ -99,6 +99,16 @@ struct FullScreenPlayer: View {
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
+                    if let caption = player.currentCaptionText,
+                       gestureSeekPreview == nil,
+                       scrubberSeekPreview == nil {
+                        CaptionOverlay(
+                            text: caption,
+                            bottomPadding: playerControlsVisible
+                                ? timelineBottomPadding(in: proxy.size) + 54
+                                : 14
+                        )
+                    }
                     CustomPlayerControls(
                         isVisible: playerControlsVisible,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
@@ -784,7 +794,52 @@ struct FullScreenPlayer: View {
             mutePlayerButton
         case .fullscreen:
             fullscreenButton
+        case .captions:
+            captionsPlayerMenu
         }
+    }
+
+    @ViewBuilder
+    private var captionsPlayerMenu: some View {
+        Menu {
+            Button {
+                player.selectCaptionTrack(nil)
+                showPlayerControls()
+            } label: {
+                if player.selectedCaptionTrackID == nil {
+                    Label("Off", systemImage: "checkmark")
+                } else {
+                    Text("Off")
+                }
+            }
+
+            if !player.captionTracks.isEmpty {
+                Divider()
+                ForEach(player.captionTracks) { track in
+                    Button {
+                        player.selectCaptionTrack(track)
+                        showPlayerControls()
+                    } label: {
+                        if player.selectedCaptionTrackID == track.id {
+                            Label(
+                                track.displayName,
+                                systemImage: player.isLoadingCaptions ? "clock" : "checkmark"
+                            )
+                        } else {
+                            Text(track.displayName)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: player.selectedCaptionTrackID == nil
+                ? "captions.bubble"
+                : "captions.bubble.fill")
+                .playerTopControl()
+        }
+        .disabled(player.captionTracks.isEmpty)
+        .accessibilityLabel("Captions")
+        .accessibilityValue(player.selectedCaptionTrackID == nil ? "Off" : "On")
     }
 
     @ViewBuilder
