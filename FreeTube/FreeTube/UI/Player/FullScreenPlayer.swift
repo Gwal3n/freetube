@@ -100,7 +100,6 @@ struct FullScreenPlayer: View {
                         elapsed: gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
                         playbackRate: player.playbackRate,
-                        playbackQuality: player.playbackQuality,
                         sponsorSegments: player.sponsorBlockSegments,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
@@ -127,10 +126,6 @@ struct FullScreenPlayer: View {
                         },
                         onSetRate: {
                             player.setPlaybackRate($0)
-                            showPlayerControls()
-                        },
-                        onSetQuality: {
-                            player.setPlaybackQuality($0)
                             showPlayerControls()
                         },
                         onCollapse: {

@@ -62,7 +62,16 @@ struct HomeScreen: View {
             }
             .onChange(of: searchActivation) { _, _ in
                 guard !MacIntegration.isRunningOnMac else { return }
-                path = NavigationPath()
+                // A re-tap while a Search destination is open means "back to Search" only. A
+                // second re-tap from the root clears the old result set and focuses the native
+                // search field. Keeping these actions separate matches ordinary tab navigation.
+                guard path.isEmpty else {
+                    path = NavigationPath()
+                    isSearchPresented = false
+                    return
+                }
+                searchModel.query = ""
+                searchModel.clearResults()
                 // Re-present even if Search remained logically active after its keyboard was
                 // resigned, otherwise assigning `true` again would not restore focus.
                 isSearchPresented = false

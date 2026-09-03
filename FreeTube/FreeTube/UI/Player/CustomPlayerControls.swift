@@ -8,7 +8,6 @@ struct CustomPlayerControls: View {
     let elapsed: TimeInterval
     let duration: TimeInterval
     let playbackRate: Double
-    let playbackQuality: VideoQuality
     let sponsorSegments: [SponsorBlockSegment]
     let hasPrevious: Bool
     let hasNext: Bool
@@ -19,7 +18,6 @@ struct CustomPlayerControls: View {
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onSetRate: (Double) -> Void
-    let onSetQuality: (VideoQuality) -> Void
     let onCollapse: () -> Void
 
     var body: some View {
@@ -35,25 +33,6 @@ struct CustomPlayerControls: View {
                     }
                     Spacer()
                     additionalTopControls
-                    Menu {
-                        ForEach(VideoQuality.allCases.filter { $0 != .audioOnly }) { quality in
-                            Button {
-                                onSetQuality(quality)
-                            } label: {
-                                if playbackQuality == quality {
-                                    Label(quality.displayName, systemImage: "checkmark")
-                                } else {
-                                    Text(verbatim: quality.displayName)
-                                }
-                            }
-                        }
-                    } label: {
-                        Text(verbatim: playbackQuality.displayName)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 44, minHeight: 36)
-                            .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
-                    }
                     Menu {
                         ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
                             Button {

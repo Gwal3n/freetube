@@ -111,6 +111,7 @@ final class PlayerStateManager {
     private var readinessItem: AVPlayerItem?
     private var readinessToken = 0
     private var itemErrorLogObservation: NSObjectProtocol?
+    private var itemAccessLogObservation: NSObjectProtocol?
     private var playerErrorObservation: NSKeyValueObservation?
     private var defaultRateObservation: NSKeyValueObservation?
     private var sponsorBlockTask: Task<Void, Never>?
@@ -161,8 +162,12 @@ final class PlayerStateManager {
     func tearDownObservers() {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        if let itemErrorLogObservation { NotificationCenter.default.removeObserver(itemErrorLogObservation) }
+        if let itemAccessLogObservation { NotificationCenter.default.removeObserver(itemAccessLogObservation) }
         timeObserver = nil
         endObserver = nil
+        itemErrorLogObservation = nil
+        itemAccessLogObservation = nil
         clearSponsorBlockState()
     }
 
@@ -687,6 +692,7 @@ final class PlayerStateManager {
     private func observe(item: AVPlayerItem) {
         itemStatusObservation?.invalidate()
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
+        if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
 
         itemStatusObservation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
             guard let self else { return }
@@ -718,6 +724,17 @@ final class PlayerStateManager {
             // Never include `entry.uri`: YouTube playback URLs are signed, sensitive, and
             // short-lived. Resolver identity is enough to correlate this with candidate logs.
             self?.log.error("AVPlayerItem error-log: domain=\(entry.errorDomain, privacy: .public) code=\(entry.errorStatusCode, privacy: .public) comment=\(entry.errorComment ?? "", privacy: .public)")
+        }
+
+        itemAccessLogObservation = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.newAccessLogEntryNotification,
+            object: item,
+            queue: .main
+        ) { [weak self, weak item] _ in
+            guard let entry = item?.accessLog()?.events.last else { return }
+            // Access-log URIs and server addresses may contain signed playback credentials. Only
+            // record aggregate ABR measurements needed to diagnose low-quality HLS renditions.
+            self?.log.info("AVPlayerItem access-log: indicatedBitrate=\(entry.indicatedBitrate, privacy: .public) observedBitrate=\(entry.observedBitrate, privacy: .public) switches=\(entry.numberOfServerAddressChanges, privacy: .public) stalls=\(entry.numberOfStalls, privacy: .public)")
         }
     }
 

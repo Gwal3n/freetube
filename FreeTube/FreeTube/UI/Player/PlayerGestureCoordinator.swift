@@ -393,21 +393,17 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             ? .preferredFont(forTextStyle: .subheadline)
             : .preferredFont(forTextStyle: .headline)
         label.font = font
+        label.attributedText = nil
+        label.text = text
+        label.textColor = .white
+        label.layer.shadowColor = UIColor.black.cgColor
+        label.layer.shadowOpacity = outlined ? 0.95 : 0
+        label.layer.shadowRadius = outlined ? 1.5 : 0
+        label.layer.shadowOffset = .zero
+        label.clipsToBounds = !outlined
         if outlined {
-            label.text = nil
-            label.attributedText = NSAttributedString(
-                string: text,
-                attributes: [
-                    .font: font,
-                    .foregroundColor: UIColor.white,
-                    .strokeColor: UIColor.black,
-                    .strokeWidth: -4
-                ]
-            )
             label.backgroundColor = .clear
         } else {
-            label.attributedText = nil
-            label.text = text
             label.backgroundColor = UIColor.black.withAlphaComponent(0.52)
         }
         label.bounds.size = outlined

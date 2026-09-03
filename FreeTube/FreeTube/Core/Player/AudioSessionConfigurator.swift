@@ -11,12 +11,13 @@ import OSLog
 enum AudioSessionConfigurator {
     private static let log = AppLog(subsystem: "com.leshko.freetube", category: "AudioSession")
 
-    static func configure() {
+    static func configure(allowMixing: Bool = UserPreferences().allowAudioMixing) {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .moviePlayback, options: [])
+            let options: AVAudioSession.CategoryOptions = allowMixing ? [.mixWithOthers] : []
+            try session.setCategory(.playback, mode: .moviePlayback, options: options)
             try session.setActive(true, options: [])
-            log.info("Audio session configured for .playback/.moviePlayback")
+            log.info("Audio session configured for .playback/.moviePlayback (mixWithOthers=\(allowMixing, privacy: .public))")
         } catch {
             log.error("Failed to configure audio session: \(String(describing: error), privacy: .public)")
         }

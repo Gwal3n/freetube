@@ -18,6 +18,9 @@ struct UserPreferences {
     /// cleanly for existing installs.
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
+    /// Lets FreeTube coexist with audio already playing in another app. The default remains the
+    /// normal primary-media behavior, where activating FreeTube interrupts other non-mixable audio.
+    @AppStorage("allowAudioMixing") var allowAudioMixing: Bool = false
     /// When true, `LogFileWriter` opens a new file under `Documents/Logs/` on every app
     /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app

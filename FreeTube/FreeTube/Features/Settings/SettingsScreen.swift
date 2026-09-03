@@ -42,10 +42,11 @@ struct SettingsScreen: View {
                         }
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
+                    Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("Videos download to your device before playback. Lower qualities save space and download faster.")
+                    Text("Allowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
                 }
 
                 Section("Search") {

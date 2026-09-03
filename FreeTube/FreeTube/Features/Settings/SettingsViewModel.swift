@@ -33,6 +33,14 @@ final class SettingsViewModel {
         set { preferences.autoplayNext = newValue }
     }
 
+    var allowAudioMixing: Bool {
+        get { preferences.allowAudioMixing }
+        set {
+            preferences.allowAudioMixing = newValue
+            AudioSessionConfigurator.configure(allowMixing: newValue)
+        }
+    }
+
     var sponsorBlockEnabled: Bool {
         get { preferences.sponsorBlockEnabled }
         set { preferences.sponsorBlockEnabled = newValue }
