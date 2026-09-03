@@ -263,8 +263,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   comments response; continuations and replies stay explicit. Disabling it restores fully lazy loads.
   The pinned b5i response also exposes chapter title, start time, timestamp text, and thumbnails via
   `MoreVideoInfosResponse.chapters`; the domain/UI chapter mapping remains future work.
-  The stats row shows views plus an explicitly labelled upload date/relative upload value, never
-  the video duration (duration already belongs in the player timeline).
+  The stats row is always visible directly beneath the title, outside the expandable description.
+  It shows views plus an explicitly labelled upload date/relative upload value, never the video
+  duration (duration already belongs in the player timeline). Prefer the exact display strings from
+  the prefetched response and fall back to the `Video` summary fields while that request is pending.
 - **Up Next and Comments are always present as independent collapsed sections.** There is no
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's

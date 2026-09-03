@@ -42,6 +42,7 @@ struct FullScreenPlayer: View {
     @State private var gestureSeekPreview: TimeInterval?
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
+    @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
@@ -154,6 +155,12 @@ struct FullScreenPlayer: View {
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
                     showPlayerControls()
+                }
+                .onChange(of: player.loadState, initial: true) { _, state in
+                    guard state == .readyToPlay,
+                          prefetchVideoDetails,
+                          let video = player.currentVideo else { return }
+                    loadDetailsIfNeeded(for: video)
                 }
             // Pull-down-to-dismiss starting from the video surface.
             //
@@ -387,6 +394,12 @@ struct FullScreenPlayer: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            let statsRow = detailsStatsRow(video: video)
+            if !statsRow.isEmpty {
+                Text(statsRow)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             // Tapping anywhere on the channel row pushes the channel detail screen onto the
             // popup's internal NavigationStack — banner, subscribe button, latest videos,
             // shorts, playlists. Pushing (rather than presenting) keeps the video surface and
@@ -486,14 +499,6 @@ struct FullScreenPlayer: View {
             }
         }
 
-        // Quick stats line: views • explicitly labelled upload date.
-        let statsRow = detailsStatsRow(video: video)
-        if !statsRow.isEmpty {
-            Text(statsRow)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-
         // Like count if we got it from the details payload.
         if let likes = details?.likeCount, likes > 0 {
             Text("\(formatCount(likes)) likes")
@@ -524,10 +529,16 @@ struct FullScreenPlayer: View {
     /// `42K views • Uploaded 3 days ago`, omitting any pieces we don't have.
     private func detailsStatsRow(video: Video) -> String {
         var parts: [String] = []
-        if let views = video.viewCount, views > 0 {
+        if let viewsText = details?.viewCountText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !viewsText.isEmpty {
+            parts.append(viewsText)
+        } else if let views = video.viewCount, views > 0 {
             parts.append("\(formatCount(views)) views")
         }
-        if let published = video.publishedAt {
+        if let uploadDateText = details?.uploadDateText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !uploadDateText.isEmpty {
+            parts.append("Uploaded \(uploadDateText)")
+        } else if let published = video.publishedAt {
             parts.append("Uploaded \(published.formatted(date: .abbreviated, time: .omitted))")
         } else if let relative = video.publishedRelative, !relative.isEmpty {
             parts.append("Uploaded \(relative)")

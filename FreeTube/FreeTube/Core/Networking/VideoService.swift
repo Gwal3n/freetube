@@ -9,6 +9,8 @@ struct VideoInfo: Sendable {
     let isLikedByUser: Bool
     let isDislikedByUser: Bool
     let recommended: [Video]
+    let viewCountText: String?
+    let uploadDateText: String?
     /// Initial token and availability extracted from the same MoreVideoInfosResponse as details.
     /// Keeping them here lets background prefetch avoid issuing that response twice.
     let commentsContinuationToken: String?
@@ -131,6 +133,8 @@ final class VideoService: VideoServicing {
                 isLikedByUser: response.authenticatedInfos?.likeStatus == .liked,
                 isDislikedByUser: response.authenticatedInfos?.likeStatus == .disliked,
                 recommended: recommended,
+                viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
+                uploadDateText: response.timePosted.postedDate ?? response.timePosted.relativePostedDate,
                 commentsContinuationToken: response.commentsContinuationToken,
                 commentsAvailability: response.commentsContinuationToken != nil || response.commentsCount != nil
                     ? .available
@@ -180,6 +184,8 @@ final class VideoService: VideoServicing {
             isLikedByUser: false,
             isDislikedByUser: false,
             recommended: recommended,
+            viewCountText: nil,
+            uploadDateText: nil,
             commentsContinuationToken: nil,
             commentsAvailability: .available,
             streamingURL: response.streamingURL,
