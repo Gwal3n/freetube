@@ -106,6 +106,7 @@ struct FullScreenPlayer: View {
                         elapsed: gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
                         sponsorSegments: player.sponsorBlockSegments,
+                        chapters: player.chapters,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
                         additionalTopControls: AnyView(
@@ -575,6 +576,7 @@ struct FullScreenPlayer: View {
                     // Drop the result if the user switched videos before this returned.
                     guard player.currentVideo?.id == videoID else { return }
                     details = info
+                    player.installVideoDetails(info, for: videoID)
                     let fetched = info.descriptionText?
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                     let snippet = video.descriptionSnippet?

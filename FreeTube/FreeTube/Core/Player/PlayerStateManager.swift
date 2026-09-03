@@ -54,6 +54,7 @@ final class PlayerStateManager {
     private(set) var isMuted = false
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
+    private(set) var chapters: [VideoChapter] = []
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
     /// the user explicitly reopens the expanded player.
     private(set) var pipDismissalRequest = 0
@@ -184,6 +185,7 @@ final class PlayerStateManager {
         itemErrorLogObservation = nil
         itemAccessLogObservation = nil
         clearSponsorBlockState()
+        chapters = []
     }
 
     // MARK: - Public commands
@@ -213,6 +215,7 @@ final class PlayerStateManager {
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
+        chapters = []
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -276,6 +279,7 @@ final class PlayerStateManager {
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
+        chapters = []
         if recordInPlaybackHistory {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
         }
@@ -342,6 +346,13 @@ final class PlayerStateManager {
         refreshArtwork(for: video)
         recordWatchHistory(video: video)
         updateNowPlaying()
+    }
+
+    /// Applies ancillary metadata only while it still belongs to the selected video. Stream
+    /// resolution and the current AVPlayerItem are deliberately untouched.
+    func installVideoDetails(_ info: VideoInfo, for videoID: String) {
+        guard currentVideo?.id == videoID else { return }
+        chapters = info.chapters
     }
 
     private var resolutionTask: Task<Void, Never>?
@@ -567,6 +578,7 @@ final class PlayerStateManager {
         contentPrefetchTask?.cancel()
         contentPrefetchTask = nil
         clearSponsorBlockState()
+        chapters = []
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -895,6 +907,10 @@ final class PlayerStateManager {
                 if preferences.prefetchVideoDetails {
                     contentPrefetchTask?.cancel()
                     contentPrefetchTask = Task {
+                        if let info = try? await VideoContentPrefetchStore.shared.fetchDetails(videoID: video.id) {
+                            self.installVideoDetails(info, for: video.id)
+                        }
+                        guard !Task.isCancelled else { return }
                         await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
                     }
                 }
@@ -1100,6 +1116,7 @@ final class PlayerStateManager {
                 log.debug("Discarding stale recommendations for \(seed.id, privacy: .public)")
                 return
             }
+            installVideoDetails(info, for: seed.id)
             let existingIDs = Set(queue.items.map(\.id))
             let needed = targetUpcomingCount - upcomingCount
             let toAppend = Array(

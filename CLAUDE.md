@@ -261,8 +261,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   playback candidate. `VideoContentPrefetchStore` deduplicates the `MoreVideoInfosResponse` already
   used for recommendations, caches at most twelve videos in memory, and fetches only the initial
   comments response; continuations and replies stay explicit. Disabling it restores fully lazy loads.
-  The pinned b5i response also exposes chapter title, start time, timestamp text, and thumbnails via
-  `MoreVideoInfosResponse.chapters`; the domain/UI chapter mapping remains future work.
+  The pinned b5i response exposes chapter title, start time, timestamp text, and thumbnails via
+  `MoreVideoInfosResponse.chapters`; `VideoService` maps those into app-owned `VideoChapter` values.
+  The timeline draws subtle separators at chapter boundaries and shows the active chapter beside
+  elapsed time. That label opens a native, scrollable Menu whose rows seek directly to each chapter.
   The stats row is always visible directly beneath the title, outside the expandable description.
   It shows views plus an explicitly labelled upload date/relative upload value, never the video
   duration (duration already belongs in the player timeline). Prefer the exact display strings from

@@ -9,6 +9,7 @@ struct CustomPlayerControls: View {
     let elapsed: TimeInterval
     let duration: TimeInterval
     let sponsorSegments: [SponsorBlockSegment]
+    let chapters: [VideoChapter]
     let hasPrevious: Bool
     let hasNext: Bool
     let additionalTopControls: AnyView
@@ -67,6 +68,7 @@ struct CustomPlayerControls: View {
                     elapsed: elapsed,
                     duration: duration,
                     segments: sponsorSegments,
+                    chapters: chapters,
                     onSeek: onSeek
                 )
                 .padding(.horizontal, 12)

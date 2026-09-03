@@ -11,6 +11,7 @@ struct VideoInfo: Sendable {
     let recommended: [Video]
     let viewCountText: String?
     let uploadDateText: String?
+    let chapters: [VideoChapter]
     /// Initial token and availability extracted from the same MoreVideoInfosResponse as details.
     /// Keeping them here lets background prefetch avoid issuing that response twice.
     let commentsContinuationToken: String?
@@ -135,6 +136,7 @@ final class VideoService: VideoServicing {
                 recommended: recommended,
                 viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
                 uploadDateText: response.timePosted.postedDate ?? response.timePosted.relativePostedDate,
+                chapters: Self.chapters(from: response.chapters ?? []),
                 commentsContinuationToken: response.commentsContinuationToken,
                 commentsAvailability: response.commentsContinuationToken != nil || response.commentsCount != nil
                     ? .available
@@ -186,10 +188,29 @@ final class VideoService: VideoServicing {
             recommended: recommended,
             viewCountText: nil,
             uploadDateText: nil,
+            chapters: [],
             commentsContinuationToken: nil,
             commentsAvailability: .available,
             streamingURL: response.streamingURL,
             formats: formats
         )
+    }
+
+    private static func chapters(from chapters: [MoreVideoInfosResponse.Chapter]) -> [VideoChapter] {
+        var seenStartTimes = Set<Int>()
+        return chapters
+            .compactMap { chapter -> VideoChapter? in
+                guard let startTime = chapter.startTimeSeconds,
+                      startTime >= 0,
+                      seenStartTimes.insert(startTime).inserted else { return nil }
+                let title = chapter.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return VideoChapter(
+                    title: title?.isEmpty == false ? title ?? "Chapter" : "Chapter",
+                    startTime: TimeInterval(startTime),
+                    timeDescription: chapter.timeDescriptions.shortTimeDescription,
+                    thumbnailURL: Mappers.bestThumbnailURL(chapter.thumbnail)
+                )
+            }
+            .sorted { $0.startTime < $1.startTime }
     }
 }

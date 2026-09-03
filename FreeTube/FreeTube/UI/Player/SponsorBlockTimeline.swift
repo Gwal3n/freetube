@@ -5,16 +5,49 @@ struct SponsorBlockTimeline: View {
     let elapsed: TimeInterval
     let duration: TimeInterval
     let segments: [SponsorBlockSegment]
+    let chapters: [VideoChapter]
     let onSeek: (TimeInterval) -> Void
 
     @State private var dragTime: TimeInterval?
 
     private var displayedTime: TimeInterval { dragTime ?? elapsed }
+    private var currentChapter: VideoChapter? {
+        chapters.last { $0.startTime <= displayedTime }
+    }
 
     var body: some View {
         VStack(spacing: 4) {
-            HStack {
+            HStack(spacing: 7) {
                 Text(verbatim: format(displayedTime))
+                if let currentChapter {
+                    Menu {
+                        ForEach(chapters) { chapter in
+                            Button {
+                                onSeek(chapter.startTime)
+                            } label: {
+                                if chapter.id == currentChapter.id {
+                                    Label {
+                                        Text(verbatim: chapterMenuTitle(chapter))
+                                    } icon: {
+                                        Image(systemName: "checkmark")
+                                    }
+                                } else {
+                                    Text(verbatim: chapterMenuTitle(chapter))
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(verbatim: currentChapter.title)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 7, weight: .bold))
+                        }
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(maxWidth: 190, alignment: .leading)
+                    }
+                    .accessibilityLabel("Current chapter, \(currentChapter.title)")
+                }
                 Spacer()
                 Text(verbatim: format(duration))
             }
@@ -40,6 +73,16 @@ struct SponsorBlockTimeline: View {
                             .offset(x: width * fraction(for: segment.startTime))
                     }
 
+                    // Fine gaps divide the shared progress track without competing visually with
+                    // SponsorBlock's colored ranges. The first chapter starts at zero, so only
+                    // later boundaries need a marker.
+                    ForEach(chapters.filter { $0.startTime > 0 }) { chapter in
+                        Rectangle()
+                            .fill(.black.opacity(0.82))
+                            .frame(width: 2, height: 4)
+                            .offset(x: min(max(width * fraction(for: chapter.startTime) - 1, 0), width - 2))
+                    }
+
                     Circle()
                         .fill(.red)
                         .frame(width: 14, height: 14)
@@ -63,7 +106,7 @@ struct SponsorBlockTimeline: View {
             }
             .frame(height: 24)
         }
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: chapters.isEmpty ? .ignore : .contain)
         .accessibilityLabel("Playback position")
         .accessibilityValue("\(format(displayedTime)) of \(format(duration))")
         .accessibilityAdjustableAction { direction in
@@ -96,5 +139,10 @@ struct SponsorBlockTimeline: View {
         let seconds = total % 60
         if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    private func chapterMenuTitle(_ chapter: VideoChapter) -> String {
+        let timestamp = chapter.timeDescription ?? format(chapter.startTime)
+        return "\(timestamp)  \(chapter.title)"
     }
 }
