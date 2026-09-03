@@ -16,6 +16,7 @@ struct CustomPlayerControls: View {
     let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
+    let onSeekPreviewChanged: (TimeInterval?) -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onCollapse: () -> Void
@@ -69,7 +70,8 @@ struct CustomPlayerControls: View {
                     duration: duration,
                     segments: sponsorSegments,
                     chapters: chapters,
-                    onSeek: onSeek
+                    onSeek: onSeek,
+                    onPreviewChanged: onSeekPreviewChanged
                 )
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomTimelinePadding)

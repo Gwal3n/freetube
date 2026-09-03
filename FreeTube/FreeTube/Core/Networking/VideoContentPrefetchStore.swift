@@ -10,11 +10,13 @@ final class VideoContentPrefetchStore {
 
     private struct Entry {
         var details: VideoInfo? = nil
+        var playbackInfo: VideoInfo? = nil
         var comments: CommentThread? = nil
     }
 
     private var entries: [String: Entry] = [:]
     private var detailTasks: [String: Task<VideoInfo, Error>] = [:]
+    private var playbackInfoTasks: [String: Task<VideoInfo, Error>] = [:]
     private let videoService: any VideoServicing
     private let commentService: any CommentServicing
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "ContentPrefetch")
@@ -58,6 +60,26 @@ final class VideoContentPrefetchStore {
             return details
         } catch {
             detailTasks[videoID] = nil
+            throw error
+        }
+    }
+
+    func fetchPlaybackInfo(videoID: String) async throws -> VideoInfo {
+        if let cached = entries[videoID]?.playbackInfo { return cached }
+        if let task = playbackInfoTasks[videoID] { return try await task.value }
+
+        let service = videoService
+        let task = Task { try await service.fetchInfo(id: videoID) }
+        playbackInfoTasks[videoID] = task
+        do {
+            let info = try await task.value
+            var entry = entries[videoID] ?? Entry()
+            entry.playbackInfo = info
+            entries[videoID] = entry
+            playbackInfoTasks[videoID] = nil
+            return info
+        } catch {
+            playbackInfoTasks[videoID] = nil
             throw error
         }
     }

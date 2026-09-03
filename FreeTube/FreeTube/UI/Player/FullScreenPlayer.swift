@@ -126,6 +126,9 @@ struct FullScreenPlayer: View {
                             player.seek(to: $0)
                             showPlayerControls()
                         },
+                        onSeekPreviewChanged: { seconds in
+                            gestureSeekPreview = seconds
+                        },
                         onPrevious: {
                             player.playPrevious()
                             showPlayerControls()
@@ -139,6 +142,18 @@ struct FullScreenPlayer: View {
                             p.fullScreenPresented = false
                         }
                     )
+                    if let previewTime = gestureSeekPreview,
+                       let tile = player.storyboard?.tile(
+                           at: previewTime,
+                           duration: player.duration,
+                           maximumWidth: 320,
+                           maximumHeight: 180
+                       ) {
+                        StoryboardPreview(tile: tile, time: previewTime)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                            .padding(.bottom, timelineBottomPadding(in: proxy.size) + 54)
+                            .allowsHitTesting(false)
+                    }
                     if let notice = player.sponsorBlockNotice {
                         SponsorBlockSkipOverlay(
                             notice: notice,

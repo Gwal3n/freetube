@@ -12,6 +12,7 @@ struct VideoInfo: Sendable {
     let viewCountText: String?
     let uploadDateText: String?
     let chapters: [VideoChapter]
+    let storyboard: VideoStoryboard?
     /// Initial token and availability extracted from the same MoreVideoInfosResponse as details.
     /// Keeping them here lets background prefetch avoid issuing that response twice.
     let commentsContinuationToken: String?
@@ -137,6 +138,7 @@ final class VideoService: VideoServicing {
                 viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
                 uploadDateText: response.timePosted.postedDate ?? response.timePosted.relativePostedDate,
                 chapters: Self.chapters(from: response.chapters ?? []),
+                storyboard: nil,
                 commentsContinuationToken: response.commentsContinuationToken,
                 commentsAvailability: response.commentsContinuationToken != nil || response.commentsCount != nil
                     ? .available
@@ -189,6 +191,7 @@ final class VideoService: VideoServicing {
             viewCountText: nil,
             uploadDateText: nil,
             chapters: [],
+            storyboard: response.storyboard.map(Self.storyboard(from:)),
             commentsContinuationToken: nil,
             commentsAvailability: .available,
             streamingURL: response.streamingURL,
@@ -212,5 +215,25 @@ final class VideoService: VideoServicing {
                 )
             }
             .sorted { $0.startTime < $1.startTime }
+    }
+
+    private static func storyboard(from storyboard: YTStoryboard) -> VideoStoryboard {
+        VideoStoryboard { time, duration, maximumWidth, maximumHeight in
+            guard let tile = storyboard.tile(
+                at: time,
+                duration: duration,
+                maximumWidth: maximumWidth,
+                maximumHeight: maximumHeight
+            ) else { return nil }
+            return VideoStoryboard.Tile(
+                url: tile.url,
+                column: tile.column,
+                row: tile.row,
+                columns: tile.level.columns,
+                rows: tile.level.rows,
+                width: tile.level.width,
+                height: tile.level.height
+            )
+        }
     }
 }

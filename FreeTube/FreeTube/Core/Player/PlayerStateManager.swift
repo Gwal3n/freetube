@@ -55,6 +55,7 @@ final class PlayerStateManager {
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     private(set) var chapters: [VideoChapter] = []
+    private(set) var storyboard: VideoStoryboard?
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
     /// the user explicitly reopens the expanded player.
     private(set) var pipDismissalRequest = 0
@@ -186,6 +187,7 @@ final class PlayerStateManager {
         itemAccessLogObservation = nil
         clearSponsorBlockState()
         chapters = []
+        storyboard = nil
     }
 
     // MARK: - Public commands
@@ -216,6 +218,7 @@ final class PlayerStateManager {
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         chapters = []
+        storyboard = nil
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -280,6 +283,7 @@ final class PlayerStateManager {
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         chapters = []
+        storyboard = nil
         if recordInPlaybackHistory {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
         }
@@ -352,7 +356,12 @@ final class PlayerStateManager {
     /// resolution and the current AVPlayerItem are deliberately untouched.
     func installVideoDetails(_ info: VideoInfo, for videoID: String) {
         guard currentVideo?.id == videoID else { return }
-        chapters = info.chapters
+        if !info.chapters.isEmpty {
+            chapters = info.chapters
+        }
+        if let resolvedStoryboard = info.storyboard {
+            storyboard = resolvedStoryboard
+        }
     }
 
     private var resolutionTask: Task<Void, Never>?
@@ -579,6 +588,7 @@ final class PlayerStateManager {
         contentPrefetchTask = nil
         clearSponsorBlockState()
         chapters = []
+        storyboard = nil
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -904,15 +914,20 @@ final class PlayerStateManager {
                 loadState = .readyToPlay
                 applyStoredResumePosition(await resumeLookup.value, for: video)
                 updateNowPlaying()
-                if preferences.prefetchVideoDetails {
-                    contentPrefetchTask?.cancel()
-                    contentPrefetchTask = Task {
+                contentPrefetchTask?.cancel()
+                contentPrefetchTask = Task {
+                    // Storyboards are ancillary playback metadata. Start this only after AVPlayer
+                    // accepts the stream so thumbnail previews can never delay first playback.
+                    async let playbackInfo = try? VideoContentPrefetchStore.shared.fetchPlaybackInfo(videoID: video.id)
+                    if preferences.prefetchVideoDetails {
                         if let info = try? await VideoContentPrefetchStore.shared.fetchDetails(videoID: video.id) {
                             self.installVideoDetails(info, for: video.id)
                         }
                         guard !Task.isCancelled else { return }
                         await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
                     }
+                    guard !Task.isCancelled, let info = await playbackInfo else { return }
+                    self.installVideoDetails(info, for: video.id)
                 }
                 // Usually redundant — the optimistic `play()` above has either started the item or
                 // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case

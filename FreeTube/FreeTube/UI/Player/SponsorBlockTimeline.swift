@@ -7,6 +7,7 @@ struct SponsorBlockTimeline: View {
     let segments: [SponsorBlockSegment]
     let chapters: [VideoChapter]
     let onSeek: (TimeInterval) -> Void
+    let onPreviewChanged: (TimeInterval?) -> Void
 
     @State private var dragTime: TimeInterval?
 
@@ -94,12 +95,15 @@ struct SponsorBlockTimeline: View {
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
                             guard duration > 0 else { return }
-                            dragTime = min(max(value.location.x / width, 0), 1) * duration
+                            let target = min(max(value.location.x / width, 0), 1) * duration
+                            dragTime = target
+                            onPreviewChanged(target)
                         }
                         .onEnded { value in
                             guard duration > 0 else { dragTime = nil; return }
                             let target = min(max(value.location.x / width, 0), 1) * duration
                             dragTime = nil
+                            onPreviewChanged(nil)
                             onSeek(target)
                         }
                 )
