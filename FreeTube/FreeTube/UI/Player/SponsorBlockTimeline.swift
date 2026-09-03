@@ -22,33 +22,12 @@ struct SponsorBlockTimeline: View {
             HStack(spacing: 7) {
                 Text(verbatim: format(displayedTime))
                 if let currentChapter {
-                    Menu {
-                        ForEach(chapters) { chapter in
-                            Button {
-                                onSeek(chapter.startTime)
-                            } label: {
-                                if chapter.id == currentChapter.id {
-                                    Label {
-                                        Text(verbatim: chapterMenuTitle(chapter))
-                                    } icon: {
-                                        Image(systemName: "checkmark")
-                                    }
-                                } else {
-                                    Text(verbatim: chapterMenuTitle(chapter))
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 3) {
-                            Text(verbatim: currentChapter.title)
-                                .lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 7, weight: .bold))
-                        }
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(maxWidth: 190, alignment: .leading)
-                    }
-                    .accessibilityLabel("Current chapter, \(currentChapter.title)")
+                    ChapterPlayerMenu(
+                        chapters: chapters,
+                        currentChapter: currentChapter,
+                        onSelect: onSeek
+                    )
+                    .equatable()
                 }
                 Spacer()
                 Text(verbatim: format(duration))
@@ -157,8 +136,4 @@ struct SponsorBlockTimeline: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
-    private func chapterMenuTitle(_ chapter: VideoChapter) -> String {
-        let timestamp = chapter.timeDescription ?? format(chapter.startTime)
-        return "\(timestamp)  \(chapter.title)"
-    }
 }

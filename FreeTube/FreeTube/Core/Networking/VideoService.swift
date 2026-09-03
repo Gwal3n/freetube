@@ -194,7 +194,11 @@ final class VideoService: VideoServicing {
             uploadDateText: nil,
             chapters: [],
             storyboard: response.storyboard.map(Self.storyboard(from:)),
-            captionTracks: response.captions.map(Self.captionTrack(from:)),
+            // Translation targets can exceed a hundred entries and are not actual tracks supplied
+            // by the video. Keep the picker to YouTube's native/manual and ASR source tracks.
+            captionTracks: response.captions
+                .filter { !$0.isTranslated }
+                .map(Self.captionTrack(from:)),
             commentsContinuationToken: nil,
             commentsAvailability: .available,
             streamingURL: response.streamingURL,

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @available(iOS 17.0, *)
-struct CustomPlayerControls: View {
+struct CustomPlayerControls<AdditionalTopControls: View>: View {
     let isVisible: Bool
     let isSeekPreviewActive: Bool
     let isPlaying: Bool
@@ -12,7 +12,7 @@ struct CustomPlayerControls: View {
     let chapters: [VideoChapter]
     let hasPrevious: Bool
     let hasNext: Bool
-    let additionalTopControls: AnyView
+    let additionalTopControls: AdditionalTopControls
     let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void

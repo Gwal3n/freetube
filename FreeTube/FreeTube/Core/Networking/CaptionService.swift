@@ -15,14 +15,12 @@ final class CaptionService: CaptionServicing, @unchecked Sendable {
     }
 
     func fetchCues(for track: VideoCaptionTrack) async throws -> [CaptionCue] {
-        guard var components = URLComponents(url: track.url, resolvingAgainstBaseURL: false) else {
+        // Preserve YouTube's signed query byte-for-byte. Reconstructing it through URLComponents
+        // can normalize percent escaping and invalidate the caption request signature.
+        let separator = track.url.query == nil ? "?" : "&"
+        guard let url = URL(string: track.url.absoluteString + separator + "fmt=json3") else {
             throw URLError(.badURL)
         }
-        var queryItems = components.queryItems ?? []
-        queryItems.removeAll { $0.name == "fmt" }
-        queryItems.append(URLQueryItem(name: "fmt", value: "json3"))
-        components.queryItems = queryItems
-        guard let url = components.url else { throw URLError(.badURL) }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
@@ -34,19 +32,35 @@ final class CaptionService: CaptionServicing, @unchecked Sendable {
         }
 
         let document = try JSONDecoder().decode(JSON3Document.self, from: data)
-        let cues = document.events.compactMap { event -> CaptionCue? in
-            guard let startMilliseconds = event.tStartMs,
-                  let durationMilliseconds = event.dDurationMs else { return nil }
+        let timedLines = document.events.compactMap { event -> TimedLine? in
+            guard let startMilliseconds = event.tStartMs else { return nil }
             let text = event.segs
                 .compactMap(\.utf8)
                 .joined()
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
-            let start = TimeInterval(startMilliseconds) / 1_000
+            return TimedLine(
+                startMilliseconds: startMilliseconds,
+                durationMilliseconds: event.dDurationMs,
+                text: text
+            )
+        }
+        let cues = timedLines.enumerated().map { index, line in
+            let start = TimeInterval(line.startMilliseconds) / 1_000
+            let inferredEndMilliseconds = timedLines.indices.contains(index + 1)
+                ? timedLines[index + 1].startMilliseconds
+                : line.startMilliseconds + 5_000
+            let explicitEndMilliseconds = line.durationMilliseconds.map {
+                line.startMilliseconds + $0
+            }
+            let endMilliseconds = max(
+                line.startMilliseconds + 100,
+                explicitEndMilliseconds ?? inferredEndMilliseconds
+            )
             return CaptionCue(
                 startTime: start,
-                endTime: start + TimeInterval(durationMilliseconds) / 1_000,
-                text: text
+                endTime: TimeInterval(endMilliseconds) / 1_000,
+                text: line.text
             )
         }
         log.info("Loaded \(cues.count, privacy: .public) caption cues for \(track.languageCode, privacy: .public)")
@@ -79,4 +93,10 @@ private struct JSON3Event: Decodable {
 
 private struct JSON3Segment: Decodable {
     let utf8: String?
+}
+
+private struct TimedLine {
+    let startMilliseconds: Int
+    let durationMilliseconds: Int?
+    let text: String
 }
