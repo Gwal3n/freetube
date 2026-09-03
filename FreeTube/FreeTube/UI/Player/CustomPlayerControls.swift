@@ -5,6 +5,7 @@ struct CustomPlayerControls: View {
     let isVisible: Bool
     let isSeekPreviewActive: Bool
     let isPlaying: Bool
+    let hasEnded: Bool
     let elapsed: TimeInterval
     let duration: TimeInterval
     let sponsorSegments: [SponsorBlockSegment]
@@ -44,13 +45,14 @@ struct CustomPlayerControls: View {
                     }
                     .disabled(!hasPrevious)
                     Button(action: onTogglePlayPause) {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
                             .font(.system(size: 34, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 68, height: 68)
                             .contentShape(Circle())
                             .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
                     }
+                    .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
                     Button(action: onNext) {
                         Image(systemName: "forward.end.fill").playerCenterControl()
                     }

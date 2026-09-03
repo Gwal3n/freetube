@@ -100,6 +100,7 @@ struct FullScreenPlayer: View {
                         isVisible: playerControlsVisible,
                         isSeekPreviewActive: gestureSeekPreview != nil,
                         isPlaying: player.isPlaying,
+                        hasEnded: player.hasEnded,
                         elapsed: gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
                         sponsorSegments: player.sponsorBlockSegments,

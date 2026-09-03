@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// **Search** tab. Search suggestions, results, and local recent searches only; it deliberately
 /// performs no home/trending feed request while idle.
@@ -44,6 +45,13 @@ struct HomeScreen: View {
             }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                // Interactive keyboard dismissal does not consistently clear `.searchable`'s
+                // presentation binding on iOS 26. Closing it here restores the large Search title
+                // and the native resting search-field placement without replacing system UI.
+                guard isSearchPresented else { return }
+                isSearchPresented = false
             }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in

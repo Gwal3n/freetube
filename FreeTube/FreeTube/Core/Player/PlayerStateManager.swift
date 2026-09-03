@@ -44,6 +44,9 @@ final class PlayerStateManager {
     private(set) var currentArtwork: UIImage?
     private(set) var loadState: LoadState = .idle
     private(set) var isPlaying: Bool = false
+    /// True only when the current item reached its natural end and no automatic transition has
+    /// replaced it. Drives replay chrome and lets a backward seek resume from the chosen point.
+    private(set) var hasEnded: Bool = false
     private(set) var elapsed: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
     private(set) var playbackRate: Double
@@ -230,6 +233,7 @@ final class PlayerStateManager {
         fullScreenPresented = true
         elapsed = 0
         duration = 0
+        hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
         refreshArtwork(for: synthetic)
@@ -299,6 +303,7 @@ final class PlayerStateManager {
         // that's what showed phantom progress bars on cells the user never played.
         elapsed = 0
         duration = 0
+        hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
         recordWatchHistory(video: video)
@@ -352,6 +357,10 @@ final class PlayerStateManager {
     }
 
     func play() {
+        if hasEnded {
+            replay()
+            return
+        }
         log.info("play()")
         player.play()
         isPlaying = true
@@ -368,6 +377,17 @@ final class PlayerStateManager {
     func togglePlayPause() {
         log.info("togglePlayPause() (isPlaying=\(self.isPlaying, privacy: .public))")
         isPlaying ? pause() : play()
+    }
+
+    /// Restarts the current item without resolving its stream again.
+    func replay() {
+        guard player.currentItem != nil else { return }
+        log.info("replay()")
+        hasEnded = false
+        seek(to: 0, resumeAfterEnded: false)
+        player.play()
+        isPlaying = true
+        publishNowPlayingWhenAlone()
     }
 
     /// Inserts a user-selected search result immediately after the current queue item without
@@ -413,9 +433,17 @@ final class PlayerStateManager {
         }
     }
 
-    func seek(to seconds: TimeInterval, rearmSponsorBlock: Bool = true) {
+    func seek(
+        to seconds: TimeInterval,
+        rearmSponsorBlock: Bool = true,
+        resumeAfterEnded: Bool = true
+    ) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
         let boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
+        let shouldResume = resumeAfterEnded && hasEnded && boundedSeconds < max(0, duration - 0.25)
+        if shouldResume {
+            hasEnded = false
+        }
         // Any segment whose end is still ahead of the new position becomes eligible again. This
         // makes rewinding before a previously skipped segment behave like a fresh encounter.
         if rearmSponsorBlock {
@@ -443,6 +471,9 @@ final class PlayerStateManager {
                 if settledTime.isFinite {
                     self.elapsed = settledTime
                     self.handleSponsorBlockSegment(at: settledTime)
+                }
+                if shouldResume {
+                    self.play()
                 }
             }
         }
@@ -524,6 +555,7 @@ final class PlayerStateManager {
         fullScreenPresented = false
         currentVideo = nil
         loadState = .idle
+        hasEnded = false
         player.removeAllItems()
         playbackHistory.removeAll()
         playbackHistoryIndex = -1
@@ -1086,10 +1118,23 @@ final class PlayerStateManager {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
             guard let self else { return }
             Task { @MainActor in
-                if self.preferences.autoplayNext { self.playNext() }
+                guard let endedItem = notification.object as? AVPlayerItem,
+                      endedItem === self.player.currentItem else { return }
+                self.isPlaying = false
+                self.hasEnded = true
+                self.elapsed = self.duration
+                self.persistCurrentPlaybackProgress(force: true)
+                self.updateNowPlaying()
+
+                // Loop-one is an explicit playback instruction and therefore remains active even
+                // when general autoplay is disabled. Any successful transition resets `hasEnded`
+                // in `load`; if there is no next item, the replay state stays visible.
+                if self.queue.repeatMode == .one || self.preferences.autoplayNext {
+                    self.playNext()
+                }
             }
         }
 

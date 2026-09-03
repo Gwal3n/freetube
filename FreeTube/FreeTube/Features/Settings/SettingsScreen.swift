@@ -65,20 +65,23 @@ struct SettingsScreen: View {
                     NavigationLink {
                         SponsorBlockSettingsScreen(model: model)
                     } label: {
-                        LabeledContent("SponsorBlock") {
+                        LabeledContent("Categories and behavior") {
                             Text(model.sponsorBlockEnabled ? "On" : "Off")
                                 .foregroundStyle(.secondary)
                         }
                     }
+                } header: {
+                    Text("SponsorBlock")
+                } footer: {
+                    Text("Show or skip community-identified video segments without delaying playback.")
+                }
+
+                Section("Player controls") {
                     NavigationLink {
                         PlayerControlsSettingsScreen(model: model)
                     } label: {
-                        Label("Player controls", systemImage: "slider.horizontal.3")
+                        Label("Customize controls", systemImage: "slider.horizontal.3")
                     }
-                } header: {
-                    Text("Playback enhancements")
-                } footer: {
-                    Text("Show or skip community-identified video segments without delaying playback.")
                 }
 
                 Section {
