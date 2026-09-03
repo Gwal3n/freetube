@@ -17,8 +17,10 @@ import OSLog
 @available(iOS 17.0, *)
 struct VideoMoreActionsMenu: View {
     let video: Video
+    var offersPlayNext = false
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(PlayerStateManager.self) private var player
     @Query private var favorites: [FavoriteVideo]
 
     @State private var shareFileURL: URL?
@@ -53,6 +55,15 @@ struct VideoMoreActionsMenu: View {
 
     @ViewBuilder
     private var menuContent: some View {
+        if offersPlayNext {
+            Button {
+                player.enqueueNext(video)
+            } label: {
+                Label("Play next", systemImage: "text.insert")
+            }
+            .disabled(player.currentVideo == nil || player.currentVideo?.id == video.id)
+            Divider()
+        }
         Button {
             if let url = watchURL { UIApplication.shared.open(url) }
         } label: {

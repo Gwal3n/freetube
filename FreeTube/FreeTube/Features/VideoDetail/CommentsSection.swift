@@ -30,11 +30,15 @@ struct CommentsSection: View {
                         Button {
                             Task { await model.loadMore() }
                         } label: {
-                            Label("Load more comments", systemImage: "chevron.down")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                            Text("Load more")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(.ultraThinMaterial, in: Capsule())
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
                         .padding(.horizontal)
                     }
                 }

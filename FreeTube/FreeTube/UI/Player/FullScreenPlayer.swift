@@ -605,19 +605,28 @@ struct FullScreenPlayer: View {
                     }
                 }
             } label: {
-                Label("Share", systemImage: "square.and.arrow.up")
-                    .frame(maxWidth: .infinity)
+                Image(systemName: "square.and.arrow.up")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .accessibilityLabel("Share")
 
             Button {
                 startDownload(video)
             } label: {
                 downloadButtonLabel(for: video)
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
             .disabled(isDownloadActive(for: video) || downloads.localFile(for: video.id) != nil)
+            .accessibilityLabel(downloadAccessibilityLabel(for: video))
+
+            Spacer()
         }
         .padding(.horizontal)
     }
@@ -625,15 +634,20 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func downloadButtonLabel(for video: Video) -> some View {
         if downloads.localFile(for: video.id) != nil {
-            Label("Downloaded", systemImage: "checkmark.circle.fill")
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3.weight(.semibold))
         } else if isDownloadActive(for: video) {
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text("Downloading")
-            }
+            ProgressView().controlSize(.small)
         } else {
-            Label("Download", systemImage: "arrow.down.circle")
+            Image(systemName: "arrow.down.circle")
+                .font(.title3.weight(.semibold))
         }
+    }
+
+    private func downloadAccessibilityLabel(for video: Video) -> String {
+        if downloads.localFile(for: video.id) != nil { return "Downloaded" }
+        if isDownloadActive(for: video) { return "Downloading" }
+        return "Download"
     }
 
     private func isDownloadActive(for video: Video) -> Bool {

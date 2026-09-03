@@ -11,6 +11,7 @@ struct VideoRow: View {
     let video: Video
     var onTap: () -> Void = {}
     var showsMoreMenu: Bool = false
+    var offersPlayNext = false
 
     /// Playback count + relative upload date joined by a middle dot. Either half can be empty
     /// (older listings sometimes omit one), so we filter before joining to avoid stray separators.
@@ -29,7 +30,7 @@ struct VideoRow: View {
             .accessibilityElement(children: .combine)
 
             if showsMoreMenu {
-                VideoMoreActionsMenu(video: video)
+                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
             }
         }
     }

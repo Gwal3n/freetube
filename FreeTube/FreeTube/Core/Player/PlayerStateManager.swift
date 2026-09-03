@@ -361,6 +361,14 @@ final class PlayerStateManager {
         isPlaying ? pause() : play()
     }
 
+    /// Inserts a user-selected search result immediately after the current queue item without
+    /// interrupting playback. The queue remains local and recommendation loading stays unchanged.
+    func enqueueNext(_ video: Video) {
+        guard let currentVideo, video.id != currentVideo.id else { return }
+        queue.insertNext(video)
+        log.info("Queued \(video.id, privacy: .public) to play next")
+    }
+
     func setPlaybackRate(_ rate: Double) {
         let boundedRate = min(max(rate, 0.25), 2)
         player.defaultRate = Float(boundedRate)

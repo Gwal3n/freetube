@@ -120,7 +120,7 @@ struct SearchContent: View {
                 Section("Videos") {
                     let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
                     ForEach(results.videos) { video in
-                        VideoRow(video: video, showsMoreMenu: true) {
+                        VideoRow(video: video, showsMoreMenu: true, offersPlayNext: true) {
                             dismissKeyboard()
                             player.load(video)
                         }
