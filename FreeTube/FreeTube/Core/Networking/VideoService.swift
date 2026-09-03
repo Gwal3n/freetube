@@ -9,6 +9,10 @@ struct VideoInfo: Sendable {
     let isLikedByUser: Bool
     let isDislikedByUser: Bool
     let recommended: [Video]
+    /// Initial token and availability extracted from the same MoreVideoInfosResponse as details.
+    /// Keeping them here lets background prefetch avoid issuing that response twice.
+    let commentsContinuationToken: String?
+    let commentsAvailability: CommentThread.Availability
     /// The HLS playlist URL (if available). Per `VideoInfosResponse` docs, this URL is consumable by
     /// `AVPlayer` directly. Prefer it over per-format URLs unless a specific quality is required.
     let streamingURL: URL?
@@ -127,6 +131,10 @@ final class VideoService: VideoServicing {
                 isLikedByUser: response.authenticatedInfos?.likeStatus == .liked,
                 isDislikedByUser: response.authenticatedInfos?.likeStatus == .disliked,
                 recommended: recommended,
+                commentsContinuationToken: response.commentsContinuationToken,
+                commentsAvailability: response.commentsContinuationToken != nil || response.commentsCount != nil
+                    ? .available
+                    : .disabled,
                 streamingURL: nil,
                 formats: []
             )
@@ -172,6 +180,8 @@ final class VideoService: VideoServicing {
             isLikedByUser: false,
             isDislikedByUser: false,
             recommended: recommended,
+            commentsContinuationToken: nil,
+            commentsAvailability: .available,
             streamingURL: response.streamingURL,
             formats: formats
         )

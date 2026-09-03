@@ -32,10 +32,12 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var horizontalSeekDuration: TimeInterval?
     private var horizontalSeekPeakVelocity: CGFloat = 0
     private var rateBeforeBoost: Float?
+    private var lastPiPDismissalRequest: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
     init(
         player: AVPlayer,
+        pipDismissalRequest: Int,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
@@ -43,11 +45,27 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onToggleControls: @escaping () -> Void
     ) {
         self.player = player
+        self.lastPiPDismissalRequest = pipDismissalRequest
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
+    }
+
+    /// AVPlayerViewController owns the automatic PiP controller privately. Temporarily disabling
+    /// PiP is its public way to close that presentation when the inline player is explicitly
+    /// reopened; eligibility is restored on the following main-actor turn for future backgrounds.
+    func dismissPiPIfRequested(on controller: AVPlayerViewController, request: Int) {
+        guard request != lastPiPDismissalRequest else { return }
+        lastPiPDismissalRequest = request
+        controller.allowsPictureInPicturePlayback = false
+        Task { @MainActor [weak self, weak controller] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard self?.lastPiPDismissalRequest == request else { return }
+            controller?.allowsPictureInPicturePlayback = true
+            controller?.canStartPictureInPictureAutomaticallyFromInline = true
+        }
     }
 
     func update(

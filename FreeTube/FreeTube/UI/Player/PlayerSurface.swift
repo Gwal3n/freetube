@@ -6,6 +6,7 @@ import AVKit
 @available(iOS 17.0, *)
 struct PlayerSurface: UIViewControllerRepresentable {
     let player: AVPlayer
+    let pipDismissalRequest: Int
     var onSeekRelative: (TimeInterval) -> Void
     var onSeekAbsolute: (TimeInterval) -> Void
     var onSeekPreview: (TimeInterval?) -> Void
@@ -17,6 +18,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     func makeCoordinator() -> PlayerGestureCoordinator {
         PlayerGestureCoordinator(
             player: player,
+            pipDismissalRequest: pipDismissalRequest,
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
@@ -43,6 +45,10 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsVideoFrameAnalysis = false
+        context.coordinator.dismissPiPIfRequested(
+            on: controller,
+            request: pipDismissalRequest
+        )
         context.coordinator.update(
             player: player,
             onSeekRelative: onSeekRelative,

@@ -33,6 +33,11 @@ final class SettingsViewModel {
         set { preferences.autoplayNext = newValue }
     }
 
+    var prefetchVideoDetails: Bool {
+        get { preferences.prefetchVideoDetails }
+        set { preferences.prefetchVideoDetails = newValue }
+    }
+
     var allowAudioMixing: Bool {
         get { preferences.allowAudioMixing }
         set {

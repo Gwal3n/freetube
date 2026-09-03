@@ -16,6 +16,12 @@ struct Comment: Identifiable, Hashable, Sendable {
 }
 
 struct CommentThread: Sendable {
+    enum Availability: Equatable, Sendable {
+        case available
+        case disabled
+    }
+
     let comments: [Comment]
     let continuationToken: String?
+    let availability: Availability
 }

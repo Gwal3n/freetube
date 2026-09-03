@@ -20,6 +20,14 @@ struct CommentsSection: View {
                 if model.isLoading && model.comments.isEmpty {
                     LoadingView()
                         .padding(.vertical, 12)
+                } else if model.commentsDisabled {
+                    ContentUnavailableView(
+                        "Comments disabled",
+                        systemImage: "text.bubble",
+                        description: Text("Comments are unavailable for this video.")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
                 } else {
                     ForEach(model.comments) { comment in
                         commentThread(comment)

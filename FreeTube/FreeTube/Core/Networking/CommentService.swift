@@ -52,7 +52,14 @@ final class CommentService: CommentServicing {
                 )
                 guard let initial = info.commentsContinuationToken else {
                     log.notice("MoreVideoInfosResponse returned no commentsContinuationToken")
-                    return CommentThread(comments: [], continuationToken: nil)
+                    let availability: CommentThread.Availability = info.commentsCount == nil
+                        ? .disabled
+                        : .available
+                    return CommentThread(
+                        comments: [],
+                        continuationToken: nil,
+                        availability: availability
+                    )
                 }
                 token = initial
             } catch {
@@ -66,7 +73,11 @@ final class CommentService: CommentServicing {
                 data: [.continuation: token]
             )
             let comments = response.results.map { Mappers.comment(from: $0) }
-            return CommentThread(comments: comments, continuationToken: response.continuationToken)
+            return CommentThread(
+                comments: comments,
+                continuationToken: response.continuationToken,
+                availability: .available
+            )
         } catch {
             throw YouTubeServiceError.network(error)
         }
@@ -79,7 +90,11 @@ final class CommentService: CommentServicing {
                 data: [.continuation: continuation]
             )
             let comments = response.results.map { Mappers.comment(from: $0) }
-            return CommentThread(comments: comments, continuationToken: response.continuationToken)
+            return CommentThread(
+                comments: comments,
+                continuationToken: response.continuationToken,
+                availability: .available
+            )
         } catch {
             throw YouTubeServiceError.network(error)
         }

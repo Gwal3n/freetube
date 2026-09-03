@@ -9,6 +9,7 @@ final class CommentsViewModel {
     private(set) var comments: [Comment] = []
     private(set) var continuationToken: String?
     private(set) var isLoading: Bool = false
+    private(set) var commentsDisabled = false
     private(set) var repliesByCommentID: [String: [Comment]] = [:]
     private(set) var replyContinuationTokens: [String: String] = [:]
     private(set) var loadingReplyCommentIDs: Set<String> = []
@@ -27,9 +28,10 @@ final class CommentsViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            let thread = try await service.fetchComments(videoID: videoID, continuation: nil)
+            let thread = try await VideoContentPrefetchStore.shared.fetchComments(videoID: videoID)
             comments = thread.comments
             continuationToken = thread.continuationToken
+            commentsDisabled = thread.availability == .disabled
         } catch {
             errorState = ErrorState(from: error)
         }

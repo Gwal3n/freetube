@@ -14,6 +14,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .search
     @State private var searchActivation = 0
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
@@ -92,6 +93,17 @@ struct RootView: View {
         // the popup collapses so the rest of the app honors the system appearance again.
         .onChange(of: player.fullScreenPresented) { _, presented in
             updateStatusBarOverride(forFullScreenOpen: presented)
+            if presented {
+                player.requestInlinePlaybackRestoration()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Reopening the app from an automatic PiP session may leave the popup binding true,
+            // so there is no false→true popup transition to observe. Foreground activation is
+            // the second explicit signal that the same video should return inline.
+            if phase == .active, player.fullScreenPresented {
+                player.requestInlinePlaybackRestoration()
+            }
         }
         // Menu-bar / keyboard-shortcut driven tab switching from `MacCommands`. The
         // notification is meaningful only on Mac (where the menu bar exists) and on iPad

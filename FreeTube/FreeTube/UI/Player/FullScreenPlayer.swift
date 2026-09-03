@@ -80,6 +80,7 @@ struct FullScreenPlayer: View {
                     Color.black
                     PlayerSurface(
                         player: player.player,
+                        pipDismissalRequest: player.pipDismissalRequest,
                         onSeekRelative: { seconds in
                             player.seekRelative(by: seconds)
                         },
@@ -558,7 +559,7 @@ struct FullScreenPlayer: View {
         Task { [videoID = video.id] in
             defer { Task { @MainActor in isLoadingDetails = false } }
             do {
-                let info = try await VideoService().fetchMoreInfo(id: videoID)
+                let info = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
                 await MainActor.run {
                     // Drop the result if the user switched videos before this returned.
                     guard player.currentVideo?.id == videoID else { return }

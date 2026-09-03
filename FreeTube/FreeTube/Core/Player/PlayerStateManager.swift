@@ -54,6 +54,9 @@ final class PlayerStateManager {
     private(set) var isMuted = false
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
+    /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
+    /// the user explicitly reopens the expanded player.
+    private(set) var pipDismissalRequest = 0
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
 
@@ -208,6 +211,7 @@ final class PlayerStateManager {
         // timeout. Cancelling settles that wait immediately.
         resolutionTask?.cancel()
         recommendationTask?.cancel()
+        contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
@@ -270,6 +274,7 @@ final class PlayerStateManager {
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         recommendationTask?.cancel()
+        contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         if recordInPlaybackHistory {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
@@ -341,6 +346,7 @@ final class PlayerStateManager {
 
     private var resolutionTask: Task<Void, Never>?
     private var recommendationTask: Task<Void, Never>?
+    private var contentPrefetchTask: Task<Void, Never>?
 
     /// Upserts a `WatchHistoryEntry` so the Library's "Recents" section reflects what the user
     /// played. Same-id taps just bump `watchedAt` so the row floats to the top. The actor hop keeps
@@ -382,6 +388,10 @@ final class PlayerStateManager {
     func togglePlayPause() {
         log.info("togglePlayPause() (isPlaying=\(self.isPlaying, privacy: .public))")
         isPlaying ? pause() : play()
+    }
+
+    func requestInlinePlaybackRestoration() {
+        pipDismissalRequest &+= 1
     }
 
     /// Restarts the current item without resolving its stream again.
@@ -554,6 +564,8 @@ final class PlayerStateManager {
         resolutionTask = nil
         recommendationTask?.cancel()
         recommendationTask = nil
+        contentPrefetchTask?.cancel()
+        contentPrefetchTask = nil
         clearSponsorBlockState()
         pause()
         miniPlayerVisible = false
@@ -880,6 +892,12 @@ final class PlayerStateManager {
                 loadState = .readyToPlay
                 applyStoredResumePosition(await resumeLookup.value, for: video)
                 updateNowPlaying()
+                if preferences.prefetchVideoDetails {
+                    contentPrefetchTask?.cancel()
+                    contentPrefetchTask = Task {
+                        await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
+                    }
+                }
                 // Usually redundant — the optimistic `play()` above has either started the item or
                 // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
                 // where a rejected candidate left the transport paused.
@@ -1076,7 +1094,7 @@ final class PlayerStateManager {
         }
 
         do {
-            let info = try await VideoService().fetchMoreInfo(id: seed.id)
+            let info = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: seed.id)
             try Task.checkCancellation()
             guard currentVideo?.id == seed.id else {
                 log.debug("Discarding stale recommendations for \(seed.id, privacy: .public)")

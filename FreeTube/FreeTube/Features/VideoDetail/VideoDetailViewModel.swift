@@ -51,6 +51,8 @@ final class VideoDetailViewModel {
                 isLikedByUser: !info.isLikedByUser,
                 isDislikedByUser: false,
                 recommended: info.recommended,
+                commentsContinuationToken: info.commentsContinuationToken,
+                commentsAvailability: info.commentsAvailability,
                 streamingURL: info.streamingURL,
                 formats: info.formats
             )
@@ -75,6 +77,8 @@ final class VideoDetailViewModel {
                 isLikedByUser: false,
                 isDislikedByUser: !info.isDislikedByUser,
                 recommended: info.recommended,
+                commentsContinuationToken: info.commentsContinuationToken,
+                commentsAvailability: info.commentsAvailability,
                 streamingURL: info.streamingURL,
                 formats: info.formats
             )
