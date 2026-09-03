@@ -269,7 +269,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   metadata request starts only after AVPlayer accepts a stream and is cached in memory, so seek
   previews never join the playback-critical path. Only a direct drag on the timeline shows the
   cropped sprite tile, positioned above and following the scrubber while remaining clamped inside
-  the video edges. Horizontal swipe seeking still previews its target on the timeline without a tile.
+  the video edges; the tile contains no redundant timestamp. Horizontal swipe seeking still previews
+  its target on the timeline without a tile.
   The stats row is always visible directly beneath the title, outside the expandable description.
   It shows views plus an explicitly labelled upload date/relative upload value, never the video
   duration (duration already belongs in the player timeline). Prefer the exact display strings from

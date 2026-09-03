@@ -99,16 +99,6 @@ struct FullScreenPlayer: View {
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
-                    if let caption = player.currentCaptionText,
-                       gestureSeekPreview == nil,
-                       scrubberSeekPreview == nil {
-                        CaptionOverlay(
-                            text: caption,
-                            bottomPadding: playerControlsVisible
-                                ? timelineBottomPadding(in: proxy.size) + 54
-                                : 14
-                        )
-                    }
                     CustomPlayerControls(
                         isVisible: playerControlsVisible,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
@@ -151,6 +141,16 @@ struct FullScreenPlayer: View {
                             p.fullScreenPresented = false
                         }
                     )
+                    if let caption = player.currentCaptionText,
+                       gestureSeekPreview == nil,
+                       scrubberSeekPreview == nil {
+                        CaptionOverlay(
+                            text: caption,
+                            bottomPadding: playerControlsVisible
+                                ? timelineBottomPadding(in: proxy.size) + 54
+                                : 14
+                        )
+                    }
                     if let previewTime = scrubberSeekPreview,
                        let tile = player.storyboard?.tile(
                            at: previewTime,
@@ -158,7 +158,7 @@ struct FullScreenPlayer: View {
                            maximumWidth: 320,
                            maximumHeight: 180
                        ) {
-                        StoryboardPreview(tile: tile, time: previewTime)
+                        StoryboardPreview(tile: tile)
                             .position(
                                 x: storyboardPreviewX(
                                     for: previewTime,
