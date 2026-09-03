@@ -120,6 +120,9 @@ final class PlayerStateManager {
     private var sponsorBlockNoticeTask: Task<Void, Never>?
     private var pendingSeekTarget: TimeInterval?
     private var seekRequestID = 0
+    private var lastProgressSaveAt = Date.distantPast
+    private var lastSavedProgressVideoID: String?
+    private var lastSavedProgressPosition: TimeInterval = -.infinity
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
@@ -254,6 +257,7 @@ final class PlayerStateManager {
         recordInPlaybackHistory: Bool = true
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
+        persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         recommendationTask?.cancel()
         clearSponsorBlockState()
@@ -273,6 +277,9 @@ final class PlayerStateManager {
             player.removeAllItems()
         }
         currentVideo = video
+        lastProgressSaveAt = .distantPast
+        lastSavedProgressVideoID = nil
+        lastSavedProgressPosition = -.infinity
         // Ordinary playback gets a fresh, bounded recommendation set for each video and retains no
         // history. Explicit playlist batches keep their curated order and skip recommendations.
         if skipRecommendations {
@@ -354,6 +361,7 @@ final class PlayerStateManager {
         log.info("pause()")
         player.pause()
         isPlaying = false
+        persistCurrentPlaybackProgress(force: true)
     }
 
     func togglePlayPause() {
@@ -489,6 +497,7 @@ final class PlayerStateManager {
 
     func dismiss() {
         log.info("dismiss()")
+        persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         resolutionTask = nil
         recommendationTask?.cancel()
@@ -750,6 +759,11 @@ final class PlayerStateManager {
     private func resolveAndPlay(video: Video, autoplay: Bool, skipRecommendations: Bool = false) async {
         log.info("resolveAndPlay: start for \(video.id, privacy: .public)")
         let resolutionStartedAt = Date()
+        // The model-actor read runs alongside network resolution and is consumed only after the
+        // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
+        let resumeLookup = Task {
+            await PersistenceWriter.shared.watchProgress(videoID: video.id)
+        }
         loadState = .resolving
         var excludedStrategies = Set<PlaybackStrategy>()
 
@@ -811,6 +825,7 @@ final class PlayerStateManager {
                 // comparable with builds that played only after this point.
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 loadState = .readyToPlay
+                applyStoredResumePosition(await resumeLookup.value, for: video)
                 updateNowPlaying()
                 // Usually redundant — the optimistic `play()` above has either started the item or
                 // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
@@ -1045,6 +1060,7 @@ final class PlayerStateManager {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
                 }
+                self.persistCurrentPlaybackProgress(force: false)
                 self.updateNowPlaying()
             }
         }
@@ -1125,6 +1141,55 @@ final class PlayerStateManager {
             rate: isPlaying ? 1.0 : 0.0,
             artwork: currentArtwork
         )
+    }
+
+    // MARK: - Resume position
+
+    /// Resumes only meaningful, unfinished progress. A short opening is treated as unwatched, and
+    /// the final 30 seconds are treated as completed so finished videos restart normally.
+    private func applyStoredResumePosition(
+        _ progress: (position: TimeInterval, duration: TimeInterval)?,
+        for video: Video
+    ) {
+        guard currentVideo?.id == video.id,
+              let progress,
+              progress.position.isFinite,
+              progress.position >= 10 else { return }
+        let knownDuration = duration > 0 ? duration : progress.duration
+        guard knownDuration > 0,
+              knownDuration - progress.position >= 30,
+              progress.position < knownDuration * 0.95 else { return }
+        log.info("Resuming \(video.id, privacy: .public) at \(progress.position, privacy: .public)s")
+        seek(to: progress.position)
+    }
+
+    /// Writes at most every ten seconds during playback, plus forced lifecycle saves. Duplicate
+    /// pause/dismiss/video-switch calls are suppressed when the position has not advanced.
+    private func persistCurrentPlaybackProgress(force: Bool) {
+        guard let video = currentVideo,
+              !video.id.hasPrefix("fetch-"),
+              elapsed.isFinite,
+              duration.isFinite,
+              elapsed >= 0,
+              duration > 0 else { return }
+        let now = Date()
+        if !force, now.timeIntervalSince(lastProgressSaveAt) < 10 { return }
+        if lastSavedProgressVideoID == video.id,
+           abs(lastSavedProgressPosition - elapsed) < 0.5 { return }
+
+        lastProgressSaveAt = now
+        lastSavedProgressVideoID = video.id
+        lastSavedProgressPosition = elapsed
+        let videoID = video.id
+        let position = elapsed
+        let totalDuration = duration
+        Task {
+            await PersistenceWriter.shared.updateWatchProgress(
+                videoID: videoID,
+                position: position,
+                duration: totalDuration
+            )
+        }
     }
 
     /// A mixable session should not compete for Now Playing while another app is active. When the

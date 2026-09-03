@@ -46,6 +46,26 @@ actor PersistenceWriter {
         try? modelContext.save()
     }
 
+    /// Stores lightweight playback progress without bumping `watchedAt`; opening a video controls
+    /// history ordering, while periodic transport ticks should not continuously reorder the list.
+    func updateWatchProgress(videoID: String, position: TimeInterval, duration: TimeInterval) {
+        let target = videoID
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+        guard let existing = try? modelContext.fetch(descriptor).first else { return }
+        existing.lastPosition = position
+        existing.duration = duration
+        try? modelContext.save()
+    }
+
+    /// Returns the locally stored resume point. Reads share this model actor so they never race a
+    /// periodic progress write or touch a `ModelContext` from the main actor.
+    func watchProgress(videoID: String) -> (position: TimeInterval, duration: TimeInterval)? {
+        let target = videoID
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+        guard let existing = try? modelContext.fetch(descriptor).first else { return nil }
+        return (existing.lastPosition, existing.duration)
+    }
+
     func deleteWatchHistory(videoID: String) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
