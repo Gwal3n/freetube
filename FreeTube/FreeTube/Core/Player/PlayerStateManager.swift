@@ -347,6 +347,7 @@ final class PlayerStateManager {
         log.info("play()")
         player.play()
         isPlaying = true
+        publishNowPlayingWhenAlone()
     }
 
     func pause() {
@@ -358,14 +359,6 @@ final class PlayerStateManager {
     func togglePlayPause() {
         log.info("togglePlayPause() (isPlaying=\(self.isPlaying, privacy: .public))")
         isPlaying ? pause() : play()
-    }
-
-    /// Republishes the current transport metadata after another app gives up primary-audio
-    /// ownership. The audio-session observer calls this only while FreeTube is actively playing.
-    func reclaimNowPlayingIfActive() {
-        guard currentVideo != nil, isPlaying else { return }
-        log.info("Reclaiming Now Playing after primary audio from another app stopped")
-        updateNowPlaying()
     }
 
     func setPlaybackRate(_ rate: Double) {
@@ -1124,6 +1117,17 @@ final class PlayerStateManager {
             rate: isPlaying ? 1.0 : 0.0,
             artwork: currentArtwork
         )
+    }
+
+    /// A mixable session should not compete for Now Playing while another app is active. When the
+    /// user starts or resumes FreeTube while it is the only audio source, reactivating the same
+    /// mixable configuration and republishing metadata lets it present normal media controls.
+    private func publishNowPlayingWhenAlone() {
+        guard preferences.allowAudioMixing,
+              !AVAudioSession.sharedInstance().isOtherAudioPlaying else { return }
+        AudioSessionConfigurator.configure(allowMixing: true)
+        log.info("Publishing Now Playing for FreeTube as the only active audio source")
+        updateNowPlaying()
     }
 
     /// Resolves an artwork image for the given video and stores it in `currentArtwork`. Tries three
