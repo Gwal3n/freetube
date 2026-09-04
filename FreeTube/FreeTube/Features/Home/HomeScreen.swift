@@ -45,17 +45,6 @@ struct HomeScreen: View {
             .navigationDestination(for: SearchChannelRoute.self) { route in
                 ChannelScreen(channelID: route.id)
             }
-            .toolbar {
-                if searchModel.submittedQuery != nil {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            leaveSearchResults()
-                        } label: {
-                            Label("Back", systemImage: "chevron.left")
-                        }
-                    }
-                }
-            }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
@@ -124,11 +113,14 @@ struct HomeScreen: View {
             return
         }
         await searchModel.submit()
-        guard searchModel.submittedQuery == trimmed else { return }
-        // End the expanded system search presentation after every completed submission. The
-        // searchable field remains in the navigation bar, while its presentation can no longer
-        // obscure the leading Back item on a subsequent search.
-        isSearchPresented = false
+        // Keep native search presentation (and therefore the visible query + clear button), but
+        // dismiss the keyboard once results arrive.
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 
     /// In-place results are not a pushed navigation destination, so provide the familiar leading-
@@ -152,7 +144,6 @@ struct HomeScreen: View {
     private func leaveSearchResults() {
         searchModel.query = ""
         searchModel.clearResults()
-        isSearchPresented = false
     }
 }
 
