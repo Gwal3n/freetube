@@ -275,6 +275,7 @@ struct PopupContentWrapper: View {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(Color.secondary)
                     }
+                    .contentShape(.interaction, Rectangle().inset(by: -10))
                     .accessibilityLabel("Close player")
                 }
             }
@@ -290,6 +291,8 @@ struct PopupContentWrapper: View {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                             .foregroundStyle(Color.primary)
                     }
+                    .contentShape(.interaction, Rectangle().inset(by: -10))
+                    .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
                 }
             }
             .onChange(of: player.loadState, initial: true) { old, new in
