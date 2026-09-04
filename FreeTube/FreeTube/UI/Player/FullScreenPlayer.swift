@@ -41,6 +41,8 @@ struct FullScreenPlayer: View {
     @State private var playerControlsVisible = true
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
+    @State private var isChapterListPresented = false
+    @State private var panelScrollOffset: CGFloat = 0
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -68,7 +70,15 @@ struct FullScreenPlayer: View {
         // `GeometryReader` and sizing the ZStack to `proxy.size.width × width*9/16`
         // explicitly removes the clamp — full-width on every idiom.
         GeometryReader { proxy in
-            VStack(spacing: 0) {
+            let isLandscape = verticalSizeClass == .compact
+            let chapterPanelWidth: CGFloat = isLandscape && isChapterListPresented
+                ? min(360, proxy.size.width * 0.38)
+                : 0
+            let surfaceWidth = proxy.size.width - chapterPanelWidth
+            let surfaceHeight = playerSurfaceHeight(width: surfaceWidth, viewportHeight: proxy.size.height)
+
+            ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 0) {
                 // Pinning the ZStack to width × width*9/16 keeps the surface a stable height
                 // across .resolving → .downloading → .readyToPlay (the underlying
                 // AVPlayerViewController has zero intrinsic size while loading; the explicit
@@ -118,7 +128,9 @@ struct FullScreenPlayer: View {
                             }
                             .buttonStyle(.plain)
                         ),
-                        bottomTimelinePadding: timelineBottomPadding(in: proxy.size),
+                        bottomTimelinePadding: timelineBottomPadding(
+                            in: CGSize(width: surfaceWidth, height: proxy.size.height)
+                        ),
                         onTogglePlayPause: {
                             player.togglePlayPause()
                             showPlayerControls()
@@ -129,6 +141,13 @@ struct FullScreenPlayer: View {
                         },
                         onSeekPreviewChanged: { seconds in
                             scrubberSeekPreview = seconds
+                        },
+                        onShowChapters: {
+                            guard !player.chapters.isEmpty else { return }
+                            withAnimation(.snappy(duration: 0.28)) {
+                                isChapterListPresented.toggle()
+                            }
+                            showPlayerControls()
                         },
                         onPrevious: {
                             player.playPrevious()
@@ -155,12 +174,14 @@ struct FullScreenPlayer: View {
                                 x: storyboardPreviewX(
                                     for: previewTime,
                                     duration: player.duration,
-                                    surfaceWidth: proxy.size.width
+                                    surfaceWidth: surfaceWidth
                                 ),
                                 y: max(
                                     58,
-                                    proxy.size.width * 9 / 16
-                                        - timelineBottomPadding(in: proxy.size)
+                                    surfaceHeight
+                                        - timelineBottomPadding(
+                                            in: CGSize(width: surfaceWidth, height: proxy.size.height)
+                                        )
                                         - 68
                                 )
                             )
@@ -172,17 +193,21 @@ struct FullScreenPlayer: View {
                             onUndo: { player.undoSponsorBlockSkip() },
                             onSkip: { player.confirmSponsorBlockSkip() },
                             onDismiss: { player.dismissSponsorBlockNotice() },
-                            bottomPadding: timelineBottomPadding(in: proxy.size) + 46
+                            bottomPadding: timelineBottomPadding(
+                                in: CGSize(width: surfaceWidth, height: proxy.size.height)
+                            ) + 46
                         )
                     }
                 }
-                .frame(width: proxy.size.width, height: proxy.size.width * 9 / 16)
+                .frame(width: surfaceWidth, height: surfaceHeight)
                 .animation(.easeOut(duration: 0.2), value: player.loadState)
                 .onAppear { showPlayerControls() }
                 .onDisappear { controlsHideTask?.cancel() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
+                    isChapterListPresented = false
+                    panelScrollOffset = 0
                     showPlayerControls()
                 }
                 .onChange(of: player.loadState, initial: true) { _, state in
@@ -256,7 +281,33 @@ struct FullScreenPlayer: View {
                     prefetchDescriptionIfAvailable(for: video)
                 }
             }
-        }
+            }
+            .frame(width: proxy.size.width, alignment: .leading)
+
+            if isChapterListPresented, !player.chapters.isEmpty {
+                ChapterListPanel(
+                    chapters: player.chapters,
+                    elapsed: player.elapsed,
+                    isLandscape: isLandscape,
+                    onSeek: { target in
+                        player.seek(to: target)
+                        showPlayerControls()
+                    },
+                    onDismiss: {
+                        withAnimation(.snappy(duration: 0.28)) {
+                            isChapterListPresented = false
+                        }
+                    }
+                )
+                .frame(
+                    width: isLandscape ? chapterPanelWidth : proxy.size.width,
+                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - surfaceHeight)
+                )
+                .offset(y: isLandscape ? 0 : surfaceHeight)
+                .transition(isLandscape ? .move(edge: .trailing) : .move(edge: .bottom))
+                .zIndex(5)
+            }
+            }
         // One continuous material under EVERYTHING, including the top safe-area inset (status bar).
         // VStack content still respects safe area; only the material extends behind the inset.
         .background {
@@ -311,6 +362,23 @@ struct FullScreenPlayer: View {
         return max(22, aspectHeight - availableSize.height + 16)
     }
 
+    /// Uses AVPlayer's display-correct dimensions for portrait/tall media. Tall videos start at
+    /// their natural ratio (bounded so some feed remains reachable), then smoothly compress toward
+    /// the familiar 16:9 player as the lower panel scrolls, matching YouTube's expanding header.
+    private func playerSurfaceHeight(width: CGFloat, viewportHeight: CGFloat) -> CGFloat {
+        guard width > 0 else { return 0 }
+        let compactHeight = width * 9 / 16
+        let size = player.videoPresentationSize
+        guard verticalSizeClass != .compact,
+              size.width > 0, size.height > 0 else { return compactHeight }
+        let naturalHeight = width * size.height / size.width
+        let expandedHeight = min(max(naturalHeight, compactHeight), viewportHeight * 0.72)
+        let collapsible = expandedHeight - compactHeight
+        guard collapsible > 0 else { return compactHeight }
+        let progress = min(max(panelScrollOffset / max(collapsible, 1), 0), 1)
+        return expandedHeight - collapsible * progress
+    }
+
     /// Tracks the timeline thumb while keeping the 116pt-wide preview plus edge clearance
     /// wholly inside the player surface at both ends of the video.
     private func storyboardPreviewX(
@@ -360,13 +428,23 @@ struct FullScreenPlayer: View {
     private func panel(_ video: Video) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                Color.clear
+                    .frame(height: 0)
+                    .reportPlayerPanelScrollOffset()
                 metadata(video)
                 detailsSection(video: video)
                 queuePanel
-                CommentsSection(videoID: video.id)
+                CommentsSection(
+                    videoID: video.id,
+                    countText: details?.commentsCountText ?? player.commentsCountText
+                )
                     .id(video.id)
             }
             .padding(.vertical)
+        }
+        .coordinateSpace(name: "playerPanelScroll")
+        .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
+            panelScrollOffset = offset
         }
         .scrollContentBackground(.hidden)
     }
@@ -533,7 +611,11 @@ struct FullScreenPlayer: View {
     private func expandedDetailsBody(video: Video) -> some View {
         // Full description text (from the loaded details, falling back to the search-result snippet).
         if let text = availableDescription(video: video) {
-            Text(text)
+            RichDescriptionText(
+                parts: details?.descriptionParts ?? [],
+                fallback: text,
+                onSeek: { player.seek(to: $0) }
+            )
                 .font(.subheadline)
                 .foregroundStyle(.primary)
         } else if isLoadingDetails {

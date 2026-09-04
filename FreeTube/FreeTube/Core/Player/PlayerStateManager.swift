@@ -56,6 +56,9 @@ final class PlayerStateManager {
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     private(set) var chapters: [VideoChapter] = []
     private(set) var storyboard: VideoStoryboard?
+    private(set) var commentsCountText: String?
+    /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
+    private(set) var videoPresentationSize: CGSize = .zero
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
     /// the user explicitly reopens the expanded player.
     private(set) var pipDismissalRequest = 0
@@ -107,6 +110,7 @@ final class PlayerStateManager {
     private var statusCancellable: AnyCancellable?
     private var endObserver: NSObjectProtocol?
     private var itemStatusObservation: NSKeyValueObservation?
+    private var itemPresentationSizeObservation: NSKeyValueObservation?
     private var itemLoadStartedAt: Date?
     /// KVO-driven readiness handshake for the candidate currently under test.
     ///
@@ -178,6 +182,8 @@ final class PlayerStateManager {
     /// here so we don't have to reach into main-actor-isolated state from a nonisolated context.
     func tearDownObservers() {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
+        itemStatusObservation?.invalidate()
+        itemPresentationSizeObservation?.invalidate()
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let itemErrorLogObservation { NotificationCenter.default.removeObserver(itemErrorLogObservation) }
         if let itemAccessLogObservation { NotificationCenter.default.removeObserver(itemAccessLogObservation) }
@@ -185,9 +191,13 @@ final class PlayerStateManager {
         endObserver = nil
         itemErrorLogObservation = nil
         itemAccessLogObservation = nil
+        itemStatusObservation = nil
+        itemPresentationSizeObservation = nil
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        commentsCountText = nil
+        videoPresentationSize = .zero
     }
 
     // MARK: - Public commands
@@ -219,6 +229,8 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        commentsCountText = nil
+        videoPresentationSize = .zero
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -284,6 +296,8 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        commentsCountText = nil
+        videoPresentationSize = .zero
         if recordInPlaybackHistory {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
         }
@@ -361,6 +375,9 @@ final class PlayerStateManager {
         }
         if let resolvedStoryboard = info.storyboard {
             storyboard = resolvedStoryboard
+        }
+        if let count = info.commentsCountText, !count.isEmpty {
+            commentsCountText = count
         }
     }
 
@@ -796,6 +813,7 @@ final class PlayerStateManager {
 
     private func observe(item: AVPlayerItem) {
         itemStatusObservation?.invalidate()
+        itemPresentationSizeObservation?.invalidate()
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
 
@@ -817,6 +835,15 @@ final class PlayerStateManager {
                 @unknown default:
                     break
                 }
+            }
+        }
+
+        itemPresentationSizeObservation = item.observe(\.presentationSize, options: [.new, .initial]) { [weak self] item, _ in
+            guard let self else { return }
+            Task { @MainActor in
+                let size = item.presentationSize
+                guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { return }
+                self.videoPresentationSize = size
             }
         }
 

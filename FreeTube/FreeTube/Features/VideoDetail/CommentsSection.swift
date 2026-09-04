@@ -2,13 +2,15 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct CommentsSection: View {
+    let countText: String?
     @State private var model: CommentsViewModel
     /// Permanently mounted below Up Next, but collapsed and unloaded by default so showing the
     /// header never brings the comment tree (or its network work) into play until the user asks.
     @State private var isExpanded = false
     @State private var expandedReplyCommentIDs: Set<String> = []
 
-    init(videoID: String) {
+    init(videoID: String, countText: String? = nil) {
+        self.countText = countText
         _model = State(wrappedValue: CommentsViewModel(videoID: videoID))
     }
 
@@ -71,7 +73,7 @@ struct CommentsSection: View {
             }
         } label: {
             HStack {
-                SectionHeader(title: "Comments")
+                SectionHeader(title: commentsTitle)
                 Spacer()
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.subheadline.weight(.semibold))
@@ -83,6 +85,12 @@ struct CommentsSection: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal)
+    }
+
+    private var commentsTitle: String {
+        guard let count = countText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !count.isEmpty else { return "Comments" }
+        return "Comments · \(count)"
     }
 
     @ViewBuilder

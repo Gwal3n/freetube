@@ -5,6 +5,7 @@ import YouTubeKit
 struct VideoInfo: Sendable {
     let video: Video
     let descriptionText: String?
+    let descriptionParts: [VideoDescriptionPart]
     let likeCount: Int?
     let isLikedByUser: Bool
     let isDislikedByUser: Bool
@@ -16,6 +17,7 @@ struct VideoInfo: Sendable {
     /// Initial token and availability extracted from the same MoreVideoInfosResponse as details.
     /// Keeping them here lets background prefetch avoid issuing that response twice.
     let commentsContinuationToken: String?
+    let commentsCountText: String?
     let commentsAvailability: CommentThread.Availability
     /// The HLS playlist URL (if available). Per `VideoInfosResponse` docs, this URL is consumable by
     /// `AVPlayer` directly. Prefer it over per-format URLs unless a specific quality is required.
@@ -114,6 +116,7 @@ final class VideoService: VideoServicing {
             )
             let recommended = response.recommendedVideos.compactMap { $0 as? YTVideo }.map(Mappers.video(from:))
             let descriptionText = response.videoDescription?.compactMap(\.text).joined()
+            let descriptionParts = Self.descriptionParts(from: response.videoDescription ?? [])
             let video = Video(
                 id: id,
                 title: response.videoTitle ?? "",
@@ -131,6 +134,7 @@ final class VideoService: VideoServicing {
             return VideoInfo(
                 video: video,
                 descriptionText: descriptionText,
+                descriptionParts: descriptionParts,
                 likeCount: response.likesCount.defaultState.flatMap { Int($0) },
                 isLikedByUser: response.authenticatedInfos?.likeStatus == .liked,
                 isDislikedByUser: response.authenticatedInfos?.likeStatus == .disliked,
@@ -140,6 +144,7 @@ final class VideoService: VideoServicing {
                 chapters: Self.chapters(from: response.chapters ?? []),
                 storyboard: nil,
                 commentsContinuationToken: response.commentsContinuationToken,
+                commentsCountText: response.commentsCount,
                 commentsAvailability: response.commentsContinuationToken != nil || response.commentsCount != nil
                     ? .available
                     : .disabled,
@@ -184,6 +189,7 @@ final class VideoService: VideoServicing {
         return VideoInfo(
             video: video,
             descriptionText: response.videoDescription,
+            descriptionParts: [],
             likeCount: nil,
             isLikedByUser: false,
             isDislikedByUser: false,
@@ -193,6 +199,7 @@ final class VideoService: VideoServicing {
             chapters: [],
             storyboard: response.storyboard.map(Self.storyboard(from:)),
             commentsContinuationToken: nil,
+            commentsCountText: nil,
             commentsAvailability: .available,
             streamingURL: response.streamingURL,
             formats: formats
@@ -215,6 +222,24 @@ final class VideoService: VideoServicing {
                 )
             }
             .sorted { $0.startTime < $1.startTime }
+    }
+
+    private static func descriptionParts(
+        from parts: [MoreVideoInfosResponse.YouTubeDescriptionPart]
+    ) -> [VideoDescriptionPart] {
+        parts.compactMap { part in
+            guard let text = part.text, !text.isEmpty else { return nil }
+            let action: VideoDescriptionPart.Action?
+            switch part.role {
+            case .link(let url): action = .externalURL(url)
+            case .chapter(let seconds): action = .seek(TimeInterval(seconds))
+            case .video(let id): action = .video(id)
+            case .channel(let id): action = .channel(id)
+            case .playlist(let id): action = .playlist(id)
+            default: action = nil
+            }
+            return VideoDescriptionPart(text: text, action: action)
+        }
     }
 
     private static func storyboard(from storyboard: YTStoryboard) -> VideoStoryboard {

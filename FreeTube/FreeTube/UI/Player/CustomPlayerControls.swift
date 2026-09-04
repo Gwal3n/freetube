@@ -17,6 +17,7 @@ struct CustomPlayerControls: View {
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
     let onSeekPreviewChanged: (TimeInterval?) -> Void
+    let onShowChapters: () -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onCollapse: () -> Void
@@ -71,7 +72,8 @@ struct CustomPlayerControls: View {
                     segments: sponsorSegments,
                     chapters: chapters,
                     onSeek: onSeek,
-                    onPreviewChanged: onSeekPreviewChanged
+                    onPreviewChanged: onSeekPreviewChanged,
+                    onShowChapters: onShowChapters
                 )
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomTimelinePadding)

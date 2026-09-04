@@ -8,6 +8,7 @@ struct SponsorBlockTimeline: View {
     let chapters: [VideoChapter]
     let onSeek: (TimeInterval) -> Void
     let onPreviewChanged: (TimeInterval?) -> Void
+    let onShowChapters: () -> Void
 
     @State private var dragTime: TimeInterval?
     @State private var isPreviewingDrag = false
@@ -24,23 +25,7 @@ struct SponsorBlockTimeline: View {
             HStack(spacing: 7) {
                 Text(verbatim: format(displayedTime))
                 if let currentChapter {
-                    Menu {
-                        ForEach(chapters) { chapter in
-                            Button {
-                                onSeek(chapter.startTime)
-                            } label: {
-                                if chapter.id == currentChapter.id {
-                                    Label {
-                                        Text(verbatim: chapterMenuTitle(chapter))
-                                    } icon: {
-                                        Image(systemName: "checkmark")
-                                    }
-                                } else {
-                                    Text(verbatim: chapterMenuTitle(chapter))
-                                }
-                            }
-                        }
-                    } label: {
+                    Button(action: onShowChapters) {
                         HStack(spacing: 3) {
                             Text(verbatim: currentChapter.title)
                                 .lineLimit(1)
@@ -172,8 +157,4 @@ struct SponsorBlockTimeline: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
-    private func chapterMenuTitle(_ chapter: VideoChapter) -> String {
-        let timestamp = chapter.timeDescription ?? format(chapter.startTime)
-        return "\(timestamp)  \(chapter.title)"
-    }
 }

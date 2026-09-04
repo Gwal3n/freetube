@@ -47,6 +47,7 @@ final class VideoDetailViewModel {
             info = VideoInfo(
                 video: info.video,
                 descriptionText: info.descriptionText,
+                descriptionParts: info.descriptionParts,
                 likeCount: info.likeCount,
                 isLikedByUser: !info.isLikedByUser,
                 isDislikedByUser: false,
@@ -56,6 +57,7 @@ final class VideoDetailViewModel {
                 chapters: info.chapters,
                 storyboard: info.storyboard,
                 commentsContinuationToken: info.commentsContinuationToken,
+                commentsCountText: info.commentsCountText,
                 commentsAvailability: info.commentsAvailability,
                 streamingURL: info.streamingURL,
                 formats: info.formats
@@ -77,6 +79,7 @@ final class VideoDetailViewModel {
             info = VideoInfo(
                 video: info.video,
                 descriptionText: info.descriptionText,
+                descriptionParts: info.descriptionParts,
                 likeCount: info.likeCount,
                 isLikedByUser: false,
                 isDislikedByUser: !info.isDislikedByUser,
@@ -86,6 +89,7 @@ final class VideoDetailViewModel {
                 chapters: info.chapters,
                 storyboard: info.storyboard,
                 commentsContinuationToken: info.commentsContinuationToken,
+                commentsCountText: info.commentsCountText,
                 commentsAvailability: info.commentsAvailability,
                 streamingURL: info.streamingURL,
                 formats: info.formats
