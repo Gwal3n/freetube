@@ -292,8 +292,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   must not request or render a home/trending/discovery feed. Native search presents suggestions,
   and a successful keyboard/suggestion/history submission swaps the root content to results in
   place—the same native search bar and query remain mounted, with no results-page push animation.
-  A leading Back control clears that result/query state and reveals recent searches. Channels and
-  playlists still push normally from their result rows. Results include videos, channels, and playlists. iPhone and iPad retain native
+  A persistent leading Back control—or a swipe from the leading screen edge—clears that
+  result/query state and reveals recent searches. End expanded search presentation after each
+  submission so it cannot obscure Back on subsequent searches. Channels and playlists still push
+  normally from their result rows. Results include videos, channels, and playlists. iPhone and iPad retain native
   `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
   native search collapses awkwardly there. Search stays an ordinary peer tab—never assign
   `TabRole.search`, which detaches it visually on iOS 26. Re-selecting the ordinary tab increments a
