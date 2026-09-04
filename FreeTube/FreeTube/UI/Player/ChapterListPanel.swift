@@ -15,6 +15,7 @@ struct ChapterListPanel: View {
     let onDismiss: () -> Void
     @State private var dismissTranslation: CGFloat = 0
     @State private var listScrollOffset: CGFloat = 0
+    @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
     @State private var isDraggingListSheet = false
 
@@ -90,9 +91,16 @@ struct ChapterListPanel: View {
         if #available(iOS 18.0, *) {
             chapterRows
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                    max(0, geometry.contentOffset.y + geometry.contentInsets.top)
-                } action: { _, offset in
-                    listScrollOffset = offset
+                    geometry.contentOffset.y + geometry.contentInsets.top
+                } action: { _, rawOffset in
+                    listScrollOffset = max(0, rawOffset)
+                    let overscroll = max(0, -rawOffset)
+                    listOverscroll = overscroll
+                    // After a cancelled pull, retain compensation until the ScrollView finishes
+                    // its own snap-back; dropping it at touch-up would create a one-frame gap.
+                    if isDraggingListSheet, listDismissOrigin == 0, overscroll <= 0.5 {
+                        isDraggingListSheet = false
+                    }
                 }
                 .simultaneousGesture(listHandoffDismissGesture)
         } else {
@@ -114,6 +122,10 @@ struct ChapterListPanel: View {
                 }
             }
             .padding(.vertical, 6)
+            // Once the gesture hands off, the complete panel already follows the finger. Cancel
+            // the ScrollView's simultaneous visual rubber-band so the rows retain a constant
+            // distance from the header instead of appearing to travel twice as fast.
+            .offset(y: isDraggingListSheet ? -listOverscroll : 0)
         }
         .scrollIndicators(.visible)
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
@@ -154,7 +166,9 @@ struct ChapterListPanel: View {
                     }
                 }
                 listDismissOrigin = 0
-                isDraggingListSheet = false
+                if listOverscroll <= 0.5 {
+                    isDraggingListSheet = false
+                }
             }
     }
 

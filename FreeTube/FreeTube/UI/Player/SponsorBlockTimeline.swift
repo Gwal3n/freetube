@@ -35,6 +35,9 @@ struct SponsorBlockTimeline: View {
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(maxWidth: 190, alignment: .leading)
                     }
+                    // Expand only the interactive shape; keep the compact chapter typography and
+                    // timeline layout unchanged.
+                    .contentShape(.interaction, Rectangle().inset(by: -10))
                     .accessibilityLabel("Current chapter, \(currentChapter.title)")
                 }
                 Spacer()
