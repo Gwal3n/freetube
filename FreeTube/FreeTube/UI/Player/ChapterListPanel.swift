@@ -12,7 +12,7 @@ struct ChapterListPanel: View {
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
     @State private var dismissTranslation: CGFloat = 0
-    @State private var panelHeight: CGFloat = 0
+    @State private var maximumDismissPull: CGFloat = 0
 
     private var currentChapterID: VideoChapter.ID? {
         chapters.last { $0.startTime <= elapsed }?.id
@@ -48,27 +48,11 @@ struct ChapterListPanel: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .contentShape(Rectangle())
-            .simultaneousGesture(chapterDismissGesture)
 
             Divider().opacity(0.45)
 
             ScrollViewReader { scrollProxy in
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(chapters) { chapter in
-                            Button {
-                                onSeek(chapter.startTime)
-                            } label: {
-                                chapterRow(chapter)
-                            }
-                            .buttonStyle(.plain)
-                            .id(chapter.id)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                }
-                .scrollIndicators(.visible)
+                chapterScrollView
                 .onAppear {
                     guard let currentChapterID else { return }
                     scrollProxy.scrollTo(currentChapterID, anchor: .center)
@@ -82,15 +66,6 @@ struct ChapterListPanel: View {
                 Rectangle().fill(.regularMaterial)
             }
         }
-        .background {
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: ChapterPanelHeightKey.self,
-                    value: proxy.size.height
-                )
-            }
-        }
-        .onPreferenceChange(ChapterPanelHeightKey.self) { panelHeight = $0 }
         .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16, style: .continuous))
         .overlay(alignment: isLandscape ? .leading : .top) {
             Rectangle()
@@ -104,30 +79,52 @@ struct ChapterListPanel: View {
         .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
     }
 
-    /// Keep sheet movement on the non-scrolling header. Letting a parent drag recognizer compete
-    /// with SwiftUI's private ScrollView recognizer caused false dismissals and visible oscillation
-    /// on iOS 26. The list now has exclusive ownership of every gesture that starts in its rows.
-    private var chapterDismissGesture: some Gesture {
-        DragGesture(minimumDistance: 6)
-            .onChanged { value in
-                guard !isLandscape else { return }
-                let downward = value.translation.height > 0
-                    && abs(value.translation.height) > abs(value.translation.width)
-                guard downward else { return }
-                dismissTranslation = max(0, value.translation.height)
-            }
-            .onEnded { value in
-                if !isLandscape, dismissTranslation > 0 {
-                    let projected = max(0, value.predictedEndTranslation.height)
-                    let threshold = max(110, panelHeight * 0.25)
-                    if dismissTranslation > threshold || projected > threshold {
+    @ViewBuilder
+    private var chapterScrollView: some View {
+        if #available(iOS 18.0, *) {
+            chapterRows
+                // Read the native ScrollView's rubber-band directly. There is no competing drag
+                // recognizer, so a pull can only begin after the list itself reaches its top.
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.contentOffset.y + geometry.contentInsets.top
+                } action: { _, offset in
+                    guard !isLandscape else { return }
+                    let pull = max(0, -offset)
+                    dismissTranslation = pull
+                    maximumDismissPull = max(maximumDismissPull, pull)
+                }
+                .onScrollPhaseChange { _, newPhase in
+                    guard !isLandscape, newPhase == .idle else { return }
+                    if maximumDismissPull >= 54 {
                         onDismiss()
+                    } else {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            dismissTranslation = 0
+                        }
                     }
+                    maximumDismissPull = 0
                 }
-                withAnimation(.snappy(duration: 0.24)) {
-                    dismissTranslation = 0
+        } else {
+            chapterRows
+        }
+    }
+
+    private var chapterRows: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(chapters) { chapter in
+                    Button {
+                        onSeek(chapter.startTime)
+                    } label: {
+                        chapterRow(chapter)
+                    }
+                    .buttonStyle(.plain)
+                    .id(chapter.id)
                 }
             }
+            .padding(.vertical, 6)
+        }
+        .scrollIndicators(.visible)
     }
 
     private func chapterRow(_ chapter: VideoChapter) -> some View {
@@ -182,12 +179,5 @@ struct ChapterListPanel: View {
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
             : String(format: "%d:%02d", minutes, seconds)
-    }
-}
-
-private struct ChapterPanelHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
