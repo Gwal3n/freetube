@@ -9,7 +9,7 @@ struct CommentRow: View {
     @State private var isBodyExpanded = false
 
     private var isLongComment: Bool {
-        comment.bodyText.count > 240 || comment.bodyText.filter(\.isNewline).count >= 4
+        comment.bodyText.count > 240 || comment.bodyText.filter(\.isNewline).count >= 3
     }
 
     var body: some View {
@@ -20,7 +20,7 @@ struct CommentRow: View {
             }
             Text(comment.bodyText)
                 .font(.subheadline)
-                .lineLimit(isLongComment && !isBodyExpanded ? 4 : nil)
+                .lineLimit(isLongComment && !isBodyExpanded ? 3 : nil)
 
             if isLongComment {
                 Button(isBodyExpanded ? "Show less" : "Read more") {

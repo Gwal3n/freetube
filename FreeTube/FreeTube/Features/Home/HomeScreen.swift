@@ -43,25 +43,16 @@ struct HomeScreen: View {
             .navigationDestination(for: SearchChannelRoute.self) { route in
                 ChannelScreen(channelID: route.id)
             }
+            .navigationDestination(for: SearchResultsRoute.self) { route in
+                SearchResultsScreen(model: searchModel, query: route.query)
+            }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
-                // Interactive keyboard dismissal does not consistently clear `.searchable`'s
-                // presentation binding on iOS 26. Closing it here restores the large Search title
-                // and the native resting search-field placement without replacing system UI.
-                guard isSearchPresented else { return }
-                isSearchPresented = false
             }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in
                 if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
                     searchModel.clearResults()
-                }
-            }
-            .refreshable {
-                if searchModel.results != nil {
-                    await searchModel.submit()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
@@ -77,15 +68,21 @@ struct HomeScreen: View {
                 }
                 Task { @MainActor in
                     await Task.yield()
-                    focusSearch()
+                    await focusSearch()
                 }
             }
         }
     }
 
     /// Gives focus back to native `.searchable` without coupling presentation to query/results.
-    private func focusSearch() {
-        guard !isSearchPresented else { return }
+    private func focusSearch() async {
+        // Native searchable can remain logically presented after its keyboard resigns. Cycle only
+        // the presentation binding on an explicit tab re-tap so it reliably regains first responder
+        // without coupling ordinary keyboard dismissal to navigation-bar layout.
+        if isSearchPresented {
+            isSearchPresented = false
+            await Task.yield()
+        }
         isSearchPresented = true
     }
 
@@ -117,9 +114,17 @@ struct HomeScreen: View {
             return
         }
         await searchModel.submit()
+        guard searchModel.results != nil,
+              searchModel.submittedQuery == trimmed else { return }
+        isSearchPresented = false
+        path.append(SearchResultsRoute(query: trimmed))
     }
 }
 
 private struct SearchChannelRoute: Hashable {
     let id: String
+}
+
+private struct SearchResultsRoute: Hashable {
+    let query: String
 }

@@ -161,7 +161,7 @@ struct FullScreenPlayer: View {
                                     58,
                                     proxy.size.width * 9 / 16
                                         - timelineBottomPadding(in: proxy.size)
-                                        - 82
+                                        - 68
                                 )
                             )
                             .allowsHitTesting(false)
@@ -186,6 +186,12 @@ struct FullScreenPlayer: View {
                     showPlayerControls()
                 }
                 .onChange(of: player.loadState, initial: true) { _, state in
+                    if state == .readyToPlay, player.isPlaying {
+                        // The initial onAppear/current-video callbacks run while resolution is
+                        // still pending, when showPlayerControls cannot schedule its hide timer.
+                        // Readiness is the first reliable point at which playback can own it.
+                        showPlayerControls()
+                    }
                     guard state == .readyToPlay,
                           prefetchVideoDetails,
                           let video = player.currentVideo else { return }
@@ -355,7 +361,6 @@ struct FullScreenPlayer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 metadata(video)
-                playerActions(video)
                 detailsSection(video: video)
                 queuePanel
                 CommentsSection(videoID: video.id)
@@ -450,26 +455,30 @@ struct FullScreenPlayer: View {
             // popup's internal NavigationStack — banner, subscribe button, latest videos,
             // shorts, playlists. Pushing (rather than presenting) keeps the video surface and
             // transport controls visible at the top; only the panel area below is replaced.
-            if !video.channelID.isEmpty {
-                Button {
-                    @Bindable var p = player
-                    p.fullScreenPresented = false
-                    let channelID = video.channelID
-                    Task { @MainActor in
-                        // Let LNPopupUI begin its collapse before presenting a new full-screen
-                        // controller; presenting both in the same transaction is ignored by UIKit.
-                        try? await Task.sleep(for: .milliseconds(180))
-                        NotificationCenter.default.post(
-                            name: .freetubeOpenChannel,
-                            object: channelID
-                        )
+            HStack(spacing: 8) {
+                if !video.channelID.isEmpty {
+                    Button {
+                        @Bindable var p = player
+                        p.fullScreenPresented = false
+                        let channelID = video.channelID
+                        Task { @MainActor in
+                            // Let LNPopupUI begin its collapse before presenting a new full-screen
+                            // controller; presenting both in the same transaction is ignored by UIKit.
+                            try? await Task.sleep(for: .milliseconds(180))
+                            NotificationCenter.default.post(
+                                name: .freetubeOpenChannel,
+                                object: channelID
+                            )
+                        }
+                    } label: {
+                        channelRow(video)
                     }
-                } label: {
+                    .buttonStyle(.plain)
+                } else {
                     channelRow(video)
                 }
-                .buttonStyle(.plain)
-            } else {
-                channelRow(video)
+                Spacer(minLength: 4)
+                playerActions(video)
             }
         }
         .padding(.horizontal)
@@ -487,8 +496,9 @@ struct FullScreenPlayer: View {
                 .frame(width: 32, height: 32)
                 .clipShape(Circle())
 
-            Text(video.channelName).font(.subheadline)
-            Spacer()
+            Text(video.channelName)
+                .font(.subheadline)
+                .lineLimit(1)
         }
     }
 
@@ -641,7 +651,7 @@ struct FullScreenPlayer: View {
 
     @ViewBuilder
     private func playerActions(_ video: Video) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             Menu {
                 if let url = watchURL(video) {
                     ShareLink(item: url) {
@@ -691,10 +701,7 @@ struct FullScreenPlayer: View {
             .foregroundStyle(.primary)
             .disabled(isDownloadActive(for: video) || downloads.localFile(for: video.id) != nil)
             .accessibilityLabel(downloadAccessibilityLabel(for: video))
-
-            Spacer()
         }
-        .padding(.horizontal)
     }
 
     @ViewBuilder

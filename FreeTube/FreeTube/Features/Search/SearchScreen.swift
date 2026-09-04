@@ -8,7 +8,6 @@ import UIKit
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
-    @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
@@ -18,8 +17,6 @@ struct SearchContent: View {
         Group {
             if model.isEditingNewQuery {
                 suggestionContent
-            } else if let results = model.results {
-                resultsList(results)
             } else if model.isLoading {
                 LoadingView()
             } else if !history.isEmpty {
@@ -92,62 +89,6 @@ struct SearchContent: View {
                     Button("Clear all", role: .destructive) {
                         for entry in history { modelContext.delete(entry) }
                         try? modelContext.save()
-                    }
-                }
-            }
-        }
-        .listStyle(.plain)
-        .scrollDismissesKeyboard(.immediately)
-    }
-
-    @ViewBuilder
-    private func resultsList(_ results: SearchResult) -> some View {
-        List {
-            if !results.channels.isEmpty {
-                Section("Channels") {
-                    ForEach(results.channels) { channel in
-                        NavigationLink {
-                            ChannelScreen(channelID: channel.id)
-                        } label: {
-                            ChannelRow(channel: channel)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            if !results.playlists.isEmpty {
-                Section("Playlists") {
-                    ForEach(results.playlists) { playlist in
-                        NavigationLink {
-                            PlaylistScreen(playlistID: playlist.id)
-                        } label: {
-                            PlaylistRow(playlist: playlist, showsMoreMenu: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            if !results.videos.isEmpty {
-                Section("Videos") {
-                    let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
-                    ForEach(results.videos) { video in
-                        VideoRow(video: video, showsMoreMenu: true, offersPlayNext: true) {
-                            dismissKeyboard()
-                            player.load(video)
-                        }
-                        .onAppear {
-                            guard lookaheadIDs.contains(video.id),
-                                  results.continuationToken != nil,
-                                  !model.isLoading else { return }
-                            Task { await model.loadMore() }
-                        }
-                    }
-                    if model.isLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
                     }
                 }
             }

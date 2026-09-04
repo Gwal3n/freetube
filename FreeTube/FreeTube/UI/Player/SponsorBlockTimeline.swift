@@ -11,6 +11,8 @@ struct SponsorBlockTimeline: View {
 
     @State private var dragTime: TimeInterval?
     @State private var isPreviewingDrag = false
+    @State private var scrubChapterID: VideoChapter.ID?
+    @State private var chapterHapticTrigger = 0
 
     private var displayedTime: TimeInterval { dragTime ?? elapsed }
     private var currentChapter: VideoChapter? {
@@ -98,6 +100,7 @@ struct SponsorBlockTimeline: View {
                             guard duration > 0 else { return }
                             let target = min(max(value.location.x / width, 0), 1) * duration
                             dragTime = target
+                            updateChapterHaptic(at: target)
                             // A tap still seeks on release, but a storyboard should appear only
                             // once the user deliberately drags the timeline.
                             if isPreviewingDrag || abs(value.translation.width) >= 3 {
@@ -109,12 +112,14 @@ struct SponsorBlockTimeline: View {
                             guard duration > 0 else {
                                 dragTime = nil
                                 isPreviewingDrag = false
+                                scrubChapterID = nil
                                 onPreviewChanged(nil)
                                 return
                             }
                             let target = min(max(value.location.x / width, 0), 1) * duration
                             dragTime = nil
                             isPreviewingDrag = false
+                            scrubChapterID = nil
                             onPreviewChanged(nil)
                             onSeek(target)
                         }
@@ -122,6 +127,7 @@ struct SponsorBlockTimeline: View {
             }
             .frame(height: 24)
         }
+        .sensoryFeedback(.selection, trigger: chapterHapticTrigger)
         .accessibilityElement(children: chapters.isEmpty ? .ignore : .contain)
         .accessibilityLabel("Playback position")
         .accessibilityValue("\(format(displayedTime)) of \(format(duration))")
@@ -129,6 +135,15 @@ struct SponsorBlockTimeline: View {
             let delta: TimeInterval = direction == .increment ? 10 : -10
             onSeek(min(max(elapsed + delta, 0), duration))
         }
+    }
+
+    /// Emits one light selection tick when a drag crosses a chapter boundary. The first chapter
+    /// under the finger establishes the baseline silently so touching the scrubber does not buzz.
+    private func updateChapterHaptic(at time: TimeInterval) {
+        guard let chapterID = chapters.last(where: { $0.startTime <= time })?.id else { return }
+        defer { scrubChapterID = chapterID }
+        guard let previous = scrubChapterID, previous != chapterID else { return }
+        chapterHapticTrigger &+= 1
     }
 
     private func fraction(for time: TimeInterval) -> CGFloat {
