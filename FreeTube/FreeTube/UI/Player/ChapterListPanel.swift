@@ -146,18 +146,22 @@ struct ChapterListPanel: View {
                     && abs(value.translation.height) > abs(value.translation.width)
                 guard downward else { return }
                 dismissTranslation = max(0, value.translation.height)
-                maximumDismissPull = max(maximumDismissPull, dismissTranslation)
             }
-            .onEnded { _ in
+            .onEnded { value in
                 guard !isLandscape else { return }
-                if maximumDismissPull >= Self.dismissalThreshold {
+                let finalPosition = max(0, value.translation.height)
+                let projectedPosition = max(0, value.predictedEndTranslation.height)
+                // Both positions must remain beyond the threshold. An upward reversal projects
+                // back above it and therefore cancels, even if the sheet was previously pulled
+                // much farther down.
+                if finalPosition >= Self.dismissalThreshold,
+                   projectedPosition >= Self.dismissalThreshold {
                     onDismiss()
                 } else {
                     withAnimation(.snappy(duration: 0.22)) {
                         dismissTranslation = 0
                     }
                 }
-                maximumDismissPull = 0
             }
     }
 
