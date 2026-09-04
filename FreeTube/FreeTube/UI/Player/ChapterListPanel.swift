@@ -59,19 +59,6 @@ struct ChapterListPanel: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        Color.clear
-                            .frame(height: 1)
-                            .background {
-                                GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: ChapterListScrollOffsetKey.self,
-                                        value: max(
-                                            0,
-                                            -proxy.frame(in: .named("chapterListScroll")).minY
-                                        )
-                                    )
-                                }
-                            }
                         ForEach(chapters) { chapter in
                             Button {
                                 onSeek(chapter.startTime)
@@ -83,8 +70,22 @@ struct ChapterListPanel: View {
                         }
                     }
                     .padding(.vertical, 6)
+                    // Observe the complete content rather than a sentinel row inside the lazy
+                    // stack. SwiftUI unloads an off-screen lazy sentinel and its preference then
+                    // falls back to zero, which made a list at the bottom look as if it were at
+                    // the top and incorrectly enabled sheet dismissal.
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: ChapterListScrollOffsetKey.self,
+                                value: max(
+                                    0,
+                                    -proxy.frame(in: .named("chapterListScroll")).minY
+                                )
+                            )
+                        }
+                    }
                 }
-                .scrollDisabled(isTrackingDismiss)
                 .coordinateSpace(name: "chapterListScroll")
                 .onPreferenceChange(ChapterListScrollOffsetKey.self) {
                     listScrollOffset = $0
@@ -147,19 +148,18 @@ struct ChapterListPanel: View {
                 if !isTrackingDismiss {
                     // Let the native ScrollView rubber-band for a short distance first. Only a
                     // deliberate second stage transfers ownership to the complete sheet.
-                    let elasticBand: CGFloat = 34
+                    let elasticBand: CGFloat = 18
                     guard value.translation.height > elasticBand else { return }
                     dismissDragOrigin = elasticBand
                     isTrackingDismiss = true
                 }
-                dismissTranslation = resistedDistance(
-                    max(0, value.translation.height - dismissDragOrigin)
-                )
+                dismissTranslation = max(0, value.translation.height - dismissDragOrigin)
             }
             .onEnded { value in
                 if !isLandscape, isTrackingDismiss {
-                    let projected = resistedDistance(
-                        max(0, value.predictedEndTranslation.height - dismissDragOrigin)
+                    let projected = max(
+                        0,
+                        value.predictedEndTranslation.height - dismissDragOrigin
                     )
                     let threshold = max(110, panelHeight * 0.25)
                     if dismissTranslation > threshold || projected > threshold {
@@ -174,12 +174,6 @@ struct ChapterListPanel: View {
                 isDismissGestureActive = false
                 dismissGestureStartedAtTop = false
             }
-    }
-
-    /// Once the native ScrollView has supplied the initial elastic band, the sheet itself follows
-    /// the remaining movement with mild resistance.
-    private func resistedDistance(_ distance: CGFloat) -> CGFloat {
-        distance * 0.82
     }
 
     private func chapterRow(_ chapter: VideoChapter) -> some View {
