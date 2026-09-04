@@ -110,12 +110,14 @@ struct FullScreenPlayer: View {
                         chapters: player.chapters,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
-                        additionalTopControls: HStack(spacing: 0) {
-                            ForEach(visiblePlayerTopControls) { control in
-                                playerTopControl(control)
+                        additionalTopControls: AnyView(
+                            HStack(spacing: 0) {
+                                ForEach(visiblePlayerTopControls) { control in
+                                    playerTopControl(control)
+                                }
                             }
-                        }
-                        .buttonStyle(.plain),
+                            .buttonStyle(.plain)
+                        ),
                         bottomTimelinePadding: timelineBottomPadding(in: proxy.size),
                         onTogglePlayPause: {
                             player.togglePlayPause()
@@ -141,16 +143,6 @@ struct FullScreenPlayer: View {
                             p.fullScreenPresented = false
                         }
                     )
-                    if let caption = player.currentCaptionText,
-                       gestureSeekPreview == nil,
-                       scrubberSeekPreview == nil {
-                        CaptionOverlay(
-                            text: caption,
-                            bottomPadding: playerControlsVisible
-                                ? timelineBottomPadding(in: proxy.size) + 54
-                                : 14
-                        )
-                    }
                     if let previewTime = scrubberSeekPreview,
                        let tile = player.storyboard?.tile(
                            at: previewTime,
@@ -158,7 +150,7 @@ struct FullScreenPlayer: View {
                            maximumWidth: 320,
                            maximumHeight: 180
                        ) {
-                        StoryboardPreview(tile: tile)
+                        StoryboardPreview(tile: tile, time: previewTime)
                             .position(
                                 x: storyboardPreviewX(
                                     for: previewTime,
@@ -169,7 +161,7 @@ struct FullScreenPlayer: View {
                                     58,
                                     proxy.size.width * 9 / 16
                                         - timelineBottomPadding(in: proxy.size)
-                                        - 78
+                                        - 108
                                 )
                             )
                             .allowsHitTesting(false)
@@ -650,19 +642,43 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func playerActions(_ video: Video) -> some View {
         HStack(spacing: 12) {
-            PlayerShareMenu(
-                watchURL: watchURL(video),
-                downloadedFileURL: downloads.localFile(for: video.id),
-                onCopyAtCurrentTime: {
+            Menu {
+                if let url = watchURL(video) {
+                    ShareLink(item: url) {
+                        Label("Share…", systemImage: "square.and.arrow.up")
+                    }
+                    Link(destination: url) {
+                        Label("Open in browser", systemImage: "safari")
+                    }
+                    Button {
+                        UIPasteboard.general.string = url.absoluteString
+                    } label: {
+                        Label("Copy URL", systemImage: "link")
+                    }
+                }
+                Button {
                     if let url = watchURLAtCurrentTime(video) {
                         UIPasteboard.general.string = url.absoluteString
                     }
-                },
-                onShareDownloadedFile: { url in
-                    shareFileURL = url
+                } label: {
+                    Label("Copy URL at current time", systemImage: "clock")
                 }
-            )
-            .equatable()
+                if let localFile = downloads.localFile(for: video.id) {
+                    Button {
+                        shareFileURL = localFile
+                    } label: {
+                        Label("Share downloaded file…", systemImage: "doc")
+                    }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .accessibilityLabel("Share")
 
             Button {
                 startDownload(video)
@@ -761,35 +777,42 @@ struct FullScreenPlayer: View {
     private func playerTopControl(_ control: PlayerTopControl) -> some View {
         switch control {
         case .speed:
-            SpeedPlayerMenu(selectedRate: player.playbackRate) { rate in
-                player.setPlaybackRate(rate)
-                showPlayerControls()
-            }
-            .equatable()
+            speedPlayerMenu
         case .loop:
             loopPlayerButton
         case .mute:
             mutePlayerButton
         case .fullscreen:
             fullscreenButton
-        case .captions:
-            CaptionPlayerMenu(
-                tracks: player.captionTracks,
-                selectedTrackID: player.selectedCaptionTrackID,
-                isLoading: player.isLoadingCaptions,
-                onSelect: { track in
-                    player.selectCaptionTrack(track)
-                },
-                onPresentationChanged: { presented in
-                    if presented {
-                        controlsHideTask?.cancel()
-                        controlsHideTask = nil
+        }
+    }
+
+    @ViewBuilder
+    private var speedPlayerMenu: some View {
+        Menu {
+            ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
+                Button {
+                    player.setPlaybackRate(rate)
+                    showPlayerControls()
+                } label: {
+                    if abs(player.playbackRate - rate) < 0.01 {
+                        Label(rateLabel(rate), systemImage: "checkmark")
                     } else {
-                        showPlayerControls()
+                        Text(rateLabel(rate))
                     }
                 }
-            )
+            }
+        } label: {
+            Text(rateLabel(player.playbackRate))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(minWidth: 42, minHeight: 36)
+                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
         }
+    }
+
+    private func rateLabel(_ rate: Double) -> String {
+        rate == 1 ? "1×" : "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
 
     @ViewBuilder

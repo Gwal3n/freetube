@@ -56,15 +56,6 @@ final class PlayerStateManager {
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     private(set) var chapters: [VideoChapter] = []
     private(set) var storyboard: VideoStoryboard?
-    private(set) var captionTracks: [VideoCaptionTrack] = []
-    private(set) var selectedCaptionTrackID: String?
-    private(set) var captionCues: [CaptionCue] = []
-    private(set) var isLoadingCaptions = false
-    var currentCaptionText: String? {
-        guard selectedCaptionTrackID != nil else { return nil }
-        let lines = captionCues.filter { $0.contains(elapsed) }.map(\.text)
-        return lines.isEmpty ? nil : lines.joined(separator: "\n")
-    }
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
     /// the user explicitly reopens the expanded player.
     private(set) var pipDismissalRequest = 0
@@ -84,7 +75,6 @@ final class PlayerStateManager {
     let queue: QueueManager
     private let resolver: any PlaybackResolving
     private let sponsorBlockService: any SponsorBlockServicing
-    private let captionService: any CaptionServicing
     private let preferences: UserPreferences
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
@@ -137,8 +127,6 @@ final class PlayerStateManager {
     private var sponsorBlockBoundaryObservers: [Any] = []
     private var handledSponsorBlockSegmentIDs = Set<String>()
     private var sponsorBlockNoticeTask: Task<Void, Never>?
-    private var captionTask: Task<Void, Never>?
-    private var captionCueCache: [String: [CaptionCue]] = [:]
     private var pendingSeekTarget: TimeInterval?
     private var seekRequestID = 0
     private var lastProgressSaveAt = Date.distantPast
@@ -148,13 +136,11 @@ final class PlayerStateManager {
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
         sponsorBlockService: any SponsorBlockServicing = SponsorBlockService(),
-        captionService: any CaptionServicing = CaptionService(),
         preferences: UserPreferences = UserPreferences()
     ) {
         self.queue = queue
         self.resolver = resolver
         self.sponsorBlockService = sponsorBlockService
-        self.captionService = captionService
         self.preferences = preferences
         self.playbackRate = preferences.playbackRate
         self.playbackQuality = preferences.preferredQuality
@@ -202,7 +188,6 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
-        clearCaptionState()
     }
 
     // MARK: - Public commands
@@ -234,7 +219,6 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
-        clearCaptionState()
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
 
@@ -300,7 +284,6 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
-        clearCaptionState()
         if recordInPlaybackHistory {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
         }
@@ -378,9 +361,6 @@ final class PlayerStateManager {
         }
         if let resolvedStoryboard = info.storyboard {
             storyboard = resolvedStoryboard
-        }
-        if !info.captionTracks.isEmpty {
-            captionTracks = info.captionTracks
         }
     }
 
@@ -464,43 +444,6 @@ final class PlayerStateManager {
         isMuted.toggle()
         player.isMuted = isMuted
         log.info("Player muted=\(self.isMuted, privacy: .public)")
-    }
-
-    /// Selects an external YouTube timed-text track without replacing or reloading the AVPlayer item.
-    func selectCaptionTrack(_ track: VideoCaptionTrack?) {
-        captionTask?.cancel()
-        captionCues = []
-        isLoadingCaptions = false
-        guard let track, let videoID = currentVideo?.id else {
-            selectedCaptionTrackID = nil
-            return
-        }
-
-        selectedCaptionTrackID = track.id
-        if let cachedCues = captionCueCache[track.id] {
-            captionCues = cachedCues
-            return
-        }
-        isLoadingCaptions = true
-        let service = captionService
-        captionTask = Task { [weak self] in
-            do {
-                let cues = try await service.fetchCues(for: track)
-                guard !Task.isCancelled,
-                      self?.currentVideo?.id == videoID,
-                      self?.selectedCaptionTrackID == track.id else { return }
-                self?.captionCueCache[track.id] = cues
-                self?.captionCues = cues
-                self?.isLoadingCaptions = false
-            } catch is CancellationError {
-                return
-            } catch {
-                guard self?.currentVideo?.id == videoID,
-                      self?.selectedCaptionTrackID == track.id else { return }
-                self?.isLoadingCaptions = false
-                self?.log.notice("Caption load failed for language \(track.languageCode, privacy: .public): \(String(describing: error), privacy: .public)")
-            }
-        }
     }
 
     var isLoopingCurrentVideo: Bool {
@@ -646,7 +589,6 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
-        clearCaptionState()
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -826,16 +768,6 @@ final class PlayerStateManager {
         sponsorBlockSegments = []
         handledSponsorBlockSegmentIDs.removeAll()
         removeSponsorBlockBoundaryObservers()
-    }
-
-    private func clearCaptionState() {
-        captionTask?.cancel()
-        captionTask = nil
-        captionTracks = []
-        selectedCaptionTrackID = nil
-        captionCues = []
-        captionCueCache = [:]
-        isLoadingCaptions = false
     }
 
     private func removeSponsorBlockBoundaryObservers() {

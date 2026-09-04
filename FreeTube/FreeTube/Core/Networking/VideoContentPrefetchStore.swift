@@ -69,21 +69,7 @@ final class VideoContentPrefetchStore {
         if let task = playbackInfoTasks[videoID] { return try await task.value }
 
         let service = videoService
-        let task = Task {
-            do {
-                return try await service.fetchInfo(id: videoID)
-            } catch {
-                // This post-playback metadata request occasionally receives a transient
-                // `Video unavailable` even while the independent native stream is playing.
-                // Retry once, then try the alternate client; neither path delays playback.
-                try await Task.sleep(for: .milliseconds(650))
-                do {
-                    return try await service.fetchInfo(id: videoID)
-                } catch {
-                    return try await service.fetchInfoViaTVHTML5(id: videoID)
-                }
-            }
-        }
+        let task = Task { try await service.fetchInfo(id: videoID) }
         playbackInfoTasks[videoID] = task
         do {
             let info = try await task.value
