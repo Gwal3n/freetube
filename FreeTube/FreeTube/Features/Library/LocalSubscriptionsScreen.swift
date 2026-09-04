@@ -10,8 +10,6 @@ struct LocalSubscriptionsScreen: View {
     @State private var importError: String?
     @State private var refreshError: String?
     @State private var isRefreshing = false
-    @State private var refreshedCount = 0
-    @State private var refreshTotal = 0
     private let channelService: any ChannelServicing = ChannelService()
 
     var body: some View {
@@ -34,27 +32,14 @@ struct LocalSubscriptionsScreen: View {
                     .onDelete(perform: store.remove)
                 }
                 .listStyle(.plain)
+                .refreshable {
+                    await refreshProfilePhotos()
+                }
             }
         }
         .navigationTitle("Local subscriptions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if isRefreshing {
-                    ProgressView(value: Double(refreshedCount), total: Double(max(1, refreshTotal)))
-                        .progressViewStyle(.circular)
-                        .accessibilityLabel("Refreshing profile photos")
-                        .accessibilityValue("\(refreshedCount) of \(refreshTotal)")
-                } else {
-                    Button {
-                        Task { await refreshProfilePhotos() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(store.subscriptions.isEmpty)
-                    .accessibilityLabel("Refresh profile photos")
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
@@ -136,8 +121,6 @@ struct LocalSubscriptionsScreen: View {
         guard !channelIDs.isEmpty else { return }
 
         isRefreshing = true
-        refreshedCount = 0
-        refreshTotal = channelIDs.count
         var failureCount = 0
         defer { isRefreshing = false }
 
@@ -159,7 +142,6 @@ struct LocalSubscriptionsScreen: View {
 
             for channel in results { store.add(channel) }
             failureCount += batch.count - results.count
-            refreshedCount += batch.count
         }
 
         if failureCount > 0 {
