@@ -14,7 +14,9 @@ struct ChapterListPanel: View {
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
     @State private var dismissTranslation: CGFloat = 0
-    @State private var maximumDismissPull: CGFloat = 0
+    @State private var listScrollOffset: CGFloat = 0
+    @State private var listDismissOrigin: CGFloat = 0
+    @State private var isDraggingListSheet = false
 
     private var currentChapterID: VideoChapter.ID? {
         chapters.last { $0.startTime <= elapsed }?.id
@@ -87,27 +89,12 @@ struct ChapterListPanel: View {
     private var chapterScrollView: some View {
         if #available(iOS 18.0, *) {
             chapterRows
-                // Read the native ScrollView's rubber-band directly. There is no competing drag
-                // recognizer, so a pull can only begin after the list itself reaches its top.
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                    geometry.contentOffset.y + geometry.contentInsets.top
+                    max(0, geometry.contentOffset.y + geometry.contentInsets.top)
                 } action: { _, offset in
-                    guard !isLandscape else { return }
-                    let pull = max(0, -offset)
-                    dismissTranslation = pull
-                    maximumDismissPull = max(maximumDismissPull, pull)
+                    listScrollOffset = offset
                 }
-                .onScrollPhaseChange { _, newPhase in
-                    guard !isLandscape, newPhase == .idle else { return }
-                    if maximumDismissPull >= Self.dismissalThreshold {
-                        onDismiss()
-                    } else {
-                        withAnimation(.snappy(duration: 0.22)) {
-                            dismissTranslation = 0
-                        }
-                    }
-                    maximumDismissPull = 0
-                }
+                .simultaneousGesture(listHandoffDismissGesture)
         } else {
             chapterRows
         }
@@ -129,9 +116,46 @@ struct ChapterListPanel: View {
             .padding(.vertical, 6)
         }
         .scrollIndicators(.visible)
-        // A short chapter list does not exceed the viewport, and SwiftUI otherwise suppresses
-        // its rubber-band entirely. Pull-to-dismiss still needs a negative top offset in that case.
-        .scrollBounceBehavior(.always, axes: .vertical)
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+    }
+
+    /// The list owns the gesture while it has content above it. As soon as it reaches the top,
+    /// continued downward travel is measured from that exact handoff point and moves the sheet.
+    private var listHandoffDismissGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .onChanged { value in
+                guard !isLandscape else { return }
+                let downward = value.translation.height > 0
+                    && abs(value.translation.height) > abs(value.translation.width)
+                guard downward else { return }
+
+                if !isDraggingListSheet {
+                    guard listScrollOffset <= 1 else { return }
+                    listDismissOrigin = value.translation.height
+                    isDraggingListSheet = true
+                }
+                dismissTranslation = max(0, value.translation.height - listDismissOrigin)
+            }
+            .onEnded { value in
+                guard !isLandscape else { return }
+                if isDraggingListSheet {
+                    let finalPosition = max(0, value.translation.height - listDismissOrigin)
+                    let projectedPosition = max(
+                        0,
+                        value.predictedEndTranslation.height - listDismissOrigin
+                    )
+                    if finalPosition >= Self.dismissalThreshold,
+                       projectedPosition >= Self.dismissalThreshold {
+                        onDismiss()
+                    } else {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            dismissTranslation = 0
+                        }
+                    }
+                }
+                listDismissOrigin = 0
+                isDraggingListSheet = false
+            }
     }
 
     /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
