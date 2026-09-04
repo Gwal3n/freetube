@@ -270,8 +270,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   carries it with the successful playback candidate. The storyboard and signed stream URL share
   the existing 30-minute in-memory cache; no redundant b5i player request is made. b5i fallback
   candidates can still supply `VideoInfosResponse.storyboard`. Only a direct drag on the timeline shows the
-  cropped sprite tile, positioned above and following the scrubber while remaining clamped inside
-  the video edges. Horizontal swipe seeking still previews its target on the timeline without a tile.
+  cropped sprite tile, positioned close above and following the scrubber while remaining clamped inside
+  the video edges. The compact tile has no duplicate timestamp or dark card—only a thin white border.
+  Horizontal swipe seeking still previews its target on the timeline without a tile.
   The stats row is always visible directly beneath the title, outside the expandable description.
   It shows views plus an explicitly labelled upload date/relative upload value, never the video
   duration (duration already belongs in the player timeline). Prefer the exact display strings from

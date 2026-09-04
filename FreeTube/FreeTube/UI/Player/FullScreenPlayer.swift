@@ -150,7 +150,7 @@ struct FullScreenPlayer: View {
                            maximumWidth: 320,
                            maximumHeight: 180
                        ) {
-                        StoryboardPreview(tile: tile, time: previewTime)
+                        StoryboardPreview(tile: tile)
                             .position(
                                 x: storyboardPreviewX(
                                     for: previewTime,
@@ -161,7 +161,7 @@ struct FullScreenPlayer: View {
                                     58,
                                     proxy.size.width * 9 / 16
                                         - timelineBottomPadding(in: proxy.size)
-                                        - 108
+                                        - 82
                                 )
                             )
                             .allowsHitTesting(false)
@@ -305,7 +305,7 @@ struct FullScreenPlayer: View {
         return max(22, aspectHeight - availableSize.height + 16)
     }
 
-    /// Tracks the timeline thumb while keeping the 142pt-wide preview (132pt image + padding)
+    /// Tracks the timeline thumb while keeping the 116pt-wide preview plus edge clearance
     /// wholly inside the player surface at both ends of the video.
     private func storyboardPreviewX(
         for time: TimeInterval,
@@ -317,7 +317,7 @@ struct FullScreenPlayer: View {
         }
         let fraction = min(max(time / duration, 0), 1)
         let trackX = 12 + (surfaceWidth - 24) * CGFloat(fraction)
-        let minimumCenterX: CGFloat = 79
+        let minimumCenterX: CGFloat = 66
         guard surfaceWidth >= minimumCenterX * 2 else { return surfaceWidth / 2 }
         return min(max(trackX, minimumCenterX), surfaceWidth - minimumCenterX)
     }
