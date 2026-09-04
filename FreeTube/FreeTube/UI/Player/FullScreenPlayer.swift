@@ -60,21 +60,23 @@ struct FullScreenPlayer: View {
         // comments, queue. Removing per-section backgrounds and using one full-screen material lets
         // the popup read as one continuous translucent surface instead of three stacked tones.
         //
-        // **Why the outer `GeometryReader`:** we want the video to always be full-width
-        // regardless of how wide vs tall the popup is. `.aspectRatio(16/9, .fit)` clamps the
-        // video to whichever dimension is tighter — on iPhone portrait that's always width
-        // (the screen is much taller than 16:9), but on Mac (Designed-for-iPad) and iPad
-        // landscape the window is wider than 16:9 so `.fit` height-clamps and the video sits
-        // letterboxed inside black side bars. Reading the available width via
-        // `GeometryReader` and sizing the ZStack to `proxy.size.width × width*9/16`
-        // explicitly removes the clamp — full-width on every idiom.
+        // The outer GeometryReader provides a stable viewport for both the display-correct
+        // expanded ratio and the compact 16:9 ratio. Their difference becomes the first part of
+        // the lower panel's scroll range, allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
             let chapterPanelWidth: CGFloat = isLandscape && player.chapterListPresented
                 ? min(360, proxy.size.width * 0.38)
                 : 0
             let surfaceWidth = proxy.size.width - chapterPanelWidth
-            let surfaceHeight = playerSurfaceHeight(width: surfaceWidth, viewportHeight: proxy.size.height)
+            let compactSurfaceHeight = surfaceWidth * 9 / 16
+            let expandedSurfaceHeight = expandedPlayerSurfaceHeight(
+                width: surfaceWidth,
+                viewportHeight: proxy.size.height
+            )
+            let collapseRange = max(0, expandedSurfaceHeight - compactSurfaceHeight)
+            let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
+            let surfaceHeight = expandedSurfaceHeight - consumedCollapse
 
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
@@ -263,7 +265,14 @@ struct FullScreenPlayer: View {
                     if let channel = pushedChannel {
                         channelStack(channel)
                     } else {
-                        panel(video)
+                        panel(
+                            video,
+                            collapseRange: collapseRange,
+                            minimumContentHeight: max(
+                                0,
+                                proxy.size.height - compactSurfaceHeight + collapseRange
+                            )
+                        )
                     }
                 }
                 // Reset description state, (best-effort) prefetch the snippet, AND pop any
@@ -358,18 +367,14 @@ struct FullScreenPlayer: View {
     /// Uses AVPlayer's display-correct dimensions for portrait/tall media. Tall videos start at
     /// their natural ratio (bounded so some feed remains reachable), then smoothly compress toward
     /// the familiar 16:9 player as the lower panel scrolls, matching YouTube's expanding header.
-    private func playerSurfaceHeight(width: CGFloat, viewportHeight: CGFloat) -> CGFloat {
+    private func expandedPlayerSurfaceHeight(width: CGFloat, viewportHeight: CGFloat) -> CGFloat {
         guard width > 0 else { return 0 }
         let compactHeight = width * 9 / 16
         let size = player.videoPresentationSize
         guard verticalSizeClass != .compact,
               size.width > 0, size.height > 0 else { return compactHeight }
         let naturalHeight = width * size.height / size.width
-        let expandedHeight = min(max(naturalHeight, compactHeight), viewportHeight * 0.72)
-        let collapsible = expandedHeight - compactHeight
-        guard collapsible > 0 else { return compactHeight }
-        let progress = min(max(panelScrollOffset / 160, 0), 1)
-        return expandedHeight - collapsible * progress
+        return min(max(naturalHeight, compactHeight), viewportHeight * 0.72)
     }
 
     /// Tracks the timeline thumb while keeping the 116pt-wide preview plus edge clearance
@@ -418,16 +423,28 @@ struct FullScreenPlayer: View {
     /// Default panel mode. No NavigationStack wrapping — the outer popup's `.thinMaterial`
     /// shows through directly behind metadata, Up Next, and Comments.
     @ViewBuilder
-    private func panel(_ video: Video) -> some View {
+    private func panel(
+        _ video: Video,
+        collapseRange: CGFloat,
+        minimumContentHeight: CGFloat
+    ) -> some View {
         if #available(iOS 18.0, *) {
-            panelScrollView(video)
+            panelScrollView(
+                video,
+                collapseRange: collapseRange,
+                minimumContentHeight: minimumContentHeight
+            )
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
                     max(0, geometry.contentOffset.y + geometry.contentInsets.top)
                 } action: { _, offset in
                     panelScrollOffset = offset
                 }
         } else {
-            panelScrollView(video)
+            panelScrollView(
+                video,
+                collapseRange: collapseRange,
+                minimumContentHeight: minimumContentHeight
+            )
                 .coordinateSpace(name: "playerPanelScroll")
                 .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
                     panelScrollOffset = offset
@@ -435,7 +452,11 @@ struct FullScreenPlayer: View {
         }
     }
 
-    private func panelScrollView(_ video: Video) -> some View {
+    private func panelScrollView(
+        _ video: Video,
+        collapseRange: CGFloat,
+        minimumContentHeight: CGFloat
+    ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Color.clear
@@ -452,6 +473,13 @@ struct FullScreenPlayer: View {
                     .id(video.id)
             }
             .padding(.vertical)
+            // While the header is collapsing, counteract the ScrollView's own content movement.
+            // The feed therefore remains attached to the moving player edge. Once 16:9 is
+            // reached the compensation stops and ordinary scrolling continues beneath it.
+            .offset(y: min(max(panelScrollOffset, 0), collapseRange))
+            // Preserve enough scroll extent to consume the complete header collapse even when
+            // comments and Up Next are both collapsed and the natural feed is very short.
+            .frame(minHeight: minimumContentHeight, alignment: .top)
         }
         .scrollContentBackground(.hidden)
     }
