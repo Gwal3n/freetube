@@ -15,6 +15,8 @@ struct ChapterListPanel: View {
     @State private var dismissTranslation: CGFloat = 0
     @State private var dismissDragOrigin: CGFloat = 0
     @State private var isTrackingDismiss = false
+    @State private var isDismissGestureActive = false
+    @State private var dismissGestureStartedAtTop = false
     @State private var panelHeight: CGFloat = 0
 
     private var currentChapterID: VideoChapter.ID? {
@@ -127,17 +129,27 @@ struct ChapterListPanel: View {
     /// A downward pull dismisses only while the chapter list is resting at its top. Upward drags
     /// and drags within scrolled content remain ordinary list scrolling.
     private var chapterDismissGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
+        // Zero distance lets us snapshot top eligibility at actual touch-down, before the native
+        // ScrollView has moved several points and potentially reached its top.
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
                 guard !isLandscape else { return }
+                if !isDismissGestureActive {
+                    isDismissGestureActive = true
+                    // Eligibility is fixed at touch-down. A gesture that began farther down the
+                    // list may scroll back to the top, but must end before a new pull can dismiss.
+                    dismissGestureStartedAtTop = listScrollOffset <= 1
+                }
+                guard dismissGestureStartedAtTop else { return }
                 let downward = value.translation.height > 0
                     && abs(value.translation.height) > abs(value.translation.width)
                 guard downward else { return }
                 if !isTrackingDismiss {
-                    guard listScrollOffset <= 1 else { return }
-                    // If this drag began by scrolling a long list back to its top, begin sheet
-                    // motion from zero here instead of jumping by the drag's full translation.
-                    dismissDragOrigin = value.translation.height
+                    // Let the native ScrollView rubber-band for a short distance first. Only a
+                    // deliberate second stage transfers ownership to the complete sheet.
+                    let elasticBand: CGFloat = 34
+                    guard value.translation.height > elasticBand else { return }
+                    dismissDragOrigin = elasticBand
                     isTrackingDismiss = true
                 }
                 dismissTranslation = resistedDistance(
@@ -145,28 +157,29 @@ struct ChapterListPanel: View {
                 )
             }
             .onEnded { value in
-                guard !isLandscape, isTrackingDismiss else { return }
-                let projected = resistedDistance(
-                    max(0, value.predictedEndTranslation.height - dismissDragOrigin)
-                )
-                let threshold = max(110, panelHeight * 0.25)
-                if dismissTranslation > threshold || projected > threshold {
-                    onDismiss()
+                if !isLandscape, isTrackingDismiss {
+                    let projected = resistedDistance(
+                        max(0, value.predictedEndTranslation.height - dismissDragOrigin)
+                    )
+                    let threshold = max(110, panelHeight * 0.25)
+                    if dismissTranslation > threshold || projected > threshold {
+                        onDismiss()
+                    }
                 }
                 withAnimation(.snappy(duration: 0.24)) {
                     dismissTranslation = 0
                 }
                 dismissDragOrigin = 0
                 isTrackingDismiss = false
+                isDismissGestureActive = false
+                dismissGestureStartedAtTop = false
             }
     }
 
-    /// A short, heavily resisted opening gives the list native-sheet elasticity before it begins
-    /// following the finger more directly.
+    /// Once the native ScrollView has supplied the initial elastic band, the sheet itself follows
+    /// the remaining movement with mild resistance.
     private func resistedDistance(_ distance: CGFloat) -> CGFloat {
-        let resistanceRange: CGFloat = 30
-        if distance <= resistanceRange { return distance * 0.25 }
-        return resistanceRange * 0.25 + (distance - resistanceRange) * 0.84
+        distance * 0.82
     }
 
     private func chapterRow(_ chapter: VideoChapter) -> some View {

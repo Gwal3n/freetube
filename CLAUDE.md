@@ -267,8 +267,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   The timeline punches transparent separators at chapter boundaries and shows the active chapter beside
   elapsed time. That label opens a thumbnail chapter browser over the lower feed in portrait and
   in a trailing split column in landscape, leaving the video interactive; rows seek directly. A
-  downward pull transfers from list scrolling to a resisted sheet drag when its own list reaches
-  the top, then settles using panel-relative distance and projected velocity without haptics. The
+  only a fresh downward gesture that begins with the list already at the top may dismiss it—a
+  gesture that merely scrolls back to the top must end first. Preserve roughly 34 points of native
+  ScrollView rubber-banding before transferring into a mildly resisted sheet drag, then settle
+  using panel-relative distance and projected velocity without haptics. The
   complete sheet background must move with that drag so it reveals the live feed underneath;
   use solid black for OLED mode and material otherwise. Portrait shows a
   native-style drag indicator; landscape has no swipe dismissal and retains only its close button.
