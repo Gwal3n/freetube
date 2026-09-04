@@ -41,7 +41,6 @@ struct FullScreenPlayer: View {
     @State private var playerControlsVisible = true
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
-    @State private var isChapterListPresented = false
     @State private var panelScrollOffset: CGFloat = 0
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
@@ -71,7 +70,7 @@ struct FullScreenPlayer: View {
         // explicitly removes the clamp — full-width on every idiom.
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
-            let chapterPanelWidth: CGFloat = isLandscape && isChapterListPresented
+            let chapterPanelWidth: CGFloat = isLandscape && player.chapterListPresented
                 ? min(360, proxy.size.width * 0.38)
                 : 0
             let surfaceWidth = proxy.size.width - chapterPanelWidth
@@ -145,7 +144,7 @@ struct FullScreenPlayer: View {
                         onShowChapters: {
                             guard !player.chapters.isEmpty else { return }
                             withAnimation(.snappy(duration: 0.28)) {
-                                isChapterListPresented.toggle()
+                                player.chapterListPresented.toggle()
                             }
                             showPlayerControls()
                         },
@@ -159,6 +158,7 @@ struct FullScreenPlayer: View {
                         },
                         onCollapse: {
                             @Bindable var p = player
+                            p.chapterListPresented = false
                             p.fullScreenPresented = false
                         }
                     )
@@ -206,7 +206,7 @@ struct FullScreenPlayer: View {
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
-                    isChapterListPresented = false
+                    player.chapterListPresented = false
                     panelScrollOffset = 0
                     showPlayerControls()
                 }
@@ -281,7 +281,7 @@ struct FullScreenPlayer: View {
             }
             .frame(width: proxy.size.width, alignment: .leading)
 
-            if isChapterListPresented, !player.chapters.isEmpty {
+            if player.chapterListPresented, !player.chapters.isEmpty {
                 ChapterListPanel(
                     chapters: player.chapters,
                     elapsed: player.elapsed,
@@ -292,7 +292,7 @@ struct FullScreenPlayer: View {
                     },
                     onDismiss: {
                         withAnimation(.snappy(duration: 0.28)) {
-                            isChapterListPresented = false
+                            player.chapterListPresented = false
                         }
                     }
                 )
@@ -333,9 +333,8 @@ struct FullScreenPlayer: View {
             }
         }
         .errorToast($downloadError)
-        // RootView disables LNPopupUI's global content pan so scrolling this lower feed—or a
-        // chapter list—cannot accidentally collapse the whole player. Only the explicit gesture
-        // attached to the video surface above may collapse it.
+        // RootView disables LNPopupUI's global content pan only while the chapter list is visible;
+        // otherwise the lower feed retains the library's normal interactive collapse gesture.
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
         // claims the natural content height (video + panel intrinsic

@@ -64,6 +64,9 @@ final class PlayerStateManager {
     private(set) var pipDismissalRequest = 0
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
+    /// Shared with RootView so LNPopupUI's global drag can be paused only while the chapter panel
+    /// owns vertical gestures.
+    var chapterListPresented: Bool = false
 
     // MARK: - AVPlayer
 
@@ -630,6 +633,7 @@ final class PlayerStateManager {
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
+        chapterListPresented = false
         currentVideo = nil
         loadState = .idle
         hasEnded = false

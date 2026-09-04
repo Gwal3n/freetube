@@ -56,11 +56,12 @@ struct RootView: View {
             // body re-renders and `.popupProgress(...)` re-applies with the new value.
             PopupContentWrapper(thumbnail: thumbnail)
         }
-        // Lower-feed scrolling and overlays own their vertical gestures. A global LNPopup pan
-        // races those gestures and can collapse the whole player while dismissing Chapters.
-        // The video surface retains its explicit pull-down gesture; the mini-player still opens
-        // by tapping it.
-        .popupInteractionStyle(UIViewController.PopupInteractionStyle.none)
+        // Suspend LNPopupUI's global content pan only while Chapters owns vertical gestures.
+        // Outside that temporary state, the normal interactive pull-down remains available from
+        // the feed as before; the video surface also retains its explicit gesture.
+        .popupInteractionStyle(player.chapterListPresented
+            ? UIViewController.PopupInteractionStyle.none
+            : UIViewController.PopupInteractionStyle.drag)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)
         .popupBarStyle(LNPopupBar.Style.prominent)
         // LNPopupController's marquee animation corrupts the native title/subtitle layout on

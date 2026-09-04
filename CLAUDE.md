@@ -268,6 +268,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   elapsed time. That label opens a thumbnail chapter browser over the lower feed in portrait and
   in a trailing split column in landscape, leaving the video interactive; rows seek directly. A
   downward pull follows the finger and dismisses the browser when its own list is at the top.
+  Suspend LNPopupUI's global content drag only while that browser is presented so the gestures do
+  not race; normal interactive feed-to-mini-player dragging must return as soon as it closes.
   Native extraction wraps `playerStoryboardSpecRenderer` in an app-owned `VideoStoryboard` and
   carries it with the successful playback candidate. The storyboard and signed stream URL share
   the existing 30-minute in-memory cache; no redundant b5i player request is made. b5i fallback
