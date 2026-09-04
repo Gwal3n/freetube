@@ -335,6 +335,9 @@ final class PlayerStateManager {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
         }
         queueAcceptsRecommendations = !skipRecommendations
+        if skipRecommendations, activePlaylist != nil {
+            playlistRecommendations = []
+        }
         if !skipRecommendations {
             activePlaylist = nil
             playlistRecommendations = []
@@ -1250,7 +1253,9 @@ final class PlayerStateManager {
     /// fresh "up next" queue is ready to advance when the current track ends.
     private func fillQueueWithRecommendations(for seed: Video) async {
         let targetUpcomingCount = 5
-        let upcomingCount = queue.availableUpcomingCount(limit: targetUpcomingCount)
+        let upcomingCount = activePlaylist != nil
+            ? min(targetUpcomingCount, playlistRecommendations.count)
+            : queue.availableUpcomingCount(limit: targetUpcomingCount)
         guard upcomingCount < targetUpcomingCount else {
             log.debug("Recommendation refill skipped for \(seed.id, privacy: .public): \(upcomingCount, privacy: .public) upcoming items remain")
             return

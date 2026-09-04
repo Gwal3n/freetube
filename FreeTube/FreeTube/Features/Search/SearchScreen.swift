@@ -11,6 +11,7 @@ struct SearchContent: View {
     let onDismissSearchPresentation: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
+    @State private var arePlaylistsExpanded = false
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
@@ -40,6 +41,9 @@ struct SearchContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .simultaneousGesture(dismissSearchPresentationGesture)
+        .onChange(of: model.submittedQuery) { _, _ in
+            arePlaylistsExpanded = false
+        }
         .errorToast($model.errorState)
     }
 
@@ -59,15 +63,33 @@ struct SearchContent: View {
                 }
             }
             if !results.playlists.isEmpty {
-                Section("Playlists") {
-                    ForEach(results.playlists) { playlist in
-                        NavigationLink {
-                            PlaylistScreen(playlistID: playlist.id)
-                        } label: {
-                            PlaylistRow(playlist: playlist, showsMoreMenu: true)
+                Section {
+                    if arePlaylistsExpanded {
+                        ForEach(results.playlists) { playlist in
+                            NavigationLink {
+                                PlaylistScreen(playlistID: playlist.id)
+                            } label: {
+                                PlaylistRow(playlist: playlist, showsMoreMenu: true)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                } header: {
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            arePlaylistsExpanded.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Text("Playlists")
+                            Spacer()
+                            Text("\(results.playlists.count)")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: arePlaylistsExpanded ? "chevron.up" : "chevron.down")
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             if !results.videos.isEmpty {

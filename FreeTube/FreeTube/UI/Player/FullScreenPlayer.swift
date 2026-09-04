@@ -15,6 +15,8 @@ struct FullScreenPlayer: View {
     /// Keep recommendation rows out of the render tree until the user asks to inspect them.
     @State private var isQueueExpanded = false
     @State private var isPlaylistExpanded = true
+    @State private var playlistItemsBefore = 20
+    @State private var playlistItemsAfter = 20
     /// Async-loaded description / details for the currently-playing video. Fetched on demand when
     /// the user taps "More" under the channel row.
     @State private var details: VideoInfo?
@@ -1040,8 +1042,21 @@ struct FullScreenPlayer: View {
     }
 
     private var playlistListHeight: CGFloat {
-        let loadMoreRows = player.canLoadMorePlaylistItems ? 1 : 0
-        return CGFloat(max(1, player.queue.items.count + loadMoreRows)) * Self.queueRowFootprint + 32
+        let controls = (playlistWindowLowerBound > 0 ? 1 : 0)
+            + (playlistWindowUpperBound < player.queue.items.count || player.canLoadMorePlaylistItems ? 1 : 0)
+        return CGFloat(max(1, displayedPlaylistIndices.count + controls)) * Self.queueRowFootprint + 32
+    }
+
+    private var playlistWindowLowerBound: Int {
+        max(0, player.queue.currentIndex - playlistItemsBefore)
+    }
+
+    private var playlistWindowUpperBound: Int {
+        min(player.queue.items.count, player.queue.currentIndex + playlistItemsAfter + 1)
+    }
+
+    private var displayedPlaylistIndices: Range<Int> {
+        playlistWindowLowerBound..<playlistWindowUpperBound
     }
 
     private var displayedQueueIndices: [Int] {
@@ -1061,19 +1076,39 @@ struct FullScreenPlayer: View {
         if let playlist = player.activePlaylist {
             VStack(alignment: .leading, spacing: 8) {
                 collapsiblePanelHeader(
-                    title: "Playlist",
-                    subtitle: playlist.title,
+                    title: "Playlist · \(playlist.title)",
                     isExpanded: $isPlaylistExpanded
                 )
                 if isPlaylistExpanded {
                     List {
-                        ForEach(player.queue.items) { video in
-                            queueRow(video, preservesPlaylistContext: true)
+                        if playlistWindowLowerBound > 0 {
+                            Button {
+                                playlistItemsBefore += 20
+                            } label: {
+                                Label("Load 20 previous", systemImage: "chevron.up")
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: Self.queueRowHeight)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
+                        }
+                        ForEach(displayedPlaylistIndices, id: \.self) { index in
+                            queueRow(player.queue.items[index], preservesPlaylistContext: true)
                                 .listRowBackground(Color.clear)
                                 .frame(height: Self.queueRowHeight)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
-                        if player.canLoadMorePlaylistItems {
+                        if playlistWindowUpperBound < player.queue.items.count {
+                            Button {
+                                playlistItemsAfter += 20
+                            } label: {
+                                Label("Load 20 next", systemImage: "chevron.down")
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: Self.queueRowHeight)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
+                        } else if player.canLoadMorePlaylistItems {
                             loadMoreQueueButton(isLoading: player.isLoadingMorePlaylistVideos) {
                                 await player.loadMorePlaylistItems()
                             }
@@ -1174,20 +1209,13 @@ struct FullScreenPlayer: View {
 
     private func collapsiblePanelHeader(
         title: String,
-        subtitle: String,
         isExpanded: Binding<Bool>
     ) -> some View {
         HStack {
             Button {
                 isExpanded.wrappedValue.toggle()
             } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    SectionHeader(title: title)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                SectionHeader(title: title)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
@@ -1268,6 +1296,11 @@ struct FullScreenPlayer: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(video.title)
                             .font(.subheadline)
+                            .foregroundStyle(
+                                preservesPlaylistContext && video.id == player.currentVideo?.id
+                                    ? Color.accentColor
+                                    : Color.primary
+                            )
                             .lineLimit(2)
                         // Channel name + playback count joined by a middle dot. Either piece can be
                         // empty (older listings sometimes omit view count), filter before joining so
@@ -1279,7 +1312,7 @@ struct FullScreenPlayer: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if video.id == player.currentVideo?.id {
+                    if video.id == player.currentVideo?.id, !preservesPlaylistContext {
                         // Animated audio bars instead of the static speaker glyph. Animates only
                         // for the matched row; other rows render nothing because the parent `if`
                         // gates mounting.
@@ -1292,6 +1325,12 @@ struct FullScreenPlayer: View {
             // Sibling of the load-button so taps land in the Menu instead of the row's
             // play handler. Same actions as the row would get in search/history/library.
             VideoMoreActionsMenu(video: video)
+        }
+        .background {
+            if preservesPlaylistContext, video.id == player.currentVideo?.id {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.10))
+            }
         }
     }
 
