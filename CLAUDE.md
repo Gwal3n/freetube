@@ -299,8 +299,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   tall portrait media. On iOS 18+, native `onScrollGeometryChange` progressively compresses it
   toward 16:9 over a scroll range equal to the height difference; retain the geometry probe only as
   the iOS 17 fallback. The lower panel reserves that range even when its content is short and
-  counteracts its own content offset until the collapse completes, so player compression happens
-  first and ordinary feed scrolling begins only at the compact player border. Cached MoreVideoInfos metadata may replace
+  counteracts its own content offset with measured top padding until the collapse completes, so
+  player compression happens first and ordinary feed scrolling begins only at the compact player
+  border. Do not use a visual offset here: it makes the bottom of long comment lists unreachable.
+  Cached MoreVideoInfos metadata may replace
   direct-URL placeholder titles/uploader details without restarting playback.
 - **Search is search-only.** Its root contains local recent searches or the clean empty state; it
   must not request or render a home/trending/discovery feed. Native search presents suggestions,

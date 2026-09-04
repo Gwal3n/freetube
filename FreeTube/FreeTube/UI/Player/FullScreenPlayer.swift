@@ -474,9 +474,10 @@ struct FullScreenPlayer: View {
             }
             .padding(.vertical)
             // While the header is collapsing, counteract the ScrollView's own content movement.
-            // The feed therefore remains attached to the moving player edge. Once 16:9 is
-            // reached the compensation stops and ordinary scrolling continues beneath it.
-            .offset(y: min(max(panelScrollOffset, 0), collapseRange))
+            // Use real padding rather than a visual offset: an offset does not enlarge the
+            // ScrollView's measured content and made the final comments unreachable by exactly
+            // this compensation distance.
+            .padding(.top, min(max(panelScrollOffset, 0), collapseRange))
             // Preserve enough scroll extent to consume the complete header collapse even when
             // comments and Up Next are both collapsed and the natural feed is very short.
             .frame(minHeight: minimumContentHeight, alignment: .top)
