@@ -20,7 +20,6 @@ struct CaptionPlayerMenu: View {
             Image(systemName: selectedTrackID == nil ? "captions.bubble" : "captions.bubble.fill")
                 .playerTopControl()
         }
-        .disabled(tracks.isEmpty)
         .accessibilityLabel("Captions")
         .accessibilityValue(selectedTrackID == nil ? "Off" : "On")
         .popover(isPresented: $isPresented, arrowEdge: .top) {
@@ -35,9 +34,18 @@ struct CaptionPlayerMenu: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         captionRow(title: "Off", id: nil)
-                        ForEach(tracks) { track in
-                            captionRow(title: track.displayName, id: track.id) {
-                                onSelect(track)
+                        if tracks.isEmpty {
+                            Text("Captions unavailable")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                        } else {
+                            ForEach(tracks) { track in
+                                captionRow(title: track.displayName, id: track.id) {
+                                    onSelect(track)
+                                }
                             }
                         }
                     }
