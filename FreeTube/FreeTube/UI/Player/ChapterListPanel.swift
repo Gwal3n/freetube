@@ -5,6 +5,8 @@ import Kingfisher
 /// it occupies a dedicated trailing column, leaving the video and its controls interactive.
 @available(iOS 17.0, *)
 struct ChapterListPanel: View {
+    private static let dismissalThreshold: CGFloat = 42
+
     let chapters: [VideoChapter]
     let elapsed: TimeInterval
     let isLandscape: Bool
@@ -97,7 +99,7 @@ struct ChapterListPanel: View {
                 }
                 .onScrollPhaseChange { _, newPhase in
                     guard !isLandscape, newPhase == .idle else { return }
-                    if maximumDismissPull >= 54 {
+                    if maximumDismissPull >= Self.dismissalThreshold {
                         onDismiss()
                     } else {
                         withAnimation(.snappy(duration: 0.22)) {
@@ -135,7 +137,9 @@ struct ChapterListPanel: View {
     /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
     /// It also provides an explicit fallback for users who begin their pull on the grabber/title.
     private var headerDismissGesture: some Gesture {
-        DragGesture(minimumDistance: 6)
+        // Measure against the screen rather than the moving panel. A local-space gesture changes
+        // its own coordinate system as `.offset` moves the sheet, producing visible oscillation.
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
                 guard !isLandscape else { return }
                 let downward = value.translation.height > 0
@@ -146,7 +150,7 @@ struct ChapterListPanel: View {
             }
             .onEnded { _ in
                 guard !isLandscape else { return }
-                if maximumDismissPull >= 54 {
+                if maximumDismissPull >= Self.dismissalThreshold {
                     onDismiss()
                 } else {
                     withAnimation(.snappy(duration: 0.22)) {
