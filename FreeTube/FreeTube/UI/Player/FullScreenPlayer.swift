@@ -1030,7 +1030,7 @@ struct FullScreenPlayer: View {
     /// Total height we hand to the queue `List`. Sized for the actual number of items + a 32pt
     /// bottom margin so the last row's edit-handle / swipe affordance isn't truncated.
     private var queueListHeight: CGFloat {
-        let loadMoreRows = player.canLoadMoreRecommendations ? 1 : 0
+        let loadMoreRows = player.canLoadMoreQueueItems ? 1 : 0
         let count = max(1, displayedQueueIndices.count + loadMoreRows)
         return CGFloat(count) * Self.queueRowFootprint + 32
     }
@@ -1049,7 +1049,7 @@ struct FullScreenPlayer: View {
                     isQueueExpanded.toggle()
                 } label: {
                     HStack {
-                        SectionHeader(title: "Up next")
+                        SectionHeader(title: player.activePlaylist?.title ?? "Up next")
                         Spacer()
                     }
                     .contentShape(Rectangle())
@@ -1091,13 +1091,13 @@ struct FullScreenPlayer: View {
                             player.queue.remove(at: queueIndex)
                         }
                     }
-                    if player.canLoadMoreRecommendations {
+                    if player.canLoadMoreQueueItems {
                         Button {
-                            Task { await player.loadMoreRecommendations() }
+                            Task { await player.loadMoreQueueItems() }
                         } label: {
                             HStack {
                                 Spacer()
-                                if player.isLoadingMoreRecommendations {
+                                if player.isLoadingMoreQueueItems {
                                     ProgressView()
                                 } else {
                                     Label("Load more", systemImage: "chevron.down")
@@ -1108,7 +1108,7 @@ struct FullScreenPlayer: View {
                             .frame(height: Self.queueRowHeight)
                         }
                         .buttonStyle(.plain)
-                        .disabled(player.isLoadingMoreRecommendations)
+                        .disabled(player.isLoadingMoreQueueItems)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
@@ -1128,7 +1128,7 @@ struct FullScreenPlayer: View {
     private func queueRow(_ video: Video) -> some View {
         HStack(spacing: 0) {
             Button {
-                player.load(video)
+                player.load(video, skipRecommendations: player.activePlaylist != nil)
             } label: {
                 HStack(spacing: 12) {
                     // Thumbnail with duration badge in the bottom-right corner — same affordance

@@ -58,6 +58,8 @@ final class PlayerStateManager {
     private(set) var storyboard: VideoStoryboard?
     private(set) var commentsCountText: String?
     private(set) var isLoadingMoreRecommendations = false
+    private(set) var activePlaylist: Playlist?
+    private(set) var isLoadingMorePlaylistVideos = false
     /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
     private(set) var videoPresentationSize: CGSize = .zero
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
@@ -83,6 +85,7 @@ final class PlayerStateManager {
     private let resolver: any PlaybackResolving
     private let sponsorBlockService: any SponsorBlockServicing
     private let videoService: any VideoServicing
+    private let playlistService: any PlaylistServicing
     private let preferences: UserPreferences
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
@@ -143,17 +146,20 @@ final class PlayerStateManager {
     private var lastSavedProgressPosition: TimeInterval = -.infinity
     private var recommendationBacklog: [Video] = []
     private var recommendationContinuationToken: String?
+    private var playlistContinuationToken: String?
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
         sponsorBlockService: any SponsorBlockServicing = SponsorBlockService(),
         videoService: any VideoServicing = VideoService(),
+        playlistService: any PlaylistServicing = PlaylistService(),
         preferences: UserPreferences = UserPreferences()
     ) {
         self.queue = queue
         self.resolver = resolver
         self.sponsorBlockService = sponsorBlockService
         self.videoService = videoService
+        self.playlistService = playlistService
         self.preferences = preferences
         self.playbackRate = preferences.playbackRate
         self.playbackQuality = preferences.preferredQuality
@@ -209,6 +215,9 @@ final class PlayerStateManager {
         recommendationBacklog = []
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
+        activePlaylist = nil
+        playlistContinuationToken = nil
+        isLoadingMorePlaylistVideos = false
         videoPresentationSize = .zero
     }
 
@@ -245,6 +254,9 @@ final class PlayerStateManager {
         recommendationBacklog = []
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
+        activePlaylist = nil
+        playlistContinuationToken = nil
+        isLoadingMorePlaylistVideos = false
         videoPresentationSize = .zero
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
@@ -320,6 +332,11 @@ final class PlayerStateManager {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
         }
         queueAcceptsRecommendations = !skipRecommendations
+        if !skipRecommendations {
+            activePlaylist = nil
+            playlistContinuationToken = nil
+            isLoadingMorePlaylistVideos = false
+        }
         // Pause and tear down anything currently playing. Otherwise we'd keep streaming audio from
         // the previous video while the new one's file is downloading — which is what the user kept
         // hearing when they tapped "next" mid-download.
@@ -634,6 +651,48 @@ final class PlayerStateManager {
         )
     }
 
+    /// Starts playback with an explicit playlist context. Unlike a generic recommendation queue,
+    /// this retains the playlist title and continuation so the player can identify and extend it.
+    func loadPlaylist(_ details: PlaylistDetails, startAt video: Video, shuffled: Bool = false) {
+        let videos = shuffled ? details.videos.shuffled() : details.videos
+        guard videos.contains(where: { $0.id == video.id }) else { return }
+        queue.isShuffleOn = false
+        queue.replace(with: videos)
+        if shuffled { queue.isShuffleOn = true }
+        load(video, skipRecommendations: true)
+        activePlaylist = details.playlist
+        playlistContinuationToken = details.continuationToken
+    }
+
+    var canLoadMoreQueueItems: Bool {
+        if activePlaylist != nil { return playlistContinuationToken != nil }
+        return canLoadMoreRecommendations
+    }
+
+    func loadMoreQueueItems() async {
+        if activePlaylist != nil {
+            guard let token = playlistContinuationToken, !isLoadingMorePlaylistVideos else { return }
+            let playlistID = activePlaylist?.id
+            isLoadingMorePlaylistVideos = true
+            defer { isLoadingMorePlaylistVideos = false }
+            do {
+                let page = try await playlistService.fetchMore(continuation: token)
+                guard activePlaylist?.id == playlistID else { return }
+                let existing = Set(queue.items.map(\.id))
+                queue.append(contentsOf: page.videos.filter { !existing.contains($0.id) })
+                playlistContinuationToken = page.continuationToken
+            } catch {
+                log.notice("Playlist continuation failed: \(String(describing: error), privacy: .public)")
+            }
+        } else {
+            await loadMoreRecommendations()
+        }
+    }
+
+    var isLoadingMoreQueueItems: Bool {
+        isLoadingMorePlaylistVideos || isLoadingMoreRecommendations
+    }
+
     func dismiss() {
         log.info("dismiss()")
         persistCurrentPlaybackProgress(force: true)
@@ -649,6 +708,9 @@ final class PlayerStateManager {
         recommendationBacklog = []
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
+        activePlaylist = nil
+        playlistContinuationToken = nil
+        isLoadingMorePlaylistVideos = false
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false

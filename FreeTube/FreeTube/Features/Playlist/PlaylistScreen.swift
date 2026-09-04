@@ -60,7 +60,7 @@ struct PlaylistScreen: View {
                     // Full-bleed divider — no horizontal padding so the line spans edge to edge.
                     Divider()
 
-                    videosList(details.videos)
+                    videosList(details)
                         .padding(.vertical)
                 } else if model.isLoading {
                     LoadingView().padding(.top, 60)
@@ -273,20 +273,14 @@ struct PlaylistScreen: View {
         HStack(spacing: 10) {
             glassPill(title: "Play all", systemImage: "play.fill") {
                 guard !details.videos.isEmpty else { return }
-                player.queue.replace(with: details.videos)
-                // `skipRecommendations: true` — the user explicitly chose the playlist as their
-                // queue, so we don't want YouTube's "more like this" picks appended underneath.
                 if let first = details.videos.first {
-                    player.load(first, skipRecommendations: true)
+                    player.loadPlaylist(details, startAt: first)
                 }
             }
             glassPill(title: "Shuffle", systemImage: "shuffle") {
                 guard !details.videos.isEmpty else { return }
-                let shuffled = details.videos.shuffled()
-                player.queue.replace(with: shuffled)
-                player.queue.isShuffleOn = true
-                if let first = shuffled.first {
-                    player.load(first, skipRecommendations: true)
+                if let first = details.videos.randomElement() {
+                    player.loadPlaylist(details, startAt: first, shuffled: true)
                 }
             }
             glassPill(title: "Download", systemImage: "arrow.down.circle.fill") {
@@ -357,14 +351,14 @@ struct PlaylistScreen: View {
     // MARK: - Videos
 
     @ViewBuilder
-    private func videosList(_ videos: [Video]) -> some View {
+    private func videosList(_ details: PlaylistDetails) -> some View {
+        let videos = details.videos
         LazyVStack(spacing: 0) {
             ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                 VideoRow(video: video) {
                     // Make sure the queue reflects the playlist's order before kicking off
                     // playback, so "next video" actually means the next playlist entry.
-                    player.queue.replace(with: videos)
-                    player.load(video, skipRecommendations: true)
+                    player.loadPlaylist(details, startAt: video)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 6)
