@@ -70,25 +70,23 @@ struct HomeScreen: View {
             }
             .onChange(of: searchActivation) { _, _ in
                 guard !MacIntegration.isRunningOnMac else { return }
-                // A re-tap while a Search destination is open means "back to Search" only. A
-                // second re-tap from the root clears the old result set and focuses the native
-                // search field. Keeping these actions separate matches ordinary tab navigation.
-                guard path.isEmpty else {
+                // Re-selecting Search returns from a pushed destination and focuses the native
+                // field in one action. It must not discard the current term or result set.
+                if !path.isEmpty {
                     path = NavigationPath()
-                    isSearchPresented = false
-                    return
                 }
-                searchModel.query = ""
-                searchModel.clearResults()
-                // Re-present even if Search remained logically active after its keyboard was
-                // resigned, otherwise assigning `true` again would not restore focus.
-                isSearchPresented = false
                 Task { @MainActor in
                     await Task.yield()
-                    isSearchPresented = true
+                    focusSearch()
                 }
             }
         }
+    }
+
+    /// Gives focus back to native `.searchable` without coupling presentation to query/results.
+    private func focusSearch() {
+        guard !isSearchPresented else { return }
+        isSearchPresented = true
     }
 
     /// Persists the trimmed query, then either opens a recognized YouTube URL or performs search.

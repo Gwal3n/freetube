@@ -7,8 +7,12 @@ import OSLog
 @MainActor
 final class SearchViewModel {
     var query: String = "" {
-        didSet { scheduleAutocomplete() }
+        didSet {
+            suggestions = []
+            scheduleAutocomplete()
+        }
     }
+    private(set) var submittedQuery: String?
     private(set) var suggestions: [SearchSuggestion] = []
     private(set) var results: SearchResult?
     private(set) var isLoading: Bool = false
@@ -20,6 +24,15 @@ final class SearchViewModel {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "SearchViewModel")
 
     private var autocompleteTask: Task<Void, Never>?
+    private var searchGeneration = 0
+
+    /// True while the field contains a new query that has not produced the visible result set.
+    /// SearchContent uses this to show live suggestions instead of stale results.
+    var isEditingNewQuery: Bool {
+        let current = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !current.isEmpty else { return false }
+        return current != submittedQuery
+    }
 
     init(
         service: any SearchServicing = SearchService(),
@@ -62,7 +75,9 @@ final class SearchViewModel {
     /// Drops the previous search's results + suggestions so the embedding view can fall
     /// back to its non-search state. Called when the search field is cleared.
     func clearResults() {
+        searchGeneration &+= 1
         results = nil
+        submittedQuery = nil
         suggestions = []
         isLoading = false
         autocompleteTask?.cancel()
@@ -71,6 +86,8 @@ final class SearchViewModel {
     func submit() async {
         let submittedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !submittedQuery.isEmpty else { return }
+        searchGeneration &+= 1
+        let generation = searchGeneration
         // A pending autocomplete request must never win the race with an explicit keyboard or
         // suggestion submission and put suggestions back over the requested results.
         if query != submittedQuery {
@@ -78,11 +95,24 @@ final class SearchViewModel {
         }
         autocompleteTask?.cancel()
         suggestions = []
+        results = nil
+        self.submittedQuery = submittedQuery
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if searchGeneration == generation {
+                isLoading = false
+                if isEditingNewQuery {
+                    scheduleAutocomplete()
+                }
+            }
+        }
         do {
             let result = try await service.search(query: submittedQuery, restricted: preferences.restrictedSearchMode)
+            guard searchGeneration == generation,
+                  query.trimmingCharacters(in: .whitespacesAndNewlines) == submittedQuery
+            else { return }
             results = result
+            self.submittedQuery = submittedQuery
             suggestions = []
         } catch {
             errorState = ErrorState(from: error)

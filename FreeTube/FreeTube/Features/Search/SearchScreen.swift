@@ -16,23 +16,10 @@ struct SearchContent: View {
 
     var body: some View {
         Group {
-            if let results = model.results {
+            if model.isEditingNewQuery {
+                suggestionContent
+            } else if let results = model.results {
                 resultsList(results)
-            } else if !model.suggestions.isEmpty {
-                ScrollView {
-                    SearchSuggestionList(
-                        suggestions: model.suggestions,
-                        onSelect: { suggestion in
-                            model.query = suggestion.text
-                            onRunSearch(suggestion.text)
-                            dismissKeyboard()
-                        },
-                        onFill: { suggestion in
-                            model.query = suggestion.text
-                        }
-                    )
-                }
-                .scrollDismissesKeyboard(.immediately)
             } else if model.isLoading {
                 LoadingView()
             } else if !history.isEmpty {
@@ -49,6 +36,30 @@ struct SearchContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .errorToast($model.errorState)
+    }
+
+    @ViewBuilder
+    private var suggestionContent: some View {
+        if model.suggestions.isEmpty {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { dismissKeyboard() }
+        } else {
+            ScrollView {
+                SearchSuggestionList(
+                    suggestions: model.suggestions,
+                    onSelect: { suggestion in
+                        model.query = suggestion.text
+                        onRunSearch(suggestion.text)
+                        dismissKeyboard()
+                    },
+                    onFill: { suggestion in
+                        model.query = suggestion.text
+                    }
+                )
+            }
+            .scrollDismissesKeyboard(.immediately)
+        }
     }
 
     @ViewBuilder

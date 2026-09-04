@@ -294,8 +294,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
   native search collapses awkwardly there. Search stays an ordinary peer tab—never assign
   `TabRole.search`, which detaches it visually on iOS 26. Re-selecting the ordinary tab increments a
-  selection-binding activation token that drives `.searchable(isPresented:)`; no UIKit tab gesture
-  observer is installed. Selecting a suggestion or history entry passes that row's query explicitly
+  selection-binding activation token that drives `.searchable(isPresented:)`; it returns from any
+  pushed destination and focuses the field without clearing the current query or results. The live
+  field value and last submitted query are tracked separately, so editing a displayed query reveals
+  its live suggestions rather than leaving stale results in front. No UIKit tab gesture observer is
+  installed. Selecting a suggestion or history entry passes that row's query explicitly
   to the search submission before resigning keyboard focus; never rely on a later read of field state.
   Selecting a video also resigns focus without dismissing the search UI. Never attach a parent tap
   or drag recognizer around the search `List`: even a simultaneous gesture mask can consume native
