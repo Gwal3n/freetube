@@ -22,6 +22,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var singleTapGesture: UITapGestureRecognizer?
     private var horizontalPanGesture: UIPanGestureRecognizer?
     private var feedbackLabel: UILabel?
+    private var feedbackBlurView: UIVisualEffectView?
     private var outlinedFeedbackLabel: UILabel?
     private var feedbackWorkItem: DispatchWorkItem?
     private var pendingSingleTapWorkItem: DispatchWorkItem?
@@ -169,6 +170,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         resetHorizontalSeek()
         feedbackLabel?.removeFromSuperview()
         feedbackLabel = nil
+        feedbackBlurView?.removeFromSuperview()
+        feedbackBlurView = nil
         outlinedFeedbackLabel?.removeFromSuperview()
         outlinedFeedbackLabel = nil
         feedbackView = nil
@@ -414,6 +417,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         if outlined {
             label = outlinedFeedbackLabel ?? makeOutlinedFeedbackLabel(in: view)
             feedbackLabel?.alpha = 0
+            feedbackBlurView?.alpha = 0
         } else {
             label = feedbackLabel ?? makeFeedbackLabel(in: view)
             outlinedFeedbackLabel?.alpha = 0
@@ -434,12 +438,21 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             : compact
                 ? CGSize(width: 52, height: 26)
                 : CGSize(width: 68, height: 38)
-        label.layer.cornerRadius = outlined ? 0 : compact ? 13 : 19
-        label.center = CGPoint(
+        let center = CGPoint(
             x: view.bounds.width * horizontalFraction,
             y: view.bounds.height * verticalFraction
         )
-        label.alpha = 1
+        if outlined {
+            label.center = center
+            label.alpha = 1
+        } else if let feedbackBlurView {
+            feedbackBlurView.bounds.size = label.bounds.size
+            feedbackBlurView.center = center
+            feedbackBlurView.layer.cornerRadius = compact ? 13 : 19
+            label.frame = feedbackBlurView.bounds
+            label.alpha = 1
+            feedbackBlurView.alpha = 1
+        }
 
         guard automaticallyHide else { return }
         let workItem = DispatchWorkItem { [weak self] in self?.hideFeedback() }
@@ -448,17 +461,25 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func makeFeedbackLabel(in view: UIView) -> UILabel {
+        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        blurView.clipsToBounds = true
+        blurView.isUserInteractionEnabled = false
+        blurView.accessibilityElementsHidden = true
+        blurView.contentView.backgroundColor = UIColor.black.withAlphaComponent(0.12)
+        view.addSubview(blurView)
+
         let label = UILabel()
         label.font = .preferredFont(forTextStyle: .headline)
         label.textColor = .white
         label.textAlignment = .center
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.52)
-        label.layer.cornerRadius = 19
-        label.clipsToBounds = true
+        label.backgroundColor = .clear
         label.bounds.size = CGSize(width: 68, height: 38)
         label.isUserInteractionEnabled = false
         label.accessibilityElementsHidden = true
-        view.addSubview(label)
+        blurView.bounds.size = label.bounds.size
+        label.frame = blurView.bounds
+        blurView.contentView.addSubview(label)
+        feedbackBlurView = blurView
         feedbackLabel = label
         return label
     }
@@ -487,6 +508,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         feedbackWorkItem = nil
         UIView.animate(withDuration: 0.2) { [weak self] in
             self?.feedbackLabel?.alpha = 0
+            self?.feedbackBlurView?.alpha = 0
             self?.outlinedFeedbackLabel?.alpha = 0
         }
     }

@@ -19,6 +19,7 @@ struct LibraryScreen: View {
     @State private var accountModel = AccountViewModel()
     @State private var showingLogin = false
     @Query(sort: \WatchHistoryEntry.watchedAt, order: .reverse) private var localHistory: [WatchHistoryEntry]
+    @State private var localSubscriptions = LocalSubscriptionStore.shared
 
     var body: some View {
         NavigationStack {
@@ -68,6 +69,23 @@ struct LibraryScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Local history")
                         Text(countSubtitle(localHistory.count, noun: "video"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            NavigationLink {
+                LocalSubscriptionsScreen()
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "person.2.fill")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Local subscriptions")
+                        Text(countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

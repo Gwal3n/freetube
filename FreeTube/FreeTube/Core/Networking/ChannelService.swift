@@ -200,19 +200,9 @@ final class ChannelService: ChannelServicing {
         let banner = Mappers.bestThumbnailURL(response.bannerThumbnails)
         let subCount = Mappers.parseAbbreviatedCount(response.subscriberCount)
         let videoCount = Int((response.videoCount ?? "").filter(\.isNumber))
-        // **isSubscribed source priority:**
-        //   1. `SubscriptionRegistry` — our local cache of channel IDs the user has subscribed
-        //      to. Updated on every subscribe/unsubscribe call and on `SubscribedChannelsScreen`
-        //      load. Trusted because we own it.
-        //   2. `response.subscribeStatus` — YouTubeKit's parser. Unreliable on the modern
-        //      `pageHeaderRenderer` channel layout (the field comes back nil), but valid when
-        //      present, so we OR it in as a fallback.
-        // Defaulting to `false` only when both signals are absent fixes the long-standing bug
-        // where the channel screen always showed "Subscribe" regardless of subscription state.
-        let registryHit = SubscriptionRegistry.containsBypassActor(id)
-        let parsed = response.subscribeStatus ?? false
-        let isSubscribed = registryHit || parsed
-        log.debug("[channel] mapChannel \(id, privacy: .public) — registry=\(registryHit, privacy: .public) parsed=\(parsed, privacy: .public) → isSubscribed=\(isSubscribed, privacy: .public)")
+        // The button represents this app's device-only subscription state. Deliberately ignore
+        // YouTube's account subscription flag so no signed-in state leaks into the local list.
+        let isSubscribed = LocalSubscriptionStore.containsPersisted(id)
         return Channel(
             id: id,
             name: name,

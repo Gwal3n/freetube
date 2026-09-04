@@ -17,12 +17,10 @@ protocol SubscriptionServicing: Sendable {
     func fetchSubscriptions() async throws -> [Channel]
     func fetchSubscriptionsPage() async throws -> SubscriptionsPage
     func fetchSubscriptionsMore(continuation: String) async throws -> SubscriptionsPage
-    func subscribe(channelID: String) async throws
-    func unsubscribe(channelID: String) async throws
 }
 
-/// Wraps `AccountSubscriptionsFeedResponse`, `AccountSubscriptionsResponse`,
-/// `SubscribeChannelResponse`, `UnsubscribeChannelResponse`.
+/// Read-only access to the signed-in account's subscription pages. Subscription changes in this
+/// app are device-only and are handled by `LocalSubscriptionStore`.
 final class SubscriptionService: SubscriptionServicing {
     private let client: YouTubeKitClient
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "SubscriptionService")
@@ -84,52 +82,4 @@ final class SubscriptionService: SubscriptionServicing {
         }
     }
 
-    /// Subscribes to the channel via YouTubeKit's `SubscribeChannelResponse`. Requires the user
-    /// to be signed in (cookies on the model). Surfaces `.notAuthenticated` if YouTube's
-    /// response carries `isDisconnected=true`, `.network(_)` for any transport error.
-    func subscribe(channelID: String) async throws {
-        log.info("[subs] subscribe channelID=\(channelID, privacy: .public)")
-        do {
-            let response = try await SubscribeChannelResponse.sendThrowingRequest(
-                youtubeModel: client.model,
-                data: [.browseId: channelID]
-            )
-            if response.isDisconnected {
-                log.notice("[subs] subscribe: response isDisconnected=true (cookies rejected)")
-                throw YouTubeServiceError.notAuthenticated
-            }
-            // Update the local registry so any ChannelScreen rendered after this call shows
-            // "Subscribed" — YouTubeKit's `subscribeStatus` parser is unreliable on the modern
-            // `pageHeaderRenderer` layout, so we can't depend on the next channel fetch to
-            // surface the correct state.
-            await MainActor.run { SubscriptionRegistry.shared.add(channelID) }
-            log.info("[subs] subscribe OK channelID=\(channelID, privacy: .public)")
-        } catch let error as YouTubeServiceError {
-            throw error
-        } catch {
-            log.error("[subs] subscribe failed: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.network(error)
-        }
-    }
-
-    func unsubscribe(channelID: String) async throws {
-        log.info("[subs] unsubscribe channelID=\(channelID, privacy: .public)")
-        do {
-            let response = try await UnsubscribeChannelResponse.sendThrowingRequest(
-                youtubeModel: client.model,
-                data: [.browseId: channelID]
-            )
-            if response.isDisconnected {
-                log.notice("[subs] unsubscribe: response isDisconnected=true")
-                throw YouTubeServiceError.notAuthenticated
-            }
-            await MainActor.run { SubscriptionRegistry.shared.remove(channelID) }
-            log.info("[subs] unsubscribe OK channelID=\(channelID, privacy: .public)")
-        } catch let error as YouTubeServiceError {
-            throw error
-        } catch {
-            log.error("[subs] unsubscribe failed: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.network(error)
-        }
-    }
 }

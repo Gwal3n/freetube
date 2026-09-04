@@ -30,16 +30,4 @@ final class SubscriptionsViewModel {
         }
     }
 
-    func toggleSubscribe(_ channel: Channel) async {
-        do {
-            if channel.isSubscribed {
-                try await service.unsubscribe(channelID: channel.id)
-            } else {
-                try await service.subscribe(channelID: channel.id)
-            }
-            await load()
-        } catch {
-            errorState = ErrorState(from: error)
-        }
-    }
 }

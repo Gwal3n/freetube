@@ -18,6 +18,8 @@ struct ChapterListPanel: View {
     @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
     @State private var isDraggingListSheet = false
+    @State private var suppressChapterSelection = false
+    @State private var selectionSuppressionGeneration = 0
 
     private var currentChapterID: VideoChapter.ID? {
         chapters.last { $0.startTime <= elapsed }?.id
@@ -113,6 +115,10 @@ struct ChapterListPanel: View {
             LazyVStack(spacing: 0) {
                 ForEach(chapters) { chapter in
                     Button {
+                        // A ScrollView drag can still deliver the row button's touch-up while the
+                        // gesture is handing off to sheet dismissal. Never interpret that release
+                        // as a request to seek.
+                        guard !suppressChapterSelection else { return }
                         onSeek(chapter.startTime)
                     } label: {
                         chapterRow(chapter)
@@ -128,7 +134,9 @@ struct ChapterListPanel: View {
             .offset(y: isDraggingListSheet ? -listOverscroll : 0)
         }
         .scrollIndicators(.visible)
-        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+        // Keep the same native rubber-band affordance for short chapter lists. `.basedOnSize`
+        // disables it when the rows do not fill the viewport, making the sheet feel stuck.
+        .scrollBounceBehavior(.always, axes: .vertical)
     }
 
     /// The list owns the gesture while it has content above it. As soon as it reaches the top,
@@ -145,6 +153,8 @@ struct ChapterListPanel: View {
                     guard listScrollOffset <= 1 else { return }
                     listDismissOrigin = value.translation.height
                     isDraggingListSheet = true
+                    suppressChapterSelection = true
+                    selectionSuppressionGeneration &+= 1
                 }
                 dismissTranslation = max(0, value.translation.height - listDismissOrigin)
             }
@@ -169,7 +179,19 @@ struct ChapterListPanel: View {
                 if listOverscroll <= 0.5 {
                     isDraggingListSheet = false
                 }
+                releaseChapterSelectionSuppression()
             }
+    }
+
+    /// Keep suppression alive briefly past touch-up because SwiftUI may dispatch a row Button's
+    /// action after the simultaneous DragGesture's `onEnded` callback in the same event cycle.
+    private func releaseChapterSelectionSuppression() {
+        let generation = selectionSuppressionGeneration
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard generation == selectionSuppressionGeneration else { return }
+            suppressChapterSelection = false
+        }
     }
 
     /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
