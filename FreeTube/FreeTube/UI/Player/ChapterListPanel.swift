@@ -1,6 +1,5 @@
 import SwiftUI
 import Kingfisher
-import UIKit
 
 /// Non-modal chapter browser. In portrait it covers only the feed below the player; in landscape
 /// it occupies a dedicated trailing column, leaving the video and its controls interactive.
@@ -9,6 +8,7 @@ struct ChapterListPanel: View {
     let chapters: [VideoChapter]
     let elapsed: TimeInterval
     let isLandscape: Bool
+    let usesOLEDBackground: Bool
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
     @State private var listScrollOffset: CGFloat = 0
@@ -94,19 +94,21 @@ struct ChapterListPanel: View {
                 }
             }
         }
-        .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
         .simultaneousGesture(chapterDismissGesture)
         .background {
-            Rectangle()
-                .fill(.regularMaterial)
-                .background {
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: ChapterPanelHeightKey.self,
-                            value: proxy.size.height
-                        )
-                    }
-                }
+            if usesOLEDBackground {
+                Color.black
+            } else {
+                Rectangle().fill(.regularMaterial)
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: ChapterPanelHeightKey.self,
+                    value: proxy.size.height
+                )
+            }
         }
         .onPreferenceChange(ChapterPanelHeightKey.self) { panelHeight = $0 }
         .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16, style: .continuous))
@@ -116,6 +118,10 @@ struct ChapterListPanel: View {
                 .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
         }
         .shadow(color: .black.opacity(0.28), radius: 14)
+        // Move the complete sheet after applying its background and clipping. Applying offset
+        // earlier leaves the material parked in place and reveals a gray rectangle instead of the
+        // underlying player feed.
+        .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
     }
 
     /// A downward pull dismisses only while the chapter list is resting at its top. Upward drags
@@ -145,7 +151,6 @@ struct ChapterListPanel: View {
                 )
                 let threshold = max(110, panelHeight * 0.25)
                 if dismissTranslation > threshold || projected > threshold {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onDismiss()
                 }
                 withAnimation(.snappy(duration: 0.24)) {

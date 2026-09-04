@@ -286,17 +286,19 @@ struct FullScreenPlayer: View {
                     channelPath = NavigationPath()
                     prefetchDescriptionIfAvailable(for: video)
                 }
+                // Keep the previous landscape video/sidebar geometry. Only constrain the lower
+                // metadata column so its title and rows cannot extend underneath Chapters.
+                .frame(width: surfaceWidth, alignment: .leading)
             }
             }
-            // In landscape Chapters owns the trailing column. Constrain the complete video/feed
-            // stack—not only the video surface—so metadata can never render underneath the panel.
-            .frame(width: surfaceWidth, alignment: .leading)
+            .frame(width: proxy.size.width, alignment: .leading)
 
             if player.chapterListPresented, !player.chapters.isEmpty {
                 ChapterListPanel(
                     chapters: player.chapters,
                     elapsed: player.elapsed,
                     isLandscape: isLandscape,
+                    usesOLEDBackground: oledPlayerBackground,
                     onSeek: { target in
                         player.seek(to: target)
                         showPlayerControls()

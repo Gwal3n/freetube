@@ -268,12 +268,14 @@ and a rejected strategy is excluded before requesting the next candidate.
   elapsed time. That label opens a thumbnail chapter browser over the lower feed in portrait and
   in a trailing split column in landscape, leaving the video interactive; rows seek directly. A
   downward pull transfers from list scrolling to a resisted sheet drag when its own list reaches
-  the top, then settles using panel-relative distance and projected velocity. Portrait shows a
+  the top, then settles using panel-relative distance and projected velocity without haptics. The
+  complete sheet background must move with that drag so it reveals the live feed underneath;
+  use solid black for OLED mode and material otherwise. Portrait shows a
   native-style drag indicator; landscape has no swipe dismissal and retains only its close button.
   Suspend LNPopupUI's global content drag only while that browser is presented so the gestures do
   not race; normal interactive feed-to-mini-player dragging must return as soon as it closes. In
-  landscape, constrain the entire video/feed column to the width left of the chapter sidebar—never
-  allow titles or metadata to render underneath it.
+  landscape, preserve the established video/sidebar geometry and constrain only the lower
+  metadata/feed column to the width left of the chapter sidebar—never allow titles underneath it.
   Native extraction wraps `playerStoryboardSpecRenderer` in an app-owned `VideoStoryboard` and
   carries it with the successful playback candidate. The storyboard and signed stream URL share
   the existing 30-minute in-memory cache; no redundant b5i player request is made. b5i fallback
