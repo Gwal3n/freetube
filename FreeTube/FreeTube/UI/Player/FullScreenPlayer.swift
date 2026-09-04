@@ -936,6 +936,8 @@ struct FullScreenPlayer: View {
             mutePlayerButton
         case .fullscreen:
             fullscreenButton
+        case .autoplay:
+            autoplayPlayerButton
         }
     }
 
@@ -1006,19 +1008,18 @@ struct FullScreenPlayer: View {
 
     // MARK: - Queue controls
 
-    /// Compact autoplay control kept beside the Up Next heading so it remains visible while the
-    /// queue is collapsed. The filled glyph is the on state.
+    /// Autoplay belongs with playback behavior, so keep it available with the player's other
+    /// configurable top controls instead of coupling it to the Up Next panel's expanded state.
     @ViewBuilder
-    private var autoplayButton: some View {
+    private var autoplayPlayerButton: some View {
         Button {
             autoplayNext.toggle()
+            showPlayerControls()
         } label: {
             Image(systemName: autoplayNext ? "play.circle.fill" : "play.circle")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.primary)
-                .frame(width: 36, height: 28)
+                .playerTopControl()
+                .opacity(autoplayNext ? 1 : 0.58)
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("Autoplay next")
         .accessibilityValue(autoplayNext ? "On" : "Off")
     }
@@ -1137,9 +1138,6 @@ struct FullScreenPlayer: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                if isQueueExpanded {
-                    autoplayButton
-                }
                 Button {
                     isQueueExpanded.toggle()
                 } label: {
@@ -1324,7 +1322,7 @@ struct FullScreenPlayer: View {
 
             // Sibling of the load-button so taps land in the Menu instead of the row's
             // play handler. Same actions as the row would get in search/history/library.
-            VideoMoreActionsMenu(video: video)
+            VideoMoreActionsMenu(video: video, offersPlayNext: !preservesPlaylistContext)
         }
         .background {
             if preservesPlaylistContext, video.id == player.currentVideo?.id {
