@@ -369,7 +369,28 @@ final class PlayerStateManager {
     /// Applies ancillary metadata only while it still belongs to the selected video. Stream
     /// resolution and the current AVPlayerItem are deliberately untouched.
     func installVideoDetails(_ info: VideoInfo, for videoID: String) {
-        guard currentVideo?.id == videoID else { return }
+        guard let current = currentVideo, current.id == videoID else { return }
+        // Direct links begin with intentionally cheap placeholder metadata. If that first lookup
+        // fails, the shared MoreVideoInfos request still supplies the title and uploader later;
+        // merge those fields without restarting playback or touching the resolved stream.
+        if !info.video.title.isEmpty,
+           (current.title == "YouTube video" || current.title.isEmpty || current.channelID.isEmpty) {
+            enrichCurrentVideo(with: Video(
+                id: current.id,
+                title: info.video.title,
+                channelID: info.video.channelID.isEmpty ? current.channelID : info.video.channelID,
+                channelName: info.video.channelName.isEmpty ? current.channelName : info.video.channelName,
+                channelThumbnailURL: info.video.channelThumbnailURL ?? current.channelThumbnailURL,
+                thumbnailURL: current.thumbnailURL ?? info.video.thumbnailURL,
+                duration: current.duration ?? info.video.duration,
+                viewCount: current.viewCount ?? info.video.viewCount,
+                publishedAt: current.publishedAt ?? info.video.publishedAt,
+                publishedRelative: current.publishedRelative ?? info.video.publishedRelative,
+                descriptionSnippet: info.descriptionText ?? current.descriptionSnippet,
+                isLive: current.isLive || info.video.isLive,
+                isShort: current.isShort || info.video.isShort
+            ))
+        }
         if !info.chapters.isEmpty {
             chapters = info.chapters
         }

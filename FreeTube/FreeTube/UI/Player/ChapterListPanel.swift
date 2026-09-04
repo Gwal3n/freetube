@@ -10,6 +10,8 @@ struct ChapterListPanel: View {
     let isLandscape: Bool
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
+    @State private var listScrollOffset: CGFloat = 0
+    @GestureState private var dismissTranslation: CGFloat = 0
 
     private var currentChapterID: VideoChapter.ID? {
         chapters.last { $0.startTime <= elapsed }?.id
@@ -43,6 +45,19 @@ struct ChapterListPanel: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: 1)
+                            .background {
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: ChapterListScrollOffsetKey.self,
+                                        value: max(
+                                            0,
+                                            -proxy.frame(in: .named("chapterListScroll")).minY
+                                        )
+                                    )
+                                }
+                            }
                         ForEach(chapters) { chapter in
                             Button {
                                 onSeek(chapter.startTime)
@@ -55,6 +70,10 @@ struct ChapterListPanel: View {
                     }
                     .padding(.vertical, 6)
                 }
+                .coordinateSpace(name: "chapterListScroll")
+                .onPreferenceChange(ChapterListScrollOffsetKey.self) {
+                    listScrollOffset = $0
+                }
                 .scrollIndicators(.visible)
                 .onAppear {
                     guard let currentChapterID else { return }
@@ -62,6 +81,8 @@ struct ChapterListPanel: View {
                 }
             }
         }
+        .offset(y: max(0, dismissTranslation))
+        .simultaneousGesture(chapterDismissGesture)
         .background(.regularMaterial)
         .overlay(alignment: isLandscape ? .leading : .top) {
             Rectangle()
@@ -69,6 +90,26 @@ struct ChapterListPanel: View {
                 .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
         }
         .shadow(color: .black.opacity(0.28), radius: 14)
+    }
+
+    /// A downward pull dismisses only while the chapter list is resting at its top. Upward drags
+    /// and drags within scrolled content remain ordinary list scrolling.
+    private var chapterDismissGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .updating($dismissTranslation) { value, state, _ in
+                guard listScrollOffset <= 1,
+                      value.translation.height > 0,
+                      abs(value.translation.height) > abs(value.translation.width) else { return }
+                state = value.translation.height
+            }
+            .onEnded { value in
+                guard listScrollOffset <= 1,
+                      value.translation.height > 0,
+                      abs(value.translation.height) > abs(value.translation.width) else { return }
+                if value.translation.height > 90 || value.predictedEndTranslation.height > 180 {
+                    onDismiss()
+                }
+            }
     }
 
     private func chapterRow(_ chapter: VideoChapter) -> some View {
@@ -123,5 +164,12 @@ struct ChapterListPanel: View {
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
             : String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+private struct ChapterListScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

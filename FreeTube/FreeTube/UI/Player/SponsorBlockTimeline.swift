@@ -67,9 +67,10 @@ struct SponsorBlockTimeline: View {
                     // later boundaries need a marker.
                     ForEach(chapters.filter { $0.startTime > 0 }) { chapter in
                         Rectangle()
-                            .fill(.black.opacity(0.82))
+                            .fill(.black)
                             .frame(width: 2, height: 4)
                             .offset(x: min(max(width * fraction(for: chapter.startTime) - 1, 0), width - 2))
+                            .blendMode(.destinationOut)
                     }
 
                     Circle()
@@ -77,6 +78,7 @@ struct SponsorBlockTimeline: View {
                         .frame(width: 14, height: 14)
                         .offset(x: min(max(width * progress - 7, 0), width - 14))
                 }
+                .compositingGroup()
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(

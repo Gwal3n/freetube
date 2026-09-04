@@ -230,16 +230,49 @@ final class VideoService: VideoServicing {
         parts.compactMap { part in
             guard let text = part.text, !text.isEmpty else { return nil }
             let action: VideoDescriptionPart.Action?
-            switch part.role {
-            case .link(let url): action = .externalURL(url)
-            case .chapter(let seconds): action = .seek(TimeInterval(seconds))
-            case .video(let id): action = .video(id)
-            case .channel(let id): action = .channel(id)
-            case .playlist(let id): action = .playlist(id)
-            default: action = nil
+            if let seconds = Self.timestampSeconds(from: text) {
+                action = .seek(seconds)
+            } else {
+                switch part.role {
+                case .link(let url): action = .externalURL(Self.unwrappedRedirect(url))
+                case .chapter(let seconds): action = .seek(TimeInterval(seconds))
+                case .video(let id): action = .video(id)
+                case .channel(let id): action = .channel(id)
+                case .playlist(let id): action = .playlist(id)
+                default: action = nil
+                }
             }
             return VideoDescriptionPart(text: text, action: action)
         }
+    }
+
+    /// YouTube sometimes describes a timestamp as a video link instead of a chapter action. Its
+    /// visible `m:ss`/`h:mm:ss` text remains stable, so recognize that form before inspecting role.
+    private static func timestampSeconds(from text: String) -> TimeInterval? {
+        let components = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+        guard components.count == 2 || components.count == 3,
+              components.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+              let seconds = components.last.flatMap({ Int($0) }), seconds < 60 else { return nil }
+        if components.count == 2 {
+            guard let minutes = Int(components[0]) else { return nil }
+            return TimeInterval(minutes * 60 + seconds)
+        }
+        guard let hours = Int(components[0]),
+              let minutes = Int(components[1]), minutes < 60 else { return nil }
+        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
+    }
+
+    /// MoreVideoInfos uses YouTube's tracking redirect for many ordinary links. Opening its `q`
+    /// destination directly avoids a browser flash and preserves the creator's actual URL.
+    private static func unwrappedRedirect(_ url: URL) -> URL {
+        guard let host = url.host?.lowercased(),
+              host == "youtube.com" || host.hasSuffix(".youtube.com"),
+              url.path == "/redirect",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let target = components.queryItems?
+                .first(where: { $0.name == "q" || $0.name == "url" })?.value,
+              let destination = URL(string: target) else { return url }
+        return destination
     }
 
     private static func storyboard(from storyboard: YTStoryboard) -> VideoStoryboard {

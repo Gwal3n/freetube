@@ -375,7 +375,7 @@ struct FullScreenPlayer: View {
         let expandedHeight = min(max(naturalHeight, compactHeight), viewportHeight * 0.72)
         let collapsible = expandedHeight - compactHeight
         guard collapsible > 0 else { return compactHeight }
-        let progress = min(max(panelScrollOffset / max(collapsible, 1), 0), 1)
+        let progress = min(max(panelScrollOffset / 160, 0), 1)
         return expandedHeight - collapsible * progress
     }
 
@@ -429,7 +429,8 @@ struct FullScreenPlayer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Color.clear
-                    .frame(height: 0)
+                    // Keep the geometry probe alive so it reliably emits scroll preferences.
+                    .frame(height: 1)
                     .reportPlayerPanelScrollOffset()
                 metadata(video)
                 detailsSection(video: video)

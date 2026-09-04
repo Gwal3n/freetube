@@ -264,9 +264,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   comments response; continuations and replies stay explicit. Disabling it restores fully lazy loads.
   The pinned b5i response exposes chapter title, start time, timestamp text, and thumbnails via
   `MoreVideoInfosResponse.chapters`; `VideoService` maps those into app-owned `VideoChapter` values.
-  The timeline draws subtle separators at chapter boundaries and shows the active chapter beside
+  The timeline punches transparent separators at chapter boundaries and shows the active chapter beside
   elapsed time. That label opens a thumbnail chapter browser over the lower feed in portrait and
-  in a trailing split column in landscape, leaving the video interactive; rows seek directly.
+  in a trailing split column in landscape, leaving the video interactive; rows seek directly. A
+  downward pull follows the finger and dismisses the browser when its own list is at the top.
   Native extraction wraps `playerStoryboardSpecRenderer` in an app-owned `VideoStoryboard` and
   carries it with the successful playback candidate. The storyboard and signed stream URL share
   the existing 30-minute in-memory cache; no redundant b5i player request is made. b5i fallback
@@ -290,9 +291,12 @@ and a rejected strategy is excluded before requesting the next candidate.
   a continuation token nor a comments header/count as disabled and show that state after expansion;
   a present zero-count header is an available empty section, not disabled. Preserve its formatted
   comment count in `VideoInfo` and show it in the collapsed section heading. Keep expanded metadata
-  app-owned: structured description runs map to `VideoDescriptionPart`; timestamps seek locally and
-  ordinary links use the system handler. AVPlayer's display-correct `presentationSize` expands tall
-  portrait media, while scrolling the lower panel progressively compresses it toward 16:9.
+  app-owned: structured description runs map to `VideoDescriptionPart`; timestamp-shaped runs seek
+  locally even when YouTube labels them as video links, while ordinary links use the system handler
+  after unwrapping YouTube tracking redirects. AVPlayer's display-correct `presentationSize` expands
+  tall portrait media, while a non-zero scroll geometry probe progressively compresses it toward
+  16:9 over the first 160 points of lower-panel scrolling. Cached MoreVideoInfos metadata may replace
+  direct-URL placeholder titles/uploader details without restarting playback.
 - **Search is search-only.** Its root contains local recent searches or the clean empty state; it
   must not request or render a home/trending/discovery feed. Native search presents suggestions,
   and a successful keyboard/suggestion/history submission swaps the root content to results in
