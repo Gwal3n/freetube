@@ -254,6 +254,7 @@ private struct LocalHistoryScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @Query(sort: \WatchHistoryEntry.watchedAt, order: .reverse) private var entries: [WatchHistoryEntry]
     @State private var confirmsClear = false
+    @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
 
     var body: some View {
         Group {
@@ -268,7 +269,11 @@ private struct LocalHistoryScreen: View {
                     ForEach(dayGroups, id: \.day) { group in
                         Section {
                             ForEach(group.entries) { entry in
-                                VideoRow(video: video(from: entry), showsMoreMenu: true) {
+                                VideoRow(
+                                    video: video(from: entry),
+                                    showsMoreMenu: true,
+                                    playbackProgress: showHistoryProgressBars ? playbackProgress(for: entry) : nil
+                                ) {
                                     player.load(video(from: entry))
                                 }
                                 .swipeActions {
@@ -340,6 +345,18 @@ private struct LocalHistoryScreen: View {
             isLive: false,
             isShort: false
         )
+    }
+
+    /// Match `PlayerStateManager.applyStoredResumePosition` exactly so a row never advertises
+    /// progress for a video that playback considers finished or too close to an endpoint.
+    private func playbackProgress(for entry: WatchHistoryEntry) -> Double? {
+        guard entry.lastPosition.isFinite,
+              entry.duration.isFinite,
+              entry.lastPosition >= 10,
+              entry.duration > 0,
+              entry.duration - entry.lastPosition >= 30,
+              entry.lastPosition < entry.duration * 0.95 else { return nil }
+        return entry.lastPosition / entry.duration
     }
 }
 

@@ -18,6 +18,8 @@ struct UserPreferences {
     /// cleanly for existing installs.
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
+    /// Shows locally stored resume progress along the bottom edge of History thumbnails.
+    @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
     /// Fetches expanded details and the first comments page only after playback is ready. Further
     /// comment pages and replies always remain user initiated.
     @AppStorage("prefetchVideoDetails") var prefetchVideoDetails: Bool = true

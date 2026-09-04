@@ -42,6 +42,7 @@ struct SettingsScreen: View {
                         }
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
+                    Toggle("Show history progress", isOn: Bindable(model).showHistoryProgressBars)
                     Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
                     Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
                 } header: {

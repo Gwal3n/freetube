@@ -33,6 +33,11 @@ final class SettingsViewModel {
         set { preferences.autoplayNext = newValue }
     }
 
+    var showHistoryProgressBars: Bool {
+        get { preferences.showHistoryProgressBars }
+        set { preferences.showHistoryProgressBars = newValue }
+    }
+
     var prefetchVideoDetails: Bool {
         get { preferences.prefetchVideoDetails }
         set { preferences.prefetchVideoDetails = newValue }
