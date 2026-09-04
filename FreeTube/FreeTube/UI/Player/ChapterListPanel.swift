@@ -11,7 +11,9 @@ struct ChapterListPanel: View {
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
     @State private var listScrollOffset: CGFloat = 0
-    @GestureState private var dismissTranslation: CGFloat = 0
+    @State private var dismissTranslation: CGFloat = 0
+    @State private var dismissDragOrigin: CGFloat = 0
+    @State private var isTrackingDismiss = false
 
     private var currentChapterID: VideoChapter.ID? {
         chapters.last { $0.startTime <= elapsed }?.id
@@ -70,6 +72,7 @@ struct ChapterListPanel: View {
                     }
                     .padding(.vertical, 6)
                 }
+                .scrollDisabled(isTrackingDismiss)
                 .coordinateSpace(name: "chapterListScroll")
                 .onPreferenceChange(ChapterListScrollOffsetKey.self) {
                     listScrollOffset = $0
@@ -96,19 +99,30 @@ struct ChapterListPanel: View {
     /// and drags within scrolled content remain ordinary list scrolling.
     private var chapterDismissGesture: some Gesture {
         DragGesture(minimumDistance: 8)
-            .updating($dismissTranslation) { value, state, _ in
-                guard listScrollOffset <= 1,
-                      value.translation.height > 0,
-                      abs(value.translation.height) > abs(value.translation.width) else { return }
-                state = value.translation.height
+            .onChanged { value in
+                let downward = value.translation.height > 0
+                    && abs(value.translation.height) > abs(value.translation.width)
+                guard downward else { return }
+                if !isTrackingDismiss {
+                    guard listScrollOffset <= 1 else { return }
+                    // If this drag began by scrolling a long list back to its top, begin sheet
+                    // motion from zero here instead of jumping by the drag's full translation.
+                    dismissDragOrigin = value.translation.height
+                    isTrackingDismiss = true
+                }
+                dismissTranslation = max(0, value.translation.height - dismissDragOrigin)
             }
             .onEnded { value in
-                guard listScrollOffset <= 1,
-                      value.translation.height > 0,
-                      abs(value.translation.height) > abs(value.translation.width) else { return }
-                if value.translation.height > 90 || value.predictedEndTranslation.height > 180 {
+                guard isTrackingDismiss else { return }
+                let projected = value.predictedEndTranslation.height - dismissDragOrigin
+                if dismissTranslation > 90 || projected > 180 {
                     onDismiss()
                 }
+                withAnimation(.snappy(duration: 0.24)) {
+                    dismissTranslation = 0
+                }
+                dismissDragOrigin = 0
+                isTrackingDismiss = false
             }
     }
 

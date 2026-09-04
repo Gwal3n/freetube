@@ -56,13 +56,11 @@ struct RootView: View {
             // body re-renders and `.popupProgress(...)` re-applies with the new value.
             PopupContentWrapper(thumbnail: thumbnail)
         }
-        // `.drag` enables LNPopupUI's pull-down-from-content gesture for collapsing the
-        // expanded player. Previously we had `.snap` here PLUS a hand-rolled `DragGesture` in
-        // `FullScreenPlayer.body` — the two raced each other and the visible offset wouldn't
-        // track the finger during the drag once playback became interactive. `.drag` alone is
-        // what LNPopupUI ships for this exact use case; the popup bar's own tap-to-open still
-        // works the same.
-        .popupInteractionStyle(UIViewController.PopupInteractionStyle.drag)
+        // Lower-feed scrolling and overlays own their vertical gestures. A global LNPopup pan
+        // races those gestures and can collapse the whole player while dismissing Chapters.
+        // The video surface retains its explicit pull-down gesture; the mini-player still opens
+        // by tapping it.
+        .popupInteractionStyle(UIViewController.PopupInteractionStyle.none)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)
         .popupBarStyle(LNPopupBar.Style.prominent)
         // LNPopupController's marquee animation corrupts the native title/subtitle layout on

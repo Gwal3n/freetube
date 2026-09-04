@@ -226,12 +226,9 @@ struct FullScreenPlayer: View {
             //
             // `AVPlayerViewController`'s internal `UIPanGestureRecognizer`s (scrubber, system
             // controls) consume touches before they can reach LNPopupUI's outer pan, so the
-            // library's `.popupInteractionStyle(.drag)` only works when the gesture starts on
-            // SwiftUI views below the video (comments / queue). `.simultaneousGesture` is the
-            // escape hatch: SwiftUI composes this `DragGesture` with the UIKit recognizers
-            // underneath instead of arbitrating between them, so AVPlayerViewController's
-            // controls keep working AND we can detect a downward pull and dismiss the popup
-            // imperatively. LNPopupUI animates the collapse — we just flip the binding.
+            // the popup host cannot reliably detect a gesture starting here. This explicit
+            // simultaneous gesture keeps AVPlayerViewController's controls working while allowing
+            // a pull begun on the video itself to collapse the popup.
             .simultaneousGesture(
                 DragGesture(minimumDistance: 30, coordinateSpace: .global)
                     .onEnded { value in
@@ -336,12 +333,9 @@ struct FullScreenPlayer: View {
             }
         }
         .errorToast($downloadError)
-        // Pull-down-to-dismiss is handled by LNPopupUI via `.popupInteractionStyle(...)` in
-        // RootView. We don't install a custom DragGesture here — it would race with the system
-        // gesture arbitration the popup hosts (and with AVPlayerViewController's own touch
-        // handling once the video surface goes interactive). That was the bug where the
-        // expanded player wouldn't visibly follow the finger during a downward swipe once
-        // playback started; the close was only happening on touch-up.
+        // RootView disables LNPopupUI's global content pan so scrolling this lower feed—or a
+        // chapter list—cannot accidentally collapse the whole player. Only the explicit gesture
+        // attached to the video surface above may collapse it.
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
         // claims the natural content height (video + panel intrinsic
@@ -426,6 +420,23 @@ struct FullScreenPlayer: View {
     /// shows through directly behind metadata, Up Next, and Comments.
     @ViewBuilder
     private func panel(_ video: Video) -> some View {
+        if #available(iOS 18.0, *) {
+            panelScrollView(video)
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    max(0, geometry.contentOffset.y + geometry.contentInsets.top)
+                } action: { _, offset in
+                    panelScrollOffset = offset
+                }
+        } else {
+            panelScrollView(video)
+                .coordinateSpace(name: "playerPanelScroll")
+                .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
+                    panelScrollOffset = offset
+                }
+        }
+    }
+
+    private func panelScrollView(_ video: Video) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Color.clear
@@ -442,10 +453,6 @@ struct FullScreenPlayer: View {
                     .id(video.id)
             }
             .padding(.vertical)
-        }
-        .coordinateSpace(name: "playerPanelScroll")
-        .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
-            panelScrollOffset = offset
         }
         .scrollContentBackground(.hidden)
     }

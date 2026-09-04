@@ -294,8 +294,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   app-owned: structured description runs map to `VideoDescriptionPart`; timestamp-shaped runs seek
   locally even when YouTube labels them as video links, while ordinary links use the system handler
   after unwrapping YouTube tracking redirects. AVPlayer's display-correct `presentationSize` expands
-  tall portrait media, while a non-zero scroll geometry probe progressively compresses it toward
-  16:9 over the first 160 points of lower-panel scrolling. Cached MoreVideoInfos metadata may replace
+  tall portrait media. On iOS 18+, native `onScrollGeometryChange` progressively compresses it
+  toward 16:9 over the first 160 points of lower-panel scrolling; retain the geometry probe only as
+  the iOS 17 fallback. Cached MoreVideoInfos metadata may replace
   direct-URL placeholder titles/uploader details without restarting playback.
 - **Search is search-only.** Its root contains local recent searches or the clean empty state; it
   must not request or render a home/trending/discovery feed. Native search presents suggestions,
