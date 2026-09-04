@@ -14,6 +14,7 @@ struct FullScreenPlayer: View {
 
     /// Keep recommendation rows out of the render tree until the user asks to inspect them.
     @State private var isQueueExpanded = false
+    @State private var isPlaylistExpanded = true
     /// Async-loaded description / details for the currently-playing video. Fetched on demand when
     /// the user taps "More" under the channel row.
     @State private var details: VideoInfo?
@@ -474,6 +475,9 @@ struct FullScreenPlayer: View {
                     .reportPlayerPanelScrollOffset()
                 metadata(video)
                 detailsSection(video: video)
+                if player.activePlaylist != nil {
+                    playlistPanel
+                }
                 queuePanel
                 CommentsSection(
                     videoID: video.id,
@@ -1030,16 +1034,59 @@ struct FullScreenPlayer: View {
     /// Total height we hand to the queue `List`. Sized for the actual number of items + a 32pt
     /// bottom margin so the last row's edit-handle / swipe affordance isn't truncated.
     private var queueListHeight: CGFloat {
-        let loadMoreRows = player.canLoadMoreQueueItems ? 1 : 0
-        let count = max(1, displayedQueueIndices.count + loadMoreRows)
+        let loadMoreRows = player.canLoadMoreRecommendations ? 1 : 0
+        let count = max(1, displayedUpNextVideos.count + loadMoreRows)
         return CGFloat(count) * Self.queueRowFootprint + 32
+    }
+
+    private var playlistListHeight: CGFloat {
+        let loadMoreRows = player.canLoadMorePlaylistItems ? 1 : 0
+        return CGFloat(max(1, player.queue.items.count + loadMoreRows)) * Self.queueRowFootprint + 32
     }
 
     private var displayedQueueIndices: [Int] {
         player.queue.items.indices.filter { player.queue.items[$0].id != player.currentVideo?.id }
     }
 
+    private var displayedUpNextVideos: [Video] {
+        player.activePlaylist == nil
+            ? displayedQueueIndices.map { player.queue.items[$0] }
+            : player.playlistRecommendations
+    }
+
     // MARK: - Queue panel
+
+    @ViewBuilder
+    private var playlistPanel: some View {
+        if let playlist = player.activePlaylist {
+            VStack(alignment: .leading, spacing: 8) {
+                collapsiblePanelHeader(
+                    title: "Playlist",
+                    subtitle: playlist.title,
+                    isExpanded: $isPlaylistExpanded
+                )
+                if isPlaylistExpanded {
+                    List {
+                        ForEach(player.queue.items) { video in
+                            queueRow(video, preservesPlaylistContext: true)
+                                .listRowBackground(Color.clear)
+                                .frame(height: Self.queueRowHeight)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        }
+                        if player.canLoadMorePlaylistItems {
+                            loadMoreQueueButton(isLoading: player.isLoadingMorePlaylistVideos) {
+                                await player.loadMorePlaylistItems()
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollDisabled(true)
+                    .frame(height: playlistListHeight)
+                }
+            }
+        }
+    }
 
     @ViewBuilder
     private var queuePanel: some View {
@@ -1049,7 +1096,7 @@ struct FullScreenPlayer: View {
                     isQueueExpanded.toggle()
                 } label: {
                     HStack {
-                        SectionHeader(title: player.activePlaylist?.title ?? "Up next")
+                        SectionHeader(title: "Up next")
                         Spacer()
                     }
                     .contentShape(Rectangle())
@@ -1075,13 +1122,14 @@ struct FullScreenPlayer: View {
             // doesn't try to consume the outer scroll's gesture space.
             if isQueueExpanded {
                 List {
-                    ForEach(displayedQueueIndices, id: \.self) { queueIndex in
-                        queueRow(player.queue.items[queueIndex])
+                    ForEach(displayedUpNextVideos) { video in
+                        queueRow(video, preservesPlaylistContext: false)
                             .listRowBackground(Color.clear)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
                     .onDelete { offsets in
+                        guard player.activePlaylist == nil else { return }
                         let queueIndices = offsets.compactMap { displayIndex in
                             displayedQueueIndices.indices.contains(displayIndex)
                                 ? displayedQueueIndices[displayIndex]
@@ -1091,13 +1139,13 @@ struct FullScreenPlayer: View {
                             player.queue.remove(at: queueIndex)
                         }
                     }
-                    if player.canLoadMoreQueueItems {
+                    if player.canLoadMoreRecommendations {
                         Button {
-                            Task { await player.loadMoreQueueItems() }
+                            Task { await player.loadMoreRecommendations() }
                         } label: {
                             HStack {
                                 Spacer()
-                                if player.isLoadingMoreQueueItems {
+                                if player.isLoadingMoreRecommendations {
                                     ProgressView()
                                 } else {
                                     Label("Load more", systemImage: "chevron.down")
@@ -1108,7 +1156,7 @@ struct FullScreenPlayer: View {
                             .frame(height: Self.queueRowHeight)
                         }
                         .buttonStyle(.plain)
-                        .disabled(player.isLoadingMoreQueueItems)
+                        .disabled(player.isLoadingMoreRecommendations)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
@@ -1124,11 +1172,70 @@ struct FullScreenPlayer: View {
         }
     }
 
+    private func collapsiblePanelHeader(
+        title: String,
+        subtitle: String,
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        HStack {
+            Button {
+                isExpanded.wrappedValue.toggle()
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    SectionHeader(title: title)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Button {
+                isExpanded.wrappedValue.toggle()
+            } label: {
+                Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal)
+    }
+
+    private func loadMoreQueueButton(
+        isLoading: Bool,
+        action: @escaping () async -> Void
+    ) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            HStack {
+                Spacer()
+                if isLoading {
+                    ProgressView()
+                } else {
+                    Label("Load more", systemImage: "chevron.down")
+                        .font(.subheadline.weight(.medium))
+                }
+                Spacer()
+            }
+            .frame(height: Self.queueRowHeight)
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+    }
+
     @ViewBuilder
-    private func queueRow(_ video: Video) -> some View {
+    private func queueRow(_ video: Video, preservesPlaylistContext: Bool) -> some View {
         HStack(spacing: 0) {
             Button {
-                player.load(video, skipRecommendations: player.activePlaylist != nil)
+                player.load(video, skipRecommendations: preservesPlaylistContext)
             } label: {
                 HStack(spacing: 12) {
                     // Thumbnail with duration badge in the bottom-right corner — same affordance

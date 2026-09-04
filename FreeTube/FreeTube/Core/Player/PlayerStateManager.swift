@@ -60,6 +60,7 @@ final class PlayerStateManager {
     private(set) var isLoadingMoreRecommendations = false
     private(set) var activePlaylist: Playlist?
     private(set) var isLoadingMorePlaylistVideos = false
+    private(set) var playlistRecommendations: [Video] = []
     /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
     private(set) var videoPresentationSize: CGSize = .zero
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
@@ -216,6 +217,7 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         activePlaylist = nil
+        playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
         videoPresentationSize = .zero
@@ -255,6 +257,7 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         activePlaylist = nil
+        playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
         videoPresentationSize = .zero
@@ -334,6 +337,7 @@ final class PlayerStateManager {
         queueAcceptsRecommendations = !skipRecommendations
         if !skipRecommendations {
             activePlaylist = nil
+            playlistRecommendations = []
             playlistContinuationToken = nil
             isLoadingMorePlaylistVideos = false
         }
@@ -661,31 +665,27 @@ final class PlayerStateManager {
         if shuffled { queue.isShuffleOn = true }
         load(video, skipRecommendations: true)
         activePlaylist = details.playlist
+        playlistRecommendations = []
         playlistContinuationToken = details.continuationToken
     }
 
-    var canLoadMoreQueueItems: Bool {
-        if activePlaylist != nil { return playlistContinuationToken != nil }
-        return canLoadMoreRecommendations
+    var canLoadMorePlaylistItems: Bool {
+        activePlaylist != nil && playlistContinuationToken != nil
     }
 
-    func loadMoreQueueItems() async {
-        if activePlaylist != nil {
-            guard let token = playlistContinuationToken, !isLoadingMorePlaylistVideos else { return }
-            let playlistID = activePlaylist?.id
-            isLoadingMorePlaylistVideos = true
-            defer { isLoadingMorePlaylistVideos = false }
-            do {
-                let page = try await playlistService.fetchMore(continuation: token)
-                guard activePlaylist?.id == playlistID else { return }
-                let existing = Set(queue.items.map(\.id))
-                queue.append(contentsOf: page.videos.filter { !existing.contains($0.id) })
-                playlistContinuationToken = page.continuationToken
-            } catch {
-                log.notice("Playlist continuation failed: \(String(describing: error), privacy: .public)")
-            }
-        } else {
-            await loadMoreRecommendations()
+    func loadMorePlaylistItems() async {
+        guard let token = playlistContinuationToken, !isLoadingMorePlaylistVideos else { return }
+        let playlistID = activePlaylist?.id
+        isLoadingMorePlaylistVideos = true
+        defer { isLoadingMorePlaylistVideos = false }
+        do {
+            let page = try await playlistService.fetchMore(continuation: token)
+            guard activePlaylist?.id == playlistID else { return }
+            let existing = Set(queue.items.map(\.id))
+            queue.append(contentsOf: page.videos.filter { !existing.contains($0.id) })
+            playlistContinuationToken = page.continuationToken
+        } catch {
+            log.notice("Playlist continuation failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -709,6 +709,7 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         activePlaylist = nil
+        playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
         pause()
@@ -1237,7 +1238,7 @@ final class PlayerStateManager {
         // Every other entry point — single video taps from Home/Search/Mini-player, queue-row
         // taps, Next/Previous, and even tapping an individual playlist video — gets the
         // autoplay-style recommendation fill, so the player keeps advancing past the seed.
-        if !skipRecommendations {
+        if !skipRecommendations || activePlaylist != nil {
             recommendationTask = Task { [weak self] in
                 await self?.fillQueueWithRecommendations(for: video)
             }
@@ -1263,13 +1264,17 @@ final class PlayerStateManager {
                 return
             }
             installVideoDetails(info, for: seed.id)
-            let existingIDs = Set(queue.items.map(\.id))
+            let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
             let needed = targetUpcomingCount - upcomingCount
             let fresh = info.recommended.filter { !existingIDs.contains($0.id) }
             let toAppend = Array(fresh.prefix(needed))
             recommendationBacklog = Array(fresh.dropFirst(toAppend.count))
             recommendationContinuationToken = info.recommendedContinuationToken
-            queue.append(contentsOf: toAppend)
+            if activePlaylist != nil {
+                playlistRecommendations = toAppend
+            } else {
+                queue.append(contentsOf: toAppend)
+            }
             log.info("Queued \(toAppend.count, privacy: .public) recommendations for \(seed.id, privacy: .public)")
         } catch is CancellationError {
             log.debug("Recommendation fetch cancelled for \(seed.id, privacy: .public)")
@@ -1292,7 +1297,11 @@ final class PlayerStateManager {
         if !recommendationBacklog.isEmpty {
             let page = Array(recommendationBacklog.prefix(5))
             recommendationBacklog.removeFirst(page.count)
-            queue.append(contentsOf: page)
+            if activePlaylist != nil {
+                playlistRecommendations.append(contentsOf: page)
+            } else {
+                queue.append(contentsOf: page)
+            }
             return
         }
 
@@ -1301,12 +1310,16 @@ final class PlayerStateManager {
         do {
             let page = try await videoService.fetchRecommendedVideos(continuation: token)
             guard !Task.isCancelled, currentVideo?.id == videoID else { return }
-            let existingIDs = Set(queue.items.map(\.id))
+            let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
             let fresh = page.videos.filter { !existingIDs.contains($0.id) }
             let visible = Array(fresh.prefix(5))
             recommendationBacklog = Array(fresh.dropFirst(visible.count))
             recommendationContinuationToken = page.continuationToken
-            queue.append(contentsOf: visible)
+            if activePlaylist != nil {
+                playlistRecommendations.append(contentsOf: visible)
+            } else {
+                queue.append(contentsOf: visible)
+            }
         } catch {
             log.notice("Recommendation continuation failed: \(String(describing: error), privacy: .public)")
         }
