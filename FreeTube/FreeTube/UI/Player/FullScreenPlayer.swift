@@ -117,6 +117,7 @@ struct FullScreenPlayer: View {
                         hasEnded: player.hasEnded,
                         elapsed: scrubberSeekPreview ?? gestureSeekPreview ?? player.elapsed,
                         duration: player.duration,
+                        isLive: player.currentVideo?.isLive == true,
                         sponsorSegments: player.sponsorBlockSegments,
                         chapters: player.chapters,
                         hasPrevious: hasPrevious,
@@ -568,10 +569,22 @@ struct FullScreenPlayer: View {
             }
             .buttonStyle(.plain)
             let statsRow = detailsStatsRow(video: video)
-            if !statsRow.isEmpty {
-                Text(statsRow)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if video.isLive || !statsRow.isEmpty {
+                HStack(spacing: 7) {
+                    if video.isLive {
+                        Text("LIVE")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                    }
+                    if !statsRow.isEmpty {
+                        Text(statsRow)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             // Tapping anywhere on the channel row pushes the channel detail screen onto the
             // popup's internal NavigationStack — banner, subscribe button, latest videos,
@@ -1017,7 +1030,8 @@ struct FullScreenPlayer: View {
     /// Total height we hand to the queue `List`. Sized for the actual number of items + a 32pt
     /// bottom margin so the last row's edit-handle / swipe affordance isn't truncated.
     private var queueListHeight: CGFloat {
-        let count = max(1, displayedQueueIndices.count)
+        let loadMoreRows = player.canLoadMoreRecommendations ? 1 : 0
+        let count = max(1, displayedQueueIndices.count + loadMoreRows)
         return CGFloat(count) * Self.queueRowFootprint + 32
     }
 
@@ -1077,6 +1091,27 @@ struct FullScreenPlayer: View {
                             player.queue.remove(at: queueIndex)
                         }
                     }
+                    if player.canLoadMoreRecommendations {
+                        Button {
+                            Task { await player.loadMoreRecommendations() }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if player.isLoadingMoreRecommendations {
+                                    ProgressView()
+                                } else {
+                                    Label("Load more", systemImage: "chevron.down")
+                                        .font(.subheadline.weight(.medium))
+                                }
+                                Spacer()
+                            }
+                            .frame(height: Self.queueRowHeight)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(player.isLoadingMoreRecommendations)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -1115,7 +1150,10 @@ struct FullScreenPlayer: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
-                                .background(Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 3))
+                                .background(
+                                    video.isLive ? Color.red : Color.black.opacity(0.78),
+                                    in: RoundedRectangle(cornerRadius: 3)
+                                )
                                 .padding(3)
                         }
                     }

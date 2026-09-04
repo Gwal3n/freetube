@@ -33,7 +33,7 @@ enum Mappers {
             publishedAt: nil,
             publishedRelative: yt.timePosted,
             descriptionSnippet: nil,
-            isLive: yt.timeLength == "live",
+            isLive: yt.timeLength?.localizedCaseInsensitiveCompare("live") == .orderedSame,
             isShort: false
         )
     }

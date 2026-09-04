@@ -60,6 +60,7 @@ extension Video {
 
 extension Video {
     var durationString: String {
+        if isLive { return "LIVE" }
         guard let duration else { return "" }
         let total = Int(duration)
         let hours = total / 3600

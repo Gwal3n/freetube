@@ -193,7 +193,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func performDoubleTapSeek(at location: CGPoint) {
-        guard let view = gestureView else { return }
+        guard let view = gestureView,
+              let itemDuration = player?.currentItem?.duration.seconds,
+              itemDuration.isFinite,
+              itemDuration > 0 else { return }
         let isForward = location.x >= view.bounds.midX
         let interval: TimeInterval = isForward ? 10 : -10
         log.info("Double tap recognized; seeking \(interval, privacy: .public)s")

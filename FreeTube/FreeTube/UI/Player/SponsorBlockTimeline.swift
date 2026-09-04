@@ -4,6 +4,7 @@ import SwiftUI
 struct SponsorBlockTimeline: View {
     let elapsed: TimeInterval
     let duration: TimeInterval
+    let isLive: Bool
     let segments: [SponsorBlockSegment]
     let chapters: [VideoChapter]
     let onSeek: (TimeInterval) -> Void
@@ -21,6 +22,19 @@ struct SponsorBlockTimeline: View {
     }
 
     var body: some View {
+        if isLive, duration <= 0 {
+            HStack {
+                Text("LIVE")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                Spacer()
+            }
+            .padding(.vertical, 6)
+            .accessibilityLabel("Live broadcast")
+        } else {
         VStack(spacing: 4) {
             HStack(spacing: 7) {
                 Text(verbatim: format(displayedTime))
@@ -124,6 +138,7 @@ struct SponsorBlockTimeline: View {
         .accessibilityAdjustableAction { direction in
             let delta: TimeInterval = direction == .increment ? 10 : -10
             onSeek(min(max(elapsed + delta, 0), duration))
+        }
         }
     }
 

@@ -143,7 +143,7 @@ Every YouTubeKit response type gets exactly one service method. Do not call `You
 | `PlaylistInfosResponse` (+Continuation) | `PlaylistService.fetchPlaylist(id:)` / `fetchMore()` |
 | `VideoInfosResponse` | `VideoService.fetchInfo(id:)` (iOS client) — **also `VideoService.fetchInfoViaTVHTML5(id:)`** (TVHTML5_SIMPLY_EMBEDDED_PLAYER context for PoT-resistant URLs) |
 | `VideoInfosWithDownloadFormatsResponse` | `VideoService.fetchInfoWithFormats(id:)` |
-| `MoreVideoInfosResponse` | `VideoService.fetchMoreInfo(id:)` |
+| `MoreVideoInfosResponse` (+RecommendedVideosContinuation) | `VideoService.fetchMoreInfo(id:)` / `fetchRecommendedVideos(continuation:)` |
 | `AccountInfosResponse` | `AccountService.fetchAccountInfo()` |
 | `AccountLibraryResponse` | `AccountService.fetchLibrary()` |
 | `AccountPlaylistsResponse` | `AccountService.fetchPlaylists()` |

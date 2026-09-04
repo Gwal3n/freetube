@@ -10,6 +10,7 @@ struct VideoInfo: Sendable {
     let isLikedByUser: Bool
     let isDislikedByUser: Bool
     let recommended: [Video]
+    let recommendedContinuationToken: String?
     let viewCountText: String?
     let uploadDateText: String?
     let chapters: [VideoChapter]
@@ -34,10 +35,16 @@ struct VideoInfoWithFormats: Sendable {
     let formats: [VideoFormat]
 }
 
+struct RecommendedVideosPage: Sendable {
+    let videos: [Video]
+    let continuationToken: String?
+}
+
 protocol VideoServicing: Sendable {
     func fetchInfo(id: String) async throws -> VideoInfo
     func fetchInfoWithFormats(id: String) async throws -> VideoInfoWithFormats
     func fetchMoreInfo(id: String) async throws -> VideoInfo
+    func fetchRecommendedVideos(continuation: String) async throws -> RecommendedVideosPage
     /// Alternate fetch using the `TVHTML5_SIMPLY_EMBEDDED_PLAYER` client — same response shape
     /// as `fetchInfo`, but the returned per-format URLs aren't PoT-protected. Used by the resolver
     /// as a fallback when the iOS client gives us only PoT-locked adaptive streams.
@@ -139,6 +146,7 @@ final class VideoService: VideoServicing {
                 isLikedByUser: response.authenticatedInfos?.likeStatus == .liked,
                 isDislikedByUser: response.authenticatedInfos?.likeStatus == .disliked,
                 recommended: recommended,
+                recommendedContinuationToken: response.recommendedVideosContinuationToken,
                 viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
                 uploadDateText: response.timePosted.postedDate ?? response.timePosted.relativePostedDate,
                 chapters: Self.chapters(from: response.chapters ?? []),
@@ -150,6 +158,19 @@ final class VideoService: VideoServicing {
                     : .disabled,
                 streamingURL: nil,
                 formats: []
+            )
+        } catch {
+            throw YouTubeServiceError.network(error)
+        }
+    }
+
+    func fetchRecommendedVideos(continuation: String) async throws -> RecommendedVideosPage {
+        do {
+            let response = try await MoreVideoInfosResponse.RecommendedVideosContinuation
+                .sendThrowingRequest(youtubeModel: client.model, data: [.continuation: continuation])
+            return RecommendedVideosPage(
+                videos: response.results.compactMap { $0 as? YTVideo }.map(Mappers.video(from:)),
+                continuationToken: response.continuationToken
             )
         } catch {
             throw YouTubeServiceError.network(error)
@@ -194,6 +215,7 @@ final class VideoService: VideoServicing {
             isLikedByUser: false,
             isDislikedByUser: false,
             recommended: recommended,
+            recommendedContinuationToken: nil,
             viewCountText: nil,
             uploadDateText: nil,
             chapters: [],

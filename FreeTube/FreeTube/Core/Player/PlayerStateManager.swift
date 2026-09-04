@@ -57,6 +57,7 @@ final class PlayerStateManager {
     private(set) var chapters: [VideoChapter] = []
     private(set) var storyboard: VideoStoryboard?
     private(set) var commentsCountText: String?
+    private(set) var isLoadingMoreRecommendations = false
     /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
     private(set) var videoPresentationSize: CGSize = .zero
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
@@ -81,6 +82,7 @@ final class PlayerStateManager {
     let queue: QueueManager
     private let resolver: any PlaybackResolving
     private let sponsorBlockService: any SponsorBlockServicing
+    private let videoService: any VideoServicing
     private let preferences: UserPreferences
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
@@ -139,15 +141,19 @@ final class PlayerStateManager {
     private var lastProgressSaveAt = Date.distantPast
     private var lastSavedProgressVideoID: String?
     private var lastSavedProgressPosition: TimeInterval = -.infinity
+    private var recommendationBacklog: [Video] = []
+    private var recommendationContinuationToken: String?
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
         sponsorBlockService: any SponsorBlockServicing = SponsorBlockService(),
+        videoService: any VideoServicing = VideoService(),
         preferences: UserPreferences = UserPreferences()
     ) {
         self.queue = queue
         self.resolver = resolver
         self.sponsorBlockService = sponsorBlockService
+        self.videoService = videoService
         self.preferences = preferences
         self.playbackRate = preferences.playbackRate
         self.playbackQuality = preferences.preferredQuality
@@ -200,6 +206,9 @@ final class PlayerStateManager {
         chapters = []
         storyboard = nil
         commentsCountText = nil
+        recommendationBacklog = []
+        recommendationContinuationToken = nil
+        isLoadingMoreRecommendations = false
         videoPresentationSize = .zero
     }
 
@@ -233,6 +242,9 @@ final class PlayerStateManager {
         chapters = []
         storyboard = nil
         commentsCountText = nil
+        recommendationBacklog = []
+        recommendationContinuationToken = nil
+        isLoadingMoreRecommendations = false
         videoPresentationSize = .zero
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
@@ -300,6 +312,9 @@ final class PlayerStateManager {
         chapters = []
         storyboard = nil
         commentsCountText = nil
+        recommendationBacklog = []
+        recommendationContinuationToken = nil
+        isLoadingMoreRecommendations = false
         videoPresentationSize = .zero
         if recordInPlaybackHistory {
             recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
@@ -515,6 +530,7 @@ final class PlayerStateManager {
         resumeAfterEnded: Bool = true
     ) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
+        guard currentVideo?.isLive != true || duration > 0 else { return }
         let boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
         let shouldResume = resumeAfterEnded && hasEnded && boundedSeconds < max(0, duration - 0.25)
         if shouldResume {
@@ -630,6 +646,9 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        recommendationBacklog = []
+        recommendationContinuationToken = nil
+        isLoadingMoreRecommendations = false
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -1184,17 +1203,50 @@ final class PlayerStateManager {
             installVideoDetails(info, for: seed.id)
             let existingIDs = Set(queue.items.map(\.id))
             let needed = targetUpcomingCount - upcomingCount
-            let toAppend = Array(
-                info.recommended
-                    .filter { !existingIDs.contains($0.id) }
-                    .prefix(needed)
-            )
+            let fresh = info.recommended.filter { !existingIDs.contains($0.id) }
+            let toAppend = Array(fresh.prefix(needed))
+            recommendationBacklog = Array(fresh.dropFirst(toAppend.count))
+            recommendationContinuationToken = info.recommendedContinuationToken
             queue.append(contentsOf: toAppend)
             log.info("Queued \(toAppend.count, privacy: .public) recommendations for \(seed.id, privacy: .public)")
         } catch is CancellationError {
             log.debug("Recommendation fetch cancelled for \(seed.id, privacy: .public)")
         } catch {
             log.notice("Recommendation fetch failed for \(seed.id, privacy: .public): \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    var canLoadMoreRecommendations: Bool {
+        !recommendationBacklog.isEmpty || recommendationContinuationToken != nil
+    }
+
+    /// Adds the next small recommendation page to Up Next. The remainder of YouTube's initial
+    /// response is consumed before its network continuation, so no recommendations are skipped.
+    func loadMoreRecommendations() async {
+        guard !isLoadingMoreRecommendations, canLoadMoreRecommendations else { return }
+        isLoadingMoreRecommendations = true
+        defer { isLoadingMoreRecommendations = false }
+
+        if !recommendationBacklog.isEmpty {
+            let page = Array(recommendationBacklog.prefix(5))
+            recommendationBacklog.removeFirst(page.count)
+            queue.append(contentsOf: page)
+            return
+        }
+
+        guard let token = recommendationContinuationToken else { return }
+        let videoID = currentVideo?.id
+        do {
+            let page = try await videoService.fetchRecommendedVideos(continuation: token)
+            guard !Task.isCancelled, currentVideo?.id == videoID else { return }
+            let existingIDs = Set(queue.items.map(\.id))
+            let fresh = page.videos.filter { !existingIDs.contains($0.id) }
+            let visible = Array(fresh.prefix(5))
+            recommendationBacklog = Array(fresh.dropFirst(visible.count))
+            recommendationContinuationToken = page.continuationToken
+            queue.append(contentsOf: visible)
+        } catch {
+            log.notice("Recommendation continuation failed: \(String(describing: error), privacy: .public)")
         }
     }
 

@@ -55,7 +55,7 @@ struct VideoCard: View {
                     .font(.caption2)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.black.opacity(0.75))
+                    .background(video.isLive ? Color.red : Color.black.opacity(0.75))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .padding(6)

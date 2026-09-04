@@ -8,6 +8,7 @@ struct CustomPlayerControls: View {
     let hasEnded: Bool
     let elapsed: TimeInterval
     let duration: TimeInterval
+    let isLive: Bool
     let sponsorSegments: [SponsorBlockSegment]
     let chapters: [VideoChapter]
     let hasPrevious: Bool
@@ -69,6 +70,7 @@ struct CustomPlayerControls: View {
                 SponsorBlockTimeline(
                     elapsed: elapsed,
                     duration: duration,
+                    isLive: isLive,
                     segments: sponsorSegments,
                     chapters: chapters,
                     onSeek: onSeek,

@@ -67,7 +67,7 @@ struct VideoRow: View {
                         .font(.caption2)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
-                        .background(.black.opacity(0.75))
+                        .background(video.isLive ? Color.red : Color.black.opacity(0.75))
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                         .padding(4)
