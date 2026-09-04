@@ -30,6 +30,10 @@ struct StoryboardPreview: View {
         .frame(width: previewWidth, height: previewHeight, alignment: .topLeading)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(.white.opacity(0.9), lineWidth: 0.75)
+        }
         .padding(5)
         .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .shadow(color: .black.opacity(0.45), radius: 4, y: 2)

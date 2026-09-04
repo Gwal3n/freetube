@@ -169,7 +169,7 @@ struct FullScreenPlayer: View {
                                     58,
                                     proxy.size.width * 9 / 16
                                         - timelineBottomPadding(in: proxy.size)
-                                        - 90
+                                        - 78
                                 )
                             )
                             .allowsHitTesting(false)

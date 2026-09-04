@@ -8,13 +8,29 @@ protocol CaptionServicing: Sendable {
 /// Downloads YouTube's JSON3 timed-text document and maps it into dependency-neutral cues.
 final class CaptionService: CaptionServicing, @unchecked Sendable {
     private let session: URLSession
+    private let client: YouTubeKitClient
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "CaptionService")
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = .shared, client: YouTubeKitClient = .shared) {
         self.session = session
+        self.client = client
     }
 
     func fetchCues(for track: VideoCaptionTrack) async throws -> [CaptionCue] {
+        // Start with the exact URL YouTube supplied. Its signature can cover query values, so even
+        // a legitimate format rewrite may produce a successful response with an empty body.
+        if let nativeData = try? await fetchData(from: track.url) {
+            if let cues = try? decodeJSON3(nativeData), !cues.isEmpty {
+                log.info("Loaded \(cues.count, privacy: .public) native JSON3 caption cues for \(track.languageCode, privacy: .public)")
+                return cues
+            }
+            let cues = decodeSRV3(nativeData)
+            if !cues.isEmpty {
+                log.info("Loaded \(cues.count, privacy: .public) native srv3 caption cues for \(track.languageCode, privacy: .public)")
+                return cues
+            }
+        }
+
         let jsonURL = try captionURL(from: track.url, format: "json3")
         if let jsonData = try? await fetchData(from: jsonURL),
            let cues = try? decodeJSON3(jsonData),
@@ -57,6 +73,16 @@ final class CaptionService: CaptionServicing, @unchecked Sendable {
     private func fetchData(from url: URL) async throws -> Data {
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
+        request.setValue(
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
+            forHTTPHeaderField: "User-Agent"
+        )
+        request.setValue("https://www.youtube.com/", forHTTPHeaderField: "Referer")
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        let cookies = client.cookies
+        if !cookies.isEmpty {
+            request.setValue(cookies, forHTTPHeaderField: "Cookie")
+        }
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               (200..<300).contains(httpResponse.statusCode) else {
@@ -81,7 +107,19 @@ final class CaptionService: CaptionServicing, @unchecked Sendable {
                 text: text
             )
         }
-        let cues = timedLines.enumerated().map { index, line in
+        return cues(from: timedLines)
+    }
+
+    private func decodeSRV3(_ data: Data) -> [CaptionCue] {
+        let delegate = SRV3ParserDelegate()
+        let parser = XMLParser(data: data)
+        parser.delegate = delegate
+        guard parser.parse() else { return [] }
+        return cues(from: delegate.lines)
+    }
+
+    private func cues(from timedLines: [TimedLine]) -> [CaptionCue] {
+        timedLines.enumerated().map { index, line in
             let start = TimeInterval(line.startMilliseconds) / 1_000
             let inferredEndMilliseconds = timedLines.indices.contains(index + 1)
                 ? timedLines[index + 1].startMilliseconds
@@ -99,7 +137,6 @@ final class CaptionService: CaptionServicing, @unchecked Sendable {
                 text: line.text
             )
         }
-        return cues
     }
 
     private func decodeWebVTT(_ data: Data) -> [CaptionCue] {
@@ -166,4 +203,62 @@ private struct TimedLine {
     let startMilliseconds: Int
     let durationMilliseconds: Int?
     let text: String
+}
+
+/// Handles both modern srv3 `<p t d>` cues and the older `<text start dur>` timed-text shape.
+private final class SRV3ParserDelegate: NSObject, XMLParserDelegate {
+    private(set) var lines: [TimedLine] = []
+    private var activeElement: String?
+    private var startMilliseconds: Int?
+    private var durationMilliseconds: Int?
+    private var buffer = ""
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        guard elementName == "p" || elementName == "text" else { return }
+        activeElement = elementName
+        buffer = ""
+        if elementName == "p" {
+            startMilliseconds = attributeDict["t"].flatMap(Int.init)
+            durationMilliseconds = attributeDict["d"].flatMap(Int.init)
+        } else {
+            startMilliseconds = attributeDict["start"]
+                .flatMap(Double.init)
+                .map { Int($0 * 1_000) }
+            durationMilliseconds = attributeDict["dur"]
+                .flatMap(Double.init)
+                .map { Int($0 * 1_000) }
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard activeElement != nil else { return }
+        buffer += string
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        guard elementName == activeElement, let startMilliseconds else { return }
+        let text = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            lines.append(TimedLine(
+                startMilliseconds: startMilliseconds,
+                durationMilliseconds: durationMilliseconds,
+                text: text
+            ))
+        }
+        activeElement = nil
+        self.startMilliseconds = nil
+        durationMilliseconds = nil
+        buffer = ""
+    }
 }
