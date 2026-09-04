@@ -288,11 +288,12 @@ and a rejected strategy is excluded before requesting the next candidate.
   YouTubeKit has no literal comments-disabled Boolean. Treat a `MoreVideoInfosResponse` with neither
   a continuation token nor a comments header/count as disabled and show that state after expansion;
   a present zero-count header is an available empty section, not disabled.
-- **Search is search-only.** Its NavigationStack root contains local recent searches or the clean
-  empty state; it must not request or render a home/trending/discovery feed. Native search presents
-  suggestions, and a successful keyboard/suggestion/history submission pushes a dedicated results
-  destination titled with the submitted query. Back returns to the root without clearing results
-  as a side effect. Results include videos, channels, and playlists. iPhone and iPad retain native
+- **Search is search-only.** Its root contains local recent searches or the clean empty state; it
+  must not request or render a home/trending/discovery feed. Native search presents suggestions,
+  and a successful keyboard/suggestion/history submission swaps the root content to results in
+  place—the same native search bar and query remain mounted, with no results-page push animation.
+  A leading Back control clears that result/query state and reveals recent searches. Channels and
+  playlists still push normally from their result rows. Results include videos, channels, and playlists. iPhone and iPad retain native
   `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
   native search collapses awkwardly there. Search stays an ordinary peer tab—never assign
   `TabRole.search`, which detaches it visually on iOS 26. Re-selecting the ordinary tab increments a

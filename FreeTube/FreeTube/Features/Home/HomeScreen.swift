@@ -43,8 +43,16 @@ struct HomeScreen: View {
             .navigationDestination(for: SearchChannelRoute.self) { route in
                 ChannelScreen(channelID: route.id)
             }
-            .navigationDestination(for: SearchResultsRoute.self) { route in
-                SearchResultsScreen(model: searchModel, query: route.query)
+            .toolbar {
+                if searchModel.submittedQuery != nil {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            leaveSearchResults()
+                        } label: {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                    }
+                }
             }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
@@ -114,17 +122,17 @@ struct HomeScreen: View {
             return
         }
         await searchModel.submit()
-        guard searchModel.results != nil,
-              searchModel.submittedQuery == trimmed else { return }
+    }
+
+    /// Returns to the recent-search root without a navigation transition. The same native search
+    /// field stays mounted; only its query and the result content are reset.
+    private func leaveSearchResults() {
+        searchModel.query = ""
+        searchModel.clearResults()
         isSearchPresented = false
-        path.append(SearchResultsRoute(query: trimmed))
     }
 }
 
 private struct SearchChannelRoute: Hashable {
     let id: String
-}
-
-private struct SearchResultsRoute: Hashable {
-    let query: String
 }
