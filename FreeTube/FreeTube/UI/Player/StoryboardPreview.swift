@@ -15,24 +15,26 @@ struct StoryboardPreview: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            KFImage(tile.url)
-                .resizable()
-                .frame(
-                    width: previewWidth * CGFloat(tile.columns),
-                    height: previewHeight * CGFloat(tile.rows)
-                )
-                .offset(
-                    x: -previewWidth * CGFloat(tile.column),
-                    y: -previewHeight * CGFloat(tile.row)
-                )
-        }
-        .frame(width: previewWidth, height: previewHeight, alignment: .topLeading)
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(.white.opacity(0.9), lineWidth: 0.75)
+        VStack(spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                KFImage(tile.url)
+                    .resizable()
+                    .frame(
+                        width: previewWidth * CGFloat(tile.columns),
+                        height: previewHeight * CGFloat(tile.rows)
+                    )
+                    .offset(
+                        x: -previewWidth * CGFloat(tile.column),
+                        y: -previewHeight * CGFloat(tile.row)
+                    )
+            }
+            .frame(width: previewWidth, height: previewHeight, alignment: .topLeading)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(.white.opacity(0.9), lineWidth: 0.75)
+            }
         }
         .padding(5)
         .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 9, style: .continuous))

@@ -776,12 +776,19 @@ struct FullScreenPlayer: View {
             CaptionPlayerMenu(
                 tracks: player.captionTracks,
                 selectedTrackID: player.selectedCaptionTrackID,
-                isLoading: player.isLoadingCaptions
-            ) { track in
-                player.selectCaptionTrack(track)
-                showPlayerControls()
-            }
-            .equatable()
+                isLoading: player.isLoadingCaptions,
+                onSelect: { track in
+                    player.selectCaptionTrack(track)
+                },
+                onPresentationChanged: { presented in
+                    if presented {
+                        controlsHideTask?.cancel()
+                        controlsHideTask = nil
+                    } else {
+                        showPlayerControls()
+                    }
+                }
+            )
         }
     }
 
