@@ -11,12 +11,7 @@ struct ChapterListPanel: View {
     let usesOLEDBackground: Bool
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
-    @State private var listScrollOffset: CGFloat = 0
     @State private var dismissTranslation: CGFloat = 0
-    @State private var dismissDragOrigin: CGFloat = 0
-    @State private var isTrackingDismiss = false
-    @State private var isDismissGestureActive = false
-    @State private var dismissGestureStartedAtTop = false
     @State private var panelHeight: CGFloat = 0
 
     private var currentChapterID: VideoChapter.ID? {
@@ -53,6 +48,8 @@ struct ChapterListPanel: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
+            .simultaneousGesture(chapterDismissGesture)
 
             Divider().opacity(0.45)
 
@@ -70,25 +67,6 @@ struct ChapterListPanel: View {
                         }
                     }
                     .padding(.vertical, 6)
-                    // Observe the complete content rather than a sentinel row inside the lazy
-                    // stack. SwiftUI unloads an off-screen lazy sentinel and its preference then
-                    // falls back to zero, which made a list at the bottom look as if it were at
-                    // the top and incorrectly enabled sheet dismissal.
-                    .background {
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: ChapterListScrollOffsetKey.self,
-                                value: max(
-                                    0,
-                                    -proxy.frame(in: .named("chapterListScroll")).minY
-                                )
-                            )
-                        }
-                    }
-                }
-                .coordinateSpace(name: "chapterListScroll")
-                .onPreferenceChange(ChapterListScrollOffsetKey.self) {
-                    listScrollOffset = $0
                 }
                 .scrollIndicators(.visible)
                 .onAppear {
@@ -97,7 +75,6 @@ struct ChapterListPanel: View {
                 }
             }
         }
-        .simultaneousGesture(chapterDismissGesture)
         .background {
             if usesOLEDBackground {
                 Color.black
@@ -127,40 +104,21 @@ struct ChapterListPanel: View {
         .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
     }
 
-    /// A downward pull dismisses only while the chapter list is resting at its top. Upward drags
-    /// and drags within scrolled content remain ordinary list scrolling.
+    /// Keep sheet movement on the non-scrolling header. Letting a parent drag recognizer compete
+    /// with SwiftUI's private ScrollView recognizer caused false dismissals and visible oscillation
+    /// on iOS 26. The list now has exclusive ownership of every gesture that starts in its rows.
     private var chapterDismissGesture: some Gesture {
-        // Zero distance lets us snapshot top eligibility at actual touch-down, before the native
-        // ScrollView has moved several points and potentially reached its top.
-        DragGesture(minimumDistance: 0)
+        DragGesture(minimumDistance: 6)
             .onChanged { value in
                 guard !isLandscape else { return }
-                if !isDismissGestureActive {
-                    isDismissGestureActive = true
-                    // Eligibility is fixed at touch-down. A gesture that began farther down the
-                    // list may scroll back to the top, but must end before a new pull can dismiss.
-                    dismissGestureStartedAtTop = listScrollOffset <= 1
-                }
-                guard dismissGestureStartedAtTop else { return }
                 let downward = value.translation.height > 0
                     && abs(value.translation.height) > abs(value.translation.width)
                 guard downward else { return }
-                if !isTrackingDismiss {
-                    // Let the native ScrollView rubber-band for a short distance first. Only a
-                    // deliberate second stage transfers ownership to the complete sheet.
-                    let elasticBand: CGFloat = 18
-                    guard value.translation.height > elasticBand else { return }
-                    dismissDragOrigin = elasticBand
-                    isTrackingDismiss = true
-                }
-                dismissTranslation = max(0, value.translation.height - dismissDragOrigin)
+                dismissTranslation = max(0, value.translation.height)
             }
             .onEnded { value in
-                if !isLandscape, isTrackingDismiss {
-                    let projected = max(
-                        0,
-                        value.predictedEndTranslation.height - dismissDragOrigin
-                    )
+                if !isLandscape, dismissTranslation > 0 {
+                    let projected = max(0, value.predictedEndTranslation.height)
                     let threshold = max(110, panelHeight * 0.25)
                     if dismissTranslation > threshold || projected > threshold {
                         onDismiss()
@@ -169,10 +127,6 @@ struct ChapterListPanel: View {
                 withAnimation(.snappy(duration: 0.24)) {
                     dismissTranslation = 0
                 }
-                dismissDragOrigin = 0
-                isTrackingDismiss = false
-                isDismissGestureActive = false
-                dismissGestureStartedAtTop = false
             }
     }
 
@@ -228,13 +182,6 @@ struct ChapterListPanel: View {
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
             : String(format: "%d:%02d", minutes, seconds)
-    }
-}
-
-private struct ChapterListScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 
