@@ -48,6 +48,8 @@ struct ChapterListPanel: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
+            .simultaneousGesture(headerDismissGesture)
 
             Divider().opacity(0.45)
 
@@ -125,6 +127,34 @@ struct ChapterListPanel: View {
             .padding(.vertical, 6)
         }
         .scrollIndicators(.visible)
+        // A short chapter list does not exceed the viewport, and SwiftUI otherwise suppresses
+        // its rubber-band entirely. Pull-to-dismiss still needs a negative top offset in that case.
+        .scrollBounceBehavior(.always, axes: .vertical)
+    }
+
+    /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
+    /// It also provides an explicit fallback for users who begin their pull on the grabber/title.
+    private var headerDismissGesture: some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { value in
+                guard !isLandscape else { return }
+                let downward = value.translation.height > 0
+                    && abs(value.translation.height) > abs(value.translation.width)
+                guard downward else { return }
+                dismissTranslation = max(0, value.translation.height)
+                maximumDismissPull = max(maximumDismissPull, dismissTranslation)
+            }
+            .onEnded { _ in
+                guard !isLandscape else { return }
+                if maximumDismissPull >= 54 {
+                    onDismiss()
+                } else {
+                    withAnimation(.snappy(duration: 0.22)) {
+                        dismissTranslation = 0
+                    }
+                }
+                maximumDismissPull = 0
+            }
     }
 
     private func chapterRow(_ chapter: VideoChapter) -> some View {
