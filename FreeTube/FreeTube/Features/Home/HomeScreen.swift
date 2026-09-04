@@ -29,9 +29,15 @@ struct HomeScreen: View {
                     }
                 }
 
-                SearchContent(model: searchModel) { query in
-                    Task { await runSearch(query: query) }
-                }
+                SearchContent(
+                    model: searchModel,
+                    onRunSearch: { query in
+                        Task { await runSearch(query: query) }
+                    },
+                    onDismissSearchPresentation: {
+                        isSearchPresented = false
+                    }
+                )
             }
             .contentShape(Rectangle())
             .simultaneousGesture(searchBackGesture)

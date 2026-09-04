@@ -8,6 +8,7 @@ import UIKit
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
+    let onDismissSearchPresentation: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
 
@@ -31,10 +32,14 @@ struct SearchContent: View {
                     message: "Find videos, channels, and playlists."
                 )
                 .contentShape(Rectangle())
-                .onTapGesture { dismissKeyboard() }
+                .onTapGesture {
+                    dismissKeyboard()
+                    onDismissSearchPresentation()
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .simultaneousGesture(dismissSearchPresentationGesture)
         .errorToast($model.errorState)
     }
 
@@ -99,7 +104,10 @@ struct SearchContent: View {
         if model.suggestions.isEmpty {
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { dismissKeyboard() }
+                .onTapGesture {
+                    dismissKeyboard()
+                    onDismissSearchPresentation()
+                }
         } else {
             ScrollView {
                 SearchSuggestionList(
@@ -163,6 +171,18 @@ struct SearchContent: View {
             from: nil,
             for: nil
         )
+    }
+
+    /// `.scrollDismissesKeyboard` resigns UIKit's first responder but does not consistently update
+    /// `.searchable(isPresented:)` on iOS 26. End the native presentation after a real vertical
+    /// content drag so the navigation title and search bar return to their matching idle state.
+    private var dismissSearchPresentationGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onEnded { value in
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                dismissKeyboard()
+                onDismissSearchPresentation()
+            }
     }
 }
 
