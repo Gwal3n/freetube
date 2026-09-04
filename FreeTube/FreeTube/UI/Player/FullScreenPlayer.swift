@@ -314,7 +314,11 @@ struct FullScreenPlayer: View {
                     height: isLandscape ? proxy.size.height : max(0, proxy.size.height - surfaceHeight)
                 )
                 .offset(y: isLandscape ? 0 : surfaceHeight)
-                .transition(isLandscape ? .move(edge: .trailing) : .move(edge: .bottom))
+                // Moving the landscape material sidebar while simultaneously widening the player
+                // leaves a stale strip at the trailing edge for one render pass. Remove it
+                // atomically and let the underlying column resize; portrait retains its sheet
+                // transition because its geometry does not change horizontally.
+                .transition(isLandscape ? .identity : .move(edge: .bottom))
                 .zIndex(5)
             }
             }

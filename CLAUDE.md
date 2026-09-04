@@ -276,6 +276,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   not race; normal interactive feed-to-mini-player dragging must return as soon as it closes. In
   landscape, preserve the established video/sidebar geometry and constrain only the lower
   metadata/feed column to the width left of the chapter sidebar—never allow titles underneath it.
+  Remove the landscape sidebar atomically (`.identity` transition): combining a trailing material
+  transition with simultaneous player-column expansion leaves a one-frame strip on the right.
   Native extraction wraps `playerStoryboardSpecRenderer` in an app-owned `VideoStoryboard` and
   carries it with the successful playback candidate. The storyboard and signed stream URL share
   the existing 30-minute in-memory cache; no redundant b5i player request is made. b5i fallback
