@@ -7,7 +7,7 @@ import FreeTubeStreamKit
 /// The extractor's hosted remote fallback is deliberately disabled: all requests and cipher
 /// processing happen on the device, and signed URLs are cached in memory for at most 30 minutes.
 protocol NativeStreamServicing: Sendable {
-    func resolve(video: Video, quality: VideoQuality) async throws -> URL
+    func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -19,12 +19,12 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
     }
 
     /// Returns an HLS, progressive video, or audio-only URL suitable for `AVPlayer`.
-    func resolve(video: Video, quality: VideoQuality) async throws -> URL {
+    func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult {
         let videoID = video.id
         let cacheKey = "native-\(quality.rawValue)"
-        if let cached = await cache.get(videoID: videoID, formatID: cacheKey) {
+        if let cached = await cache.getEntry(videoID: videoID, formatID: cacheKey) {
             log.debug("Native stream cache hit for \(videoID, privacy: .public)")
-            return cached
+            return NativeStreamResult(url: cached.url, storyboard: cached.storyboard)
         }
 
         let startedAt = Date()
@@ -43,9 +43,10 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             // progressive path below, since an HLS master playlist always carries a video track.
             if quality != .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
-                await cache.set(videoID: videoID, formatID: cacheKey, url: hls)
+                let storyboard = await storyboard(from: youtube, videoID: videoID)
+                await cache.set(videoID: videoID, formatID: cacheKey, url: hls, storyboard: storyboard)
                 log.info("Resolved native HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
-                return hls
+                return NativeStreamResult(url: hls, storyboard: storyboard)
             }
 
             let streams = try await youtube.streams
@@ -65,9 +66,10 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             }
 
             if let selected {
-                await cache.set(videoID: videoID, formatID: cacheKey, url: selected.url)
+                let storyboard = await storyboard(from: youtube, videoID: videoID)
+                await cache.set(videoID: videoID, formatID: cacheKey, url: selected.url, storyboard: storyboard)
                 log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
-                return selected.url
+                return NativeStreamResult(url: selected.url, storyboard: storyboard)
             }
 
             log.notice("Native extractor returned no playable stream for \(videoID, privacy: .public) after \(Date().timeIntervalSince(startedAt), privacy: .public)s")
@@ -77,6 +79,24 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         } catch {
             log.notice("Native extraction failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
+        }
+    }
+
+    private func storyboard(from youtube: YouTube, videoID: String) async -> VideoStoryboard? {
+        do {
+            guard let storyboard = try await youtube.storyboard else {
+                log.debug("Native player response contained no storyboard for \(videoID, privacy: .public)")
+                return nil
+            }
+            let result = VideoStoryboard(
+                specification: storyboard.specification,
+                recommendedLevel: storyboard.recommendedLevel
+            )
+            log.info("Native storyboard \(result == nil ? "could not be decoded" : "resolved", privacy: .public) for \(videoID, privacy: .public)")
+            return result
+        } catch {
+            log.notice("Native storyboard extraction failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
+            return nil
         }
     }
 

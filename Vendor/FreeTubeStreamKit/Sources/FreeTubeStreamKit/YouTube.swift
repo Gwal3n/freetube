@@ -37,6 +37,23 @@ public class YouTube {
         }
     }
 
+    /// Seek-preview sprite-sheet information from the same cached player response used for streams.
+    public var storyboard: YouTubeStoryboard? {
+        get async throws {
+            for info in try await videoInfos {
+                guard let renderer = info.storyboards?.playerStoryboardSpecRenderer,
+                      let specification = renderer.spec,
+                      !specification.isEmpty
+                else { continue }
+                return YouTubeStoryboard(
+                    specification: specification,
+                    recommendedLevel: renderer.recommendedLevel
+                )
+            }
+            return nil
+        }
+    }
+
     public let videoID: String
 
     var watchURL: URL {

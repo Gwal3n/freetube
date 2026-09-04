@@ -912,13 +912,13 @@ final class PlayerStateManager {
                 // comparable with builds that played only after this point.
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 loadState = .readyToPlay
+                if let nativeStoryboard = candidate.storyboard {
+                    storyboard = nativeStoryboard
+                }
                 applyStoredResumePosition(await resumeLookup.value, for: video)
                 updateNowPlaying()
                 contentPrefetchTask?.cancel()
                 contentPrefetchTask = Task {
-                    // Storyboards are ancillary playback metadata. Start this only after AVPlayer
-                    // accepts the stream so thumbnail previews can never delay first playback.
-                    async let playbackInfo = try? VideoContentPrefetchStore.shared.fetchPlaybackInfo(videoID: video.id)
                     if preferences.prefetchVideoDetails {
                         if let info = try? await VideoContentPrefetchStore.shared.fetchDetails(videoID: video.id) {
                             self.installVideoDetails(info, for: video.id)
@@ -926,8 +926,6 @@ final class PlayerStateManager {
                         guard !Task.isCancelled else { return }
                         await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
                     }
-                    guard !Task.isCancelled, let info = await playbackInfo else { return }
-                    self.installVideoDetails(info, for: video.id)
                 }
                 // Usually redundant — the optimistic `play()` above has either started the item or
                 // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case

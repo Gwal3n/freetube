@@ -26,9 +26,16 @@ enum PlaybackStrategy: String, Sendable, Hashable {
     case legacyDownload = "legacy-download"
 }
 
-struct PlaybackCandidate: Sendable, Hashable {
+struct PlaybackCandidate: Sendable {
     let source: PlaybackSource
     let strategy: PlaybackStrategy
+    let storyboard: VideoStoryboard?
+
+    init(source: PlaybackSource, strategy: PlaybackStrategy, storyboard: VideoStoryboard? = nil) {
+        self.source = source
+        self.strategy = strategy
+        self.storyboard = storyboard
+    }
 }
 
 protocol PlaybackResolving {

@@ -41,8 +41,12 @@ final class PlaybackResolver: PlaybackResolving {
 
         if !strategies.contains(.native) {
             do {
-                let url = try await nativeStreams.resolve(video: video, quality: quality)
-                return PlaybackCandidate(source: .direct(url), strategy: .native)
+                let result = try await nativeStreams.resolve(video: video, quality: quality)
+                return PlaybackCandidate(
+                    source: .direct(result.url),
+                    strategy: .native,
+                    storyboard: result.storyboard
+                )
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -52,9 +56,10 @@ final class PlaybackResolver: PlaybackResolving {
 
         if !strategies.contains(.b5iIOS) {
             do {
-                if let url = try await resolveB5IStream(videoID: videoID, quality: quality, client: .iOS) {
+                let info = try await videoService.fetchInfo(id: videoID)
+                if let url = Self.pickStreamURL(from: info, quality: quality) {
                     log.info("resolve: produced b5i iOS candidate for \(videoID, privacy: .public)")
-                    return PlaybackCandidate(source: .direct(url), strategy: .b5iIOS)
+                    return PlaybackCandidate(source: .direct(url), strategy: .b5iIOS, storyboard: info.storyboard)
                 }
             } catch is CancellationError {
                 throw CancellationError()
@@ -63,9 +68,10 @@ final class PlaybackResolver: PlaybackResolving {
 
         if !strategies.contains(.b5iTVHTML5) {
             do {
-                if let url = try await resolveB5IStream(videoID: videoID, quality: quality, client: .tvHTML5) {
+                let info = try await videoService.fetchInfoViaTVHTML5(id: videoID)
+                if let url = Self.pickStreamURL(from: info, quality: quality) {
                     log.info("resolve: produced b5i TVHTML5 candidate for \(videoID, privacy: .public)")
-                    return PlaybackCandidate(source: .direct(url), strategy: .b5iTVHTML5)
+                    return PlaybackCandidate(source: .direct(url), strategy: .b5iTVHTML5, storyboard: info.storyboard)
                 }
             } catch is CancellationError {
                 throw CancellationError()
@@ -80,13 +86,7 @@ final class PlaybackResolver: PlaybackResolving {
         return PlaybackCandidate(source: .localFile(url), strategy: .legacyDownload)
     }
 
-    private enum B5IClient { case iOS, tvHTML5 }
-
-    private func resolveB5IStream(videoID: String, quality: VideoQuality, client: B5IClient) async throws -> URL? {
-        let info = switch client {
-        case .iOS: try await videoService.fetchInfo(id: videoID)
-        case .tvHTML5: try await videoService.fetchInfoViaTVHTML5(id: videoID)
-        }
+    private static func pickStreamURL(from info: VideoInfo, quality: VideoQuality) -> URL? {
         if let hls = info.streamingURL { return hls }
         return Self.pickProgressiveURL(from: info.formats, quality: quality)
     }

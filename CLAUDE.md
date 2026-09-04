@@ -171,6 +171,7 @@ in an `AVPlayerItem`, and never imports either extraction library itself. Resolu
 
 1. **Existing local file.** `DownloadManager.localFile(for:)` wins immediately, preserving offline playback.
 2. **Native local extraction, HLS-first.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It reads the InnerTube player response's `hlsManifestUrl` **before** touching `youtube.streams`, for live and on-demand alike. That path never runs the JavaScriptCore signature/n-parameter solver, which re-parses the whole ~2.5 MB player.js once per InnerTube client and was costing ~4s per play for a result the resolver then discarded in favour of this same HLS URL. Progressive selection (natively playable audio+video within `preferredQuality.heightCap`) runs only when no HLS manifest exists, and remains the sole path for the `audioOnly` preference since a master playlist always carries video. The dependency's hosted remote extractor is never enabled. Candidates are AVPlayer-validated.
+   The same cached player response also supplies `playerStoryboardSpecRenderer`; the native result carries that dependency-neutral storyboard with the stream candidate, so previews require no second player request.
 3. **b5i direct streams, validated by AVPlayer.** `PlaybackResolver` produces iOS and then TVHTML5 HLS/progressive candidates through `VideoService`. These sit *behind* the native resolver: for ordinary VOD, `VideoInfosResponse` reports no HLS URL and its formats carry metadata without usable URLs (upstream documents that real URLs require `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running them first spent ~1.5s per play on candidates that could not be produced. `PlayerStateManager` only accepts a candidate after its `AVPlayerItem` reaches `.readyToPlay`; failure or a four-second readiness timeout advances to the next strategy.
 4. **Legacy download fallback.** Only after every direct resolver fails, `DownloadManager.ensureDownloaded` runs the existing yt-dlp → YouTubeKit download pipeline. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
 
@@ -265,9 +266,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   `MoreVideoInfosResponse.chapters`; `VideoService` maps those into app-owned `VideoChapter` values.
   The timeline draws subtle separators at chapter boundaries and shows the active chapter beside
   elapsed time. That label opens a native, scrollable Menu whose rows seek directly to each chapter.
-  `VideoInfosResponse.storyboard` is likewise wrapped in an app-owned `VideoStoryboard`; its
-  metadata request starts only after AVPlayer accepts a stream and is cached in memory, so seek
-  previews never join the playback-critical path. Only a direct drag on the timeline shows the
+  Native extraction wraps `playerStoryboardSpecRenderer` in an app-owned `VideoStoryboard` and
+  carries it with the successful playback candidate. The storyboard and signed stream URL share
+  the existing 30-minute in-memory cache; no redundant b5i player request is made. b5i fallback
+  candidates can still supply `VideoInfosResponse.storyboard`. Only a direct drag on the timeline shows the
   cropped sprite tile, positioned above and following the scrubber while remaining clamped inside
   the video edges. Horizontal swipe seeking still previews its target on the timeline without a tile.
   The stats row is always visible directly beneath the title, outside the expandable description.

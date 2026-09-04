@@ -185,6 +185,7 @@ class InnerTube {
         let playabilityStatus: PlayabilityStatus?
         let streamingData: StreamingData?
         let videoDetails: VideoDetails?
+        let storyboards: Storyboards?
 
         struct PlayabilityStatus: Decodable {
             let status: String?
@@ -205,6 +206,15 @@ class InnerTube {
                     let width: Int
                     let height: Int
                 }
+            }
+        }
+
+        struct Storyboards: Decodable {
+            let playerStoryboardSpecRenderer: PlayerStoryboardSpecRenderer?
+
+            struct PlayerStoryboardSpecRenderer: Decodable {
+                let spec: String?
+                let recommendedLevel: Int?
             }
         }
     }
