@@ -130,6 +130,10 @@ final class LocalSubscriptionStore {
     private func upsert(_ item: LocalSubscription, persistImmediately: Bool = true) {
         if let index = subscriptions.firstIndex(where: { $0.id == item.id }) {
             var merged = item
+            if merged.name == merged.id, subscriptions[index].name != subscriptions[index].id {
+                merged.name = subscriptions[index].name
+            }
+            if merged.channelURL == nil { merged.channelURL = subscriptions[index].channelURL }
             if merged.thumbnailURL == nil { merged.thumbnailURL = subscriptions[index].thumbnailURL }
             subscriptions[index] = merged
         } else {

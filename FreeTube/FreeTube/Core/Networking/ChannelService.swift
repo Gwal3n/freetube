@@ -17,6 +17,7 @@ struct ChannelDetails: Sendable {
 
 protocol ChannelServicing: Sendable {
     func fetchChannel(id: String) async throws -> ChannelDetails
+    func fetchChannelMetadata(id: String) async throws -> Channel
     func fetchVideosNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchShortsNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchDirectsNextPage(channelID: String) async throws -> ChannelTab<Video>
@@ -97,6 +98,22 @@ final class ChannelService: ChannelServicing {
             directs: directsTab.videoTab,
             playlists: extractPlaylistTab(from: merged)
         )
+    }
+
+    /// Fetches only the channel header. Used for refreshing local-subscription names and artwork;
+    /// unlike `fetchChannel(id:)`, this deliberately avoids four secondary content-tab requests.
+    func fetchChannelMetadata(id: String) async throws -> Channel {
+        log.info("fetchChannelMetadata(\(id, privacy: .public))")
+        do {
+            let response = try await ChannelInfosResponse.sendThrowingRequest(
+                youtubeModel: client.model,
+                data: [.browseId: id]
+            )
+            return mapChannel(from: response, channelID: id)
+        } catch {
+            log.error("Channel metadata failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+            throw YouTubeServiceError.network(error)
+        }
     }
 
     // MARK: - Pagination

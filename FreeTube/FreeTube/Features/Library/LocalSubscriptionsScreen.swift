@@ -8,6 +8,11 @@ struct LocalSubscriptionsScreen: View {
     @State private var showingClearConfirmation = false
     @State private var importMessage: String?
     @State private var importError: String?
+    @State private var refreshError: String?
+    @State private var isRefreshing = false
+    @State private var refreshedCount = 0
+    @State private var refreshTotal = 0
+    private let channelService: any ChannelServicing = ChannelService()
 
     var body: some View {
         Group {
@@ -34,6 +39,22 @@ struct LocalSubscriptionsScreen: View {
         .navigationTitle("Local subscriptions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if isRefreshing {
+                    ProgressView(value: Double(refreshedCount), total: Double(max(1, refreshTotal)))
+                        .progressViewStyle(.circular)
+                        .accessibilityLabel("Refreshing profile photos")
+                        .accessibilityValue("\(refreshedCount) of \(refreshTotal)")
+                } else {
+                    Button {
+                        Task { await refreshProfilePhotos() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(store.subscriptions.isEmpty)
+                    .accessibilityLabel("Refresh profile photos")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
@@ -84,6 +105,14 @@ struct LocalSubscriptionsScreen: View {
         } message: {
             Text(importError ?? "")
         }
+        .alert("Some photos weren’t refreshed", isPresented: Binding(
+            get: { refreshError != nil },
+            set: { if !$0 { refreshError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(refreshError ?? "")
+        }
     }
 
     private func importFile(_ result: Result<[URL], Error>) {
@@ -95,6 +124,48 @@ struct LocalSubscriptionsScreen: View {
             importMessage = "Imported \(count) \(count == 1 ? "channel" : "channels")."
         } catch {
             importError = error.localizedDescription
+        }
+    }
+
+    /// Refresh in small batches: enough parallelism for a large imported list without launching
+    /// hundreds of simultaneous YouTube browse requests. Successful channels are persisted as
+    /// each batch completes, so partial progress survives if the screen is dismissed.
+    private func refreshProfilePhotos() async {
+        guard !isRefreshing else { return }
+        let channelIDs = store.subscriptions.map(\.id)
+        guard !channelIDs.isEmpty else { return }
+
+        isRefreshing = true
+        refreshedCount = 0
+        refreshTotal = channelIDs.count
+        var failureCount = 0
+        defer { isRefreshing = false }
+
+        for start in stride(from: 0, to: channelIDs.count, by: 4) {
+            let end = min(start + 4, channelIDs.count)
+            let batch = Array(channelIDs[start..<end])
+            let results = await withTaskGroup(of: Channel?.self) { group in
+                for channelID in batch {
+                    group.addTask {
+                        try? await channelService.fetchChannelMetadata(id: channelID)
+                    }
+                }
+                var channels: [Channel] = []
+                for await channel in group {
+                    if let channel { channels.append(channel) }
+                }
+                return channels
+            }
+
+            for channel in results { store.add(channel) }
+            failureCount += batch.count - results.count
+            refreshedCount += batch.count
+        }
+
+        if failureCount > 0 {
+            refreshError = failureCount == 1
+                ? "One channel could not be refreshed. Your existing subscription was kept."
+                : "\(failureCount) channels could not be refreshed. Your existing subscriptions were kept."
         }
     }
 }
