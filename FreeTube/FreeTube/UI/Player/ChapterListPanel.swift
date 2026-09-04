@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import UIKit
 
 /// Non-modal chapter browser. In portrait it covers only the feed below the player; in landscape
 /// it occupies a dedicated trailing column, leaving the video and its controls interactive.
@@ -14,6 +15,7 @@ struct ChapterListPanel: View {
     @State private var dismissTranslation: CGFloat = 0
     @State private var dismissDragOrigin: CGFloat = 0
     @State private var isTrackingDismiss = false
+    @State private var panelHeight: CGFloat = 0
 
     private var currentChapterID: VideoChapter.ID? {
         chapters.last { $0.startTime <= elapsed }?.id
@@ -21,6 +23,14 @@ struct ChapterListPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !isLandscape {
+                Capsule()
+                    .fill(.secondary.opacity(0.55))
+                    .frame(width: 36, height: 5)
+                    .padding(.top, 7)
+                    .padding(.bottom, 1)
+                    .accessibilityHidden(true)
+            }
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Chapters")
@@ -84,9 +94,22 @@ struct ChapterListPanel: View {
                 }
             }
         }
-        .offset(y: max(0, dismissTranslation))
+        .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
         .simultaneousGesture(chapterDismissGesture)
-        .background(.regularMaterial)
+        .background {
+            Rectangle()
+                .fill(.regularMaterial)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: ChapterPanelHeightKey.self,
+                            value: proxy.size.height
+                        )
+                    }
+                }
+        }
+        .onPreferenceChange(ChapterPanelHeightKey.self) { panelHeight = $0 }
+        .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16, style: .continuous))
         .overlay(alignment: isLandscape ? .leading : .top) {
             Rectangle()
                 .fill(.white.opacity(0.12))
@@ -100,6 +123,7 @@ struct ChapterListPanel: View {
     private var chapterDismissGesture: some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
+                guard !isLandscape else { return }
                 let downward = value.translation.height > 0
                     && abs(value.translation.height) > abs(value.translation.width)
                 guard downward else { return }
@@ -110,12 +134,18 @@ struct ChapterListPanel: View {
                     dismissDragOrigin = value.translation.height
                     isTrackingDismiss = true
                 }
-                dismissTranslation = max(0, value.translation.height - dismissDragOrigin)
+                dismissTranslation = resistedDistance(
+                    max(0, value.translation.height - dismissDragOrigin)
+                )
             }
             .onEnded { value in
-                guard isTrackingDismiss else { return }
-                let projected = value.predictedEndTranslation.height - dismissDragOrigin
-                if dismissTranslation > 90 || projected > 180 {
+                guard !isLandscape, isTrackingDismiss else { return }
+                let projected = resistedDistance(
+                    max(0, value.predictedEndTranslation.height - dismissDragOrigin)
+                )
+                let threshold = max(110, panelHeight * 0.25)
+                if dismissTranslation > threshold || projected > threshold {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onDismiss()
                 }
                 withAnimation(.snappy(duration: 0.24)) {
@@ -124,6 +154,14 @@ struct ChapterListPanel: View {
                 dismissDragOrigin = 0
                 isTrackingDismiss = false
             }
+    }
+
+    /// A short, heavily resisted opening gives the list native-sheet elasticity before it begins
+    /// following the finger more directly.
+    private func resistedDistance(_ distance: CGFloat) -> CGFloat {
+        let resistanceRange: CGFloat = 30
+        if distance <= resistanceRange { return distance * 0.25 }
+        return resistanceRange * 0.25 + (distance - resistanceRange) * 0.84
     }
 
     private func chapterRow(_ chapter: VideoChapter) -> some View {
@@ -182,6 +220,13 @@ struct ChapterListPanel: View {
 }
 
 private struct ChapterListScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct ChapterPanelHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()

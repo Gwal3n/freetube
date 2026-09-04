@@ -288,7 +288,9 @@ struct FullScreenPlayer: View {
                 }
             }
             }
-            .frame(width: proxy.size.width, alignment: .leading)
+            // In landscape Chapters owns the trailing column. Constrain the complete video/feed
+            // stack—not only the video surface—so metadata can never render underneath the panel.
+            .frame(width: surfaceWidth, alignment: .leading)
 
             if player.chapterListPresented, !player.chapters.isEmpty {
                 ChapterListPanel(
