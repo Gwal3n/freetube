@@ -75,7 +75,10 @@ nonisolated enum PythonJSBridge {
     /// one inside the evaluation scope.
     private static func installEvalJSBuiltin() {
         let evalJS = PythonFunction { (args: PythonObject) -> PythonConvertible in
-            guard let code = String(args[0]) else {
+            // PythonKit hands a one-parameter `PythonFunction` its argument directly, not as a
+            // tuple. Indexing `args[0]` therefore indexed the Python string and sent only its
+            // first character to JavaScriptCore (confirmed by the device's `1 input bytes` log).
+            guard let code = String(args) else {
                 let builtins = Python.import("builtins")
                 let err = builtins.TypeError("eval_js: first argument must be a string")
                 throw PythonError.exception(err, traceback: nil)
