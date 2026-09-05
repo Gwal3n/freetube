@@ -467,6 +467,47 @@ final class DownloadManager: TemporaryDownloading {
             }
         }.value
 
+        // The app already has a fast, proven stream resolver for playback. Prefer that same
+        // source for offline downloads instead of asking embedded yt-dlp to independently choose
+        // a client and a PoT-gated format. For ordinary video this is an HLS master manifest;
+        // FFmpeg downloads its media segments and remuxes them into the canonical local MP4.
+        // A progressive/audio-only result follows the exact same path. yt-dlp remains below as a
+        // compatibility fallback for videos for which the native resolver has no usable source.
+        do {
+            log.info("native-download[\(video.id, privacy: .public)] resolving playback source")
+            phaseByVideoID[video.id] = "stream"
+            publish(snapshot: DownloadTaskSnapshot(
+                id: snapshotID, videoID: video.id, title: video.title,
+                state: .downloading(progress: 0), createdAt: .now
+            ))
+            let resolved = try await NativeStreamService().resolve(video: video, quality: quality)
+            try await downloadResolvedSource(
+                resolved.url,
+                to: destination,
+                audioOnly: quality == .audioOnly,
+                videoID: video.id
+            )
+            try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+            await persistDownloaded(video: video, fileURL: destination)
+            publish(snapshot: DownloadTaskSnapshot(
+                id: snapshotID, videoID: video.id, title: video.title,
+                state: .completed(destination), createdAt: .now
+            ))
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                self.tasks[snapshotID] = nil
+                self.publishSnapshots()
+            }
+            log.info("native-download[\(video.id, privacy: .public)] SUCCESS in \(String(format: "%.1f", Date().timeIntervalSince(startedAt)), privacy: .public)s")
+            return destination
+        } catch is CancellationError {
+            try? FileManager.default.removeItem(at: destination)
+            throw CancellationError()
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            log.notice("native-download[\(video.id, privacy: .public)] failed: \(String(describing: error), privacy: .public); trying yt-dlp")
+        }
+
         // Use `,` (download multiple formats as separate files) instead of `+` (download + merge
         // via ffmpeg). yt-dlp's ffmpeg merger reliably hangs on iOS — once `Popen.communicate`
         // dispatches the merger ffmpeg subprocess we never see Python return. Doing the mux ourselves
@@ -505,7 +546,8 @@ final class DownloadManager: TemporaryDownloading {
             "--no-playlist",
             "--no-progress",
             "--no-check-certificates",
-            // **Player-client fallback chain + PoT bypass.** Two interrelated knobs:
+            // **Player-client fallback chain.** Try several anonymous client profiles so yt-dlp
+            // can retain valid HLS/progressive fallbacks when the native resolver fails.
             //
             // `player_client=…` — explicit list of YouTube player profiles to try, in fallback
             // order. The default yt-dlp list without a JS runtime is so narrow it commonly
@@ -519,17 +561,11 @@ final class DownloadManager: TemporaryDownloading {
             //   - `ios` — native iOS app profile.
             //   - `android_vr` — last-resort fallback (was the only default).
             //
-            // `formats=missing_pot` — **critical**. As of late-2024 yt-dlp builds, formats that
-            // YouTube has marked as requiring a Proof-of-Origin token are *filtered out by
-            // default* on the assumption they'll return HTTP 403. With every format filtered,
-            // yt-dlp falls through to "no usable formats" → `"This video is not available"`.
-            // Setting `formats=missing_pot` tells yt-dlp "keep those formats anyway — I'll try."
-            // In practice many still play because YouTube doesn't enforce PoT on every CDN
-            // edge; the ones that do 403 fall through to the next client. Without this flag we
-            // had `"...formats require a GVS PO Token which was not provided. They will be
-            // skipped..."` in the log for every client we tried, leaving zero usable formats.
+            // Do not opt into `formats=missing_pot`. Those entries are retained for diagnostics,
+            // not made downloadable: the current device log proves yt-dlp selects one and then
+            // receives HTTP 403. They also polluted the Link picker with severely throttled URLs.
             "--extractor-args",
-            "youtube:player_client=tv_simply,tv_embedded,web_creator,mweb,web_safari,ios,android_vr;formats=missing_pot",
+            "youtube:player_client=tv_simply,tv_embedded,web_creator,mweb,web_safari,ios,android_vr",
             // **Concurrent fragment downloads.** For HLS/DASH streams yt-dlp downloads each
             // chunk sequentially by default — bumping this lets it fetch N fragments at once
             // over the same HTTP/2 connection. Doesn't change the total bytes pulled but cuts
@@ -1037,6 +1073,37 @@ final class DownloadManager: TemporaryDownloading {
         if expected > 0, Int64(written) != expected {
             log.error("[fallback] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
             try? FileManager.default.removeItem(at: destination)
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+    }
+
+    /// Materializes the exact source used by normal playback. Keeping extraction and transfer as
+    /// separate steps avoids yt-dlp selecting a different, PoT-locked client format after the app
+    /// has already resolved a stream that AVPlayer can consume successfully.
+    private func downloadResolvedSource(
+        _ source: URL,
+        to destination: URL,
+        audioOnly: Bool,
+        videoID: String
+    ) async throws {
+        var args = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
+            "-i", source.absoluteString
+        ]
+        if audioOnly {
+            args.append(contentsOf: ["-vn", "-c:a", "copy"])
+        } else {
+            args.append(contentsOf: [
+                "-map", "0:v:0?", "-map", "0:a:0?",
+                "-c", "copy", "-movflags", "+faststart"
+            ])
+        }
+        args.append(destination.path)
+
+        log.info("native-download[\(videoID, privacy: .public)] FFmpeg materializing \(source.host ?? "unknown", privacy: .public)")
+        let exit = await FFmpegRunner.shared.run(args)
+        guard exit == 0, FileManager.default.fileExists(atPath: destination.path) else {
+            log.error("native-download[\(videoID, privacy: .public)] FFmpeg failed exit=\(exit, privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
     }
