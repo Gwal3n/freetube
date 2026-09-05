@@ -5,6 +5,7 @@ import UIKit
 
 @available(iOS 17.0, *)
 struct DownloadsScreen: View {
+    let navigationRequest: AppNavigationRequest?
     @State private var model = DownloadsViewModel()
     /// File-system + xattr backed downloads list. Replaces the SwiftData `@Query` —
     /// the store rebuilds `entries` from the Documents root on launch and after every
@@ -16,6 +17,7 @@ struct DownloadsScreen: View {
     /// the UI during downloads (the SQL fetches show up dominating Instruments traces).
     @Query private var favorites: [FavoriteVideo]
     @Environment(PlayerStateManager.self) private var player
+    @State private var path = NavigationPath()
 
     /// O(1) lookup table for `isFavorite(_:)`. Recomputed when `favorites` changes (which `@Query`
     /// keeps reactive), so menu rendering avoids any database work.
@@ -68,7 +70,7 @@ struct DownloadsScreen: View {
     private var totalCount: Int { savedItems.count }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List(selection: $selectedIDs) {
                 Section {
                     NavigationLink {
@@ -101,6 +103,12 @@ struct DownloadsScreen: View {
                 }
             }
             .navigationTitle("Downloads")
+            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
+                switch destination {
+                case .channel(let id): ChannelScreen(channelID: id)
+                case .playlist(let id): PlaylistScreen(playlistID: id)
+                }
+            }
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             .toolbar {
                 transferToolbarItem
@@ -160,6 +168,10 @@ struct DownloadsScreen: View {
                 if let url = shareFileURL {
                     ActivityShareSheet(activityItems: [url])
                 }
+            }
+            .onChange(of: navigationRequest?.id) { _, _ in
+                guard let destination = navigationRequest?.destination else { return }
+                path.append(destination)
             }
         }
     }

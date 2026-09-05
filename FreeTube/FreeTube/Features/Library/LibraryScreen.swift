@@ -15,14 +15,16 @@ import Kingfisher
 /// signed out would route to an error toast — clearer to just gate the whole menu.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
+    let navigationRequest: AppNavigationRequest?
     @State private var libraryModel = LibraryViewModel()
     @State private var accountModel = AccountViewModel()
     @State private var showingLogin = false
     @State private var localHistoryCount = 0
     @State private var localSubscriptions = LocalSubscriptionStore.shared
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 accountSection
                 localHistorySection
@@ -31,6 +33,12 @@ struct LibraryScreen: View {
                 }
             }
             .navigationTitle("Library")
+            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
+                switch destination {
+                case .channel(let id): ChannelScreen(channelID: id)
+                case .playlist(let id): PlaylistScreen(playlistID: id)
+                }
+            }
             .task {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 await accountModel.load()
@@ -58,6 +66,10 @@ struct LibraryScreen: View {
                 Task {
                     localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 }
+            }
+            .onChange(of: navigationRequest?.id) { _, _ in
+                guard let destination = navigationRequest?.destination else { return }
+                path.append(destination)
             }
         }
     }
@@ -284,6 +296,7 @@ private struct LocalHistoryScreen: View {
                                 VideoRow(
                                     video: video(from: entry),
                                     showsMoreMenu: true,
+                                    offersPlayNext: true,
                                     playbackProgress: showHistoryProgressBars ? playbackProgress(for: entry) : nil
                                 ) {
                                     player.load(video(from: entry))

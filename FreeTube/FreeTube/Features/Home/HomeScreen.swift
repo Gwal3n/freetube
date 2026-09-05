@@ -10,6 +10,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct HomeScreen: View {
     let searchActivation: Int
+    let navigationRequest: AppNavigationRequest?
     @State private var searchModel = SearchViewModel()
     @State private var path = NavigationPath()
     @State private var isSearchPresented = false
@@ -48,8 +49,11 @@ struct HomeScreen: View {
                 enabled: !MacIntegration.isRunningOnMac,
                 prompt: "Search YouTube"
             ))
-            .navigationDestination(for: SearchChannelRoute.self) { route in
-                ChannelScreen(channelID: route.id)
+            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
+                switch destination {
+                case .channel(let id): ChannelScreen(channelID: id)
+                case .playlist(let id): PlaylistScreen(playlistID: id)
+                }
             }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
@@ -60,9 +64,9 @@ struct HomeScreen: View {
                     searchModel.clearResults()
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
-                guard let channelID = note.object as? String, !channelID.isEmpty else { return }
-                path.append(SearchChannelRoute(id: channelID))
+            .onChange(of: navigationRequest?.id) { _, _ in
+                guard let destination = navigationRequest?.destination else { return }
+                path.append(destination)
             }
             .onChange(of: searchActivation) { _, _ in
                 guard !MacIntegration.isRunningOnMac else { return }
@@ -151,8 +155,4 @@ struct HomeScreen: View {
         searchModel.query = ""
         searchModel.clearResults()
     }
-}
-
-private struct SearchChannelRoute: Hashable {
-    let id: String
 }

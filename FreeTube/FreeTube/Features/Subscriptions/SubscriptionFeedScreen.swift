@@ -2,12 +2,14 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SubscriptionFeedScreen: View {
+    let navigationRequest: AppNavigationRequest?
     @State private var model = SubscriptionFeedViewModel()
+    @State private var path = NavigationPath()
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if model.failedChannelCount > 0 {
                     Section {
@@ -44,6 +46,12 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .navigationTitle("Feed")
+            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
+                switch destination {
+                case .channel(let id): ChannelScreen(channelID: id)
+                case .playlist(let id): PlaylistScreen(playlistID: id)
+                }
+            }
             .refreshable { await model.refresh() }
             .overlay {
                 if !model.hasSubscriptions && model.videos.isEmpty {
@@ -65,6 +73,10 @@ struct SubscriptionFeedScreen: View {
             .task { await model.load() }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await model.load() }
+            }
+            .onChange(of: navigationRequest?.id) { _, _ in
+                guard let destination = navigationRequest?.destination else { return }
+                path.append(destination)
             }
         }
     }

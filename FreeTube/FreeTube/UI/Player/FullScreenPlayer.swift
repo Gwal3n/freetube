@@ -247,9 +247,12 @@ struct FullScreenPlayer: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 30, coordinateSpace: .global)
                     .onEnded { value in
+                        let predicted = value.predictedEndTranslation
+                        let verticalIntent = abs(predicted.height) > abs(predicted.width) * 1.15
+                        guard verticalIntent else { return }
                         let mostlyDown = value.translation.height > 90
                             && abs(value.translation.width) < value.translation.height
-                        let fastFlick = value.predictedEndTranslation.height > 180
+                        let fastFlick = predicted.height > 180
                         if mostlyDown || fastFlick {
                             @Bindable var p = player
                             p.fullScreenPresented = false
@@ -1112,7 +1115,8 @@ struct FullScreenPlayer: View {
             VStack(alignment: .leading, spacing: 8) {
                 collapsiblePanelHeader(
                     title: "Playlist · \(playlist.title)",
-                    isExpanded: $isPlaylistExpanded
+                    isExpanded: $isPlaylistExpanded,
+                    onOpen: { openPlaylist(playlist.id) }
                 )
                 if isPlaylistExpanded {
                     List {
@@ -1264,7 +1268,8 @@ struct FullScreenPlayer: View {
 
     private func collapsiblePanelHeader(
         title: String,
-        isExpanded: Binding<Bool>
+        isExpanded: Binding<Bool>,
+        onOpen: (() -> Void)? = nil
     ) -> some View {
         HStack {
             Button {
@@ -1275,6 +1280,16 @@ struct FullScreenPlayer: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            if let onOpen {
+                Button(action: onOpen) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open playlist")
+            }
             Button {
                 isExpanded.wrappedValue.toggle()
             } label: {
@@ -1287,6 +1302,14 @@ struct FullScreenPlayer: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal)
+    }
+
+    private func openPlaylist(_ playlistID: String) {
+        player.fullScreenPresented = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            NotificationCenter.default.post(name: .freetubeOpenPlaylist, object: playlistID)
+        }
     }
 
     private func loadMoreQueueButton(

@@ -18,6 +18,10 @@ struct RootView: View {
     @State private var selectedTab: Tab = .feed
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
+    @State private var feedNavigationRequest: AppNavigationRequest?
+    @State private var searchNavigationRequest: AppNavigationRequest?
+    @State private var libraryNavigationRequest: AppNavigationRequest?
+    @State private var downloadsNavigationRequest: AppNavigationRequest?
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
     /// (for the list) read the same source of truth.
@@ -136,7 +140,11 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
-            selectedTab = .search
+            routeInSelectedTab(.channel(channelID))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenPlaylist)) { note in
+            guard let playlistID = note.object as? String, !playlistID.isEmpty else { return }
+            routeInSelectedTab(.playlist(playlistID))
         }
         .onAppear {
             if !showSubscriptionFeedTab, selectedTab == .feed { selectedTab = .search }
@@ -152,20 +160,20 @@ struct RootView: View {
             TabView(selection: tabSelection) {
                 if showSubscriptionFeedTab {
                     SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
-                        SubscriptionFeedScreen()
+                        SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
                     }
                 }
 
                 SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search) {
-                    HomeScreen(searchActivation: searchActivation)
+                    HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
                 }
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
-                    LibraryScreen()
+                    LibraryScreen(navigationRequest: libraryNavigationRequest)
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
-                    DownloadsScreen()
+                    DownloadsScreen(navigationRequest: downloadsNavigationRequest)
                 }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
 
@@ -183,20 +191,20 @@ struct RootView: View {
     private var legacyTabShell: some View {
         TabView(selection: tabSelection) {
             if showSubscriptionFeedTab {
-                SubscriptionFeedScreen()
+                SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
                     .tabItem { Label("Feed", systemImage: "rectangle.stack") }
                     .tag(Tab.feed)
             }
 
-            HomeScreen(searchActivation: searchActivation)
+            HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
-            LibraryScreen()
+            LibraryScreen(navigationRequest: libraryNavigationRequest)
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(Tab.library)
 
-            DownloadsScreen()
+            DownloadsScreen(navigationRequest: downloadsNavigationRequest)
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                 .tag(Tab.downloads)
@@ -224,6 +232,17 @@ struct RootView: View {
                 selectedTab = newTab
             }
         )
+    }
+
+    private func routeInSelectedTab(_ destination: AppNavigationRequest.Destination) {
+        let request = AppNavigationRequest(destination: destination)
+        switch selectedTab {
+        case .feed: feedNavigationRequest = request
+        case .search: searchNavigationRequest = request
+        case .library: libraryNavigationRequest = request
+        case .downloads: downloadsNavigationRequest = request
+        case .settings: break
+        }
     }
 
     private func updateStatusBarOverride(forFullScreenOpen open: Bool) {
