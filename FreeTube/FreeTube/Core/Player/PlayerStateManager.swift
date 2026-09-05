@@ -14,6 +14,10 @@ import UIKit
 @MainActor
 @Observable
 final class PlayerStateManager {
+    struct QueueNotice: Identifiable, Equatable {
+        let id = UUID()
+        let title: String
+    }
     enum LoadState: Equatable {
         case idle
         case resolving
@@ -61,6 +65,7 @@ final class PlayerStateManager {
     private(set) var activePlaylist: Playlist?
     private(set) var isLoadingMorePlaylistVideos = false
     private(set) var playlistRecommendations: [Video] = []
+    private(set) var queueNotice: QueueNotice?
     /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
     private(set) var videoPresentationSize: CGSize = .zero
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
@@ -447,6 +452,7 @@ final class PlayerStateManager {
     private var resolutionTask: Task<Void, Never>?
     private var recommendationTask: Task<Void, Never>?
     private var contentPrefetchTask: Task<Void, Never>?
+    private var queueNoticeDismissTask: Task<Void, Never>?
 
     /// Upserts a `WatchHistoryEntry` so the Library's "Recents" section reflects what the user
     /// played. Same-id taps just bump `watchedAt` so the row floats to the top. The actor hop keeps
@@ -510,6 +516,15 @@ final class PlayerStateManager {
     func enqueueNext(_ video: Video) {
         guard let currentVideo, video.id != currentVideo.id else { return }
         queue.insertNext(video)
+        let notice = QueueNotice(title: video.title)
+        queueNotice = notice
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        queueNoticeDismissTask?.cancel()
+        queueNoticeDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.4))
+            guard !Task.isCancelled, self?.queueNotice?.id == notice.id else { return }
+            self?.queueNotice = nil
+        }
         log.info("Queued \(video.id, privacy: .public) to play next")
     }
 
@@ -1254,7 +1269,7 @@ final class PlayerStateManager {
     /// the queue. This is what makes the player behave like the YouTube app: tap any video and a
     /// fresh "up next" queue is ready to advance when the current track ends.
     private func fillQueueWithRecommendations(for seed: Video) async {
-        let targetUpcomingCount = 5
+        let targetUpcomingCount = min(max(preferences.upNextInitialCount, 3), 15)
         let upcomingCount = activePlaylist != nil
             ? min(targetUpcomingCount, playlistRecommendations.count)
             : queue.availableUpcomingCount(limit: targetUpcomingCount)

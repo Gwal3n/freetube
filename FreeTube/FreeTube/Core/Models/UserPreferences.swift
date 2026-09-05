@@ -21,6 +21,8 @@ struct UserPreferences {
     /// Shows locally stored resume progress along the bottom edge of History thumbnails.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
     @AppStorage("showComments") var showComments: Bool = true
+    @AppStorage("showUpNext") var showUpNext: Bool = true
+    @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
     /// Fetches expanded details and the first comments page only after playback is ready. Further
     /// comment pages and replies always remain user initiated.
     @AppStorage("prefetchVideoDetails") var prefetchVideoDetails: Bool = true

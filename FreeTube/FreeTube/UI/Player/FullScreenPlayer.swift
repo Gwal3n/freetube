@@ -14,6 +14,7 @@ struct FullScreenPlayer: View {
 
     /// Keep recommendation rows out of the render tree until the user asks to inspect them.
     @State private var isQueueExpanded = false
+    @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
@@ -49,6 +50,8 @@ struct FullScreenPlayer: View {
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
+    @AppStorage("showUpNext") private var showUpNext = true
+    @AppStorage("upNextInitialCount") private var upNextInitialCount = 5
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
@@ -481,7 +484,9 @@ struct FullScreenPlayer: View {
                 if player.activePlaylist != nil {
                     playlistPanel
                 }
-                queuePanel
+                if showUpNext {
+                    queuePanel
+                }
                 if showComments {
                     CommentsSection(
                         videoID: video.id,
@@ -1040,7 +1045,7 @@ struct FullScreenPlayer: View {
     /// Total height we hand to the queue `List`. Sized for the actual number of items + a 32pt
     /// bottom margin so the last row's edit-handle / swipe affordance isn't truncated.
     private var queueListHeight: CGFloat {
-        let loadMoreRows = player.canLoadMoreRecommendations ? 1 : 0
+        let loadMoreRows = canRevealMoreUpNext ? 1 : 0
         let count = max(1, displayedUpNextVideos.count + loadMoreRows)
         return CGFloat(count) * Self.queueRowFootprint + 32
     }
@@ -1067,10 +1072,18 @@ struct FullScreenPlayer: View {
         player.queue.items.indices.filter { player.queue.items[$0].id != player.currentVideo?.id }
     }
 
-    private var displayedUpNextVideos: [Video] {
+    private var allUpNextVideos: [Video] {
         player.activePlaylist == nil
             ? displayedQueueIndices.map { player.queue.items[$0] }
             : player.playlistRecommendations
+    }
+
+    private var displayedUpNextVideos: [Video] {
+        Array(allUpNextVideos.prefix(max(1, upNextVisibleLimit)))
+    }
+
+    private var canRevealMoreUpNext: Bool {
+        upNextVisibleLimit < allUpNextVideos.count || player.canLoadMoreRecommendations
     }
 
     // MARK: - Queue panel
@@ -1163,6 +1176,14 @@ struct FullScreenPlayer: View {
                             .listRowBackground(Color.clear)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    player.enqueueNext(video)
+                                } label: {
+                                    Label("Play next", systemImage: "text.insert")
+                                }
+                                .tint(.accentColor)
+                            }
                     }
                     .onDelete { offsets in
                         guard player.activePlaylist == nil else { return }
@@ -1175,9 +1196,9 @@ struct FullScreenPlayer: View {
                             player.queue.remove(at: queueIndex)
                         }
                     }
-                    if player.canLoadMoreRecommendations {
+                    if canRevealMoreUpNext {
                         Button {
-                            Task { await player.loadMoreRecommendations() }
+                            Task { await revealMoreUpNext() }
                         } label: {
                             HStack {
                                 Spacer()
@@ -1205,7 +1226,22 @@ struct FullScreenPlayer: View {
         }
         .onChange(of: player.currentVideo?.id) {
             isQueueExpanded = false
+            upNextVisibleLimit = upNextInitialCount
         }
+        .onChange(of: upNextInitialCount) { _, newValue in
+            upNextVisibleLimit = newValue
+        }
+        .onAppear { upNextVisibleLimit = upNextInitialCount }
+    }
+
+    private func revealMoreUpNext() async {
+        let increment = 5
+        if upNextVisibleLimit < allUpNextVideos.count {
+            upNextVisibleLimit = min(upNextVisibleLimit + increment, allUpNextVideos.count)
+            return
+        }
+        await player.loadMoreRecommendations()
+        upNextVisibleLimit = min(upNextVisibleLimit + increment, allUpNextVideos.count)
     }
 
     private func collapsiblePanelHeader(

@@ -44,6 +44,16 @@ struct SettingsScreen: View {
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
                     Toggle("Show comments", isOn: Bindable(model).showComments)
+                    Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
+                    if model.showUpNext {
+                        Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
+                            LabeledContent("Initial Up Next videos") {
+                                Text("\(model.upNextInitialCount)")
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                     Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
                     Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
                 } header: {

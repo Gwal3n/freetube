@@ -76,6 +76,27 @@ struct RootView: View {
                 player.dismiss()
             }
         }
+        .overlay(alignment: .top) {
+            if let notice = player.queueNotice {
+                Label {
+                    Text("Playing next: \(notice.title)")
+                        .lineLimit(1)
+                } icon: {
+                    Image(systemName: "text.insert")
+                }
+                .font(.footnote.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: 300)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+                .padding(.top, 8)
+                .allowsHitTesting(false)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy(duration: 0.24), value: player.queueNotice?.id)
         .task {
             await SessionManager.shared.bootstrap()
         }

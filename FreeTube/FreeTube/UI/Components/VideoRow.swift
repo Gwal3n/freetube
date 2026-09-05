@@ -8,6 +8,7 @@ import Kingfisher
 /// sibling of the main tap target so taps on it don't trigger `onTap`.
 @available(iOS 17.0, *)
 struct VideoRow: View {
+    @Environment(PlayerStateManager.self) private var player
     let video: Video
     var showsMoreMenu: Bool
     var offersPlayNext: Bool
@@ -48,6 +49,16 @@ struct VideoRow: View {
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if offersPlayNext {
+                Button {
+                    player.enqueueNext(video)
+                } label: {
+                    Label("Play next", systemImage: "text.insert")
+                }
+                .tint(.accentColor)
             }
         }
     }

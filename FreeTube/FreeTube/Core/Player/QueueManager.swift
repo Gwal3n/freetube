@@ -65,6 +65,14 @@ final class QueueManager {
     }
 
     func insertNext(_ video: Video) {
+        // "Play next" means repositioning an existing queue item, not duplicating it. Removing
+        // an item before the current position shifts the current index left by one.
+        if let existingIndex = items.firstIndex(where: { $0.id == video.id }) {
+            guard existingIndex != currentIndex else { return }
+            if existingIndex == currentIndex + 1 { return }
+            items.remove(at: existingIndex)
+            if existingIndex < currentIndex { currentIndex -= 1 }
+        }
         let insertIndex = min(currentIndex + 1, items.count)
         items.insert(video, at: insertIndex)
         rebuildShuffleOrder()

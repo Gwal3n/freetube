@@ -43,6 +43,16 @@ final class SettingsViewModel {
         set { preferences.showComments = newValue }
     }
 
+    var showUpNext: Bool {
+        get { preferences.showUpNext }
+        set { preferences.showUpNext = newValue }
+    }
+
+    var upNextInitialCount: Int {
+        get { preferences.upNextInitialCount }
+        set { preferences.upNextInitialCount = newValue }
+    }
+
     var prefetchVideoDetails: Bool {
         get { preferences.prefetchVideoDetails }
         set { preferences.prefetchVideoDetails = newValue }
