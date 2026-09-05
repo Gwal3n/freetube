@@ -15,10 +15,10 @@ struct SearchContent: View {
     @State private var areChannelsExpanded = true
     @State private var areVideosExpanded = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @State private var progressByVideoID: [String: Double] = [:]
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
-    @Query private var watchHistory: [WatchHistoryEntry]
 
     var body: some View {
         Group {
@@ -55,11 +55,6 @@ struct SearchContent: View {
 
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
-        let progressByVideoID = showHistoryProgressBars
-            ? Dictionary(uniqueKeysWithValues: watchHistory.compactMap { entry in
-                entry.resumableProgress.map { (entry.videoID, $0) }
-            })
-            : [:]
         List {
             if !results.channels.isEmpty {
                 Section {
@@ -144,6 +139,12 @@ struct SearchContent: View {
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)
         .refreshable { await model.refresh() }
+        .task(id: progressLookupID(for: results.videos)) {
+            await loadProgress(for: results.videos)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
+            Task { await loadProgress(for: results.videos) }
+        }
     }
 
     private func collapsibleHeader(
@@ -163,6 +164,20 @@ struct SearchContent: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func progressLookupID(for videos: [Video]) -> String {
+        "\(showHistoryProgressBars):" + videos.map(\.id).joined(separator: ",")
+    }
+
+    private func loadProgress(for videos: [Video]) async {
+        guard showHistoryProgressBars else {
+            progressByVideoID = [:]
+            return
+        }
+        progressByVideoID = await PersistenceWriter.shared.watchProgress(
+            videoIDs: videos.map(\.id)
+        )
     }
 
     @ViewBuilder

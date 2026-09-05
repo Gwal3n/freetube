@@ -26,7 +26,9 @@ actor PersistenceWriter {
         videoID: String,
         title: String,
         channelName: String,
-        thumbnailURL: URL?
+        thumbnailURL: URL?,
+        position: TimeInterval,
+        duration: TimeInterval
     ) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
@@ -35,25 +37,53 @@ actor PersistenceWriter {
             existing.title = title
             existing.channelName = channelName
             existing.thumbnailURL = thumbnailURL
+            existing.lastPosition = position
+            existing.duration = duration
         } else {
             modelContext.insert(WatchHistoryEntry(
                 videoID: videoID,
                 title: title,
                 channelName: channelName,
-                thumbnailURL: thumbnailURL
+                thumbnailURL: thumbnailURL,
+                lastPosition: position,
+                duration: duration
             ))
         }
         try? modelContext.save()
+        NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
     }
 
     /// Stores lightweight playback progress without bumping `watchedAt`; opening a video controls
     /// history ordering, while periodic transport ticks should not continuously reorder the list.
-    func updateWatchProgress(videoID: String, position: TimeInterval, duration: TimeInterval) {
+    func updateWatchProgress(
+        videoID: String,
+        position: TimeInterval,
+        duration: TimeInterval,
+        notifyObservers: Bool = false
+    ) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
         guard let existing = try? modelContext.fetch(descriptor).first else { return }
         existing.lastPosition = position
         existing.duration = duration
+        try? modelContext.save()
+        if notifyObservers {
+            NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
+        }
+    }
+
+    func updateWatchHistoryMetadata(
+        videoID: String,
+        title: String,
+        channelName: String,
+        thumbnailURL: URL?
+    ) {
+        let target = videoID
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+        guard let existing = try? modelContext.fetch(descriptor).first else { return }
+        existing.title = title
+        existing.channelName = channelName
+        existing.thumbnailURL = thumbnailURL
         try? modelContext.save()
     }
 
@@ -66,12 +96,49 @@ actor PersistenceWriter {
         return (existing.lastPosition, existing.duration)
     }
 
+    func watchProgress(videoIDs: [String]) -> [String: Double] {
+        var result: [String: Double] = [:]
+        for videoID in Set(videoIDs) {
+            let target = videoID
+            let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+            guard let entry = try? modelContext.fetch(descriptor).first,
+                  let progress = entry.resumableProgress else { continue }
+            result[videoID] = progress
+        }
+        return result
+    }
+
+    func fetchWatchHistory(offset: Int, limit: Int) -> [WatchHistorySnapshot] {
+        var descriptor = FetchDescriptor<WatchHistoryEntry>(
+            sortBy: [SortDescriptor(\WatchHistoryEntry.watchedAt, order: .reverse)]
+        )
+        descriptor.fetchOffset = max(0, offset)
+        descriptor.fetchLimit = max(1, limit)
+        let entries = (try? modelContext.fetch(descriptor)) ?? []
+        return entries.map {
+            WatchHistorySnapshot(
+                videoID: $0.videoID,
+                title: $0.title,
+                channelName: $0.channelName,
+                thumbnailURL: $0.thumbnailURL,
+                watchedAt: $0.watchedAt,
+                lastPosition: $0.lastPosition,
+                duration: $0.duration
+            )
+        }
+    }
+
+    func watchHistoryCount() -> Int {
+        (try? modelContext.fetchCount(FetchDescriptor<WatchHistoryEntry>())) ?? 0
+    }
+
     func deleteWatchHistory(videoID: String) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
         if let entry = try? modelContext.fetch(descriptor).first {
             modelContext.delete(entry)
             try? modelContext.save()
+            NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
         }
     }
 
@@ -80,6 +147,7 @@ actor PersistenceWriter {
         guard let entries = try? modelContext.fetch(descriptor) else { return }
         for entry in entries { modelContext.delete(entry) }
         try? modelContext.save()
+        NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
     }
 
 }

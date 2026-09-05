@@ -113,6 +113,11 @@ final class PlayerStateManager {
     }
     private var playbackHistory: [PlaybackHistoryItem] = []
     private var playbackHistoryIndex = -1
+    /// Actual time spent playing the selected video in this session. This is intentionally not
+    /// derived from the playhead: resume and manual seeks must not instantly qualify history.
+    private var historyPlaybackSeconds: TimeInterval = 0
+    private var lastHistoryPlaybackTick: Date?
+    private var historyRecordedVideoID: String?
 
     var canPlayPrevious: Bool { playbackHistoryIndex > 0 }
     var canPlayNext: Bool {
@@ -364,6 +369,9 @@ final class PlayerStateManager {
         lastProgressSaveAt = .distantPast
         lastSavedProgressVideoID = nil
         lastSavedProgressPosition = -.infinity
+        historyPlaybackSeconds = 0
+        lastHistoryPlaybackTick = nil
+        historyRecordedVideoID = nil
         // Ordinary playback gets a fresh, bounded recommendation set for each video and retains no
         // history. Explicit playlist batches keep their curated order and skip recommendations.
         if skipRecommendations {
@@ -385,7 +393,6 @@ final class PlayerStateManager {
         hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
-        recordWatchHistory(video: video)
         refreshArtwork(for: video)
         loadSponsorBlockSegments(for: video.id)
         resolutionTask = Task { [weak self] in
@@ -409,7 +416,16 @@ final class PlayerStateManager {
             )
         }
         refreshArtwork(for: video)
-        recordWatchHistory(video: video)
+        if historyRecordedVideoID == video.id {
+            Task {
+                await PersistenceWriter.shared.updateWatchHistoryMetadata(
+                    videoID: video.id,
+                    title: video.title,
+                    channelName: video.channelName,
+                    thumbnailURL: video.thumbnailURL
+                )
+            }
+        }
         updateNowPlaying()
     }
 
@@ -453,25 +469,6 @@ final class PlayerStateManager {
     private var recommendationTask: Task<Void, Never>?
     private var contentPrefetchTask: Task<Void, Never>?
     private var queueNoticeDismissTask: Task<Void, Never>?
-
-    /// Upserts a `WatchHistoryEntry` so the Library's "Recents" section reflects what the user
-    /// played. Same-id taps just bump `watchedAt` so the row floats to the top. The actor hop keeps
-    /// the SQL write off the main thread; @Query observers see the change automatically once the
-    /// background context saves.
-    private func recordWatchHistory(video: Video) {
-        let videoID = video.id
-        let title = video.title
-        let channelName = video.channelName
-        let thumbnailURL = video.thumbnailURL
-        Task {
-            await PersistenceWriter.shared.upsertWatchHistory(
-                videoID: videoID,
-                title: title,
-                channelName: channelName,
-                thumbnailURL: thumbnailURL
-            )
-        }
-    }
 
     func play() {
         if hasEnded {
@@ -1362,6 +1359,7 @@ final class PlayerStateManager {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
                 }
+                self.accumulateHistoryPlaybackTime()
                 self.persistCurrentPlaybackProgress(force: false)
                 self.updateNowPlaying()
             }
@@ -1488,6 +1486,28 @@ final class PlayerStateManager {
               duration.isFinite,
               elapsed >= 0,
               duration > 0 else { return }
+        let qualificationSeconds = min(duration * 0.05, 10)
+        guard historyPlaybackSeconds >= qualificationSeconds else { return }
+
+        if historyRecordedVideoID != video.id {
+            historyRecordedVideoID = video.id
+            lastProgressSaveAt = Date()
+            lastSavedProgressVideoID = video.id
+            lastSavedProgressPosition = elapsed
+            let position = elapsed
+            let totalDuration = duration
+            Task {
+                await PersistenceWriter.shared.upsertWatchHistory(
+                    videoID: video.id,
+                    title: video.title,
+                    channelName: video.channelName,
+                    thumbnailURL: video.thumbnailURL,
+                    position: position,
+                    duration: totalDuration
+                )
+            }
+            return
+        }
         let now = Date()
         if !force, now.timeIntervalSince(lastProgressSaveAt) < 10 { return }
         if lastSavedProgressVideoID == video.id,
@@ -1503,9 +1523,24 @@ final class PlayerStateManager {
             await PersistenceWriter.shared.updateWatchProgress(
                 videoID: videoID,
                 position: position,
-                duration: totalDuration
+                duration: totalDuration,
+                notifyObservers: force
             )
         }
+    }
+
+    private func accumulateHistoryPlaybackTime() {
+        let now = Date()
+        guard player.timeControlStatus == .playing else {
+            lastHistoryPlaybackTick = nil
+            return
+        }
+        if let previous = lastHistoryPlaybackTick {
+            // Cap a delayed observer callback so backgrounding or a blocked main thread cannot
+            // count wall-clock time during which playback was not actually observed.
+            historyPlaybackSeconds += min(max(now.timeIntervalSince(previous), 0), 1)
+        }
+        lastHistoryPlaybackTick = now
     }
 
     /// A mixable session should not compete for Now Playing while another app is active. When the

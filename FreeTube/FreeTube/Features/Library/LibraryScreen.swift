@@ -18,7 +18,7 @@ struct LibraryScreen: View {
     @State private var libraryModel = LibraryViewModel()
     @State private var accountModel = AccountViewModel()
     @State private var showingLogin = false
-    @Query(sort: \WatchHistoryEntry.watchedAt, order: .reverse) private var localHistory: [WatchHistoryEntry]
+    @State private var localHistoryCount = 0
     @State private var localSubscriptions = LocalSubscriptionStore.shared
 
     var body: some View {
@@ -32,10 +32,12 @@ struct LibraryScreen: View {
             }
             .navigationTitle("Library")
             .task {
+                localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 await accountModel.load()
                 if accountModel.info != nil { await libraryModel.load() }
             }
             .refreshable {
+                localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 await accountModel.load()
                 if accountModel.info != nil { await libraryModel.load() }
             }
@@ -52,6 +54,11 @@ struct LibraryScreen: View {
                     }
             }
             .errorToast(Bindable(libraryModel).errorState)
+            .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
+                Task {
+                    localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
+                }
+            }
         }
     }
 
@@ -68,7 +75,7 @@ struct LibraryScreen: View {
                         .frame(width: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Local history")
-                        Text(countSubtitle(localHistory.count, noun: "video"))
+                        Text(countSubtitle(localHistoryCount, noun: "video"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -252,13 +259,18 @@ struct LibraryScreen: View {
 @available(iOS 17.0, *)
 private struct LocalHistoryScreen: View {
     @Environment(PlayerStateManager.self) private var player
-    @Query(sort: \WatchHistoryEntry.watchedAt, order: .reverse) private var entries: [WatchHistoryEntry]
+    @State private var entries: [WatchHistorySnapshot] = []
+    @State private var isLoading = false
+    @State private var hasMore = true
     @State private var confirmsClear = false
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    private let pageSize = 50
 
     var body: some View {
         Group {
-            if entries.isEmpty {
+            if entries.isEmpty && isLoading {
+                LoadingView()
+            } else if entries.isEmpty {
                 EmptyStateView(
                     systemImage: "clock.arrow.circlepath",
                     title: "No local history",
@@ -280,9 +292,15 @@ private struct LocalHistoryScreen: View {
                                     Button(role: .destructive) {
                                         Task {
                                             await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID)
+                                            entries.removeAll { $0.videoID == entry.videoID }
                                         }
                                     } label: {
                                         Label("Remove", systemImage: "trash")
+                                    }
+                                }
+                                .onAppear {
+                                    if entry.videoID == entries.last?.videoID {
+                                        Task { await loadMore() }
                                     }
                                 }
                             }
@@ -309,14 +327,21 @@ private struct LocalHistoryScreen: View {
             titleVisibility: .visible
         ) {
             Button("Clear History", role: .destructive) {
-                Task { await PersistenceWriter.shared.clearWatchHistory() }
+                Task {
+                    await PersistenceWriter.shared.clearWatchHistory()
+                    entries = []
+                    hasMore = false
+                }
             }
         } message: {
             Text("This removes watch history stored by FreeTube on this device.")
         }
+        .task {
+            if entries.isEmpty && hasMore { await loadMore() }
+        }
     }
 
-    private var dayGroups: [(day: Date, entries: [WatchHistoryEntry])] {
+    private var dayGroups: [(day: Date, entries: [WatchHistorySnapshot])] {
         let calendar = Calendar.autoupdatingCurrent
         return Dictionary(grouping: entries) { calendar.startOfDay(for: $0.watchedAt) }
             .map { (day: $0.key, entries: $0.value.sorted { $0.watchedAt > $1.watchedAt }) }
@@ -330,7 +355,7 @@ private struct LocalHistoryScreen: View {
         return day.formatted(date: .long, time: .omitted)
     }
 
-    private func video(from entry: WatchHistoryEntry) -> Video {
+    private func video(from entry: WatchHistorySnapshot) -> Video {
         Video(
             id: entry.videoID,
             title: entry.title,
@@ -349,8 +374,21 @@ private struct LocalHistoryScreen: View {
 
     /// Match `PlayerStateManager.applyStoredResumePosition` exactly so a row never advertises
     /// progress for a video that playback considers finished or too close to an endpoint.
-    private func playbackProgress(for entry: WatchHistoryEntry) -> Double? {
+    private func playbackProgress(for entry: WatchHistorySnapshot) -> Double? {
         entry.resumableProgress
+    }
+
+    private func loadMore() async {
+        guard !isLoading, hasMore else { return }
+        isLoading = true
+        defer { isLoading = false }
+        let page = await PersistenceWriter.shared.fetchWatchHistory(
+            offset: entries.count,
+            limit: pageSize
+        )
+        let existingIDs = Set(entries.map(\.videoID))
+        entries.append(contentsOf: page.filter { !existingIDs.contains($0.videoID) })
+        hasMore = page.count == pageSize
     }
 }
 
