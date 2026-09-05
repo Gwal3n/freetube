@@ -61,10 +61,10 @@ struct RootView: View {
             // body re-renders and `.popupProgress(...)` re-applies with the new value.
             PopupContentWrapper(thumbnail: thumbnail)
         }
-        // Suspend LNPopupUI's global content pan only while Chapters owns vertical gestures.
-        // Outside that temporary state, the normal interactive pull-down remains available from
-        // the feed as before; the video surface also retains its explicit gesture.
-        .popupInteractionStyle(player.chapterListPresented
+        // Chapters and Up Next contain their own scroll/swipe recognizers. LNPopupUI's ancestor
+        // pan cannot direction-lock against those children, so pause it while either interactive
+        // panel is open. The explicit video-surface pull-down remains available.
+        .popupInteractionStyle(player.chapterListPresented || player.upNextListPresented
             ? UIViewController.PopupInteractionStyle.none
             : UIViewController.PopupInteractionStyle.drag)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)

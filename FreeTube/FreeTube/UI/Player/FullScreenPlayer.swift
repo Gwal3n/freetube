@@ -366,8 +366,13 @@ struct FullScreenPlayer: View {
             }
         }
         .errorToast($downloadError)
-        // RootView disables LNPopupUI's global content pan only while the chapter list is visible;
-        // otherwise the lower feed retains the library's normal interactive collapse gesture.
+        .onChange(of: isQueueExpanded, initial: true) { _, expanded in
+            player.upNextListPresented = expanded
+        }
+        .onDisappear {
+            // Never leave popup interaction disabled after the expanded player goes away.
+            player.upNextListPresented = false
+        }
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
         // claims the natural content height (video + panel intrinsic
