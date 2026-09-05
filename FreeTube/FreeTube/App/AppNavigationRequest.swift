@@ -6,6 +6,7 @@ struct AppNavigationRequest: Identifiable, Equatable {
     enum Destination: Hashable {
         case channel(String)
         case playlist(String)
+        case localPlaylist(String)
     }
 
     let id = UUID()

@@ -21,6 +21,7 @@ struct LibraryScreen: View {
     @State private var showingLogin = false
     @State private var localHistoryCount = 0
     @State private var localSubscriptions = LocalSubscriptionStore.shared
+    @State private var localPlaylistCount = 0
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -37,15 +38,18 @@ struct LibraryScreen: View {
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
+                case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
             }
             .task {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
+                localPlaylistCount = await localPlaylistCountFromStore()
                 await accountModel.load()
                 if accountModel.info != nil { await libraryModel.load() }
             }
             .refreshable {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
+                localPlaylistCount = await localPlaylistCountFromStore()
                 await accountModel.load()
                 if accountModel.info != nil { await libraryModel.load() }
             }
@@ -71,7 +75,15 @@ struct LibraryScreen: View {
                 guard let destination = navigationRequest?.destination else { return }
                 path.append(destination)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
+                Task { localPlaylistCount = await localPlaylistCountFromStore() }
+            }
         }
+    }
+
+    private func localPlaylistCountFromStore() async -> Int {
+        let playlists = await LocalPlaylistService().playlists()
+        return playlists.count
     }
 
     @ViewBuilder
@@ -105,6 +117,23 @@ struct LibraryScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Local subscriptions")
                         Text(countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            NavigationLink {
+                LocalPlaylistsScreen()
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "music.note.list")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Local playlists")
+                        Text(countSubtitle(localPlaylistCount, noun: "playlist"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

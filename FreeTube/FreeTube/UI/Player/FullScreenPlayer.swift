@@ -30,6 +30,7 @@ struct FullScreenPlayer: View {
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
+    @State private var saveToPlaylistVideo: Video?
     @State private var downloadError: ErrorState?
     /// Currently-pushed channel (nil = panel mode). When non-nil, the lower section swaps the
     /// metadata + comments/queue panel for a NavigationStack rooted at `ChannelScreen`. Keeping
@@ -368,6 +369,9 @@ struct FullScreenPlayer: View {
             if let url = shareFileURL {
                 ActivityShareSheet(activityItems: [url])
             }
+        }
+        .sheet(item: $saveToPlaylistVideo) { video in
+            AddToPlaylistSheet(video: video)
         }
         .errorToast($downloadError)
         .onChange(of: upNextHorizontalSwipeActive, initial: true) { _, active in
@@ -835,6 +839,18 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func playerActions(_ video: Video) -> some View {
         HStack(spacing: 4) {
+            Button {
+                saveToPlaylistVideo = video
+            } label: {
+                Image(systemName: "bookmark")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .accessibilityLabel("Save to playlist")
+
             Menu {
                 if let url = watchURL(video) {
                     ShareLink(item: url) {
@@ -1333,7 +1349,14 @@ struct FullScreenPlayer: View {
         player.fullScreenPresented = false
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(180))
-            NotificationCenter.default.post(name: .freetubeOpenPlaylist, object: playlistID)
+            if playlistID.hasPrefix("local:") {
+                NotificationCenter.default.post(
+                    name: .freetubeOpenLocalPlaylist,
+                    object: String(playlistID.dropFirst("local:".count))
+                )
+            } else {
+                NotificationCenter.default.post(name: .freetubeOpenPlaylist, object: playlistID)
+            }
         }
     }
 

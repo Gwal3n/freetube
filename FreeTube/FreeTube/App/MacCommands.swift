@@ -110,4 +110,5 @@ extension Notification.Name {
     static let freetubeOpenChannel = Notification.Name("com.leshko.freetube.openChannel")
     /// Requests playlist presentation in the currently selected tab without changing tabs.
     static let freetubeOpenPlaylist = Notification.Name("com.leshko.freetube.openPlaylist")
+    static let freetubeOpenLocalPlaylist = Notification.Name("com.leshko.freetube.openLocalPlaylist")
 }

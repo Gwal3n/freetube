@@ -146,6 +146,10 @@ struct RootView: View {
             guard let playlistID = note.object as? String, !playlistID.isEmpty else { return }
             routeInSelectedTab(.playlist(playlistID))
         }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenLocalPlaylist)) { note in
+            guard let playlistID = note.object as? String, !playlistID.isEmpty else { return }
+            routeInSelectedTab(.localPlaylist(playlistID))
+        }
         .onAppear {
             if !showSubscriptionFeedTab, selectedTab == .feed { selectedTab = .search }
         }

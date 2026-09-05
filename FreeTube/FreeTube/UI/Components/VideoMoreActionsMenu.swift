@@ -49,7 +49,7 @@ struct VideoMoreActionsMenu: View {
             }
         }
         .sheet(item: $addToPlaylistVideo) { video in
-            AddToPlaylistSheet(videoID: video.id, videoTitle: video.title)
+            AddToPlaylistSheet(video: video)
         }
     }
 
@@ -99,8 +99,13 @@ struct VideoMoreActionsMenu: View {
         } label: {
             Label("Copy URL", systemImage: "link")
         }
+        Divider()
+        Button {
+            addToPlaylistVideo = video
+        } label: {
+            Label("Save to local playlist", systemImage: "bookmark")
+        }
         if isSignedIn {
-            Divider()
             Button {
                 toggleFavorite()
             } label: {
@@ -109,11 +114,6 @@ struct VideoMoreActionsMenu: View {
                 } else {
                     Label("Add to favorites", systemImage: "hand.thumbsup")
                 }
-            }
-            Button {
-                addToPlaylistVideo = video
-            } label: {
-                Label("Add to playlist", systemImage: "text.badge.plus")
             }
         }
         if DownloadManager.shared.localFile(for: video.id) != nil {

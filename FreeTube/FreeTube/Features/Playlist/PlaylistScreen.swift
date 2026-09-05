@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import Kingfisher
 
 /// Playlist detail screen. Top-down layout:
@@ -15,12 +14,10 @@ import Kingfisher
 struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel
     @Environment(PlayerStateManager.self) private var player
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
-
-    /// Reactive list of saved-playlist favorites so the More menu can show the right
-    /// "Save playlist" / "Remove saved playlist" state without a per-render fetch.
-    @Query private var favorites: [FavoritePlaylist]
+    @State private var isSavedLocally = false
+    @State private var isSavingLocally = false
+    private let localPlaylistService = LocalPlaylistService()
 
     /// True after the user taps "More" — expands the metadata block to show the full description
     /// and every available stat (view count + video count + creator). Collapsed by default so the
@@ -75,6 +72,10 @@ struct PlaylistScreen: View {
         // top edge of the backdrop.
         .toolbarBackground(.hidden, for: .navigationBar)
         .task { await model.load() }
+        .task(id: model.details?.playlist.id) {
+            guard let id = model.details?.playlist.id else { return }
+            isSavedLocally = await localPlaylistService.isRemoteSaved(id: id)
+        }
         .task(id: "\(showHistoryProgressBars):" + (model.details?.videos.map(\.id).joined(separator: ",") ?? "")) {
             let ids = model.details?.videos.map(\.id) ?? []
             playbackProgress = showHistoryProgressBars
@@ -323,7 +324,6 @@ struct PlaylistScreen: View {
     /// icon. Hosts the secondary menu (open in browser / favorite / copy URL).
     @ViewBuilder
     private func moreMenu(_ details: PlaylistDetails) -> some View {
-        let isFavorite = favorites.contains { $0.playlistID == details.playlist.id }
         Menu {
             if let url = playlistURL(details.playlist.id) {
                 Button {
@@ -338,14 +338,17 @@ struct PlaylistScreen: View {
                 }
             }
             Button {
-                toggleFavorite(playlist: details.playlist, isFavorite: isFavorite)
+                Task { await toggleLocalSave(details.playlist) }
             } label: {
-                if isFavorite {
+                if isSavingLocally {
+                    Label("Saving…", systemImage: "arrow.down.circle")
+                } else if isSavedLocally {
                     Label("Remove saved playlist", systemImage: "bookmark.fill")
                 } else {
                     Label("Save playlist", systemImage: "bookmark")
                 }
             }
+            .disabled(isSavingLocally)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.footnote.weight(.bold))
@@ -418,21 +421,18 @@ struct PlaylistScreen: View {
         }
     }
 
-    private func toggleFavorite(playlist: Playlist, isFavorite: Bool) {
-        if isFavorite {
-            for fav in favorites where fav.playlistID == playlist.id {
-                modelContext.delete(fav)
-            }
+    private func toggleLocalSave(_ playlist: Playlist) async {
+        if isSavedLocally {
+            await localPlaylistService.removeRemotePlaylist(id: playlist.id)
+            isSavedLocally = false
         } else {
-            modelContext.insert(FavoritePlaylist(
-                playlistID: playlist.id,
-                title: playlist.title,
-                channelName: playlist.channelName ?? "",
-                thumbnailURL: playlist.thumbnailURL,
-                videoCount: playlist.videoCount
-            ))
+            isSavingLocally = true
+            defer { isSavingLocally = false }
+            do {
+                try await localPlaylistService.saveRemotePlaylist(playlist)
+                isSavedLocally = true
+            } catch { return }
         }
-        try? modelContext.save()
     }
 
     /// YouTube's playlist URLs use the bare playlist id, stripping the `VL` prefix YouTubeKit

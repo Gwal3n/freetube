@@ -50,6 +50,7 @@ struct SubscriptionFeedScreen: View {
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
+                case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
             }
             .refreshable { await model.refresh() }

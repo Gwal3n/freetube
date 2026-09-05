@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import UIKit
 
 /// Reusable trailing ellipsis Menu for `Playlist` items. Used by search results, the
@@ -9,14 +8,15 @@ import UIKit
 ///   - Open in browser, Copy URL: always shown
 ///   - Save playlist / Remove saved playlist: stored locally
 ///
-/// Saved playlists are stored locally in `FavoritePlaylist` (SwiftData) — no YouTube sync.
+/// Saved playlists are complete device-local snapshots — no YouTube account sync.
 @available(iOS 17.0, *)
 struct PlaylistMoreActionsMenu: View {
     let playlist: Playlist
 
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
-    @Query private var favorites: [FavoritePlaylist]
+    @State private var isSaved = false
+    @State private var isSaving = false
+    private let localService = LocalPlaylistService()
 
     var body: some View {
         Menu {
@@ -34,14 +34,17 @@ struct PlaylistMoreActionsMenu: View {
             }
             Divider()
             Button {
-                toggleFavorite()
+                Task { await toggleLocalSave() }
             } label: {
-                if isFavorite {
+                if isSaving {
+                    Label("Saving…", systemImage: "progress.indicator")
+                } else if isSaved {
                     Label("Remove saved playlist", systemImage: "bookmark.fill")
                 } else {
                     Label("Save playlist", systemImage: "bookmark")
                 }
             }
+            .disabled(isSaving)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body)
@@ -50,6 +53,10 @@ struct PlaylistMoreActionsMenu: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .task { isSaved = await localService.isRemoteSaved(id: playlist.id) }
+        .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
+            Task { isSaved = await localService.isRemoteSaved(id: playlist.id) }
+        }
     }
 
     // MARK: - Helpers
@@ -61,24 +68,17 @@ struct PlaylistMoreActionsMenu: View {
         return URL(string: "https://www.youtube.com/playlist?list=\(bare)")
     }
 
-    private var isFavorite: Bool {
-        favorites.contains { $0.playlistID == playlist.id }
-    }
-
-    private func toggleFavorite() {
-        if isFavorite {
-            for fav in favorites where fav.playlistID == playlist.id {
-                modelContext.delete(fav)
-            }
+    private func toggleLocalSave() async {
+        if isSaved {
+            await localService.removeRemotePlaylist(id: playlist.id)
+            isSaved = false
         } else {
-            modelContext.insert(FavoritePlaylist(
-                playlistID: playlist.id,
-                title: playlist.title,
-                channelName: playlist.channelName ?? "",
-                thumbnailURL: playlist.thumbnailURL,
-                videoCount: playlist.videoCount
-            ))
+            isSaving = true
+            defer { isSaving = false }
+            do {
+                try await localService.saveRemotePlaylist(playlist)
+                isSaved = true
+            } catch { return }
         }
-        try? modelContext.save()
     }
 }
