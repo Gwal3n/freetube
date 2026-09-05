@@ -15,13 +15,17 @@ enum ChannelVideoSort: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// YouTube's stable Videos-tab sort parameters. The final protobuf value selects newest (0),
-    /// popular (1), or oldest (2); each request returns its own continuation chain.
+    /// Selects the channel's Videos surface. YouTube now exposes sorting through dynamic filter-
+    /// chip continuations returned by this request, rather than distinct static params values.
     var requestParameters: String {
+        "EgZ2aWRlb3PyBgQKAjoA"
+    }
+
+    var chipIndex: Int {
         switch self {
-        case .newest: "EgZ2aWRlb3PyBgQKAjoA"
-        case .popular: "EgZ2aWRlb3PyBgQKAjoB"
-        case .oldest: "EgZ2aWRlb3PyBgQKAjoC"
+        case .newest: 0
+        case .popular: 1
+        case .oldest: 2
         }
     }
 

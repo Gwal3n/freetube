@@ -75,7 +75,8 @@ struct ChannelTabScreen: View {
 
     @ViewBuilder
     private func videoList(_ videos: [Video]) -> some View {
-        if kind == .allVideos, videos.isEmpty, model.isLoadingVideos(for: videoSort) {
+        if kind == .allVideos, videos.isEmpty,
+           (!model.hasLoadedVideos(for: videoSort) || model.isLoadingVideos(for: videoSort)) {
             LoadingView()
         } else if videos.isEmpty {
             EmptyStateView(systemImage: "tray", title: "Nothing here", message: "This channel hasn't posted any \(title.lowercased()) yet.")

@@ -130,7 +130,11 @@ final class ChannelViewModel {
 
     func videos(for sort: ChannelVideoSort) -> [Video] {
         if let tab = videoTabs[sort] { return tab.items }
-        return sort.localFallback(details?.videos.items ?? [])
+        return sort == .newest ? (details?.videos.items ?? []) : []
+    }
+
+    func hasLoadedVideos(for sort: ChannelVideoSort) -> Bool {
+        sort == .newest ? details != nil : videoTabs[sort] != nil
     }
 
     func isLoadingVideos(for sort: ChannelVideoSort) -> Bool {
@@ -142,7 +146,15 @@ final class ChannelViewModel {
         loadingVideoSorts.insert(sort)
         defer { loadingVideoSorts.remove(sort) }
         do {
-            videoTabs[sort] = try await service.fetchVideos(channelID: channelID, sort: sort)
+            let remote = try await service.fetchVideos(channelID: channelID, sort: sort)
+            if remote.items.isEmpty, !(details?.videos.items.isEmpty ?? true) {
+                throw YouTubeServiceError.decoding(NSError(
+                    domain: "ChannelViewModel",
+                    code: -5,
+                    userInfo: [NSLocalizedDescriptionKey: "YouTube returned an empty sorted Videos tab."]
+                ))
+            }
+            videoTabs[sort] = remote
         } catch {
             // Preserve the old behavior as an explicit fallback: sort the already-loaded newest
             // page locally, but do not pretend it is a complete server-sorted result.

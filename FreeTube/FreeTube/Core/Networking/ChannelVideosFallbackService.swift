@@ -56,7 +56,42 @@ final class ChannelVideosFallbackService: Sendable {
     /// Fetches the channel's Videos tab via a raw POST to youtubei/v1/browse and decodes
     /// items as either `videoRenderer` or `lockupViewModel`. Records the continuation token
     /// on the state map so subsequent pagination calls can route through `fetchContinuation`.
-    func fetchVideos(channelID: String, params: String, cacheKey: String? = nil) async throws -> ChannelTab<Video> {
+    func fetchVideos(
+        channelID: String,
+        params: String,
+        cacheKey: String? = nil,
+        sort: ChannelVideoSort = .newest
+    ) async throws -> ChannelTab<Video> {
+        // YouTube no longer accepts a static params variant for Popular and Oldest. Those values
+        // now select the Videos surface only; the actual sort is represented by a per-response
+        // continuation token in the filter-chip row. Discover that token from the current Videos
+        // response before requesting the selected sort.
+        if sort != .newest {
+            let discovery = try await sendBrowse(
+                body: Self.initialBrowseBody(channelID: channelID, params: ChannelVideoSort.newest.requestParameters),
+                channelID: channelID,
+                kind: "sort-discovery"
+            ) { root in
+                ([], Self.decodeSortToken(root: root, sort: sort))
+            }
+            guard let sortToken = discovery.continuation else {
+                throw YouTubeServiceError.decoding(NSError(
+                    domain: "ChannelVideosFallback",
+                    code: -4,
+                    userInfo: [NSLocalizedDescriptionKey: "YouTube did not provide the requested channel sort."]
+                ))
+            }
+            let result = try await sendBrowse(
+                body: Self.continuationBody(token: sortToken),
+                channelID: channelID,
+                kind: "sort-\(sort.rawValue)"
+            ) { root in
+                Self.decodeContinuation(root: root, channelID: channelID)
+            }
+            await state.set(cacheKey ?? channelID, token: result.continuation)
+            return ChannelTab(items: result.videos, continuationToken: result.continuation)
+        }
+
         let body = Self.initialBrowseBody(channelID: channelID, params: params)
         let result = try await sendBrowse(body: body, channelID: channelID, kind: "initial") { root in
             Self.decodeVideosTab(root: root, channelID: channelID)
@@ -183,11 +218,37 @@ final class ChannelVideosFallbackService: Sendable {
     private static func decodeContinuation(root: Any, channelID: String) -> (videos: [Video], continuation: String?) {
         guard
             let dict = root as? [String: Any],
-            let actions = dict["onResponseReceivedActions"] as? [[String: Any]],
-            let items = ((actions.first?["appendContinuationItemsAction"] as? [String: Any])?["continuationItems"]) as? [[String: Any]]
+            let actions = dict["onResponseReceivedActions"] as? [[String: Any]]
         else { return ([], nil) }
 
-        return extractVideos(from: items, channelID: channelID)
+        // Ordinary pagination appends one item collection. Changing a sort chip instead emits
+        // two reload commands: one for the chip row and one for the video grid. Walk every action
+        // and return the collection that actually contains videos.
+        for action in actions {
+            let container = (action["appendContinuationItemsAction"] as? [String: Any])
+                ?? (action["reloadContinuationItemsCommand"] as? [String: Any])
+            guard let items = container?["continuationItems"] as? [[String: Any]] else { continue }
+            let result = extractVideos(from: items, channelID: channelID)
+            if !result.videos.isEmpty { return result }
+        }
+        return ([], nil)
+    }
+
+    /// Returns the dynamic continuation behind YouTube's Latest / Popular / Oldest chips. Chip
+    /// labels are localized, so their stable display order is safer than matching English text.
+    private static func decodeSortToken(root: Any, sort: ChannelVideoSort) -> String? {
+        guard
+            let dictionary = root as? [String: Any],
+            let tabs = ((dictionary["contents"] as? [String: Any])?["twoColumnBrowseResultsRenderer"] as? [String: Any])?["tabs"] as? [[String: Any]],
+            let selectedTab = tabs.first(where: { ($0["tabRenderer"] as? [String: Any])?["selected"] as? Bool == true }),
+            let renderer = selectedTab["tabRenderer"] as? [String: Any],
+            let richGrid = (renderer["content"] as? [String: Any])?["richGridRenderer"] as? [String: Any],
+            let chipBar = (richGrid["header"] as? [String: Any])?["chipBarViewModel"] as? [String: Any],
+            let rawChips = chipBar["chips"] as? [[String: Any]]
+        else { return nil }
+        let chips = rawChips.compactMap { $0["chipViewModel"] as? [String: Any] }
+        guard chips.indices.contains(sort.chipIndex) else { return nil }
+        return (((chips[sort.chipIndex]["tapCommand"] as? [String: Any])?["innertubeCommand"] as? [String: Any])?["continuationCommand"] as? [String: Any])?["token"] as? String
     }
 
     /// Walks the response JSON to the Videos tab's items array and extracts videos.

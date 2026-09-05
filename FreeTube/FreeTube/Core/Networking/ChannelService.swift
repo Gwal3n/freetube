@@ -153,7 +153,8 @@ final class ChannelService: ChannelServicing {
         return try await videosFallback.fetchVideos(
             channelID: channelID,
             params: sort.requestParameters,
-            cacheKey: key
+            cacheKey: key,
+            sort: sort
         )
     }
 

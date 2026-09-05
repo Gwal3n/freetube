@@ -14,8 +14,9 @@ final class ChannelVideoSortTests: XCTestCase {
         XCTAssertEqual(ChannelVideoSort.oldest.localFallback(videos).map(\.id), ["oldest", "middle", "newest"])
     }
 
-    func testEachSortUsesDistinctServerParameters() {
-        XCTAssertEqual(Set(ChannelVideoSort.allCases.map(\.requestParameters)).count, ChannelVideoSort.allCases.count)
+    func testSortsMapToStableFilterChipPositions() {
+        XCTAssertEqual(ChannelVideoSort.allCases.map(\.chipIndex), [0, 1, 2])
+        XCTAssertEqual(Set(ChannelVideoSort.allCases.map(\.requestParameters)).count, 1)
     }
 
     private func video(_ id: String, views: Int) -> Video {
