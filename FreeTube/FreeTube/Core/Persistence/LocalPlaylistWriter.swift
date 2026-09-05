@@ -19,6 +19,8 @@ actor LocalPlaylistWriter {
             return LocalPlaylistSnapshot(
                 id: record.playlistID,
                 title: record.title,
+                descriptionText: record.descriptionText,
+                sourcePlaylistID: record.sourcePlaylistID,
                 videoCount: items.count,
                 thumbnailURL: items.first?.thumbnailURL,
                 updatedAt: record.updatedAt
@@ -35,6 +37,8 @@ actor LocalPlaylistWriter {
             playlist: LocalPlaylistSnapshot(
                 id: record.playlistID,
                 title: record.title,
+                descriptionText: record.descriptionText,
+                sourcePlaylistID: record.sourcePlaylistID,
                 videoCount: items.count,
                 thumbnailURL: items.first?.thumbnailURL,
                 updatedAt: record.updatedAt
@@ -44,15 +48,20 @@ actor LocalPlaylistWriter {
     }
 
     @discardableResult
-    func create(title: String, sourcePlaylistID: String? = nil) -> String {
+    func create(title: String, descriptionText: String? = nil, sourcePlaylistID: String? = nil) -> String {
         if let sourcePlaylistID, let existing = record(sourcePlaylistID: sourcePlaylistID) {
             existing.title = title
+            existing.descriptionText = descriptionText
             existing.updatedAt = .now
             try? modelContext.save()
             notify()
             return existing.playlistID
         }
-        let record = LocalPlaylistRecord(title: title, sourcePlaylistID: sourcePlaylistID)
+        let record = LocalPlaylistRecord(
+            title: title,
+            descriptionText: descriptionText,
+            sourcePlaylistID: sourcePlaylistID
+        )
         modelContext.insert(record)
         try? modelContext.save()
         notify()
@@ -79,6 +88,11 @@ actor LocalPlaylistWriter {
         return ((try? modelContext.fetchCount(descriptor)) ?? 0) > 0
     }
 
+    func isInPersonalPlaylist(videoID: String) -> Bool {
+        let records = playlists().filter { !$0.isSavedFromYouTube }
+        return records.contains { contains(videoID: videoID, playlistID: $0.id) }
+    }
+
     func remove(videoID: String, from playlistID: String) {
         let membership = "\(playlistID):\(videoID)"
         let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(predicate: #Predicate { $0.membershipID == membership })
@@ -98,6 +112,17 @@ actor LocalPlaylistWriter {
         notify()
     }
 
+    func updatePlaylist(playlistID: String, title: String, descriptionText: String?) {
+        let target = playlistID
+        let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })
+        guard let record = try? modelContext.fetch(descriptor).first else { return }
+        record.title = title
+        record.descriptionText = descriptionText
+        record.updatedAt = .now
+        try? modelContext.save()
+        notify()
+    }
+
     func isRemotePlaylistSaved(_ sourcePlaylistID: String) -> Bool {
         record(sourcePlaylistID: sourcePlaylistID) != nil
     }
@@ -107,8 +132,17 @@ actor LocalPlaylistWriter {
         delete(playlistID: playlistID)
     }
 
-    func replace(title: String, sourcePlaylistID: String?, videos: [Video]) -> String {
-        let playlistID = create(title: title, sourcePlaylistID: sourcePlaylistID)
+    func replace(
+        title: String,
+        descriptionText: String? = nil,
+        sourcePlaylistID: String?,
+        videos: [Video]
+    ) -> String {
+        let playlistID = create(
+            title: title,
+            descriptionText: descriptionText,
+            sourcePlaylistID: sourcePlaylistID
+        )
         for item in videoRecords(playlistID: playlistID) { modelContext.delete(item) }
         for (index, video) in videos.enumerated() {
             modelContext.insert(LocalPlaylistVideoRecord(playlistID: playlistID, video: video, position: index))
@@ -117,6 +151,48 @@ actor LocalPlaylistWriter {
         try? modelContext.save()
         notify()
         return playlistID
+    }
+
+    func moveVideos(playlistID: String, from source: IndexSet, to destination: Int) {
+        var items = videoRecords(playlistID: playlistID)
+        let moving = source.compactMap { items.indices.contains($0) ? items[$0] : nil }
+        for index in source.sorted(by: >) where items.indices.contains(index) {
+            items.remove(at: index)
+        }
+        let removedBeforeDestination = source.filter { $0 < destination }.count
+        let insertionIndex = max(0, min(items.count, destination - removedBeforeDestination))
+        items.insert(contentsOf: moving, at: insertionIndex)
+        for (index, item) in items.enumerated() { item.position = index }
+        touch(playlistID)
+        try? modelContext.save()
+        notify()
+    }
+
+    func update(video: Video, in playlistID: String) {
+        let membership = "\(playlistID):\(video.id)"
+        let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(
+            predicate: #Predicate { $0.membershipID == membership }
+        )
+        guard let old = try? modelContext.fetch(descriptor).first else { return }
+        old.title = video.title
+        old.channelID = video.channelID
+        old.channelName = video.channelName
+        old.channelThumbnailURL = video.channelThumbnailURL
+        old.thumbnailURL = video.thumbnailURL
+        old.duration = video.duration
+        old.viewCount = video.viewCount
+        old.publishedAt = video.publishedAt
+        old.publishedRelative = video.publishedRelative
+        old.descriptionSnippet = video.descriptionSnippet
+        old.isLive = video.isLive
+        old.isShort = video.isShort
+        try? modelContext.save()
+    }
+
+    func finishMetadataUpdate(playlistID: String) {
+        touch(playlistID)
+        try? modelContext.save()
+        notify()
     }
 
     private func videoRecords(playlistID: String) -> [LocalPlaylistVideoRecord] {

@@ -105,6 +105,14 @@ struct SettingsScreen: View {
                     }
                 }
 
+                Section("Data") {
+                    NavigationLink {
+                        ImportDataScreen()
+                    } label: {
+                        Label("Import Data", systemImage: "square.and.arrow.down")
+                    }
+                }
+
                 Section {
                     Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
                     Picker("Cache limit", selection: Bindable(model).downloadCacheLimit) {

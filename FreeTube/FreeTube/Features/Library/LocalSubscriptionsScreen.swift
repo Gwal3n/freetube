@@ -1,13 +1,9 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 @available(iOS 17.0, *)
 struct LocalSubscriptionsScreen: View {
     @State private var store = LocalSubscriptionStore.shared
-    @State private var showingImporter = false
     @State private var showingClearConfirmation = false
-    @State private var importMessage: String?
-    @State private var importError: String?
     @State private var refreshError: String?
     @State private var isRefreshing = false
     private let channelService: any ChannelServicing = ChannelService()
@@ -18,7 +14,7 @@ struct LocalSubscriptionsScreen: View {
                 EmptyStateView(
                     systemImage: "person.2.slash",
                     title: "No local subscriptions",
-                    message: "Subscribe from a channel page or import a YouTube subscriptions CSV."
+                    message: "Subscribe from a channel page or import a YouTube subscriptions CSV in Settings."
                 )
             } else {
                 List {
@@ -41,30 +37,18 @@ struct LocalSubscriptionsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        showingImporter = true
-                    } label: {
-                        Label("Import subscriptions", systemImage: "square.and.arrow.down")
-                    }
-                    if !store.subscriptions.isEmpty {
+                if !store.subscriptions.isEmpty {
+                    Menu {
                         Button(role: .destructive) {
                             showingClearConfirmation = true
                         } label: {
                             Label("Clear all", systemImage: "trash")
                         }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
             }
-        }
-        .fileImporter(
-            isPresented: $showingImporter,
-            allowedContentTypes: [.commaSeparatedText, .plainText],
-            allowsMultipleSelection: false
-        ) { result in
-            importFile(result)
         }
         .confirmationDialog(
             "Remove all local subscriptions?",
@@ -74,22 +58,6 @@ struct LocalSubscriptionsScreen: View {
             Button("Clear all", role: .destructive) { store.removeAll() }
             Button("Cancel", role: .cancel) {}
         }
-        .alert("Import complete", isPresented: Binding(
-            get: { importMessage != nil },
-            set: { if !$0 { importMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(importMessage ?? "")
-        }
-        .alert("Couldn’t import subscriptions", isPresented: Binding(
-            get: { importError != nil },
-            set: { if !$0 { importError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(importError ?? "")
-        }
         .alert("Some photos weren’t refreshed", isPresented: Binding(
             get: { refreshError != nil },
             set: { if !$0 { refreshError = nil } }
@@ -97,18 +65,6 @@ struct LocalSubscriptionsScreen: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(refreshError ?? "")
-        }
-    }
-
-    private func importFile(_ result: Result<[URL], Error>) {
-        do {
-            guard let url = try result.get().first else { return }
-            let hasAccess = url.startAccessingSecurityScopedResource()
-            defer { if hasAccess { url.stopAccessingSecurityScopedResource() } }
-            let count = try store.importCSV(data: Data(contentsOf: url))
-            importMessage = "Imported \(count) \(count == 1 ? "channel" : "channels")."
-        } catch {
-            importError = error.localizedDescription
         }
     }
 

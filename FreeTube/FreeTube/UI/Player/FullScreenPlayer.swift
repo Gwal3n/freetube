@@ -31,6 +31,7 @@ struct FullScreenPlayer: View {
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
     @State private var saveToPlaylistVideo: Video?
+    @State private var isSavedToPersonalPlaylist = false
     @State private var downloadError: ErrorState?
     /// Currently-pushed channel (nil = panel mode). When non-nil, the lower section swaps the
     /// metadata + comments/queue panel for a NavigationStack rooted at `ChannelScreen`. Keeping
@@ -372,6 +373,12 @@ struct FullScreenPlayer: View {
         }
         .sheet(item: $saveToPlaylistVideo) { video in
             AddToPlaylistSheet(video: video)
+        }
+        .task(id: player.currentVideo?.id) {
+            await refreshPersonalPlaylistMembership()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
+            Task { await refreshPersonalPlaylistMembership() }
         }
         .errorToast($downloadError)
         .onChange(of: upNextHorizontalSwipeActive, initial: true) { _, active in
@@ -842,10 +849,11 @@ struct FullScreenPlayer: View {
             Button {
                 saveToPlaylistVideo = video
             } label: {
-                Image(systemName: "bookmark")
+                Image(systemName: isSavedToPersonalPlaylist ? "bookmark.fill" : "bookmark")
                     .font(.title3.weight(.semibold))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
+                    .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
@@ -901,6 +909,16 @@ struct FullScreenPlayer: View {
             .disabled(isDownloadActive(for: video) || downloads.localFile(for: video.id) != nil)
             .accessibilityLabel(downloadAccessibilityLabel(for: video))
         }
+    }
+
+    private func refreshPersonalPlaylistMembership() async {
+        guard let videoID = player.currentVideo?.id else {
+            isSavedToPersonalPlaylist = false
+            return
+        }
+        let isSaved = await LocalPlaylistService().isInPersonalPlaylist(videoID: videoID)
+        guard player.currentVideo?.id == videoID else { return }
+        isSavedToPersonalPlaylist = isSaved
     }
 
     @ViewBuilder
