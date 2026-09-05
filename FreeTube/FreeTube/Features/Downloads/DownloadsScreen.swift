@@ -70,6 +70,14 @@ struct DownloadsScreen: View {
     var body: some View {
         NavigationStack {
             List(selection: $selectedIDs) {
+                Section {
+                    NavigationLink {
+                        FetchScreen(embedsInNavigationStack: false)
+                    } label: {
+                        Label("Download from a link", systemImage: "link")
+                    }
+                }
+
                 if !inProgress.isEmpty {
                     Section("Transfer queue") {
                         ForEach(inProgress) { snapshot in

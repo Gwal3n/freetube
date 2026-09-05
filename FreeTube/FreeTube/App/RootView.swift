@@ -6,16 +6,16 @@ import UIKit
 /// Top-level tabbed shell. CLAUDE.md §8: mini-player sits above the tab bar and persists across tabs.
 ///
 /// Tab layout (5):
+/// - Feed (latest cached videos from local subscriptions)
 /// - Search (search field, suggestions, results, and local recent searches)
 /// - Library (subsumes the former Account + Subscriptions tabs; includes Favorites/Recents/Playlists/Login)
-/// - Link (yt-dlp-powered universal downloader; pastes any link from ~2,000 supported sites)
-/// - Downloads (saved videos + live transfer queue with progress)
+/// - Downloads (saved videos, transfer queue, and yt-dlp link downloads)
 /// - Settings (preferences, quality, reset-session)
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selectedTab: Tab = .search
+    @State private var selectedTab: Tab = .feed
     @State private var searchActivation = 0
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
@@ -28,7 +28,7 @@ struct RootView: View {
     @State private var popupBarDismissGesture = PopupBarDismissGestureHandler()
 
     enum Tab: Hashable {
-        case search, library, link, downloads, settings
+        case feed, search, library, downloads, settings
     }
 
     private var activeDownloadsCount: Int {
@@ -143,16 +143,16 @@ struct RootView: View {
     private var tabShell: some View {
         if #available(iOS 26.0, *) {
             TabView(selection: tabSelection) {
+                SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
+                    SubscriptionFeedScreen()
+                }
+
                 SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search) {
                     HomeScreen(searchActivation: searchActivation)
                 }
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
                     LibraryScreen()
-                }
-
-                SwiftUI.Tab("Link", systemImage: "link", value: Tab.link) {
-                    FetchScreen()
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
@@ -173,6 +173,10 @@ struct RootView: View {
     /// native Liquid Glass tab bar, while Search remains an ordinary peer tab on every OS.
     private var legacyTabShell: some View {
         TabView(selection: tabSelection) {
+            SubscriptionFeedScreen()
+                .tabItem { Label("Feed", systemImage: "rectangle.stack") }
+                .tag(Tab.feed)
+
             HomeScreen(searchActivation: searchActivation)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
@@ -180,10 +184,6 @@ struct RootView: View {
             LibraryScreen()
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(Tab.library)
-
-            FetchScreen()
-                .tabItem { Label("Link", systemImage: "link") }
-                .tag(Tab.link)
 
             DownloadsScreen()
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }

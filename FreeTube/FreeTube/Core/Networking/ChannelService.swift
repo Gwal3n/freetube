@@ -18,6 +18,7 @@ struct ChannelDetails: Sendable {
 protocol ChannelServicing: Sendable {
     func fetchChannel(id: String) async throws -> ChannelDetails
     func fetchChannelMetadata(id: String) async throws -> Channel
+    func fetchLatestVideos(channelID: String) async throws -> [Video]
     func fetchVideosNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchShortsNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchDirectsNextPage(channelID: String) async throws -> ChannelTab<Video>
@@ -114,6 +115,32 @@ final class ChannelService: ChannelServicing {
             log.error("Channel metadata failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
             throw YouTubeServiceError.network(error)
         }
+    }
+
+    /// Fetches only the first page of a channel's Videos tab. The local subscription feed uses
+    /// this instead of `fetchChannel(id:)` so one feed refresh does not also request Shorts,
+    /// Live, Playlists, or retain continuation state for every subscribed channel.
+    func fetchLatestVideos(channelID: String) async throws -> [Video] {
+        log.info("fetchLatestVideos(\(channelID, privacy: .public))")
+        let response: ChannelInfosResponse
+        do {
+            response = try await ChannelInfosResponse.sendThrowingRequest(
+                youtubeModel: client.model,
+                data: [.browseId: channelID]
+            )
+        } catch {
+            log.error("Feed channel request failed for \(channelID, privacy: .public): \(String(describing: error), privacy: .public)")
+            throw YouTubeServiceError.network(error)
+        }
+        let result = await fetchSecondaryTab(response: response, type: .videos, channelID: channelID)
+        if result.didFail {
+            throw YouTubeServiceError.unknown(NSError(
+                domain: "ChannelService",
+                code: -3,
+                userInfo: [NSLocalizedDescriptionKey: "The channel Videos tab could not be loaded."]
+            ))
+        }
+        return result.videoTab.items
     }
 
     // MARK: - Pagination
@@ -293,6 +320,7 @@ final class ChannelService: ChannelServicing {
     private struct SecondaryFetchResult {
         let videoTab: ChannelTab<Video>
         let source: ChannelInfosResponse
+        let didFail: Bool
     }
 
     private func fetchSecondaryTab(
@@ -302,7 +330,7 @@ final class ChannelService: ChannelServicing {
     ) async -> SecondaryFetchResult {
         let primary: SecondaryFetchResult
         if response.channelContentStore[type] != nil {
-            primary = SecondaryFetchResult(videoTab: extractVideoTab(from: response, type: type), source: response)
+            primary = SecondaryFetchResult(videoTab: extractVideoTab(from: response, type: type), source: response, didFail: false)
         } else {
             // For some channels the base response doesn't include tab links with their `params`
             // payload (e.g. when YouTube serves only a Home tab in the initial browse). YouTubeKit's
@@ -316,10 +344,10 @@ final class ChannelService: ChannelServicing {
             }
             do {
                 let updated = try await mutable.getChannelContentThrowing(forType: type, youtubeModel: client.model)
-                primary = SecondaryFetchResult(videoTab: extractVideoTab(from: updated, type: type), source: updated)
+                primary = SecondaryFetchResult(videoTab: extractVideoTab(from: updated, type: type), source: updated, didFail: false)
             } catch {
                 log.notice("fetchSecondaryTab(\(channelID, privacy: .public), \(String(describing: type), privacy: .public)) skipped: \(String(describing: error), privacy: .public)")
-                primary = SecondaryFetchResult(videoTab: ChannelTab(items: [], continuationToken: nil), source: response)
+                primary = SecondaryFetchResult(videoTab: ChannelTab(items: [], continuationToken: nil), source: response, didFail: true)
             }
         }
 
@@ -334,7 +362,7 @@ final class ChannelService: ChannelServicing {
             do {
                 let tab = try await videosFallback.fetchVideos(channelID: channelID, params: params)
                 if !tab.items.isEmpty {
-                    return SecondaryFetchResult(videoTab: tab, source: primary.source)
+                    return SecondaryFetchResult(videoTab: tab, source: primary.source, didFail: false)
                 }
             } catch {
                 log.error("[channel] fallback fetch failed for \(channelID, privacy: .public): \(String(describing: error), privacy: .public)")

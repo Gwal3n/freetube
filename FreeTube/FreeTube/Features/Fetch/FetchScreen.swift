@@ -2,7 +2,7 @@ import SwiftUI
 import Kingfisher
 import UIKit
 
-/// **Link** tab — the user pastes any URL yt-dlp supports (YouTube, Vimeo, Twitter/X,
+/// **Link Download** destination — the user pastes any URL yt-dlp supports (YouTube, Vimeo, Twitter/X,
 /// TikTok, SoundCloud, ~2000 sites total per yt-dlp's extractor count), we probe via
 /// `YtDlpInfoService`, then push `FetchProbeView` with a format picker. After downloading,
 /// the user is popped back here — the row below the URL input shows the title, a thumbnail,
@@ -14,14 +14,22 @@ import UIKit
 /// "Active downloads" section to duplicate against — the join happens in `rowState(for:)`.
 @available(iOS 17.0, *)
 struct FetchScreen: View {
+    var embedsInNavigationStack = true
     @State private var model = FetchViewModel()
     @State private var downloads = URLDownloadManager.shared
     @Environment(PlayerStateManager.self) private var player
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
-        NavigationStack {
-            List {
+        if embedsInNavigationStack {
+            NavigationStack { content }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        List {
                 Section {
                     HStack(spacing: 8) {
                         Image(systemName: "link")
@@ -95,11 +103,10 @@ struct FetchScreen: View {
                         }
                     }
                 }
-            }
-            .navigationTitle("Link")
-            .navigationDestination(isPresented: probeNavBinding) {
-                FetchProbeView(model: model)
-            }
+        }
+        .navigationTitle("Link Download")
+        .navigationDestination(isPresented: probeNavBinding) {
+            FetchProbeView(model: model)
         }
     }
 

@@ -10,7 +10,8 @@ import SwiftData
 /// still pick up changes automatically once `save()` lands (SwiftData propagates persistent-store
 /// notifications back to the main context).
 ///
-/// **What's serialized here:** WatchHistory, FavoriteVideo, SearchHistory writes. (Downloads
+/// **What's serialized here:** WatchHistory, FavoriteVideo, SearchHistory, and the local
+/// subscription-feed cache. (Downloads
 /// moved to file-system + xattr storage in `DownloadsStore` — no SwiftData involved.)
 /// Reads (favorite lookup, recent history, etc.) still go through SwiftUI `@Query` or the main
 /// context — those are reactive and indexed.
@@ -18,6 +19,72 @@ import SwiftData
 @ModelActor
 actor PersistenceWriter {
     static let shared = PersistenceWriter(modelContainer: PersistenceController.sharedContainer)
+
+    // MARK: - Subscription feed
+
+    func fetchSubscriptionFeed() -> [SubscriptionFeedSnapshot] {
+        let descriptor = FetchDescriptor<SubscriptionFeedEntry>(
+            sortBy: [SortDescriptor(\SubscriptionFeedEntry.sortDate, order: .reverse)]
+        )
+        return ((try? modelContext.fetch(descriptor)) ?? []).map { entry in
+            SubscriptionFeedSnapshot(
+                video: Video(
+                    id: entry.videoID,
+                    title: entry.title,
+                    channelID: entry.channelID,
+                    channelName: entry.channelName,
+                    channelThumbnailURL: entry.channelThumbnailURL,
+                    thumbnailURL: entry.thumbnailURL,
+                    duration: entry.duration,
+                    viewCount: entry.viewCount,
+                    publishedAt: nil,
+                    publishedRelative: entry.publishedRelative,
+                    descriptionSnippet: nil,
+                    isLive: entry.isLive,
+                    isShort: false
+                ),
+                sortDate: entry.sortDate
+            )
+        }
+    }
+
+    /// Replaces only one successfully refreshed channel. Failed channels consequently retain
+    /// their last good rows, while a successful empty response correctly clears stale entries.
+    func replaceSubscriptionFeedChannel(channelID: String, videos: [Video], refreshedAt: Date) {
+        let target = channelID
+        let descriptor = FetchDescriptor<SubscriptionFeedEntry>(predicate: #Predicate { $0.channelID == target })
+        for entry in (try? modelContext.fetch(descriptor)) ?? [] { modelContext.delete(entry) }
+        for (index, video) in videos.enumerated() {
+            modelContext.insert(SubscriptionFeedEntry(
+                video: video,
+                sortDate: Self.estimatedPublishDate(video.publishedRelative, fallback: refreshedAt.addingTimeInterval(-Double(index))),
+                refreshedAt: refreshedAt
+            ))
+        }
+        try? modelContext.save()
+    }
+
+    func pruneSubscriptionFeed(validChannelIDs: Set<String>) {
+        let descriptor = FetchDescriptor<SubscriptionFeedEntry>()
+        for entry in (try? modelContext.fetch(descriptor)) ?? [] where !validChannelIDs.contains(entry.channelID) {
+            modelContext.delete(entry)
+        }
+        try? modelContext.save()
+    }
+
+    private static func estimatedPublishDate(_ text: String?, fallback: Date) -> Date {
+        guard let text = text?.lowercased() else { return fallback }
+        let value = Int(text.split(separator: " ").first ?? "") ?? 0
+        let interval: TimeInterval
+        if text.contains("minute") { interval = Double(value) * 60 }
+        else if text.contains("hour") { interval = Double(value) * 3_600 }
+        else if text.contains("day") { interval = Double(value) * 86_400 }
+        else if text.contains("week") { interval = Double(value) * 604_800 }
+        else if text.contains("month") { interval = Double(value) * 2_629_746 }
+        else if text.contains("year") { interval = Double(value) * 31_556_952 }
+        else { return fallback }
+        return fallback.addingTimeInterval(-interval)
+    }
 
     // MARK: - WatchHistoryEntry
 

@@ -17,7 +17,8 @@ enum PersistenceController {
             WatchHistoryEntry.self,
             SearchHistoryEntry.self,
             FavoriteVideo.self,
-            FavoritePlaylist.self
+            FavoritePlaylist.self,
+            SubscriptionFeedEntry.self
         ])
         let config = ModelConfiguration(schema: schema)
         do {
