@@ -344,96 +344,96 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         }
         try output.synchronize()
     }
-}
 
-private actor ProgressTracker {
-    private let total: Int
-    private let handler: NativeHLSDownloadService.ProgressHandler
-    private var completed = 0
+    private actor ProgressTracker {
+        private let total: Int
+        private let handler: NativeHLSDownloadService.ProgressHandler
+        private var completed = 0
 
-    init(total: Int, handler: @escaping NativeHLSDownloadService.ProgressHandler) {
-        self.total = total
-        self.handler = handler
-    }
+        init(total: Int, handler: @escaping NativeHLSDownloadService.ProgressHandler) {
+            self.total = total
+            self.handler = handler
+        }
 
-    func completedOne() {
-        completed += 1
-        handler(Double(completed) / Double(total))
-    }
-}
-
-private nonisolated struct MasterPlaylist {
-    let video: [VideoRendition]
-    let audio: [AudioRendition]
-}
-
-private nonisolated struct VideoRendition {
-    let url: URL
-    let height: Int?
-    let bandwidth: Int
-    let audioGroupID: String?
-}
-
-private nonisolated struct AudioRendition {
-    let url: URL
-    let groupID: String
-    let name: String
-    let language: String?
-    let isDefault: Bool
-    let isAutoSelect: Bool
-}
-
-private nonisolated struct Rendition {
-    let url: URL
-    let kind: RenditionKind
-}
-
-private nonisolated enum RenditionKind: Hashable {
-    case video
-    case audio
-    case combined
-
-    var label: String {
-        switch self {
-        case .video: return "video"
-        case .audio: return "audio"
-        case .combined: return "combined"
+        func completedOne() {
+            completed += 1
+            handler(Double(completed) / Double(total))
         }
     }
-}
 
-private nonisolated struct MediaPlaylist {
-    let resources: [MediaResource]
-    let hasInitializationSegment: Bool
-}
+    private struct MasterPlaylist {
+        let video: [VideoRendition]
+        let audio: [AudioRendition]
+    }
 
-private nonisolated struct MediaResource: Sendable {
-    let url: URL
-    let byteRange: ClosedRange<Int64>?
-}
+    private struct VideoRendition {
+        let url: URL
+        let height: Int?
+        let bandwidth: Int
+        let audioGroupID: String?
+    }
 
-private nonisolated enum NativeHLSError: LocalizedError {
-    case invalidPlaylist
-    case missingVideoRendition
-    case missingAudioRendition
-    case emptyMediaPlaylist
-    case missingTracks
-    case segmentFailed(Int)
-    case http(Int)
-    case muxFailed(Int32)
-    case rangeIgnored
+    private struct AudioRendition {
+        let url: URL
+        let groupID: String
+        let name: String
+        let language: String?
+        let isDefault: Bool
+        let isAutoSelect: Bool
+    }
 
-    var errorDescription: String? {
-        switch self {
-        case .invalidPlaylist: return "The HLS playlist was invalid."
-        case .missingVideoRendition: return "The HLS playlist contained no video rendition."
-        case .missingAudioRendition: return "The HLS playlist contained no audio rendition."
-        case .emptyMediaPlaylist: return "The HLS media playlist contained no segments."
-        case .missingTracks: return "The downloaded HLS tracks were incomplete."
-        case .segmentFailed(let index): return "HLS segment \(index) could not be downloaded."
-        case .http(let status): return "The HLS server returned HTTP \(status)."
-        case .muxFailed(let exit): return "The downloaded HLS tracks could not be combined (\(exit))."
-        case .rangeIgnored: return "The HLS server ignored a required byte range."
+    private struct Rendition {
+        let url: URL
+        let kind: RenditionKind
+    }
+
+    private enum RenditionKind: Hashable {
+        case video
+        case audio
+        case combined
+
+        var label: String {
+            switch self {
+            case .video: return "video"
+            case .audio: return "audio"
+            case .combined: return "combined"
+            }
+        }
+    }
+
+    private struct MediaPlaylist {
+        let resources: [MediaResource]
+        let hasInitializationSegment: Bool
+    }
+
+    private struct MediaResource: Sendable {
+        let url: URL
+        let byteRange: ClosedRange<Int64>?
+    }
+
+    private enum NativeHLSError: LocalizedError {
+        case invalidPlaylist
+        case missingVideoRendition
+        case missingAudioRendition
+        case emptyMediaPlaylist
+        case missingTracks
+        case segmentFailed(Int)
+        case http(Int)
+        case muxFailed(Int32)
+        case rangeIgnored
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidPlaylist: return "The HLS playlist was invalid."
+            case .missingVideoRendition: return "The HLS playlist contained no video rendition."
+            case .missingAudioRendition: return "The HLS playlist contained no audio rendition."
+            case .emptyMediaPlaylist: return "The HLS media playlist contained no segments."
+            case .missingTracks: return "The downloaded HLS tracks were incomplete."
+            case .segmentFailed(let index): return "HLS segment \(index) could not be downloaded."
+            case .http(let status): return "The HLS server returned HTTP \(status)."
+            case .muxFailed(let exit): return "The downloaded HLS tracks could not be combined (\(exit))."
+            case .rangeIgnored: return "The HLS server ignored a required byte range."
+            }
         }
     }
 }
