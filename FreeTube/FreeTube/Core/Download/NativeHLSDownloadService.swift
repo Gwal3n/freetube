@@ -48,7 +48,7 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
             guard let video = Self.preferredVideo(from: master.video, maximumHeight: maximumHeight) else {
                 throw NativeHLSError.missingVideoRendition
             }
-            log.info("Selected HLS video height=\(video.height ?? 0, privacy: .public) bandwidth=\(video.bandwidth, privacy: .public)")
+            log.info("Selected HLS video height=\(video.height ?? 0, privacy: .public) bandwidth=\(video.bandwidth, privacy: .public) codecs=\(video.codecs, privacy: .public)")
             var chosen = [Rendition(url: video.url, kind: video.audioGroupID == nil ? .combined : .video)]
             if let groupID = video.audioGroupID {
                 guard let audio = Self.preferredAudio(from: master.audio, groupID: groupID) else {
@@ -235,7 +235,8 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
                     url: url,
                     height: resolution,
                     bandwidth: bandwidth,
-                    audioGroupID: attributes["AUDIO"]
+                    audioGroupID: attributes["AUDIO"],
+                    codecs: attributes["CODECS"] ?? ""
                 ))
             }
         }
@@ -275,12 +276,33 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     }
 
     private static func preferredVideo(from renditions: [VideoRendition], maximumHeight: Int) -> VideoRendition? {
-        let withinCap = renditions.filter { ($0.height ?? Int.max) <= maximumHeight }
-        return (withinCap.isEmpty ? renditions : withinCap).max {
+        // AVPlayer filters incompatible variants while streaming a master playlist. Once we pick
+        // and persist one rendition ourselves, that safety net is gone. Restrict downloads to
+        // codecs with broad native iOS support: AVC first, then HEVC. AV1/VP9 can appear as the
+        // highest-bandwidth 1080p rendition but produce a file with valid tracks/duration that
+        // older devices still report as `isPlayable == false`.
+        let compatible = renditions.filter { codecPreference($0.codecs) > 0 }
+        guard !compatible.isEmpty else { return nil }
+        let withinCap = compatible.filter { ($0.height ?? Int.max) <= maximumHeight }
+        return (withinCap.isEmpty ? compatible : withinCap).max {
             let lhsHeight = $0.height ?? 0
             let rhsHeight = $1.height ?? 0
-            return lhsHeight == rhsHeight ? $0.bandwidth < $1.bandwidth : lhsHeight < rhsHeight
+            if lhsHeight != rhsHeight { return lhsHeight < rhsHeight }
+            let lhsCodec = codecPreference($0.codecs)
+            let rhsCodec = codecPreference($1.codecs)
+            if lhsCodec != rhsCodec { return lhsCodec < rhsCodec }
+            return $0.bandwidth < $1.bandwidth
         }
+    }
+
+    /// Higher is preferred. An empty codec list is retained as a last resort because some valid
+    /// HLS producers omit `CODECS`; explicitly advertised AV1/VP9 is rejected for offline files.
+    private static func codecPreference(_ codecs: String) -> Int {
+        let value = codecs.lowercased()
+        if value.contains("avc1") || value.contains("avc3") { return 3 }
+        if value.contains("hvc1") || value.contains("hev1") { return 2 }
+        if value.isEmpty { return 1 }
+        return 0
     }
 
     private static func preferredAudio(from renditions: [AudioRendition], groupID: String?) -> AudioRendition? {
@@ -371,6 +393,7 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         let height: Int?
         let bandwidth: Int
         let audioGroupID: String?
+        let codecs: String
     }
 
     private struct AudioRendition {
