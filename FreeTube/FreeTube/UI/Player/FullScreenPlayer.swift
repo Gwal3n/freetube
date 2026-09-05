@@ -1227,7 +1227,7 @@ struct FullScreenPlayer: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.smooth(duration: 0.28)) {
                         isQueueExpanded.toggle()
                     }
                 } label: {
@@ -1239,7 +1239,7 @@ struct FullScreenPlayer: View {
                 }
                 .buttonStyle(.plain)
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.smooth(duration: 0.28)) {
                         isQueueExpanded.toggle()
                     }
                 } label: {
@@ -1255,7 +1255,10 @@ struct FullScreenPlayer: View {
             // `List` is the cleanest source of drag-to-reorder + swipe-to-delete in SwiftUI. We're
             // already inside a ScrollView, so we cap the list with a generous fixed height so it
             // doesn't try to consume the outer scroll's gesture space.
-            if isQueueExpanded {
+            // Keep List mounted at its final size and animate a clipping window around it. Inserting
+            // a List conditionally makes SwiftUI perform its internal row layout in one frame,
+            // which produces the visible jump that used to interrupt the expansion.
+            ZStack(alignment: .top) {
                 List {
                     ForEach(displayedUpNextVideos) { video in
                         queueRow(video, preservesPlaylistContext: false)
@@ -1310,6 +1313,10 @@ struct FullScreenPlayer: View {
                 .scrollDisabled(true)
                 .frame(height: queueListHeight)
             }
+            .frame(height: isQueueExpanded ? queueListHeight : 0, alignment: .top)
+            .clipped()
+            .opacity(isQueueExpanded ? 1 : 0)
+            .allowsHitTesting(isQueueExpanded)
         }
         .onChange(of: player.currentVideo?.id) {
             isQueueExpanded = false
