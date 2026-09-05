@@ -481,11 +481,14 @@ final class DownloadManager: TemporaryDownloading {
                 state: .downloading(progress: 0), createdAt: .now
             ))
             let resolved = try await NativeStreamService().resolve(video: video, quality: quality)
-            try await downloadResolvedSource(
+            try await downloadResolvedSourceWithYtDlp(
                 resolved.url,
                 to: destination,
                 audioOnly: quality == .audioOnly,
-                videoID: video.id
+                quality: quality,
+                video: video,
+                snapshotID: snapshotID,
+                priority: priority
             )
             try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
             await persistDownloaded(video: video, fileURL: destination)
@@ -1077,35 +1080,92 @@ final class DownloadManager: TemporaryDownloading {
         }
     }
 
-    /// Materializes the exact source used by normal playback. Keeping extraction and transfer as
-    /// separate steps avoids yt-dlp selecting a different, PoT-locked client format after the app
-    /// has already resolved a stream that AVPlayer can consume successfully.
-    private func downloadResolvedSource(
+    /// Materializes the exact source used by normal playback. yt-dlp receives the already-resolved
+    /// media URL, not the YouTube watch page, so it performs no YouTube client selection or PoT
+    /// extraction. Its only job here is concurrent HLS fragment transfer; Swift performs the final
+    /// mux because spawning yt-dlp's ffmpeg postprocessor is unreliable on iOS.
+    private func downloadResolvedSourceWithYtDlp(
         _ source: URL,
         to destination: URL,
         audioOnly: Bool,
-        videoID: String
+        quality: VideoQuality,
+        video: Video,
+        snapshotID: String,
+        priority: DownloadPriority
     ) async throws {
-        var args = [
-            "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
-            "-i", source.absoluteString
+        let directory = destination.deletingLastPathComponent()
+        let stem = destination.deletingPathExtension().lastPathComponent
+        let outputTemplate = directory
+            .appendingPathComponent("\(stem).native.%(format_id)s.%(ext)s")
+            .path
+        let cap = max(144, quality.heightCap ?? 1080)
+        let format = audioOnly ? "bestaudio" : "bestvideo[height<=\(cap)],bestaudio"
+        let args = [
+            source.absoluteString,
+            "-f", format,
+            "-o", outputTemplate,
+            "--no-playlist", "--no-progress", "--no-check-certificates",
+            "--concurrent-fragments", "\(max(1, min(16, preferences.concurrentFragments)))",
+            "--ffmpeg-location", "/dev/null/no-ffmpeg"
         ]
-        if audioOnly {
-            args.append(contentsOf: ["-vn", "-c:a", "copy"])
-        } else {
-            args.append(contentsOf: [
-                "-map", "0:v:0?", "-map", "0:a:0?",
-                "-c", "copy", "-movflags", "+faststart"
-            ])
-        }
-        args.append(destination.path)
 
-        log.info("native-download[\(videoID, privacy: .public)] FFmpeg materializing \(source.host ?? "unknown", privacy: .public)")
-        let exit = await FFmpegRunner.shared.run(args)
-        guard exit == 0, FileManager.default.fileExists(atPath: destination.path) else {
-            log.error("native-download[\(videoID, privacy: .public)] FFmpeg failed exit=\(exit, privacy: .public)")
+        log.info("native-download[\(video.id, privacy: .public)] yt-dlp HLS transfer fragments=\(max(1, min(16, preferences.concurrentFragments)), privacy: .public)")
+        try await PythonRunner.shared.run(argv: args, progress: { [weak self] dict in
+            let status = String(dict["status"] ?? "") ?? ""
+            let downloaded = Int(dict["downloaded_bytes"] ?? 0) ?? 0
+            let total = Int(dict["total_bytes"] ?? dict["total_bytes_estimate"] ?? 0) ?? 0
+            let speed = Int(dict["speed"] ?? 0) ?? 0
+            let eta = Int(dict["eta"] ?? 0) ?? 0
+            Task { @MainActor in
+                self?.handleProgress(
+                    status: status, downloaded: downloaded, total: total, speed: speed, eta: eta,
+                    phase: audioOnly ? "audio" : "stream", snapshotID: snapshotID,
+                    videoID: video.id, videoTitle: video.title
+                )
+            }
+        }, log: { [log] level, message in
+            if level == "error" {
+                log.error("native HLS yt-dlp: \(message, privacy: .public)")
+            } else if level == "warning" {
+                log.notice("native HLS yt-dlp: \(message, privacy: .public)")
+            } else {
+                log.info("native HLS yt-dlp: \(message, privacy: .public)")
+            }
+        }, priority: priority == .userInitiated ? .high : .low)
+
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ))?.filter { $0.lastPathComponent.hasPrefix("\(stem).native.") } ?? []
+        defer {
+            for file in files { try? FileManager.default.removeItem(at: file) }
+        }
+
+        if audioOnly, let audio = files.first {
+            let exit = await FFmpegRunner.shared.run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
+                "-i", audio.path, "-vn", "-c:a", "copy", destination.path
+            ])
+            guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
+            return
+        }
+
+        // Some HLS masters expose a combined rendition rather than separate video/audio groups.
+        // Preserve it directly; the caller's AVFoundation validation verifies both tracks before
+        // the download is ever published as complete.
+        if files.count == 1, let combined = files.first {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: combined, to: destination)
+            return
+        }
+
+        let videoFile = files.first { ["mp4", "webm", "mkv", "ts"].contains($0.pathExtension.lowercased()) }
+        let audioFile = files.first { ["m4a", "aac", "opus", "webm"].contains($0.pathExtension.lowercased()) && $0 != videoFile }
+        guard let videoFile, let audioFile else {
+            log.error("native-download[\(video.id, privacy: .public)] HLS transfer produced unexpected files: \(files.map(\.lastPathComponent).joined(separator: ", "), privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
+        try await muxToDestination(video: videoFile, audio: audioFile, destination: destination)
     }
 
     /// A filesystem path alone is not proof that a download succeeded. yt-dlp and URLSession can
