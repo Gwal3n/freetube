@@ -127,17 +127,7 @@ final class LocalPlaylistService: Sendable {
             }
             let resolved: Video?
             do {
-                let info = try await videoService.fetchInfo(id: placeholder.id)
-                guard !info.video.title.isEmpty else { throw LocalPlaylistImportError.noVideos }
-                let video = info.video
-                resolved = Video(
-                    id: video.id, title: video.title, channelID: video.channelID,
-                    channelName: video.channelName, channelThumbnailURL: video.channelThumbnailURL,
-                    thumbnailURL: placeholder.thumbnailURL, duration: video.duration,
-                    viewCount: video.viewCount, publishedAt: video.publishedAt,
-                    descriptionSnippet: info.descriptionText, isLive: video.isLive,
-                    isShort: video.isShort
-                )
+                resolved = try await resolveImportedMetadata(for: placeholder)
             } catch {
                 resolved = nil
                 failures += 1
@@ -153,6 +143,41 @@ final class LocalPlaylistService: Sendable {
             try? await Task.sleep(for: .milliseconds(200))
         }
         log.info("Metadata hydration finished playlist=\(playlistID, privacy: .public) processed=\(candidates.count, privacy: .public) failures=\(failures, privacy: .public)")
+    }
+
+    /// The player-info endpoint can reject a video even when its watch metadata remains public.
+    /// Try it first because it provides richer counts, then independently fall back to the watch
+    /// metadata response rather than marking the imported ID unavailable.
+    private func resolveImportedMetadata(for placeholder: Video) async throws -> Video {
+        do {
+            let info = try await videoService.fetchInfo(id: placeholder.id)
+            guard !info.video.title.isEmpty else { throw LocalPlaylistImportError.noVideos }
+            return importedVideo(from: info, placeholder: placeholder)
+        } catch {
+            log.notice("Player metadata unavailable for \(placeholder.id, privacy: .public); trying watch metadata")
+            let info = try await videoService.fetchMoreInfo(id: placeholder.id)
+            guard !info.video.title.isEmpty else { throw LocalPlaylistImportError.noVideos }
+            return importedVideo(from: info, placeholder: placeholder)
+        }
+    }
+
+    private func importedVideo(from info: VideoInfo, placeholder: Video) -> Video {
+        let video = info.video
+        return Video(
+            id: placeholder.id,
+            title: video.title.isEmpty ? placeholder.id : video.title,
+            channelID: video.channelID,
+            channelName: video.channelName,
+            channelThumbnailURL: video.channelThumbnailURL,
+            thumbnailURL: placeholder.thumbnailURL,
+            duration: video.duration ?? placeholder.duration,
+            viewCount: video.viewCount ?? placeholder.viewCount,
+            publishedAt: video.publishedAt ?? placeholder.publishedAt,
+            publishedRelative: info.uploadDateText ?? video.publishedRelative,
+            descriptionSnippet: info.descriptionText ?? video.descriptionSnippet,
+            isLive: video.isLive,
+            isShort: video.isShort
+        )
     }
 
     func retryFailedMetadata(id playlistID: String) async {
