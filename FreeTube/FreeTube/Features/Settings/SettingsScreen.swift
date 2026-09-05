@@ -20,6 +20,7 @@ struct SettingsScreen: View {
 
     /// "Are you sure?" confirmation for the destructive Clear-all-logs button.
     @State private var showingClearLogsConfirmation = false
+    @State private var showingClearHistoryConfirmation = false
 
     private var currentCacheBytes: Int64 {
         downloads.entries.reduce(0) { $0 + $1.fileSize }
@@ -110,6 +111,16 @@ struct SettingsScreen: View {
                         ImportDataScreen()
                     } label: {
                         Label("Import Data", systemImage: "square.and.arrow.down")
+                    }
+                    Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
+                        ForEach(HistoryRetentionPolicy.allCases) { policy in
+                            Text(policy.title).tag(policy)
+                        }
+                    }
+                    Button(role: .destructive) {
+                        showingClearHistoryConfirmation = true
+                    } label: {
+                        Label("Clear Watch History", systemImage: "trash")
                     }
                 }
 
@@ -272,6 +283,18 @@ struct SettingsScreen: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This removes every file under Documents/Logs/. If \"Save logs to file\" is on, a fresh log file will be opened for new entries.")
+            }
+            .confirmationDialog(
+                "Clear local watch history?",
+                isPresented: $showingClearHistoryConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear History", role: .destructive) {
+                    model.clearLocalHistory()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes watch history stored by FreeTube on this device.")
             }
         }
     }

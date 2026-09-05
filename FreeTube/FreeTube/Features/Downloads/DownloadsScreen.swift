@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import AVFoundation
 import UIKit
 
@@ -11,19 +10,8 @@ struct DownloadsScreen: View {
     /// the store rebuilds `entries` from the Documents root on launch and after every
     /// `DownloadsStore.didChange` notification (posted by the YouTube + URL writers).
     @State private var store = DownloadsStore.shared
-    @Environment(\.modelContext) private var context
-    /// All favorited video IDs, kept in sync by SwiftData's `@Query`. We do *not* per-row fetch
-    /// because that runs synchronous Core Data on the main queue for every menu rebuild and tanks
-    /// the UI during downloads (the SQL fetches show up dominating Instruments traces).
-    @Query private var favorites: [FavoriteVideo]
     @Environment(PlayerStateManager.self) private var player
     @State private var path = NavigationPath()
-
-    /// O(1) lookup table for `isFavorite(_:)`. Recomputed when `favorites` changes (which `@Query`
-    /// keeps reactive), so menu rendering avoids any database work.
-    private var favoriteIDs: Set<String> {
-        Set(favorites.map(\.videoID))
-    }
 
     // MARK: - Selection + sort state
 
@@ -284,13 +272,6 @@ struct DownloadsScreen: View {
     @ViewBuilder
     private func rowMenu(_ item: SavedItem) -> some View {
         Menu {
-            Button {
-                if let url = sourceURL(for: item) {
-                    UIApplication.shared.open(url)
-                }
-            } label: {
-                Label("Open in browser", systemImage: "safari")
-            }
             // System "Open in…" share sheet for the downloaded mp4 — opens UIActivityViewController
             // with the local file URL so the user can send it to VLC, Files, AirDrop, etc. We use
             // a Button + sheet rather than `ShareLink` because the latter is unreliable for
@@ -310,27 +291,6 @@ struct DownloadsScreen: View {
                 } label: {
                     Label("Show in Finder", systemImage: "folder")
                 }
-            }
-            // Favorites are a YouTube-only concept (the schema keys off videoID and the
-            // VideoActionsService routes through the YouTube like API). Hide the option for
-            // URL-fetched items so we don't write garbage rows.
-            if !item.isFromURL {
-                Button {
-                    toggleFavorite(item)
-                } label: {
-                    if isFavorite(item.videoID) {
-                        Label("Remove from favorites", systemImage: "hand.thumbsup.fill")
-                    } else {
-                        Label("Add to favorites", systemImage: "hand.thumbsup")
-                    }
-                }
-            }
-            Button {
-                if let url = sourceURL(for: item) {
-                    UIPasteboard.general.string = url.absoluteString
-                }
-            } label: {
-                Label("Copy URL", systemImage: "link")
             }
             Divider()
             Button(role: .destructive) {
@@ -508,38 +468,6 @@ struct DownloadsScreen: View {
         isSelecting = false
     }
 
-    /// Source URL for the "Open in browser" and "Copy URL" actions. URL-fetch items return
-    /// the original pasted URL; YouTube items return the canonical watch URL built from
-    /// videoID. The signature still takes a `SavedItem` so we can pick the right shape
-    /// without forcing the caller to know which kind of row it has.
-    private func sourceURL(for item: SavedItem) -> URL? {
-        if let original = item.originalURL, let url = URL(string: original) {
-            return url
-        }
-        return URL(string: "https://www.youtube.com/watch?v=\(item.videoID)")
-    }
-
-    /// O(1) lookup against the cached `favoriteIDs` set. The previous implementation hit Core Data
-    /// on every call, which was being invoked once per row per render → SQL on the main queue and
-    /// visible UI lag during active downloads.
-    private func isFavorite(_ videoID: String) -> Bool {
-        favoriteIDs.contains(videoID)
-    }
-
-    private func toggleFavorite(_ item: SavedItem) {
-        if let existing = favorites.first(where: { $0.videoID == item.videoID }) {
-            context.delete(existing)
-        } else {
-            context.insert(FavoriteVideo(
-                videoID: item.videoID,
-                title: item.title,
-                channelName: item.channelName,
-                thumbnailURL: nil
-            ))
-        }
-        try? context.save()
-    }
-
     // MARK: - Helpers
 
     @ViewBuilder
@@ -617,8 +545,7 @@ struct SavedItem: Identifiable {
     let duration: TimeInterval?
     /// `nil` for YouTube downloads (videoID alone reconstructs the canonical YouTube URL).
     /// Set to the original pasted URL for files downloaded via the "From URL" tab — drives
-    /// the branch between `loadLocalFile` (URL items) and the YouTube resolver, and the
-    /// "Open in browser" target.
+    /// the branch between `loadLocalFile` (URL items) and the YouTube resolver.
     let originalURL: String?
 
     /// Convenience flag: true when this row came from the "From URL" tab. Drives tap and

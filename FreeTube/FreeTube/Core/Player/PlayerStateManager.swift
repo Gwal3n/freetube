@@ -79,6 +79,13 @@ final class PlayerStateManager {
     /// LNPopupUI installs its own ancestor pan recognizer, outside the SwiftUI player tree. Pause
     /// it only while an Up Next row gesture has direction-locked horizontally.
     var upNextHorizontalSwipeActive: Bool = false
+    /// Prevents LNPopupUI's ancestor pan from taking over a scroll that began while the details
+    /// panel was away from its top edge. The user can scroll back to the top and see the native
+    /// rubber band; a fresh downward gesture then collapses the player.
+    var playerPanelAtTop: Bool = true
+    /// Latched for the lifetime of a touch that began while the panel was scrolled. This prevents
+    /// reaching the top during one long gesture from handing that same touch to LNPopupUI.
+    var playerPanelGestureStartedAwayFromTop: Bool = false
 
     // MARK: - AVPlayer
 
@@ -734,6 +741,8 @@ final class PlayerStateManager {
         miniPlayerVisible = false
         fullScreenPresented = false
         chapterListPresented = false
+        playerPanelAtTop = true
+        playerPanelGestureStartedAwayFromTop = false
         currentVideo = nil
         loadState = .idle
         hasEnded = false

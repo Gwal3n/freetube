@@ -16,6 +16,9 @@ final class AppEnvironment {
         AudioSessionConfigurator.configure()
         RemoteCommandCenter.wire(to: playerStateManager)
         BackgroundDownloadCoordinator.shared.registerBackgroundTasks()
+        if let cutoff = UserPreferences().historyRetentionPolicy.cutoffDate() {
+            Task { await PersistenceWriter.shared.clearWatchHistory(olderThan: cutoff) }
+        }
         // Non-blocking weekly TTL check on the locally-cached yt-dlp Python module. If the
         // cached copy is older than 7 days, fetch the latest from GitHub Releases in the
         // background. Doesn't interfere with the next playback attempt — the download is

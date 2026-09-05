@@ -20,6 +20,7 @@ struct UserPreferences {
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
     /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
+    @AppStorage("historyRetentionPolicy") var historyRetentionPolicyRaw: String = HistoryRetentionPolicy.forever.rawValue
     /// Removes the local-subscription Feed destination from the tab bar when disabled. Cached
     /// entries remain on device so restoring the tab is immediate and does not force a refresh.
     @AppStorage("showSubscriptionFeedTab") var showSubscriptionFeedTab: Bool = true
@@ -91,6 +92,11 @@ struct UserPreferences {
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var historyRetentionPolicy: HistoryRetentionPolicy {
+        get { HistoryRetentionPolicy(rawValue: historyRetentionPolicyRaw) ?? .forever }
+        nonmutating set { historyRetentionPolicyRaw = newValue.rawValue }
     }
 
     var playerTopControls: [PlayerTopControl] {

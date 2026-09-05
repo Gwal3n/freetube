@@ -53,6 +53,20 @@ final class SettingsViewModel {
         set { preferences.showHistoryProgressBars = newValue }
     }
 
+    var historyRetentionPolicy: HistoryRetentionPolicy {
+        get { preferences.historyRetentionPolicy }
+        set {
+            preferences.historyRetentionPolicy = newValue
+            if let cutoff = newValue.cutoffDate() {
+                Task { await PersistenceWriter.shared.clearWatchHistory(olderThan: cutoff) }
+            }
+        }
+    }
+
+    func clearLocalHistory() {
+        Task { await PersistenceWriter.shared.clearWatchHistory() }
+    }
+
     var showSubscriptionFeedTab: Bool {
         get { preferences.showSubscriptionFeedTab }
         set { preferences.showSubscriptionFeedTab = newValue }

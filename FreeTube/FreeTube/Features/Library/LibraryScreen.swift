@@ -303,7 +303,6 @@ private struct LocalHistoryScreen: View {
     @State private var entries: [WatchHistorySnapshot] = []
     @State private var isLoading = false
     @State private var hasMore = true
-    @State private var confirmsClear = false
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     private let pageSize = 50
 
@@ -356,28 +355,6 @@ private struct LocalHistoryScreen: View {
         }
         .navigationTitle("Local History")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if !entries.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Clear", role: .destructive) { confirmsClear = true }
-                }
-            }
-        }
-        .confirmationDialog(
-            "Clear local history?",
-            isPresented: $confirmsClear,
-            titleVisibility: .visible
-        ) {
-            Button("Clear History", role: .destructive) {
-                Task {
-                    await PersistenceWriter.shared.clearWatchHistory()
-                    entries = []
-                    hasMore = false
-                }
-            }
-        } message: {
-            Text("This removes watch history stored by FreeTube on this device.")
-        }
         .task {
             if entries.isEmpty && hasMore { await loadMore() }
         }

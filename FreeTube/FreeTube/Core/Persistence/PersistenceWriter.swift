@@ -222,4 +222,14 @@ actor PersistenceWriter {
         NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
     }
 
+    func clearWatchHistory(olderThan cutoff: Date) {
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(
+            predicate: #Predicate { $0.watchedAt < cutoff }
+        )
+        guard let entries = try? modelContext.fetch(descriptor), !entries.isEmpty else { return }
+        for entry in entries { modelContext.delete(entry) }
+        try? modelContext.save()
+        NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
+    }
+
 }

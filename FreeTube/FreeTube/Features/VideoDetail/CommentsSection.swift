@@ -19,41 +19,45 @@ struct CommentsSection: View {
             header
 
             if isExpanded {
-                if model.isLoading && model.comments.isEmpty {
-                    LoadingView()
-                        .padding(.vertical, 12)
-                } else if model.commentsDisabled {
-                    ContentUnavailableView(
-                        "Comments disabled",
-                        systemImage: "text.bubble",
-                        description: Text("Comments are unavailable for this video.")
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                } else {
-                    ForEach(model.comments) { comment in
-                        commentThread(comment)
-                    }
-                    if model.isLoading {
+                Group {
+                    if model.isLoading && model.comments.isEmpty {
                         LoadingView()
-                    } else if model.continuationToken != nil {
-                        Button {
-                            Task { await model.loadMore() }
-                        } label: {
-                            Text("Load more")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(.ultraThinMaterial, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
+                            .padding(.vertical, 12)
+                    } else if model.commentsDisabled {
+                        ContentUnavailableView(
+                            "Comments disabled",
+                            systemImage: "text.bubble",
+                            description: Text("Comments are unavailable for this video.")
+                        )
                         .frame(maxWidth: .infinity)
-                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                    } else {
+                        ForEach(model.comments) { comment in
+                            commentThread(comment)
+                        }
+                        if model.isLoading {
+                            LoadingView()
+                        } else if model.continuationToken != nil {
+                            Button {
+                                Task { await model.loadMore() }
+                            } label: {
+                                Text("Load more")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal)
+                        }
                     }
                 }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.snappy(duration: 0.24), value: isExpanded)
         .errorToast(Bindable(model).errorState)
         // Covers state restoration where the section mounts expanded. The normal collapsed state
         // performs no request; the header button lazily loads on first expansion.
@@ -67,7 +71,9 @@ struct CommentsSection: View {
     @ViewBuilder
     private var header: some View {
         Button {
-            isExpanded.toggle()
+            withAnimation(.snappy(duration: 0.24)) {
+                isExpanded.toggle()
+            }
             if isExpanded && model.comments.isEmpty && !model.isLoading {
                 Task { await model.load() }
             }

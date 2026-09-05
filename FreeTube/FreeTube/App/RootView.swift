@@ -64,7 +64,10 @@ struct RootView: View {
         // LNPopupUI's ancestor pan cannot direction-lock against child List swipe actions. Pause
         // it only for the lifetime of an established horizontal Up Next swipe; ordinary vertical
         // collapse remains interactive before and after that gesture.
-        .popupInteractionStyle(player.chapterListPresented || player.upNextHorizontalSwipeActive
+        .popupInteractionStyle(player.chapterListPresented
+            || player.upNextHorizontalSwipeActive
+            || !player.playerPanelAtTop
+            || player.playerPanelGestureStartedAwayFromTop
             ? UIViewController.PopupInteractionStyle.none
             : UIViewController.PopupInteractionStyle.drag)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)

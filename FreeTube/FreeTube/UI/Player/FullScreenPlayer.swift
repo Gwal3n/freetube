@@ -48,6 +48,7 @@ struct FullScreenPlayer: View {
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
+    @State private var panelScrollGestureActive = false
     @State private var controlsHideTask: Task<Void, Never>?
     @GestureState private var upNextHorizontalSwipeActive = false
     @AppStorage("autoplayNext") private var autoplayNext = true
@@ -229,6 +230,8 @@ struct FullScreenPlayer: View {
                     scrubberSeekPreview = nil
                     player.chapterListPresented = false
                     panelScrollOffset = 0
+                    player.playerPanelAtTop = true
+                    player.playerPanelGestureStartedAwayFromTop = false
                     showPlayerControls()
                 }
                 .onChange(of: player.loadState, initial: true) { _, state in
@@ -495,6 +498,7 @@ struct FullScreenPlayer: View {
                     max(0, geometry.contentOffset.y + geometry.contentInsets.top)
                 } action: { _, offset in
                     panelScrollOffset = offset
+                    player.playerPanelAtTop = offset <= 0.5
                 }
         } else {
             panelScrollView(
@@ -505,6 +509,7 @@ struct FullScreenPlayer: View {
                 .coordinateSpace(name: "playerPanelScroll")
                 .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
                     panelScrollOffset = offset
+                    player.playerPanelAtTop = offset <= 0.5
                 }
         }
     }
@@ -546,6 +551,18 @@ struct FullScreenPlayer: View {
             // comments and Up Next are both collapsed and the natural feed is very short.
             .frame(minHeight: minimumContentHeight, alignment: .top)
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { _ in
+                    guard !panelScrollGestureActive else { return }
+                    panelScrollGestureActive = true
+                    player.playerPanelGestureStartedAwayFromTop = panelScrollOffset > 0.5
+                }
+                .onEnded { _ in
+                    panelScrollGestureActive = false
+                    player.playerPanelGestureStartedAwayFromTop = false
+                }
+        )
         .scrollContentBackground(.hidden)
     }
 
@@ -1210,7 +1227,9 @@ struct FullScreenPlayer: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Button {
-                    isQueueExpanded.toggle()
+                    withAnimation(.snappy(duration: 0.24)) {
+                        isQueueExpanded.toggle()
+                    }
                 } label: {
                     HStack {
                         SectionHeader(title: "Up next")
@@ -1220,7 +1239,9 @@ struct FullScreenPlayer: View {
                 }
                 .buttonStyle(.plain)
                 Button {
-                    isQueueExpanded.toggle()
+                    withAnimation(.snappy(duration: 0.24)) {
+                        isQueueExpanded.toggle()
+                    }
                 } label: {
                     Image(systemName: isQueueExpanded ? "chevron.up" : "chevron.down")
                         .font(.subheadline.weight(.semibold))
@@ -1288,6 +1309,7 @@ struct FullScreenPlayer: View {
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
                 .frame(height: queueListHeight)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .onChange(of: player.currentVideo?.id) {
