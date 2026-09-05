@@ -55,7 +55,7 @@ extension WatchHistoryEntry {
 
 /// Sendable read model used by the paginated History UI. SwiftData model instances stay bound to
 /// their model context and never cross the persistence actor boundary.
-struct WatchHistorySnapshot: Identifiable, Sendable {
+struct WatchHistorySnapshot: Identifiable, Sendable, Codable {
     var id: String { videoID }
     let videoID: String
     let title: String

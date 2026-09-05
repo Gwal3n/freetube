@@ -87,6 +87,11 @@ final class LocalSubscriptionStore {
         persist()
     }
 
+    func replaceAll(with restored: [LocalSubscription]) {
+        subscriptions = restored
+        sortAndPersist()
+    }
+
     /// Imports YouTube/Google Takeout's subscription CSV format. Existing channels are updated,
     /// not duplicated, and channels already saved manually remain in the list.
     @discardableResult

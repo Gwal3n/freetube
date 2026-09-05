@@ -1,7 +1,7 @@
 import Foundation
 
 /// Domain model for a YouTube video. Service layer maps YouTubeKit response types into this.
-struct Video: Identifiable, Hashable, Sendable {
+struct Video: Identifiable, Hashable, Sendable, Codable {
     let id: String
     let title: String
     let channelID: String

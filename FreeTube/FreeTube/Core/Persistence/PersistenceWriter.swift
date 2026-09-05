@@ -204,6 +204,30 @@ actor PersistenceWriter {
         (try? modelContext.fetchCount(FetchDescriptor<WatchHistoryEntry>())) ?? 0
     }
 
+    func allWatchHistory() -> [WatchHistorySnapshot] {
+        fetchWatchHistory(offset: 0, limit: max(1, watchHistoryCount()))
+    }
+
+    func replaceWatchHistory(with restored: [WatchHistorySnapshot]) {
+        for entry in (try? modelContext.fetch(FetchDescriptor<WatchHistoryEntry>())) ?? [] {
+            modelContext.delete(entry)
+        }
+        try? modelContext.save()
+        for item in restored {
+            modelContext.insert(WatchHistoryEntry(
+                videoID: item.videoID,
+                title: item.title,
+                channelName: item.channelName,
+                thumbnailURL: item.thumbnailURL,
+                watchedAt: item.watchedAt,
+                lastPosition: item.lastPosition,
+                duration: item.duration
+            ))
+        }
+        try? modelContext.save()
+        NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
+    }
+
     func deleteWatchHistory(videoID: String) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
