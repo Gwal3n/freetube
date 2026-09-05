@@ -13,6 +13,7 @@ struct VideoRow: View {
     var showsMoreMenu: Bool
     var offersPlayNext: Bool
     var playbackProgress: Double?
+    var reservesMoreMenuSpace: Bool
     var onTap: () -> Void
 
     /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
@@ -22,12 +23,14 @@ struct VideoRow: View {
         showsMoreMenu: Bool = false,
         offersPlayNext: Bool = false,
         playbackProgress: Double? = nil,
+        reservesMoreMenuSpace: Bool = false,
         onTap: @escaping () -> Void = {}
     ) {
         self.video = video
         self.showsMoreMenu = showsMoreMenu
         self.offersPlayNext = offersPlayNext
         self.playbackProgress = playbackProgress
+        self.reservesMoreMenuSpace = reservesMoreMenuSpace
         self.onTap = onTap
     }
 
@@ -49,6 +52,10 @@ struct VideoRow: View {
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+            } else if reservesMoreMenuSpace {
+                Color.clear
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
             }
         }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {

@@ -33,17 +33,15 @@ struct LocalPlaylistsScreen: View {
                     Button { showingCreate = true } label: {
                         Image(systemName: "plus")
                     }
-                }
-                EditButton()
-            }
-            if editMode.isEditing {
-                ToolbarItem(placement: .bottomBar) {
+                    Button("Edit") { beginEditing() }
+                } else {
                     Button(role: .destructive) {
                         showingDeleteConfirmation = true
                     } label: {
-                        Label("Delete", systemImage: "trash")
+                        Image(systemName: "trash")
                     }
                     .disabled(selectedPlaylistIDs.isEmpty)
+                    Button("Done") { finishEditing() }
                 }
             }
         }
@@ -59,9 +57,6 @@ struct LocalPlaylistsScreen: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
-        }
-        .onChange(of: editMode) { _, mode in
-            if !mode.isEditing { selectedPlaylistIDs.removeAll() }
         }
         .confirmationDialog(
             "Delete selected playlists?",
@@ -183,5 +178,19 @@ struct LocalPlaylistsScreen: View {
         selectedPlaylistIDs.removeAll()
         withAnimation { editMode = .inactive }
         await reload()
+    }
+
+    private func beginEditing() {
+        withAnimation(.snappy) {
+            selectedPlaylistIDs.removeAll()
+            editMode = .active
+        }
+    }
+
+    private func finishEditing() {
+        withAnimation(.snappy) {
+            editMode = .inactive
+            selectedPlaylistIDs.removeAll()
+        }
     }
 }

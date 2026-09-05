@@ -32,7 +32,8 @@ struct LocalPlaylistScreen: View {
                     VideoRow(
                         video: video,
                         showsMoreMenu: editingMode == nil,
-                        offersPlayNext: editingMode == nil
+                        offersPlayNext: editingMode == nil,
+                        reservesMoreMenuSpace: true
                     ) {
                         if editingMode != nil {
                             if selectedVideoIDs.contains(video.id) {
@@ -79,6 +80,12 @@ struct LocalPlaylistScreen: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if editingMode != nil {
+                    Button(role: .destructive) {
+                        showingVideoDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(selectedVideoIDs.isEmpty)
                     Button("Done") { finishEditing() }
                 }
                 if editingMode == nil {
@@ -86,12 +93,12 @@ struct LocalPlaylistScreen: View {
                     Button {
                         showingEditor = true
                     } label: {
-                        Label("Edit Details", systemImage: "pencil")
+                        Label("Edit Details", systemImage: "square.and.pencil")
                     }
                     Button {
                         beginEditing()
                     } label: {
-                        Label("Edit Playlist", systemImage: "checkmark.circle")
+                        Label("Edit Playlist", systemImage: "list.bullet")
                     }
                     if details?.playlist.isSavedFromYouTube == true {
                         Button {
@@ -114,18 +121,6 @@ struct LocalPlaylistScreen: View {
                     } label: {
                         if isRestoring { ProgressView() } else { Image(systemName: "ellipsis.circle") }
                     }
-                }
-            }
-        }
-        .toolbar {
-            if editingMode != nil {
-                ToolbarItem(placement: .bottomBar) {
-                    Button(role: .destructive) {
-                        showingVideoDeleteConfirmation = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    .disabled(selectedVideoIDs.isEmpty)
                 }
             }
         }
@@ -257,15 +252,19 @@ struct LocalPlaylistScreen: View {
     }
 
     private func beginEditing() {
-        selectedVideoIDs.removeAll()
-        editingMode = .playlist
-        withAnimation { editMode = .active }
+        withAnimation(.snappy) {
+            selectedVideoIDs.removeAll()
+            editingMode = .playlist
+            editMode = .active
+        }
     }
 
     private func finishEditing() {
-        withAnimation { editMode = .inactive }
-        editingMode = nil
-        selectedVideoIDs.removeAll()
+        withAnimation(.snappy) {
+            editMode = .inactive
+            editingMode = nil
+            selectedVideoIDs.removeAll()
+        }
     }
 
     private func deleteSelectedVideos() async {
