@@ -960,6 +960,7 @@ final class PlayerStateManager {
                 case .readyToPlay:
                     let preparationTime = self.itemLoadStartedAt.map { Date().timeIntervalSince($0) } ?? 0
                     self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
+                    self.logAudioDiagnostics(for: item)
                     self.itemLoadStartedAt = nil
                     self.finishReadiness(.ready, for: item)
                 case .failed:
@@ -1000,8 +1001,56 @@ final class PlayerStateManager {
             guard let entry = item?.accessLog()?.events.last else { return }
             // Access-log URIs and server addresses may contain signed playback credentials. Only
             // record aggregate ABR measurements needed to diagnose low-quality HLS renditions.
-            self?.log.info("AVPlayerItem access-log: indicatedBitrate=\(entry.indicatedBitrate, privacy: .public) observedBitrate=\(entry.observedBitrate, privacy: .public) switches=\(entry.numberOfServerAddressChanges, privacy: .public) stalls=\(entry.numberOfStalls, privacy: .public)")
+            self?.log.info("AVPlayerItem access-log: indicatedBitrate=\(entry.indicatedBitrate, privacy: .public) indicatedAverageBitrate=\(entry.indicatedAverageBitrate, privacy: .public) averageAudioBitrate=\(entry.averageAudioBitrate, privacy: .public) averageVideoBitrate=\(entry.averageVideoBitrate, privacy: .public) observedBitrate=\(entry.observedBitrate, privacy: .public) switchBitrate=\(entry.switchBitrate, privacy: .public) downloadedDuration=\(entry.segmentsDownloadedDuration, privacy: .public)s watchedDuration=\(entry.durationWatched, privacy: .public)s droppedFrames=\(entry.numberOfDroppedVideoFrames, privacy: .public) stalls=\(entry.numberOfStalls, privacy: .public)")
         }
+    }
+
+    /// Captures the facts needed to separate a poor source rendition from output-route degradation
+    /// (most notably Bluetooth hands-free mode). Signed URLs and route names are deliberately
+    /// omitted from diagnostics.
+    private func logAudioDiagnostics(for item: AVPlayerItem) {
+        let session = AVAudioSession.sharedInstance()
+        let outputTypes = session.currentRoute.outputs.map(\.portType.rawValue).joined(separator: ",")
+        log.info("Audio session: category=\(session.category.rawValue, privacy: .public) mode=\(session.mode.rawValue, privacy: .public) route=\(outputTypes, privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)Hz channels=\(session.outputNumberOfChannels, privacy: .public) mixing=\(self.preferences.allowAudioMixing, privacy: .public)")
+
+        Task { @MainActor [weak self, weak item] in
+            guard let self, let item else { return }
+            do {
+                let tracks = try await item.asset.loadTracks(withMediaType: .audio)
+                guard !tracks.isEmpty else {
+                    self.log.notice("Audio diagnostics: AVPlayer asset exposes no audio track")
+                    return
+                }
+                for (index, track) in tracks.enumerated() {
+                    async let dataRate = track.load(.estimatedDataRate)
+                    async let descriptions = track.load(.formatDescriptions)
+                    let (estimatedDataRate, formatDescriptions) = try await (dataRate, descriptions)
+                    if formatDescriptions.isEmpty {
+                        self.log.info("Audio track[\(index, privacy: .public)]: estimatedDataRate=\(estimatedDataRate, privacy: .public)bps formatDescriptions=0")
+                    }
+                    for description in formatDescriptions {
+                        let codec = Self.fourCCString(CMFormatDescriptionGetMediaSubType(description))
+                        if let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee {
+                            self.log.info("Audio track[\(index, privacy: .public)]: codec=\(codec, privacy: .public) estimatedDataRate=\(estimatedDataRate, privacy: .public)bps sampleRate=\(stream.mSampleRate, privacy: .public)Hz channels=\(stream.mChannelsPerFrame, privacy: .public) bitsPerChannel=\(stream.mBitsPerChannel, privacy: .public)")
+                        } else {
+                            self.log.info("Audio track[\(index, privacy: .public)]: codec=\(codec, privacy: .public) estimatedDataRate=\(estimatedDataRate, privacy: .public)bps streamDescription=unavailable")
+                        }
+                    }
+                }
+            } catch {
+                self.log.notice("Audio diagnostics failed: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    private nonisolated static func fourCCString(_ value: FourCharCode) -> String {
+        let bytes: [UInt8] = [
+            UInt8((value >> 24) & 0xff),
+            UInt8((value >> 16) & 0xff),
+            UInt8((value >> 8) & 0xff),
+            UInt8(value & 0xff)
+        ]
+        return String(bytes: bytes, encoding: .ascii) ?? String(value)
     }
 
     private func resolveAndPlay(video: Video, autoplay: Bool, skipRecommendations: Bool = false) async {
