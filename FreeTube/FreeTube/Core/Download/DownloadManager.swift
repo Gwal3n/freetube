@@ -346,7 +346,13 @@ final class DownloadManager: TemporaryDownloading {
     /// no logging here.
     func localFile(for videoID: String) -> URL? {
         let url = Self.fileURL(for: videoID)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        guard FileManager.default.fileExists(atPath: url.path),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber,
+              size.int64Value >= Self.minimumDownloadSize else {
+            return nil
+        }
+        return url
     }
 
     /// Either returns the existing local file URL, or downloads the video via yt-dlp and returns
@@ -619,6 +625,7 @@ final class DownloadManager: TemporaryDownloading {
             // because that client profile is exempt from PoT enforcement on the video-info side.
             do {
                 try await runYouTubeKitFallback(video: video, quality: quality, destination: destination, snapshotID: snapshotID)
+                try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
                 let dur = Date().timeIntervalSince(startedAt)
                 log.info("yt-dlp[\(video.id, privacy: .public)] FALLBACK SUCCESS in \(String(format: "%.1f", dur), privacy: .public)s")
                 await persistDownloaded(video: video, fileURL: destination)
@@ -634,6 +641,7 @@ final class DownloadManager: TemporaryDownloading {
                 return destination
             } catch {
                 log.error("yt-dlp[\(video.id, privacy: .public)] YouTubeKit fallback also failed: \(String(describing: error), privacy: .public)")
+                try? FileManager.default.removeItem(at: destination)
                 publish(snapshot: DownloadTaskSnapshot(
                     id: snapshotID,
                     videoID: video.id,
@@ -721,8 +729,20 @@ final class DownloadManager: TemporaryDownloading {
             }
         }
 
-        let fileSize = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
-        log.info("yt-dlp[\(video.id, privacy: .public)] file on disk: size=\(fileSize, privacy: .public) bytes path=\(destination.path, privacy: .public)")
+        do {
+            try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+        } catch {
+            log.error("yt-dlp[\(video.id, privacy: .public)] final validation failed: \(String(describing: error), privacy: .public)")
+            try? FileManager.default.removeItem(at: destination)
+            publish(snapshot: DownloadTaskSnapshot(
+                id: snapshotID,
+                videoID: video.id,
+                title: video.title,
+                state: .failed("The downloaded file was incomplete. Please try again."),
+                createdAt: .now
+            ))
+            throw YouTubeServiceError.streamExtractionFailed
+        }
 
         log.debug("yt-dlp[\(video.id, privacy: .public)] writing download metadata xattr")
         await persistDownloaded(video: video, fileURL: destination)
@@ -1005,8 +1025,57 @@ final class DownloadManager: TemporaryDownloading {
             try handle.write(contentsOf: buffer)
             written += buffer.count
         }
+        try handle.synchronize()
         try handle.close()
         log.info("[fallback] wrote \(written, privacy: .public) bytes to \(destination.lastPathComponent, privacy: .public)")
+
+        guard written >= Self.minimumDownloadSize else {
+            log.error("[fallback] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
+            try? FileManager.default.removeItem(at: destination)
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+        if expected > 0, Int64(written) != expected {
+            log.error("[fallback] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
+            try? FileManager.default.removeItem(at: destination)
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+    }
+
+    /// A filesystem path alone is not proof that a download succeeded. yt-dlp and URLSession can
+    /// both leave a zero-byte or truncated file behind after a CDN rejection, and historically that
+    /// made the UI announce “Download finished” before the Downloads screen failed to open it.
+    /// Validate the finished asset before writing metadata or publishing `.completed`.
+    private func validateDownloadedFile(at url: URL, quality: VideoQuality, videoID: String) async throws {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber,
+              size.int64Value >= Self.minimumDownloadSize else {
+            log.error("yt-dlp[\(videoID, privacy: .public)] validation: output missing or smaller than \(Self.minimumDownloadSize, privacy: .public) bytes")
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+
+        let asset = AVURLAsset(url: url)
+        do {
+            async let playableTask = asset.load(.isPlayable)
+            async let durationTask = asset.load(.duration)
+            async let videoTracksTask = asset.loadTracks(withMediaType: .video)
+            async let audioTracksTask = asset.loadTracks(withMediaType: .audio)
+            let (playable, duration, videoTracks, audioTracks) = try await (
+                playableTask, durationTask, videoTracksTask, audioTracksTask
+            )
+            let seconds = duration.seconds
+            let hasExpectedTracks = quality == .audioOnly
+                ? !audioTracks.isEmpty
+                : !videoTracks.isEmpty && !audioTracks.isEmpty
+            guard playable, seconds.isFinite, seconds > 0, hasExpectedTracks else {
+                log.error("yt-dlp[\(videoID, privacy: .public)] validation: playable=\(playable, privacy: .public) duration=\(seconds, privacy: .public) videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
+                throw YouTubeServiceError.streamExtractionFailed
+            }
+            log.info("yt-dlp[\(videoID, privacy: .public)] validation passed: size=\(size.int64Value, privacy: .public) duration=\(seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
+        } catch {
+            log.error("yt-dlp[\(videoID, privacy: .public)] validation could not read asset: \(String(describing: error), privacy: .public)")
+            throw YouTubeServiceError.streamExtractionFailed
+        }
     }
 
     /// Picks the highest-resolution progressive (single-file, both-tracks) format whose height
@@ -1262,6 +1331,9 @@ final class DownloadManager: TemporaryDownloading {
         for: .documentDirectory,
         in: .userDomainMask
     )[0]
+
+    /// Reject placeholder/error-response files while still allowing very short clips.
+    private static let minimumDownloadSize: Int64 = 64 * 1_024
 
     /// Builds a yt-dlp `-f` format string honoring the user's quality preference.
     ///
