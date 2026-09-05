@@ -5,6 +5,7 @@ final class LocalPlaylistService: Sendable {
     private let writer: LocalPlaylistWriter
     private let remoteService: any PlaylistServicing
     private let videoService: any VideoServicing
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "LocalPlaylists")
 
     init(
         writer: LocalPlaylistWriter = .shared,
@@ -21,6 +22,9 @@ final class LocalPlaylistService: Sendable {
     func create(title: String) async -> String { await writer.create(title: title) }
     func add(video: Video, to playlistID: String) async { await writer.add(video: video, to: playlistID) }
     func remove(videoID: String, from playlistID: String) async { await writer.remove(videoID: videoID, from: playlistID) }
+    func remove(videoIDs: Set<String>, from playlistID: String) async {
+        await writer.remove(videoIDs: videoIDs, from: playlistID)
+    }
     func delete(id: String) async { await writer.delete(playlistID: id) }
     func update(id: String, title: String, descriptionText: String?) async {
         await writer.updatePlaylist(playlistID: id, title: title, descriptionText: descriptionText)
@@ -97,47 +101,62 @@ final class LocalPlaylistService: Sendable {
                 isLive: false, isShort: false
             )
         }
-        return await writer.replace(title: title.isEmpty ? "Imported playlist" : title, sourcePlaylistID: nil, videos: videos)
+        log.info("CSV staged playlist=\(title, privacy: .public) videos=\(videos.count, privacy: .public)")
+        return await writer.replace(
+            title: title.isEmpty ? "Imported playlist" : title,
+            sourcePlaylistID: nil,
+            videos: videos,
+            requiresMetadataHydration: true
+        )
     }
 
-    func hydrateImportedPlaylist(
-        id playlistID: String,
-        progress: @escaping @MainActor @Sendable (_ completed: Int, _ total: Int) -> Void
-    ) async -> Int {
-        guard let details = await writer.details(playlistID: playlistID) else { return 0 }
-        let candidates = details.videos.filter { $0.title == $0.id || $0.channelName.isEmpty }
-        var failureCount = 0
-        await progress(0, candidates.count)
+    func prepareLegacyImports() async { await writer.prepareLegacyImportedMetadata() }
+
+    func playlistsAwaitingMetadata() async -> [LocalPlaylistSnapshot] {
+        await writer.playlists().filter(\.isHydratingMetadata)
+    }
+
+    func hydratePendingPlaylist(id playlistID: String) async {
+        let candidates = await writer.pendingMetadataVideos(playlistID: playlistID)
+        log.info("Metadata hydration started playlist=\(playlistID, privacy: .public) remaining=\(candidates.count, privacy: .public)")
+        var failures = 0
         for (index, placeholder) in candidates.enumerated() {
-            if Task.isCancelled {
-                await writer.finishMetadataUpdate(playlistID: playlistID)
-                return failureCount + candidates.count - index
+            guard !Task.isCancelled else {
+                await writer.notifyMetadataProgress()
+                return
             }
-            if let base = try? await videoService.fetchInfo(id: placeholder.id) {
-                let more = try? await videoService.fetchMoreInfo(id: placeholder.id)
-                let enriched = Video(
-                    id: base.video.id,
-                    title: base.video.title.isEmpty ? placeholder.id : base.video.title,
-                    channelID: base.video.channelID.isEmpty ? (more?.video.channelID ?? "") : base.video.channelID,
-                    channelName: base.video.channelName.isEmpty ? (more?.video.channelName ?? "") : base.video.channelName,
-                    channelThumbnailURL: base.video.channelThumbnailURL ?? more?.video.channelThumbnailURL,
-                    thumbnailURL: base.video.thumbnailURL ?? placeholder.thumbnailURL,
-                    duration: base.video.duration,
-                    viewCount: base.video.viewCount,
-                    publishedAt: base.video.publishedAt,
-                    publishedRelative: more?.uploadDateText,
-                    descriptionSnippet: more?.descriptionText ?? base.descriptionText,
-                    isLive: base.video.isLive,
-                    isShort: base.video.isShort
+            let resolved: Video?
+            do {
+                let info = try await videoService.fetchInfo(id: placeholder.id)
+                guard !info.video.title.isEmpty else { throw LocalPlaylistImportError.noVideos }
+                let video = info.video
+                resolved = Video(
+                    id: video.id, title: video.title, channelID: video.channelID,
+                    channelName: video.channelName, channelThumbnailURL: video.channelThumbnailURL,
+                    thumbnailURL: placeholder.thumbnailURL, duration: video.duration,
+                    viewCount: video.viewCount, publishedAt: video.publishedAt,
+                    descriptionSnippet: info.descriptionText, isLive: video.isLive,
+                    isShort: video.isShort
                 )
-                await writer.update(video: enriched, in: playlistID)
-            } else {
-                failureCount += 1
+            } catch {
+                resolved = nil
+                failures += 1
+                log.error("Metadata hydration failed video=\(placeholder.id, privacy: .public): \(String(describing: error), privacy: .public)")
             }
-            await progress(index + 1, candidates.count)
+            let shouldPublishProgress = (index + 1).isMultiple(of: 5) || index == candidates.count - 1
+            await writer.applyHydrationResult(
+                video: resolved,
+                videoID: placeholder.id,
+                playlistID: playlistID,
+                notifyProgress: shouldPublishProgress
+            )
+            try? await Task.sleep(for: .milliseconds(200))
         }
-        await writer.finishMetadataUpdate(playlistID: playlistID)
-        return failureCount
+        log.info("Metadata hydration finished playlist=\(playlistID, privacy: .public) processed=\(candidates.count, privacy: .public) failures=\(failures, privacy: .public)")
+    }
+
+    func retryFailedMetadata(id playlistID: String) async {
+        await writer.retryFailedMetadata(playlistID: playlistID)
     }
 
     private static func csvFields(_ line: String) -> [String] {

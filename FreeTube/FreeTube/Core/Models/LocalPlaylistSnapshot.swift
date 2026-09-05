@@ -8,6 +8,12 @@ struct LocalPlaylistSnapshot: Identifiable, Hashable, Sendable {
     let videoCount: Int
     let thumbnailURL: URL?
     let updatedAt: Date
+    let metadataHydrationTotal: Int
+    let metadataHydrationProcessed: Int
+    let metadataHydrationFailures: Int
 
     var isSavedFromYouTube: Bool { sourcePlaylistID != nil }
+    var isHydratingMetadata: Bool {
+        metadataHydrationTotal > 0 && metadataHydrationProcessed < metadataHydrationTotal
+    }
 }

@@ -36,7 +36,10 @@ struct LocalPlaylistsScreen: View {
                 .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("Cancel", role: .cancel) { newTitle = "" }
         }
-        .task { await reload() }
+        .task {
+            await reload()
+            await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
         }
@@ -87,6 +90,24 @@ struct LocalPlaylistsScreen: View {
                 Text(playlist.title).lineLimit(1)
                 Text("\(playlist.videoCount) \(playlist.videoCount == 1 ? "video" : "videos")")
                     .font(.caption).foregroundStyle(.secondary)
+                if playlist.isHydratingMetadata {
+                    ProgressView(
+                        value: Double(playlist.metadataHydrationProcessed),
+                        total: Double(max(playlist.metadataHydrationTotal, 1))
+                    )
+                    .progressViewStyle(.linear)
+                    Text("Resolving \(playlist.metadataHydrationProcessed) of \(playlist.metadataHydrationTotal)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } else if playlist.metadataHydrationFailures > 0 {
+                    Label(
+                        "\(playlist.metadataHydrationFailures) unavailable",
+                        systemImage: "exclamationmark.circle"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
             }
         }
     }

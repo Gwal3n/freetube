@@ -5,9 +5,7 @@ import UniformTypeIdentifiers
 struct ImportDataScreen: View {
     @State private var showingSubscriptionImporter = false
     @State private var showingPlaylistImporter = false
-    @State private var progressTitle: String?
-    @State private var completedVideos = 0
-    @State private var totalVideos = 0
+    @State private var isImporting = false
     @State private var resultMessage: String?
     @State private var errorMessage: String?
     private let playlistService = LocalPlaylistService()
@@ -20,26 +18,22 @@ struct ImportDataScreen: View {
                 } label: {
                     Label("Import Subscriptions CSV", systemImage: "person.2.badge.plus")
                 }
-                .disabled(progressTitle != nil)
+                .disabled(isImporting)
                 Button {
                     showingPlaylistImporter = true
                 } label: {
                     Label("Import Playlist CSV Files", systemImage: "music.note.list")
                 }
-                .disabled(progressTitle != nil)
+                .disabled(isImporting)
             } footer: {
                 Text("Imports stay on this device. Each playlist CSV becomes a separate personal playlist.")
             }
 
-            if let progressTitle {
+            if isImporting {
                 Section("Importing") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(progressTitle).font(.headline).lineLimit(1)
-                        ProgressView(value: Double(completedVideos), total: Double(max(totalVideos, 1)))
-                        Text("Resolving video information \(completedVideos) of \(totalVideos)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        Text("Adding playlists to your library…")
                     }
                     .padding(.vertical, 4)
                 }
@@ -82,42 +76,33 @@ struct ImportDataScreen: View {
     }
 
     private func importPlaylists(_ result: Result<[URL], Error>) async {
+        guard !isImporting else { return }
+        isImporting = true
+        defer { isImporting = false }
         do {
             var imported = 0
-            var unresolvedVideos = 0
             var skipped = [String]()
             for url in try result.get() {
                 let accessed = url.startAccessingSecurityScopedResource()
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 do {
-                    let playlistID = try await playlistService.importCSV(
+                    _ = try await playlistService.importCSV(
                         data: Data(contentsOf: url),
                         filename: url.lastPathComponent
                     )
-                    progressTitle = url.deletingPathExtension().lastPathComponent
-                    completedVideos = 0
-                    totalVideos = 0
-                    unresolvedVideos += await playlistService.hydrateImportedPlaylist(id: playlistID) { completed, total in
-                        completedVideos = completed
-                        totalVideos = total
-                    }
                     imported += 1
                 } catch {
                     skipped.append(url.lastPathComponent)
                 }
             }
-            progressTitle = nil
             if imported > 0 {
-                let unresolvedNote = unresolvedVideos == 0
-                    ? ""
-                    : " \(unresolvedVideos) unavailable videos were kept by ID; importing those files again will retry them."
                 let skippedNote = skipped.isEmpty ? "" : " Skipped: \(skipped.joined(separator: ", "))."
-                resultMessage = "Imported \(imported) \(imported == 1 ? "playlist" : "playlists") with locally saved video information.\(unresolvedNote)\(skippedNote)"
+                resultMessage = "Imported \(imported) \(imported == 1 ? "playlist" : "playlists"). Video information will resolve from Local Playlists.\(skippedNote)"
+                await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
             } else if !skipped.isEmpty {
                 errorMessage = "Skipped: \(skipped.joined(separator: ", "))"
             }
         } catch {
-            progressTitle = nil
             errorMessage = error.localizedDescription
         }
     }

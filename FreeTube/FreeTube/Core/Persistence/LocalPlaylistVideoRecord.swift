@@ -21,8 +21,16 @@ final class LocalPlaylistVideoRecord {
     var isShort: Bool
     var position: Int
     var addedAt: Date
+    /// 0 = ordinary/resolved, 1 = waiting for imported metadata, 2 = resolution failed.
+    var metadataState: Int = 0
 
-    init(playlistID: String, video: Video, position: Int, addedAt: Date = .now) {
+    init(
+        playlistID: String,
+        video: Video,
+        position: Int,
+        addedAt: Date = .now,
+        metadataState: Int = 0
+    ) {
         membershipID = "\(playlistID):\(video.id)"
         self.playlistID = playlistID
         videoID = video.id
@@ -40,5 +48,6 @@ final class LocalPlaylistVideoRecord {
         isShort = video.isShort
         self.position = position
         self.addedAt = addedAt
+        self.metadataState = metadataState
     }
 }

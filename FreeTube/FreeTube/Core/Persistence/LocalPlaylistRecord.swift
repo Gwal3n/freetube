@@ -10,6 +10,9 @@ final class LocalPlaylistRecord {
     var createdAt: Date
     var updatedAt: Date
     var sourcePlaylistID: String?
+    var metadataHydrationTotal: Int = 0
+    var metadataHydrationProcessed: Int = 0
+    var metadataHydrationFailures: Int = 0
 
     init(
         playlistID: String = UUID().uuidString,
@@ -23,5 +26,8 @@ final class LocalPlaylistRecord {
         createdAt = .now
         updatedAt = .now
         self.sourcePlaylistID = sourcePlaylistID
+        metadataHydrationTotal = 0
+        metadataHydrationProcessed = 0
+        metadataHydrationFailures = 0
     }
 }

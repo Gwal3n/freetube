@@ -3,17 +3,25 @@ import Kingfisher
 
 @available(iOS 17.0, *)
 struct LocalPlaylistScreen: View {
+    private enum EditingMode {
+        case reorder
+        case select
+    }
+
     let playlistID: String
     @State private var details: LocalPlaylistDetails?
     @State private var isRestoring = false
     @State private var restoreError: String?
     @State private var showingEditor = false
     @State private var showingRestoreConfirmation = false
+    @State private var editingMode: EditingMode?
+    @State private var editMode: EditMode = .inactive
+    @State private var selectedVideoIDs = Set<String>()
     @Environment(PlayerStateManager.self) private var player
     private let service = LocalPlaylistService()
 
     var body: some View {
-        List {
+        List(selection: $selectedVideoIDs) {
             if let details {
                 Section {
                     playlistHeader(details)
@@ -21,8 +29,20 @@ struct LocalPlaylistScreen: View {
                         .listRowBackground(Color.clear)
                 }
                 ForEach(details.videos) { video in
-                    VideoRow(video: video, showsMoreMenu: true, offersPlayNext: true) {
-                        player.loadPlaylist(playbackDetails(from: details), startAt: video)
+                    VideoRow(
+                        video: video,
+                        showsMoreMenu: editingMode == nil,
+                        offersPlayNext: editingMode == nil
+                    ) {
+                        if editingMode == .select {
+                            if selectedVideoIDs.contains(video.id) {
+                                selectedVideoIDs.remove(video.id)
+                            } else {
+                                selectedVideoIDs.insert(video.id)
+                            }
+                        } else if editingMode == nil {
+                            player.loadPlaylist(playbackDetails(from: details), startAt: video)
+                        }
                     }
                     .swipeActions {
                         Button(role: .destructive) {
@@ -32,8 +52,11 @@ struct LocalPlaylistScreen: View {
                             }
                         } label: { Label("Remove", systemImage: "trash") }
                     }
+                    .tag(video.id)
+                    .moveDisabled(editingMode != .reorder)
                 }
                 .onMove { source, destination in
+                    guard editingMode == .reorder else { return }
                     Task {
                         await service.move(playlistID: playlistID, from: source, to: destination)
                         await reload()
@@ -41,6 +64,7 @@ struct LocalPlaylistScreen: View {
                 }
             }
         }
+        .environment(\.editMode, $editMode)
         .navigationTitle(details?.playlist.title ?? "Playlist")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
@@ -54,7 +78,20 @@ struct LocalPlaylistScreen: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                EditButton()
+                if editingMode != nil {
+                    Button("Done") { finishEditing() }
+                } else {
+                    Menu {
+                        Button { beginEditing(.reorder) } label: {
+                            Label("Reorder Videos", systemImage: "arrow.up.arrow.down")
+                        }
+                        Button { beginEditing(.select) } label: {
+                            Label("Select Videos", systemImage: "checkmark.circle")
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                }
                 Menu {
                     Button {
                         showingEditor = true
@@ -69,8 +106,30 @@ struct LocalPlaylistScreen: View {
                         }
                         .disabled(isRestoring)
                     }
+                    if let playlist = details?.playlist, playlist.metadataHydrationFailures > 0 {
+                        Button {
+                            Task {
+                                await service.retryFailedMetadata(id: playlistID)
+                                await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
+                            }
+                        } label: {
+                            Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
+                        }
+                    }
                 } label: {
                     if isRestoring { ProgressView() } else { Image(systemName: "ellipsis.circle") }
+                }
+            }
+        }
+        .toolbar {
+            if editingMode == .select {
+                ToolbarItem(placement: .bottomBar) {
+                    Button(role: .destructive) {
+                        Task { await deleteSelectedVideos() }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .disabled(selectedVideoIDs.isEmpty)
                 }
             }
         }
@@ -152,7 +211,7 @@ struct LocalPlaylistScreen: View {
                         Label("Play All", systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     Button {
                         guard let random = local.videos.randomElement() else { return }
                         player.loadPlaylist(playbackDetails(from: local), startAt: random, shuffled: true)
@@ -180,5 +239,24 @@ struct LocalPlaylistScreen: View {
         } catch {
             restoreError = error.localizedDescription
         }
+    }
+
+    private func beginEditing(_ mode: EditingMode) {
+        selectedVideoIDs.removeAll()
+        editingMode = mode
+        withAnimation { editMode = .active }
+    }
+
+    private func finishEditing() {
+        withAnimation { editMode = .inactive }
+        editingMode = nil
+        selectedVideoIDs.removeAll()
+    }
+
+    private func deleteSelectedVideos() async {
+        let ids = selectedVideoIDs
+        await service.remove(videoIDs: ids, from: playlistID)
+        finishEditing()
+        await reload()
     }
 }

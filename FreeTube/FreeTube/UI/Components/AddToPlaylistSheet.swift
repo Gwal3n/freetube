@@ -52,7 +52,6 @@ struct AddToPlaylistSheet: View {
                 }
 
                 playlistSection("Personal", playlists: personalPlaylists)
-                playlistSection("Saved from YouTube", playlists: savedPlaylists)
             }
             .animation(.snappy, value: isCreating)
             .navigationTitle("Save to Playlist")
@@ -94,10 +93,6 @@ struct AddToPlaylistSheet: View {
         playlists.filter { !$0.isSavedFromYouTube }
     }
 
-    private var savedPlaylists: [LocalPlaylistSnapshot] {
-        playlists.filter(\.isSavedFromYouTube)
-    }
-
     private func reload() async {
         playlists = await service.playlists()
         var ids = Set<String>()
@@ -117,7 +112,6 @@ struct AddToPlaylistSheet: View {
             await service.add(video: video, to: playlistID)
             containingIDs.insert(playlistID)
         }
-        playlists = await service.playlists()
     }
 
     private func createAndSave() async {
