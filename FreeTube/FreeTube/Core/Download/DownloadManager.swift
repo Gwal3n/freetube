@@ -505,6 +505,39 @@ final class DownloadManager: TemporaryDownloading {
             throw CancellationError()
         } catch {
             try? FileManager.default.removeItem(at: destination)
+            if NativeHLSDownloadService.isAuthorizationFailure(error) {
+                log.notice("native-download[\(video.id, privacy: .public)] authorization failed; invalidating the signed URL and resolving once more")
+                await StreamURLCache.shared.remove(videoID: video.id, formatID: "native-\(quality.rawValue)")
+                do {
+                    let refreshed = try await NativeStreamService().resolve(video: video, quality: quality)
+                    try await downloadResolvedSource(
+                        refreshed.url,
+                        to: destination,
+                        audioOnly: quality == .audioOnly,
+                        quality: quality,
+                        video: video,
+                        snapshotID: snapshotID
+                    )
+                    try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+                    await persistDownloaded(video: video, fileURL: destination)
+                    publish(snapshot: DownloadTaskSnapshot(
+                        id: snapshotID, videoID: video.id, title: video.title,
+                        state: .completed(destination), createdAt: .now
+                    ))
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        self.tasks[snapshotID] = nil
+                        self.publishSnapshots()
+                    }
+                    log.info("native-download[\(video.id, privacy: .public)] SUCCESS after fresh resolution")
+                    return destination
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    try? FileManager.default.removeItem(at: destination)
+                    log.notice("native-download[\(video.id, privacy: .public)] fresh-resolution retry failed: \(String(describing: error), privacy: .public)")
+                }
+            }
             log.notice("native-download[\(video.id, privacy: .public)] failed: \(String(describing: error), privacy: .public); trying yt-dlp")
         }
 
@@ -517,7 +550,7 @@ final class DownloadManager: TemporaryDownloading {
         log.debug("yt-dlp[\(video.id, privacy: .public)] format selector=\(formatString, privacy: .public)")
         // Output template includes `%(format_id)s` so individual streams land at predictable paths
         // we can find afterwards. Final destination is set by us after the Swift-side mux.
-        let outputTemplate = destination.deletingPathExtension().path + ".%(format_id)s.%(ext)s"
+        let outputTemplate = destination.deletingPathExtension().path + ".%(format_id)s-%(vcodec)s-%(acodec)s.%(ext)s"
 
         // yt-dlp argv. We force mp4 output, point `-o` at our canonical Downloads/<id>.mp4 path,
         // skip writing playlist info, and feed the cleanest possible argument set. The package's
@@ -692,9 +725,9 @@ final class DownloadManager: TemporaryDownloading {
         let elapsed = Date().timeIntervalSince(startedAt)
         log.info("yt-dlp[\(video.id, privacy: .public)] returned after \(String(format: "%.1f", elapsed), privacy: .public)s — locating output files")
 
-        // yt-dlp wrote individual streams to <id>.<format_id>.<ext> (e.g. wh4YepmEtZk.135.mp4 +
-        // wh4YepmEtZk.140.m4a). Run the candidate scan off-main since `contentsOfDirectory` on a
-        // Downloads folder with hundreds of files becomes a noticeable hitch.
+        // yt-dlp wrote either individual streams or one progressive fallback. Run the candidate
+        // scan off-main since `contentsOfDirectory` on a Downloads folder with hundreds of files
+        // becomes a noticeable hitch.
         let intermediates: [URL] = await Task.detached(priority: .utility) {
             let candidates = (try? FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil))?
                 .filter { $0.lastPathComponent.hasPrefix("\(stem).") } ?? []
@@ -703,12 +736,10 @@ final class DownloadManager: TemporaryDownloading {
         }.value
         log.debug("yt-dlp[\(video.id, privacy: .public)] candidate files: \(intermediates.map(\.lastPathComponent).joined(separator: ", "), privacy: .public)")
 
-        let videoFile = intermediates.first { url in
-            ["mp4", "webm", "mkv"].contains(url.pathExtension.lowercased()) &&
-            !url.lastPathComponent.contains(".\(stem).m4a") &&
-            url.pathExtension.lowercased() != "m4a"
-        }
-        let audioFile = intermediates.first { ["m4a", "mp3", "aac", "opus"].contains($0.pathExtension.lowercased()) }
+        // The output template records both codec roles. This is reliable even when the only
+        // available audio is WebM/Opus (an extension-only scan used to mistake it for video).
+        let videoFile = intermediates.first { $0.lastPathComponent.contains("-none.") }
+        let audioFile = intermediates.first { $0.lastPathComponent.contains("-none-") }
 
         if let videoFile, let audioFile {
             log.info("yt-dlp[\(video.id, privacy: .public)] muxing video=\(videoFile.lastPathComponent, privacy: .public) audio=\(audioFile.lastPathComponent, privacy: .public)")
@@ -1468,12 +1499,11 @@ final class DownloadManager: TemporaryDownloading {
             return "bestaudio[ext=m4a]/bestaudio"
         }
         if let cap = quality.heightCap, cap > 0 {
-            // Select exactly one video-only MP4 and one M4A audio stream. The previous ungrouped
-            // slash/comma expression was parsed as `18,140`, redundantly pairing progressive
-            // itag 18 (which already has audio) with another audio track.
-            return "bestvideo[height<=\(cap)][ext=mp4],bestaudio[ext=m4a]"
+            // Prefer native-friendly MP4/M4A, but fall back independently to whatever video-only
+            // and audio-only formats yt-dlp actually retained after its PoToken filtering.
+            return "(bestvideo[height<=\(cap)][ext=mp4]/bestvideo[height<=\(cap)],bestaudio[ext=m4a]/bestaudio)/best[height<=\(cap)][ext=mp4]/best[height<=\(cap)]"
         }
-        return "bestvideo[height<=1080][ext=mp4],bestaudio[ext=m4a]"
+        return "(bestvideo[height<=1080][ext=mp4]/bestvideo[height<=1080],bestaudio[ext=m4a]/bestaudio)/best[height<=1080][ext=mp4]/best[height<=1080]"
     }
 
     // MARK: - Networking gate + snapshots

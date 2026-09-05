@@ -45,6 +45,11 @@ actor StreamURLCache {
         log.debug("Cached stream URL for \(videoID, privacy: .public)/\(formatID, privacy: .public)")
     }
 
+    func remove(videoID: String, formatID: String) {
+        entries[Key(videoID: videoID, formatID: formatID)] = nil
+        log.debug("Invalidated stream URL for \(videoID, privacy: .public)/\(formatID, privacy: .public)")
+    }
+
     func purge() {
         entries.removeAll()
     }

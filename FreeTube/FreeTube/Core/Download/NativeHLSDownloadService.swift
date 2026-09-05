@@ -201,6 +201,14 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         }
     }
 
+    static func isAuthorizationFailure(_ error: Error) -> Bool {
+        guard let nativeError = error as? NativeHLSError else { return false }
+        switch nativeError {
+        case .http(401), .http(403): true
+        default: false
+        }
+    }
+
     // MARK: - Playlist parsing
 
     private static func parseMaster(_ text: String, baseURL: URL) throws -> MasterPlaylist {
