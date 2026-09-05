@@ -18,6 +18,7 @@ import OSLog
 struct VideoMoreActionsMenu: View {
     let video: Video
     var offersPlayNext = false
+    var onRemoveFromUpNext: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
@@ -122,6 +123,12 @@ struct VideoMoreActionsMenu: View {
                 DownloadManager.shared.deleteDownloaded(videoID: video.id, context: modelContext)
             } label: {
                 Label("Remove downloaded file", systemImage: "trash")
+            }
+        }
+        if let onRemoveFromUpNext {
+            Divider()
+            Button(role: .destructive, action: onRemoveFromUpNext) {
+                Label("Remove from Up Next", systemImage: "trash")
             }
         }
     }

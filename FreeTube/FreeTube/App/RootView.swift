@@ -61,11 +61,7 @@ struct RootView: View {
             // body re-renders and `.popupProgress(...)` re-applies with the new value.
             PopupContentWrapper(thumbnail: thumbnail)
         }
-        // LNPopupUI's ancestor pan cannot direction-lock against child List swipe actions. Pause
-        // it only for the lifetime of an established horizontal Up Next swipe; ordinary vertical
-        // collapse remains interactive before and after that gesture.
         .popupInteractionStyle(player.chapterListPresented
-            || player.upNextHorizontalSwipeActive
             || !player.playerPanelAtTop
             || player.playerPanelGestureStartedAwayFromTop
             ? UIViewController.PopupInteractionStyle.none

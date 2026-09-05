@@ -50,7 +50,6 @@ struct FullScreenPlayer: View {
     @State private var panelScrollOffset: CGFloat = 0
     @State private var panelScrollGestureActive = false
     @State private var controlsHideTask: Task<Void, Never>?
-    @GestureState private var upNextHorizontalSwipeActive = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
@@ -384,13 +383,6 @@ struct FullScreenPlayer: View {
             Task { await refreshPersonalPlaylistMembership() }
         }
         .errorToast($downloadError)
-        .onChange(of: upNextHorizontalSwipeActive, initial: true) { _, active in
-            player.upNextHorizontalSwipeActive = active
-        }
-        .onDisappear {
-            // GestureState normally resets this automatically; teardown is a final safeguard.
-            player.upNextHorizontalSwipeActive = false
-        }
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
         // claims the natural content height (video + panel intrinsic
@@ -1265,26 +1257,6 @@ struct FullScreenPlayer: View {
                             .listRowBackground(Color.clear)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    player.enqueueNext(video)
-                                } label: {
-                                    Label("Play next", systemImage: "text.insert")
-                                }
-                                .tint(.accentColor)
-                            }
-                            .simultaneousGesture(upNextSwipeDirectionGesture)
-                    }
-                    .onDelete { offsets in
-                        guard player.activePlaylist == nil else { return }
-                        let queueIndices = offsets.compactMap { displayIndex in
-                            displayedQueueIndices.indices.contains(displayIndex)
-                                ? displayedQueueIndices[displayIndex]
-                                : nil
-                        }
-                        for queueIndex in queueIndices.sorted(by: >) {
-                            player.queue.remove(at: queueIndex)
-                        }
                     }
                     if canRevealMoreUpNext {
                         Button {
@@ -1336,21 +1308,6 @@ struct FullScreenPlayer: View {
         }
         await player.loadMoreRecommendations()
         upNextVisibleLimit = min(upNextVisibleLimit + increment, allUpNextVideos.count)
-    }
-
-    /// Observes the same row drag used by SwiftUI's native swipe actions without replacing it.
-    /// Six points establishes intent before LNPopupUI's parent pan crosses its own threshold.
-    /// `@GestureState` guarantees the lock clears on both normal completion and cancellation.
-    private var upNextSwipeDirectionGesture: some Gesture {
-        DragGesture(minimumDistance: 6, coordinateSpace: .global)
-            .updating($upNextHorizontalSwipeActive) { value, isLocked, _ in
-                guard !isLocked else { return }
-                let horizontal = abs(value.translation.width)
-                let vertical = abs(value.translation.height)
-                if horizontal > vertical * 1.15 {
-                    isLocked = true
-                }
-            }
     }
 
     private func collapsiblePanelHeader(
@@ -1496,7 +1453,13 @@ struct FullScreenPlayer: View {
 
             // Sibling of the load-button so taps land in the Menu instead of the row's
             // play handler. Same actions as the row would get in search/history/library.
-            VideoMoreActionsMenu(video: video, offersPlayNext: !preservesPlaylistContext)
+            VideoMoreActionsMenu(
+                video: video,
+                offersPlayNext: !preservesPlaylistContext,
+                onRemoveFromUpNext: preservesPlaylistContext ? nil : {
+                    player.removeFromUpNext(videoID: video.id)
+                }
+            )
         }
         .background {
             if preservesPlaylistContext, video.id == player.currentVideo?.id {

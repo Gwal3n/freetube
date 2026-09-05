@@ -76,9 +76,6 @@ final class PlayerStateManager {
     /// Shared with RootView so LNPopupUI's global drag can be paused only while the chapter panel
     /// owns vertical gestures.
     var chapterListPresented: Bool = false
-    /// LNPopupUI installs its own ancestor pan recognizer, outside the SwiftUI player tree. Pause
-    /// it only while an Up Next row gesture has direction-locked horizontally.
-    var upNextHorizontalSwipeActive: Bool = false
     /// Prevents LNPopupUI's ancestor pan from taking over a scroll that began while the details
     /// panel was away from its top edge. The user can scroll back to the top and see the native
     /// rubber band; a fresh downward gesture then collapses the player.
@@ -86,6 +83,15 @@ final class PlayerStateManager {
     /// Latched for the lifetime of a touch that began while the panel was scrolled. This prevents
     /// reaching the top during one long gesture from handing that same touch to LNPopupUI.
     var playerPanelGestureStartedAwayFromTop: Bool = false
+
+    func removeFromUpNext(videoID: String) {
+        if activePlaylist != nil {
+            playlistRecommendations.removeAll { $0.id == videoID }
+        } else if let index = queue.items.firstIndex(where: { $0.id == videoID }),
+                  index != queue.currentIndex {
+            queue.remove(at: index)
+        }
+    }
 
     // MARK: - AVPlayer
 
