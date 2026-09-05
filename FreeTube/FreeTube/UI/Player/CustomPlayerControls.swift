@@ -13,6 +13,9 @@ struct CustomPlayerControls: View {
     let chapters: [VideoChapter]
     let hasPrevious: Bool
     let hasNext: Bool
+    let videoTitle: String
+    let channelName: String
+    let showsCollapseButton: Bool
     let additionalTopControls: AnyView
     let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
@@ -30,11 +33,29 @@ struct CustomPlayerControls: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    Button(action: onCollapse) {
-                        Image(systemName: "chevron.down")
-                            .playerTopControl()
+                    if showsCollapseButton {
+                        Button(action: onCollapse) {
+                            Image(systemName: "chevron.down")
+                                .playerTopControl()
+                        }
+                        Spacer()
+                    } else {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(videoTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            if !channelName.isEmpty {
+                                Text(channelName)
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.82))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
                     }
-                    Spacer()
                     additionalTopControls
                 }
                 .padding(.horizontal, 12)

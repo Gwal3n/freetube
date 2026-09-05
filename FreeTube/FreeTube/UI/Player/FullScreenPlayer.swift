@@ -135,6 +135,9 @@ struct FullScreenPlayer: View {
                         chapters: player.chapters,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
+                        videoTitle: player.currentVideo?.title ?? "",
+                        channelName: player.currentVideo?.channelName ?? "",
+                        showsCollapseButton: !isLandscape,
                         additionalTopControls: AnyView(
                             HStack(spacing: 0) {
                                 ForEach(visiblePlayerTopControls) { control in
