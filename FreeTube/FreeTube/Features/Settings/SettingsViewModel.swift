@@ -6,7 +6,22 @@ import SwiftUI
 @Observable
 @MainActor
 final class SettingsViewModel {
-    var preferences = UserPreferences()
+    var preferences: UserPreferences
+    /// Stored observable value so the Stepper's trailing count redraws immediately. Writing only
+    /// through `@AppStorage` on a nested value persists correctly but does not notify @Observable.
+    var upNextInitialCount: Int {
+        didSet { preferences.upNextInitialCount = upNextInitialCount }
+    }
+    var showUpNext: Bool {
+        didSet { preferences.showUpNext = showUpNext }
+    }
+
+    init() {
+        let preferences = UserPreferences()
+        self.preferences = preferences
+        self.upNextInitialCount = preferences.upNextInitialCount
+        self.showUpNext = preferences.showUpNext
+    }
 
     var preferredQuality: VideoQuality {
         get { preferences.preferredQuality }
@@ -41,16 +56,6 @@ final class SettingsViewModel {
     var showComments: Bool {
         get { preferences.showComments }
         set { preferences.showComments = newValue }
-    }
-
-    var showUpNext: Bool {
-        get { preferences.showUpNext }
-        set { preferences.showUpNext = newValue }
-    }
-
-    var upNextInitialCount: Int {
-        get { preferences.upNextInitialCount }
-        set { preferences.upNextInitialCount = newValue }
     }
 
     var prefetchVideoDetails: Bool {

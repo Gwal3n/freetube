@@ -413,7 +413,14 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private var fullscreenButton: some View {
         Button {
-            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
+            // A portrait source already uses the expanded player's available vertical space.
+            // Never turn the device sideways merely because the generic fullscreen button was
+            // tapped; if it is currently landscape, the button instead returns it to portrait.
+            if isPortraitVideo {
+                requestPlayerOrientation(.portrait)
+            } else {
+                requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
+            }
             showPlayerControls()
         } label: {
             Image(systemName: verticalSizeClass == .compact
@@ -426,6 +433,12 @@ struct FullScreenPlayer: View {
                 .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
         }
         .accessibilityLabel(verticalSizeClass == .compact ? "Exit fullscreen" : "Enter fullscreen")
+    }
+
+    private var isPortraitVideo: Bool {
+        let size = player.videoPresentationSize
+        if size.width > 0, size.height > 0 { return size.height > size.width }
+        return player.currentVideo?.isShort == true
     }
 
     private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {

@@ -16,6 +16,9 @@ final class QueueManager {
     var repeatMode: RepeatMode = .off
 
     private var shuffleOrder: [Int] = []
+    /// IDs explicitly added through "Play next", in FIFO order. Keeping this separate from the
+    /// recommendation queue lets repeated actions form A → B → C instead of a LIFO stack.
+    private var pendingPlayNextIDs: [String] = []
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "QueueManager")
 
     var current: Video? {
@@ -28,6 +31,7 @@ final class QueueManager {
     func replace(with videos: [Video], startAt index: Int = 0) {
         items = videos
         currentIndex = max(0, min(index, videos.count - 1))
+        pendingPlayNextIDs = []
         rebuildShuffleOrder()
     }
 
@@ -60,6 +64,7 @@ final class QueueManager {
         let previousCount = items.count
         items = Array(items[lowerBound..<upperBound])
         currentIndex -= lowerBound
+        pendingPlayNextIDs.removeAll { id in !items.contains(where: { $0.id == id }) }
         rebuildShuffleOrder()
         log.debug("Trimmed endless queue from \(previousCount, privacy: .public) to \(self.items.count, privacy: .public) items")
     }
@@ -67,20 +72,27 @@ final class QueueManager {
     func insertNext(_ video: Video) {
         // "Play next" means repositioning an existing queue item, not duplicating it. Removing
         // an item before the current position shifts the current index left by one.
+        if pendingPlayNextIDs.contains(video.id) { return }
         if let existingIndex = items.firstIndex(where: { $0.id == video.id }) {
             guard existingIndex != currentIndex else { return }
-            if existingIndex == currentIndex + 1 { return }
             items.remove(at: existingIndex)
             if existingIndex < currentIndex { currentIndex -= 1 }
         }
-        let insertIndex = min(currentIndex + 1, items.count)
+        let lastPendingIndex = pendingPlayNextIDs
+            .compactMap { pendingID in items.firstIndex(where: { $0.id == pendingID }) }
+            .filter { $0 > currentIndex }
+            .max()
+        let insertIndex = min((lastPendingIndex ?? currentIndex) + 1, items.count)
         items.insert(video, at: insertIndex)
+        pendingPlayNextIDs.append(video.id)
         rebuildShuffleOrder()
     }
 
     func remove(at index: Int) {
         guard items.indices.contains(index) else { return }
+        let removedID = items[index].id
         items.remove(at: index)
+        pendingPlayNextIDs.removeAll { $0 == removedID }
         if index < currentIndex { currentIndex -= 1 }
         if currentIndex >= items.count { currentIndex = max(0, items.count - 1) }
         rebuildShuffleOrder()
@@ -171,6 +183,9 @@ final class QueueManager {
             let nextIndex = nextIndex()
             if let nextIndex {
                 currentIndex = nextIndex
+                if let current = items[safe: currentIndex] {
+                    pendingPlayNextIDs.removeAll { $0 == current.id }
+                }
                 return items[safe: currentIndex]
             }
             return nil
@@ -187,6 +202,12 @@ final class QueueManager {
     }
 
     private func nextIndex() -> Int? {
+        // Explicit Play Next choices take priority even while shuffle is enabled.
+        if let pendingID = pendingPlayNextIDs.first,
+           let pendingIndex = items.firstIndex(where: { $0.id == pendingID }),
+           pendingIndex != currentIndex {
+            return pendingIndex
+        }
         if isShuffleOn {
             guard let position = shuffleOrder.firstIndex(of: currentIndex) else { return nil }
             let nextPosition = position + 1
