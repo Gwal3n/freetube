@@ -1227,7 +1227,7 @@ struct FullScreenPlayer: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Button {
-                    withAnimation(.snappy(duration: 0.24)) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         isQueueExpanded.toggle()
                     }
                 } label: {
@@ -1239,7 +1239,7 @@ struct FullScreenPlayer: View {
                 }
                 .buttonStyle(.plain)
                 Button {
-                    withAnimation(.snappy(duration: 0.24)) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         isQueueExpanded.toggle()
                     }
                 } label: {
@@ -1309,7 +1309,6 @@ struct FullScreenPlayer: View {
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
                 .frame(height: queueListHeight)
-                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .onChange(of: player.currentVideo?.id) {

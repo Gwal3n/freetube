@@ -54,10 +54,9 @@ struct CommentsSection: View {
                         }
                     }
                 }
-                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.snappy(duration: 0.24), value: isExpanded)
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .errorToast(Bindable(model).errorState)
         // Covers state restoration where the section mounts expanded. The normal collapsed state
         // performs no request; the header button lazily loads on first expansion.
@@ -71,7 +70,7 @@ struct CommentsSection: View {
     @ViewBuilder
     private var header: some View {
         Button {
-            withAnimation(.snappy(duration: 0.24)) {
+            withAnimation(.easeInOut(duration: 0.2)) {
                 isExpanded.toggle()
             }
             if isExpanded && model.comments.isEmpty && !model.isLoading {
