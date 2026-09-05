@@ -4,8 +4,7 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct LocalPlaylistScreen: View {
     private enum EditingMode {
-        case reorder
-        case select
+        case playlist
     }
 
     let playlistID: String
@@ -17,6 +16,7 @@ struct LocalPlaylistScreen: View {
     @State private var editingMode: EditingMode?
     @State private var editMode: EditMode = .inactive
     @State private var selectedVideoIDs = Set<String>()
+    @State private var showingVideoDeleteConfirmation = false
     @Environment(PlayerStateManager.self) private var player
     private let service = LocalPlaylistService()
 
@@ -34,7 +34,7 @@ struct LocalPlaylistScreen: View {
                         showsMoreMenu: editingMode == nil,
                         offersPlayNext: editingMode == nil
                     ) {
-                        if editingMode == .select {
+                        if editingMode != nil {
                             if selectedVideoIDs.contains(video.id) {
                                 selectedVideoIDs.remove(video.id)
                             } else {
@@ -53,10 +53,10 @@ struct LocalPlaylistScreen: View {
                         } label: { Label("Remove", systemImage: "trash") }
                     }
                     .tag(video.id)
-                    .moveDisabled(editingMode != .reorder)
+                    .moveDisabled(editingMode == nil)
                 }
                 .onMove { source, destination in
-                    guard editingMode == .reorder else { return }
+                    guard editingMode != nil else { return }
                     Task {
                         await service.move(playlistID: playlistID, from: source, to: destination)
                         await reload()
@@ -80,23 +80,18 @@ struct LocalPlaylistScreen: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if editingMode != nil {
                     Button("Done") { finishEditing() }
-                } else {
-                    Menu {
-                        Button { beginEditing(.reorder) } label: {
-                            Label("Reorder Videos", systemImage: "arrow.up.arrow.down")
-                        }
-                        Button { beginEditing(.select) } label: {
-                            Label("Select Videos", systemImage: "checkmark.circle")
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                    }
                 }
-                Menu {
+                if editingMode == nil {
+                    Menu {
                     Button {
                         showingEditor = true
                     } label: {
                         Label("Edit Details", systemImage: "pencil")
+                    }
+                    Button {
+                        beginEditing()
+                    } label: {
+                        Label("Edit Playlist", systemImage: "checkmark.circle")
                     }
                     if details?.playlist.isSavedFromYouTube == true {
                         Button {
@@ -116,16 +111,17 @@ struct LocalPlaylistScreen: View {
                             Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
                         }
                     }
-                } label: {
-                    if isRestoring { ProgressView() } else { Image(systemName: "ellipsis.circle") }
+                    } label: {
+                        if isRestoring { ProgressView() } else { Image(systemName: "ellipsis.circle") }
+                    }
                 }
             }
         }
         .toolbar {
-            if editingMode == .select {
+            if editingMode != nil {
                 ToolbarItem(placement: .bottomBar) {
                     Button(role: .destructive) {
-                        Task { await deleteSelectedVideos() }
+                        showingVideoDeleteConfirmation = true
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
@@ -161,6 +157,16 @@ struct LocalPlaylistScreen: View {
         } message: {
             Text("Local ordering, removals, and description edits will be replaced with the current public playlist.")
         }
+        .confirmationDialog(
+            "Remove selected videos?",
+            isPresented: $showingVideoDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove \(selectedVideoIDs.count) Videos", role: .destructive) {
+                Task { await deleteSelectedVideos() }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     private func reload() async { details = await service.details(id: playlistID) }
@@ -191,9 +197,20 @@ struct LocalPlaylistScreen: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(local.playlist.title)
-                    .font(.title2.bold())
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .center, spacing: 10) {
+                    Text(local.playlist.title)
+                        .font(.title2.bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    glassActionButton(systemImage: "play.fill", label: "Play All") {
+                        guard let first = local.videos.first else { return }
+                        player.loadPlaylist(playbackDetails(from: local), startAt: first)
+                    }
+                    glassActionButton(systemImage: "shuffle", label: "Shuffle") {
+                        guard let random = local.videos.randomElement() else { return }
+                        player.loadPlaylist(playbackDetails(from: local), startAt: random, shuffled: true)
+                    }
+                }
+                .disabled(local.videos.isEmpty)
                 Text("\(local.playlist.videoCount) \(local.playlist.videoCount == 1 ? "video" : "videos")")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -203,30 +220,28 @@ struct LocalPlaylistScreen: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(4)
                 }
-                HStack(spacing: 12) {
-                    Button {
-                        guard let first = local.videos.first else { return }
-                        player.loadPlaylist(playbackDetails(from: local), startAt: first)
-                    } label: {
-                        Label("Play All", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    Button {
-                        guard let random = local.videos.randomElement() else { return }
-                        player.loadPlaylist(playbackDetails(from: local), startAt: random, shuffled: true)
-                    } label: {
-                        Label("Shuffle", systemImage: "shuffle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .disabled(local.videos.isEmpty)
-                .padding(.top, 4)
             }
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
+    }
+
+    private func glassActionButton(
+        systemImage: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 38, height: 38)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .accessibilityLabel(label)
     }
 
     private func restore() async {
@@ -241,9 +256,9 @@ struct LocalPlaylistScreen: View {
         }
     }
 
-    private func beginEditing(_ mode: EditingMode) {
+    private func beginEditing() {
         selectedVideoIDs.removeAll()
-        editingMode = mode
+        editingMode = .playlist
         withAnimation { editMode = .active }
     }
 

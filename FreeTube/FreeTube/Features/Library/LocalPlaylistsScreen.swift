@@ -6,13 +6,17 @@ struct LocalPlaylistsScreen: View {
     @State private var playlists: [LocalPlaylistSnapshot] = []
     @State private var showingCreate = false
     @State private var newTitle = ""
+    @State private var editMode: EditMode = .inactive
+    @State private var selectedPlaylistIDs = Set<String>()
+    @State private var showingDeleteConfirmation = false
     private let service = LocalPlaylistService()
 
     var body: some View {
-        List {
-            playlistSection("Personal", items: personalPlaylists)
-            playlistSection("Saved from YouTube", items: savedPlaylists)
+        List(selection: $selectedPlaylistIDs) {
+            playlistSection("Personal", items: personalPlaylists, savedFromYouTube: false)
+            playlistSection("Saved from YouTube", items: savedPlaylists, savedFromYouTube: true)
         }
+        .environment(\.editMode, $editMode)
         .navigationTitle("Local Playlists")
         .overlay {
             if playlists.isEmpty {
@@ -24,9 +28,22 @@ struct LocalPlaylistsScreen: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingCreate = true } label: {
-                    Image(systemName: "plus")
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if !editMode.isEditing {
+                    Button { showingCreate = true } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+                EditButton()
+            }
+            if editMode.isEditing {
+                ToolbarItem(placement: .bottomBar) {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .disabled(selectedPlaylistIDs.isEmpty)
                 }
             }
         }
@@ -43,6 +60,21 @@ struct LocalPlaylistsScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
         }
+        .onChange(of: editMode) { _, mode in
+            if !mode.isEditing { selectedPlaylistIDs.removeAll() }
+        }
+        .confirmationDialog(
+            "Delete selected playlists?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete \(selectedPlaylistIDs.count) Playlists", role: .destructive) {
+                Task { await deleteSelectedPlaylists() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the selected playlists and their locally saved entries.")
+        }
     }
 
     private func reload() async { playlists = await service.playlists() }
@@ -56,7 +88,11 @@ struct LocalPlaylistsScreen: View {
     }
 
     @ViewBuilder
-    private func playlistSection(_ title: String, items: [LocalPlaylistSnapshot]) -> some View {
+    private func playlistSection(
+        _ title: String,
+        items: [LocalPlaylistSnapshot],
+        savedFromYouTube: Bool
+    ) -> some View {
         if !items.isEmpty {
             Section(title) {
                 ForEach(items) { playlist in
@@ -72,6 +108,14 @@ struct LocalPlaylistsScreen: View {
                         for id in ids { await service.delete(id: id) }
                         await reload()
                     }
+                }
+                .onMove { source, destination in
+                    movePlaylists(
+                        in: items,
+                        from: source,
+                        to: destination,
+                        savedFromYouTube: savedFromYouTube
+                    )
                 }
             }
         }
@@ -118,5 +162,26 @@ struct LocalPlaylistsScreen: View {
 
     private var savedPlaylists: [LocalPlaylistSnapshot] {
         playlists.filter(\.isSavedFromYouTube)
+    }
+
+    private func movePlaylists(
+        in items: [LocalPlaylistSnapshot],
+        from source: IndexSet,
+        to destination: Int,
+        savedFromYouTube: Bool
+    ) {
+        var reordered = items
+        reordered.move(fromOffsets: source, toOffset: destination)
+        let personal = savedFromYouTube ? personalPlaylists : reordered
+        let saved = savedFromYouTube ? reordered : savedPlaylists
+        playlists = personal + saved
+        Task { await service.reorderPlaylists(playlists.map(\.id)) }
+    }
+
+    private func deleteSelectedPlaylists() async {
+        await service.delete(ids: selectedPlaylistIDs)
+        selectedPlaylistIDs.removeAll()
+        withAnimation { editMode = .inactive }
+        await reload()
     }
 }

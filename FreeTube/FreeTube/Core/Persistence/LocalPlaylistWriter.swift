@@ -11,9 +11,11 @@ actor LocalPlaylistWriter {
     static let shared = LocalPlaylistWriter(modelContainer: PersistenceController.sharedContainer)
 
     func playlists() -> [LocalPlaylistSnapshot] {
-        let records = ((try? modelContext.fetch(FetchDescriptor<LocalPlaylistRecord>(
-            sortBy: [SortDescriptor(\LocalPlaylistRecord.updatedAt, order: .reverse)]
-        ))) ?? [])
+        let records = ((try? modelContext.fetch(FetchDescriptor<LocalPlaylistRecord>())) ?? [])
+            .sorted {
+                if $0.sortPosition != $1.sortPosition { return $0.sortPosition < $1.sortPosition }
+                return $0.createdAt < $1.createdAt
+            }
         return records.map { record in
             let itemCount = videoCount(playlistID: record.playlistID)
             return LocalPlaylistSnapshot(
@@ -68,6 +70,7 @@ actor LocalPlaylistWriter {
             descriptionText: descriptionText,
             sourcePlaylistID: sourcePlaylistID
         )
+        record.sortPosition = nextPlaylistPosition()
         modelContext.insert(record)
         try? modelContext.save()
         notify()
@@ -130,6 +133,30 @@ actor LocalPlaylistWriter {
         if let record = try? modelContext.fetch(descriptor).first { modelContext.delete(record) }
         for item in videoRecords(playlistID: playlistID) { modelContext.delete(item) }
         try? modelContext.save()
+        normalizePlaylistPositions()
+        notify()
+    }
+
+    func reorderPlaylists(_ orderedIDs: [String]) {
+        let records = (try? modelContext.fetch(FetchDescriptor<LocalPlaylistRecord>())) ?? []
+        let positions = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
+        for record in records {
+            if let position = positions[record.playlistID] { record.sortPosition = position }
+        }
+        try? modelContext.save()
+        notify()
+    }
+
+    func deletePlaylists(_ playlistIDs: Set<String>) {
+        guard !playlistIDs.isEmpty else { return }
+        for playlistID in playlistIDs {
+            let target = playlistID
+            let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })
+            if let record = try? modelContext.fetch(descriptor).first { modelContext.delete(record) }
+            for item in videoRecords(playlistID: playlistID) { modelContext.delete(item) }
+        }
+        try? modelContext.save()
+        normalizePlaylistPositions()
         notify()
     }
 
@@ -310,6 +337,21 @@ actor LocalPlaylistWriter {
 
     private func normalizePositions(_ playlistID: String) {
         for (index, item) in videoRecords(playlistID: playlistID).enumerated() { item.position = index }
+    }
+
+    private func nextPlaylistPosition() -> Int {
+        let records = (try? modelContext.fetch(FetchDescriptor<LocalPlaylistRecord>())) ?? []
+        return (records.map(\.sortPosition).max() ?? -1) + 1
+    }
+
+    private func normalizePlaylistPositions() {
+        let records = ((try? modelContext.fetch(FetchDescriptor<LocalPlaylistRecord>())) ?? [])
+            .sorted {
+                if $0.sortPosition != $1.sortPosition { return $0.sortPosition < $1.sortPosition }
+                return $0.createdAt < $1.createdAt
+            }
+        for (index, record) in records.enumerated() { record.sortPosition = index }
+        try? modelContext.save()
     }
 
     private func setHydrationProgress(playlistID: String, total: Int, processed: Int, failures: Int) {

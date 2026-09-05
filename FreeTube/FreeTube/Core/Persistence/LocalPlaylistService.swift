@@ -26,6 +26,8 @@ final class LocalPlaylistService: Sendable {
         await writer.remove(videoIDs: videoIDs, from: playlistID)
     }
     func delete(id: String) async { await writer.delete(playlistID: id) }
+    func delete(ids: Set<String>) async { await writer.deletePlaylists(ids) }
+    func reorderPlaylists(_ orderedIDs: [String]) async { await writer.reorderPlaylists(orderedIDs) }
     func update(id: String, title: String, descriptionText: String?) async {
         await writer.updatePlaylist(playlistID: id, title: title, descriptionText: descriptionText)
     }

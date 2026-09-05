@@ -13,6 +13,7 @@ final class LocalPlaylistRecord {
     var metadataHydrationTotal: Int = 0
     var metadataHydrationProcessed: Int = 0
     var metadataHydrationFailures: Int = 0
+    var sortPosition: Int = 0
 
     init(
         playlistID: String = UUID().uuidString,
@@ -29,5 +30,6 @@ final class LocalPlaylistRecord {
         metadataHydrationTotal = 0
         metadataHydrationProcessed = 0
         metadataHydrationFailures = 0
+        sortPosition = 0
     }
 }
