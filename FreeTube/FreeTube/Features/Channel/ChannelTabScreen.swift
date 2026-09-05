@@ -14,6 +14,7 @@ struct ChannelTabScreen: View {
     let model: ChannelViewModel
 
     @Environment(PlayerStateManager.self) private var player
+    @State private var videoSort: ChannelVideoSort = .newest
 
     /// How many rows from the bottom we trigger pagination. 5 keeps the next page warm before the
     /// user's thumb arrives at the actual last row.
@@ -29,6 +30,25 @@ struct ChannelTabScreen: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if kind == .allVideos {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sort videos", selection: $videoSort) {
+                            ForEach(ChannelVideoSort.allCases) { sort in
+                                Text(sort.title).tag(sort)
+                            }
+                        }
+                    } label: {
+                        Label(videoSort.title, systemImage: "arrow.up.arrow.down")
+                    }
+                }
+            }
+        }
+        .task(id: videoSort) {
+            guard kind == .allVideos else { return }
+            await model.loadVideos(sort: videoSort)
+        }
     }
 
     // MARK: - Data accessors
@@ -36,10 +56,8 @@ struct ChannelTabScreen: View {
     private var videos: [Video] {
         guard let details = model.details else { return [] }
         switch kind {
-        case .allVideos, .latest:
-            return details.videos.items
-        case .popular:
-            return details.videos.items.sorted { ($0.viewCount ?? 0) > ($1.viewCount ?? 0) }
+        case .allVideos:
+            return model.videos(for: videoSort)
         case .shorts:
             return details.shorts.items
         case .directs:
@@ -57,7 +75,9 @@ struct ChannelTabScreen: View {
 
     @ViewBuilder
     private func videoList(_ videos: [Video]) -> some View {
-        if videos.isEmpty {
+        if kind == .allVideos, videos.isEmpty, model.isLoadingVideos(for: videoSort) {
+            LoadingView()
+        } else if videos.isEmpty {
             EmptyStateView(systemImage: "tray", title: "Nothing here", message: "This channel hasn't posted any \(title.lowercased()) yet.")
         } else {
             List {
@@ -67,7 +87,7 @@ struct ChannelTabScreen: View {
                         .listRowBackground(Color.clear)
                         .onAppear { prefetchIfNeeded(currentIndex: index, total: videos.count) }
                 }
-                if model.canLoadMore(for: kind) {
+                if canLoadMoreCurrentContent {
                     loadMoreFooter
                 }
             }
@@ -112,7 +132,7 @@ struct ChannelTabScreen: View {
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .onAppear {
-            Task { await model.loadMore(for: kind) }
+            Task { await loadMoreCurrentContent() }
         }
     }
 
@@ -120,7 +140,26 @@ struct ChannelTabScreen: View {
 
     private func prefetchIfNeeded(currentIndex: Int, total: Int) {
         guard currentIndex >= total - prefetchLookahead else { return }
+        if kind == .allVideos {
+            guard model.canLoadMoreVideos(sort: videoSort) else { return }
+            Task { await model.loadMoreVideos(sort: videoSort) }
+            return
+        }
         guard model.canLoadMore(for: kind) else { return }
         Task { await model.loadMore(for: kind) }
+    }
+
+    private var canLoadMoreCurrentContent: Bool {
+        kind == .allVideos
+            ? model.canLoadMoreVideos(sort: videoSort)
+            : model.canLoadMore(for: kind)
+    }
+
+    private func loadMoreCurrentContent() async {
+        if kind == .allVideos {
+            await model.loadMoreVideos(sort: videoSort)
+        } else {
+            await model.loadMore(for: kind)
+        }
     }
 }

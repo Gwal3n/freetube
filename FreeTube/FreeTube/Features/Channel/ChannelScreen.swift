@@ -94,31 +94,17 @@ struct ChannelScreen: View {
     /// instead of as a trailing badge (the previous design). The system chevron from the
     /// surrounding NavigationLink supplies the disclosure indicator.
     ///
-    /// The counts for the three videos-derived rows (All / Popular / Latest) come from the
-    /// channel header's `videoCount` — that's the authoritative total YouTube reports for the
-    /// channel. Falling back to the loaded count would tell the user "27 videos" when the
-    /// channel actually has 800, which was the original bug.
+    /// Videos has one destination with a native sort menu; each sort owns independent server
+    /// pagination rather than sorting only the currently loaded page.
     @ViewBuilder
     private func menuRows(for details: ChannelDetails) -> some View {
         let totalVideos = details.channel.videoCount
 
         menuRow(
-            title: "All videos",
+            title: "Videos",
             subtitle: videosSubtitle(total: totalVideos, loaded: details.videos.items.count, hasMore: details.videos.continuationToken != nil),
             systemImage: "play.rectangle.fill",
-            destination: ChannelTabScreen(title: "All videos", kind: .allVideos, model: model)
-        )
-        menuRow(
-            title: "Popular videos",
-            subtitle: "Most viewed first",
-            systemImage: "flame.fill",
-            destination: ChannelTabScreen(title: "Popular", kind: .popular, model: model)
-        )
-        menuRow(
-            title: "Latest videos",
-            subtitle: "Newest first",
-            systemImage: "clock.fill",
-            destination: ChannelTabScreen(title: "Latest", kind: .latest, model: model)
+            destination: ChannelTabScreen(title: "Videos", kind: .allVideos, model: model)
         )
         menuRow(
             title: "Shorts",

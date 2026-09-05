@@ -19,6 +19,8 @@ protocol ChannelServicing: Sendable {
     func fetchChannel(id: String) async throws -> ChannelDetails
     func fetchChannelMetadata(id: String) async throws -> Channel
     func fetchLatestVideos(channelID: String) async throws -> [Video]
+    func fetchVideos(channelID: String, sort: ChannelVideoSort) async throws -> ChannelTab<Video>
+    func fetchVideosNextPage(channelID: String, sort: ChannelVideoSort) async throws -> ChannelTab<Video>
     func fetchVideosNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchShortsNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchDirectsNextPage(channelID: String) async throws -> ChannelTab<Video>
@@ -144,6 +146,28 @@ final class ChannelService: ChannelServicing {
     }
 
     // MARK: - Pagination
+
+    func fetchVideos(channelID: String, sort: ChannelVideoSort) async throws -> ChannelTab<Video> {
+        let key = sortedVideosCacheKey(channelID: channelID, sort: sort)
+        log.info("fetchVideos(\(channelID, privacy: .public), sort=\(sort.rawValue, privacy: .public))")
+        return try await videosFallback.fetchVideos(
+            channelID: channelID,
+            params: sort.requestParameters,
+            cacheKey: key
+        )
+    }
+
+    func fetchVideosNextPage(channelID: String, sort: ChannelVideoSort) async throws -> ChannelTab<Video> {
+        let key = sortedVideosCacheKey(channelID: channelID, sort: sort)
+        guard let page = try await videosFallback.fetchContinuation(channelID: channelID, cacheKey: key) else {
+            return ChannelTab(items: [], continuationToken: nil)
+        }
+        return page
+    }
+
+    private func sortedVideosCacheKey(channelID: String, sort: ChannelVideoSort) -> String {
+        "\(channelID)|videos|\(sort.rawValue)"
+    }
 
     func fetchVideosNextPage(channelID: String) async throws -> ChannelTab<Video> {
         // If the initial fetch handed off to our fallback decoder, keep pagination on the same

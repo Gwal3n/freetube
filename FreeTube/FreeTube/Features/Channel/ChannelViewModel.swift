@@ -5,11 +5,10 @@ import Observation
 @Observable
 @MainActor
 final class ChannelViewModel {
-    /// Identifies which tab a paginated "load more" call should target. The first three resolve
-    /// to the same backing array (the channel's `videos` tab) but are kept distinct so the menu's
-    /// row labels are explicit.
+    /// Identifies which channel content destination a paginated request should target. Video sort
+    /// state is tracked independently by `ChannelVideoSort` below.
     enum Tab: String, CaseIterable, Identifiable {
-        case allVideos, popular, latest, shorts, directs, playlists
+        case allVideos, shorts, directs, playlists
         var id: String { rawValue }
     }
 
@@ -19,6 +18,9 @@ final class ChannelViewModel {
     /// True while a per-tab continuation request is in flight. Used by the tab screen to avoid
     /// firing duplicate "load more" requests when the user is rapidly scrolling near the bottom.
     private(set) var isLoadingMore: [Tab: Bool] = [:]
+    private(set) var videoTabs: [ChannelVideoSort: ChannelTab<Video>] = [:]
+    private(set) var loadingVideoSorts: Set<ChannelVideoSort> = []
+    private(set) var loadingMoreVideoSorts: Set<ChannelVideoSort> = []
     var errorState: ErrorState?
 
     private let service: any ChannelServicing
@@ -38,7 +40,9 @@ final class ChannelViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            details = try await service.fetchChannel(id: channelID)
+            let loadedDetails = try await service.fetchChannel(id: channelID)
+            details = loadedDetails
+            videoTabs[.newest] = loadedDetails.videos
             if let channel = details?.channel, channel.isSubscribed {
                 // An imported CSV has no artwork. Refresh its stored display metadata the first
                 // time the user visits the channel, without changing subscription state.
@@ -80,13 +84,12 @@ final class ChannelViewModel {
         )
     }
 
-    /// True when YouTubeKit still has a continuation token for the underlying tab. The three
-    /// videos-derived tabs (allVideos/popular/latest) share the same backing token.
+    /// True when YouTubeKit still has a continuation token for the underlying content tab.
     func canLoadMore(for tab: Tab) -> Bool {
         guard let details else { return false }
         if isLoadingMore[tab] == true { return false }
         switch tab {
-        case .allVideos, .popular, .latest:
+        case .allVideos:
             return details.videos.continuationToken != nil
         case .shorts:
             return details.shorts.continuationToken != nil
@@ -106,9 +109,10 @@ final class ChannelViewModel {
         defer { isLoadingMore[tab] = false }
         do {
             switch tab {
-            case .allVideos, .popular, .latest:
+            case .allVideos:
                 let next = try await service.fetchVideosNextPage(channelID: channelID)
                 details = current.appendingVideos(next)
+                videoTabs[.newest] = details?.videos
             case .shorts:
                 let next = try await service.fetchShortsNextPage(channelID: channelID)
                 details = current.appendingShorts(next)
@@ -119,6 +123,57 @@ final class ChannelViewModel {
                 let next = try await service.fetchPlaylistsNextPage(channelID: channelID)
                 details = current.appendingPlaylists(next)
             }
+        } catch {
+            errorState = ErrorState(from: error)
+        }
+    }
+
+    func videos(for sort: ChannelVideoSort) -> [Video] {
+        if let tab = videoTabs[sort] { return tab.items }
+        return sort.localFallback(details?.videos.items ?? [])
+    }
+
+    func isLoadingVideos(for sort: ChannelVideoSort) -> Bool {
+        loadingVideoSorts.contains(sort)
+    }
+
+    func loadVideos(sort: ChannelVideoSort) async {
+        guard videoTabs[sort] == nil, !loadingVideoSorts.contains(sort) else { return }
+        loadingVideoSorts.insert(sort)
+        defer { loadingVideoSorts.remove(sort) }
+        do {
+            videoTabs[sort] = try await service.fetchVideos(channelID: channelID, sort: sort)
+        } catch {
+            // Preserve the old behavior as an explicit fallback: sort the already-loaded newest
+            // page locally, but do not pretend it is a complete server-sorted result.
+            videoTabs[sort] = ChannelTab(
+                items: sort.localFallback(details?.videos.items ?? []),
+                continuationToken: nil
+            )
+            errorState = ErrorState(from: error)
+        }
+    }
+
+    func canLoadMoreVideos(sort: ChannelVideoSort) -> Bool {
+        videoTabs[sort]?.continuationToken != nil && !loadingMoreVideoSorts.contains(sort)
+    }
+
+    func loadMoreVideos(sort: ChannelVideoSort) async {
+        guard canLoadMoreVideos(sort: sort), let current = videoTabs[sort] else { return }
+        loadingMoreVideoSorts.insert(sort)
+        defer { loadingMoreVideoSorts.remove(sort) }
+        do {
+            let page: ChannelTab<Video>
+            if sort == .newest {
+                page = try await service.fetchVideosNextPage(channelID: channelID)
+                details = details?.appendingVideos(page)
+            } else {
+                page = try await service.fetchVideosNextPage(channelID: channelID, sort: sort)
+            }
+            videoTabs[sort] = ChannelTab(
+                items: current.items + page.items,
+                continuationToken: page.continuationToken
+            )
         } catch {
             errorState = ErrorState(from: error)
         }

@@ -36,44 +36,45 @@ final class ChannelVideosFallbackService: Sendable {
     /// `ChannelService` know to route through us instead of YouTubeKit.
     private actor State {
         private var continuations: [String: String] = [:]
-        func get(_ channelID: String) -> String? { continuations[channelID] }
-        func set(_ channelID: String, token: String?) {
+        func get(_ key: String) -> String? { continuations[key] }
+        func set(_ key: String, token: String?) {
             if let token, !token.isEmpty {
-                continuations[channelID] = token
+                continuations[key] = token
             } else {
-                continuations.removeValue(forKey: channelID)
+                continuations.removeValue(forKey: key)
             }
         }
-        func contains(_ channelID: String) -> Bool { continuations[channelID] != nil }
+        func contains(_ key: String) -> Bool { continuations[key] != nil }
     }
 
     /// True when a prior fetch handed off pagination to this fetcher for the given channel.
     /// `ChannelService.fetchVideosNextPage` calls this before dispatching to YouTubeKit.
-    func hasPendingContinuation(channelID: String) async -> Bool {
-        await state.contains(channelID)
+    func hasPendingContinuation(channelID: String, cacheKey: String? = nil) async -> Bool {
+        await state.contains(cacheKey ?? channelID)
     }
 
     /// Fetches the channel's Videos tab via a raw POST to youtubei/v1/browse and decodes
     /// items as either `videoRenderer` or `lockupViewModel`. Records the continuation token
     /// on the state map so subsequent pagination calls can route through `fetchContinuation`.
-    func fetchVideos(channelID: String, params: String) async throws -> ChannelTab<Video> {
+    func fetchVideos(channelID: String, params: String, cacheKey: String? = nil) async throws -> ChannelTab<Video> {
         let body = Self.initialBrowseBody(channelID: channelID, params: params)
         let result = try await sendBrowse(body: body, channelID: channelID, kind: "initial") { root in
             Self.decodeVideosTab(root: root, channelID: channelID)
         }
-        await state.set(channelID, token: result.continuation)
+        await state.set(cacheKey ?? channelID, token: result.continuation)
         return ChannelTab(items: result.videos, continuationToken: result.continuation)
     }
 
     /// Fetches the next page of videos using the stored continuation token. Returns nil if
     /// no continuation is recorded (caller should fall through to YouTubeKit's path).
-    func fetchContinuation(channelID: String) async throws -> ChannelTab<Video>? {
-        guard let token = await state.get(channelID) else { return nil }
+    func fetchContinuation(channelID: String, cacheKey: String? = nil) async throws -> ChannelTab<Video>? {
+        let resolvedCacheKey = cacheKey ?? channelID
+        guard let token = await state.get(resolvedCacheKey) else { return nil }
         let body = Self.continuationBody(token: token)
         let result = try await sendBrowse(body: body, channelID: channelID, kind: "continuation") { root in
             Self.decodeContinuation(root: root, channelID: channelID)
         }
-        await state.set(channelID, token: result.continuation)
+        await state.set(resolvedCacheKey, token: result.continuation)
         return ChannelTab(items: result.videos, continuationToken: result.continuation)
     }
 
