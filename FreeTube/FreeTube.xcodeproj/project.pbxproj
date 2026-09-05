@@ -34,6 +34,7 @@
 
 /* Begin PBXFileReference section */
 		AC591D232FB9BEE5009EE538 /* FreeTube.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FreeTube.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC5940012FC10001009EE538 /* FreeTubeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FreeTubeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -55,6 +56,11 @@
 			path = FreeTube;
 			sourceTree = "<group>";
 		};
+		AC5940022FC10001009EE538 /* FreeTubeTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FreeTubeTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +79,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AC5940042FC10001009EE538 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -80,6 +93,7 @@
 			isa = PBXGroup;
 			children = (
 				AC591D252FB9BEE5009EE538 /* FreeTube */,
+				AC5940022FC10001009EE538 /* FreeTubeTests */,
 				AC591D242FB9BEE5009EE538 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +102,7 @@
 			isa = PBXGroup;
 			children = (
 				AC591D232FB9BEE5009EE538 /* FreeTube.app */,
+				AC5940012FC10001009EE538 /* FreeTubeTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +110,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AC5940032FC10001009EE538 /* FreeTubeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC59400B2FC10001009EE538 /* Build configuration list for PBXNativeTarget "FreeTubeTests" */;
+			buildPhases = (
+				AC5940052FC10001009EE538 /* Sources */,
+				AC5940042FC10001009EE538 /* Frameworks */,
+				AC5940062FC10001009EE538 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AC5940082FC10001009EE538 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AC5940022FC10001009EE538 /* FreeTubeTests */,
+			);
+			name = FreeTubeTests;
+			packageProductDependencies = (
+			);
+			productName = FreeTubeTests;
+			productReference = AC5940012FC10001009EE538 /* FreeTubeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		AC591D222FB9BEE5009EE538 /* FreeTube */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AC591D2E2FB9BEE7009EE538 /* Build configuration list for PBXNativeTarget "FreeTube" */;
@@ -139,6 +177,10 @@
 					AC591D222FB9BEE5009EE538 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					AC5940032FC10001009EE538 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = AC591D222FB9BEE5009EE538;
+					};
 				};
 			};
 			buildConfigurationList = AC591D1E2FB9BEE5009EE538 /* Build configuration list for PBXProject "FreeTube" */;
@@ -168,12 +210,20 @@
 			projectRoot = "";
 			targets = (
 				AC591D222FB9BEE5009EE538 /* FreeTube */,
+				AC5940032FC10001009EE538 /* FreeTubeTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		AC591D212FB9BEE5009EE538 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AC5940062FC10001009EE538 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -190,7 +240,32 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AC5940052FC10001009EE538 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		AC5940072FC10001009EE538 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AC591D1B2FB9BEE5009EE538 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AC591D222FB9BEE5009EE538;
+			remoteInfo = FreeTube;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		AC5940082FC10001009EE538 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AC591D222FB9BEE5009EE538 /* FreeTube */;
+			targetProxy = AC5940072FC10001009EE538 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AC591D2C2FB9BEE7009EE538 /* Debug */ = {
@@ -403,6 +478,52 @@
 			};
 			name = Release;
 		};
+		AC5940092FC10001009EE538 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2Z797QJNH7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.leshko.freetube.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FreeTube.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FreeTube";
+			};
+			name = Debug;
+		};
+		AC59400A2FC10001009EE538 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2Z797QJNH7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.leshko.freetube.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FreeTube.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FreeTube";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -420,6 +541,15 @@
 			buildConfigurations = (
 				AC591D2F2FB9BEE7009EE538 /* Debug */,
 				AC591D302FB9BEE7009EE538 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AC59400B2FC10001009EE538 /* Build configuration list for PBXNativeTarget "FreeTubeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC5940092FC10001009EE538 /* Debug */,
+				AC59400A2FC10001009EE538 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
