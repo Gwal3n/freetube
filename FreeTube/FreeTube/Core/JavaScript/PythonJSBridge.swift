@@ -82,6 +82,7 @@ nonisolated enum PythonJSBridge {
             }
 
             do {
+                log.debug("JavaScriptCore challenge evaluating \(code.utf8.count, privacy: .public) input bytes; consoleLog=\(code.contains("console.log"), privacy: .public)")
                 let result = try JSEvaluator.evaluate(wrapForStdoutCapture(code))
                 log.debug("JavaScriptCore challenge completed with \(result.utf8.count, privacy: .public) output bytes")
                 return PythonObject(result)
@@ -109,18 +110,18 @@ nonisolated enum PythonJSBridge {
     private static func wrapForStdoutCapture(_ userCode: String) -> String {
         return """
         ;(function() {
-            var __ftStdout = [];
+            globalThis.__ftStdout = [];
             var __ftCapture = function() {
                     var parts = Array.prototype.map.call(arguments, function(a) { return String(a); });
-                    __ftStdout.push(parts.join(' '));
+                    globalThis.__ftStdout.push(parts.join(' '));
                 };
-            var console = {
+            globalThis.console = {
                 log: __ftCapture,
                 info: __ftCapture,
                 error: function() {}, warn: function() {}, debug: function() {}
             };
         \(userCode)
-            return __ftStdout.join('\\n');
+            return globalThis.__ftStdout.join('\\n');
         })()
         """
     }

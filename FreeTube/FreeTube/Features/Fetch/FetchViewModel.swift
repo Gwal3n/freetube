@@ -225,6 +225,9 @@ final class FetchViewModel {
             selectedVideoFormat = nil
             selectedAudioFormat = bestAudioOnly
         }
+        if let audio = selectedAudioFormat {
+            log.info("[FetchVM] default audio format=\(audio.id, privacy: .public) language=\(audio.language ?? "none", privacy: .public) languagePreference=\(audio.languagePreference ?? 0, privacy: .public) codec=\(audio.acodec ?? "none", privacy: .public)")
+        }
         recomputeConversionDefaults()
     }
 
