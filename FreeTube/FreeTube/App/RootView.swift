@@ -61,10 +61,10 @@ struct RootView: View {
             // body re-renders and `.popupProgress(...)` re-applies with the new value.
             PopupContentWrapper(thumbnail: thumbnail)
         }
-        // Chapters and Up Next contain their own scroll/swipe recognizers. LNPopupUI's ancestor
-        // pan cannot direction-lock against those children, so pause it while either interactive
-        // panel is open. The explicit video-surface pull-down remains available.
-        .popupInteractionStyle(player.chapterListPresented || player.upNextListPresented
+        // LNPopupUI's ancestor pan cannot direction-lock against child List swipe actions. Pause
+        // it only for the lifetime of an established horizontal Up Next swipe; ordinary vertical
+        // collapse remains interactive before and after that gesture.
+        .popupInteractionStyle(player.chapterListPresented || player.upNextHorizontalSwipeActive
             ? UIViewController.PopupInteractionStyle.none
             : UIViewController.PopupInteractionStyle.drag)
         .popupCloseButtonStyle(LNPopupCloseButton.Style.none)

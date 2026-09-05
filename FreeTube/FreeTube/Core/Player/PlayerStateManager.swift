@@ -77,9 +77,8 @@ final class PlayerStateManager {
     /// owns vertical gestures.
     var chapterListPresented: Bool = false
     /// LNPopupUI installs its own ancestor pan recognizer, outside the SwiftUI player tree. Pause
-    /// that recognizer while Up Next's native List owns horizontal swipe-to-delete gestures;
-    /// otherwise a slightly diagonal row swipe can collapse the entire popup.
-    var upNextListPresented: Bool = false
+    /// it only while an Up Next row gesture has direction-locked horizontally.
+    var upNextHorizontalSwipeActive: Bool = false
 
     // MARK: - AVPlayer
 

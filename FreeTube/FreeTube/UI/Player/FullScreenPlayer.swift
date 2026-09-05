@@ -47,6 +47,7 @@ struct FullScreenPlayer: View {
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
     @State private var controlsHideTask: Task<Void, Never>?
+    @GestureState private var upNextHorizontalSwipeActive = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
@@ -366,12 +367,12 @@ struct FullScreenPlayer: View {
             }
         }
         .errorToast($downloadError)
-        .onChange(of: isQueueExpanded, initial: true) { _, expanded in
-            player.upNextListPresented = expanded
+        .onChange(of: upNextHorizontalSwipeActive, initial: true) { _, active in
+            player.upNextHorizontalSwipeActive = active
         }
         .onDisappear {
-            // Never leave popup interaction disabled after the expanded player goes away.
-            player.upNextListPresented = false
+            // GestureState normally resets this automatically; teardown is a final safeguard.
+            player.upNextHorizontalSwipeActive = false
         }
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
@@ -1211,6 +1212,7 @@ struct FullScreenPlayer: View {
                                 }
                                 .tint(.accentColor)
                             }
+                            .simultaneousGesture(upNextSwipeDirectionGesture)
                     }
                     .onDelete { offsets in
                         guard player.activePlaylist == nil else { return }
@@ -1269,6 +1271,21 @@ struct FullScreenPlayer: View {
         }
         await player.loadMoreRecommendations()
         upNextVisibleLimit = min(upNextVisibleLimit + increment, allUpNextVideos.count)
+    }
+
+    /// Observes the same row drag used by SwiftUI's native swipe actions without replacing it.
+    /// Six points establishes intent before LNPopupUI's parent pan crosses its own threshold.
+    /// `@GestureState` guarantees the lock clears on both normal completion and cancellation.
+    private var upNextSwipeDirectionGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .updating($upNextHorizontalSwipeActive) { value, isLocked, _ in
+                guard !isLocked else { return }
+                let horizontal = abs(value.translation.width)
+                let vertical = abs(value.translation.height)
+                if horizontal > vertical * 1.15 {
+                    isLocked = true
+                }
+            }
     }
 
     private func collapsiblePanelHeader(
