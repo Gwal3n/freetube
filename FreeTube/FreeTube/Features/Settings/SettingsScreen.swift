@@ -128,7 +128,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Downloads")
                 } footer: {
-                    Text("Currently using \(formattedCacheUsage). When the cache exceeds the limit, the oldest downloads are removed to fit.\n\nPrefetch starts a background download of the next queued video as soon as the current one plays, so tapping Next is instant. Turn off to save bandwidth.\n\nParallel fragments controls how many HLS/DASH chunks yt-dlp fetches at once inside a single download — higher values are faster on good connections; values above 8 can trigger YouTube rate-limiting.")
+                    Text("Currently using \(formattedCacheUsage). When the cache exceeds the limit, the oldest downloads are removed to fit.\n\nPrefetch starts a background download of the next queued video as soon as the current one plays, so tapping Next is instant. Turn off to save bandwidth.\n\nParallel fragments controls how many HLS chunks are downloaded at once — higher values are faster on good connections; values above 8 can trigger YouTube rate-limiting.")
                 }
 
                 Section {
