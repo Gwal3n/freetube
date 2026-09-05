@@ -50,6 +50,9 @@ struct FullScreenPlayer: View {
     @State private var panelScrollOffset: CGFloat = 0
     @State private var panelScrollGestureActive = false
     @State private var controlsHideTask: Task<Void, Never>?
+    /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
+    /// short landscape viewport. The same fullscreen control toggles this state back off.
+    @State private var portraitVideoFullscreen = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
@@ -75,16 +78,21 @@ struct FullScreenPlayer: View {
         // the lower panel's scroll range, allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
+            let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
             let chapterPanelWidth: CGFloat = isLandscape && player.chapterListPresented
                 ? min(360, proxy.size.width * 0.38)
                 : 0
             let surfaceWidth = proxy.size.width - chapterPanelWidth
             let compactSurfaceHeight = surfaceWidth * 9 / 16
-            let expandedSurfaceHeight = expandedPlayerSurfaceHeight(
-                width: surfaceWidth,
-                viewportHeight: proxy.size.height
-            )
-            let collapseRange = max(0, expandedSurfaceHeight - compactSurfaceHeight)
+            let expandedSurfaceHeight = usesPortraitFullscreen
+                ? proxy.size.height
+                : expandedPlayerSurfaceHeight(
+                    width: surfaceWidth,
+                    viewportHeight: proxy.size.height
+                )
+            let collapseRange = usesPortraitFullscreen
+                ? 0
+                : max(0, expandedSurfaceHeight - compactSurfaceHeight)
             let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
             let surfaceHeight = expandedSurfaceHeight - consumedCollapse
 
@@ -139,7 +147,7 @@ struct FullScreenPlayer: View {
                         hasNext: hasNext,
                         videoTitle: player.currentVideo?.title ?? "",
                         channelName: player.currentVideo?.channelName ?? "",
-                        showsCollapseButton: !isLandscape,
+                        showsCollapseButton: !isLandscape && !usesPortraitFullscreen,
                         additionalTopControls: AnyView(
                             HStack(spacing: 0) {
                                 ForEach(visiblePlayerTopControls) { control in
@@ -228,6 +236,7 @@ struct FullScreenPlayer: View {
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
                     player.chapterListPresented = false
+                    portraitVideoFullscreen = false
                     panelScrollOffset = 0
                     player.playerPanelAtTop = true
                     player.playerPanelGestureStartedAwayFromTop = false
@@ -255,6 +264,7 @@ struct FullScreenPlayer: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 30, coordinateSpace: .global)
                     .onEnded { value in
+                        guard !usesPortraitFullscreen else { return }
                         let predicted = value.predictedEndTranslation
                         let verticalIntent = abs(predicted.height) > abs(predicted.width) * 1.15
                         guard verticalIntent else { return }
@@ -268,7 +278,7 @@ struct FullScreenPlayer: View {
                     }
             )
 
-            if let video = player.currentVideo {
+            if let video = player.currentVideo, !usesPortraitFullscreen {
                 // **Two render modes for the lower section, picked by `pushedChannel`:**
                 //
                 // 1. **Panel mode (default, channel == nil):** plain ScrollView, NO
@@ -317,7 +327,7 @@ struct FullScreenPlayer: View {
             }
             .frame(width: proxy.size.width, alignment: .leading)
 
-            if player.chapterListPresented, !player.chapters.isEmpty {
+            if player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
                 ChapterListPanel(
                     chapters: player.chapters,
                     elapsed: player.elapsed,
@@ -361,7 +371,7 @@ struct FullScreenPlayer: View {
         // the dark material. LNPopupUI's `LNPopupContentHostingController` is a UIHostingController
         // subclass that doesn't override status bar style, so SwiftUI's colorScheme drives it.
         .preferredColorScheme(.dark)
-        .statusBarHidden(false)
+        .statusBarHidden(portraitFullscreenActive)
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL
         // in a `Binding<Bool>` that flips when the URL is set/cleared so the sheet lifecycle
         // matches the user's intent.
@@ -383,6 +393,11 @@ struct FullScreenPlayer: View {
             Task { await refreshPersonalPlaylistMembership() }
         }
         .errorToast($downloadError)
+        .onChange(of: player.fullScreenPresented) { _, isPresented in
+            if !isPresented {
+                portraitVideoFullscreen = false
+            }
+        }
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
         // claims the natural content height (video + panel intrinsic
@@ -436,17 +451,20 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private var fullscreenButton: some View {
         Button {
-            // A portrait source already uses the expanded player's available vertical space.
-            // Never turn the device sideways merely because the generic fullscreen button was
-            // tapped; if it is currently landscape, the button instead returns it to portrait.
             if isPortraitVideo {
-                requestPlayerOrientation(.portrait)
+                withAnimation(.smooth(duration: 0.3)) {
+                    portraitVideoFullscreen.toggle()
+                    player.chapterListPresented = false
+                }
+                if portraitVideoFullscreen {
+                    requestPlayerOrientation(.portrait)
+                }
             } else {
                 requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
             }
             showPlayerControls()
         } label: {
-            Image(systemName: verticalSizeClass == .compact
+            Image(systemName: verticalSizeClass == .compact || portraitFullscreenActive
                 ? "arrow.down.right.and.arrow.up.left"
                 : "arrow.up.left.and.arrow.down.right")
                 .font(.body.weight(.bold))
@@ -455,7 +473,15 @@ struct FullScreenPlayer: View {
                 .contentShape(Circle())
                 .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
         }
-        .accessibilityLabel(verticalSizeClass == .compact ? "Exit fullscreen" : "Enter fullscreen")
+        .accessibilityLabel(
+            verticalSizeClass == .compact || portraitFullscreenActive
+                ? "Exit fullscreen"
+                : "Enter fullscreen"
+        )
+    }
+
+    private var portraitFullscreenActive: Bool {
+        portraitVideoFullscreen && isPortraitVideo && verticalSizeClass != .compact
     }
 
     private var isPortraitVideo: Bool {
