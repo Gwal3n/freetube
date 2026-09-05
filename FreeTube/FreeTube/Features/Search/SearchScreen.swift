@@ -12,9 +12,13 @@ struct SearchContent: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @State private var arePlaylistsExpanded = false
+    @State private var areChannelsExpanded = true
+    @State private var areVideosExpanded = true
+    @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
+    @Query private var watchHistory: [WatchHistoryEntry]
 
     var body: some View {
         Group {
@@ -43,23 +47,34 @@ struct SearchContent: View {
         .simultaneousGesture(dismissSearchPresentationGesture)
         .onChange(of: model.submittedQuery) { _, _ in
             arePlaylistsExpanded = false
+            areChannelsExpanded = true
+            areVideosExpanded = true
         }
         .errorToast($model.errorState)
     }
 
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
+        let progressByVideoID = showHistoryProgressBars
+            ? Dictionary(uniqueKeysWithValues: watchHistory.compactMap { entry in
+                entry.resumableProgress.map { (entry.videoID, $0) }
+            })
+            : [:]
         List {
             if !results.channels.isEmpty {
-                Section("Channels") {
-                    ForEach(results.channels) { channel in
-                        NavigationLink {
-                            ChannelScreen(channelID: channel.id)
-                        } label: {
-                            ChannelRow(channel: channel)
+                Section {
+                    if areChannelsExpanded {
+                        ForEach(results.channels) { channel in
+                            NavigationLink {
+                                ChannelScreen(channelID: channel.id)
+                            } label: {
+                                ChannelRow(channel: channel)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                } header: {
+                    collapsibleHeader("Channels", count: results.channels.count, isExpanded: $areChannelsExpanded)
                 }
             }
             if !results.playlists.isEmpty {
@@ -93,18 +108,25 @@ struct SearchContent: View {
                 }
             }
             if !results.videos.isEmpty {
-                Section("Videos") {
-                    let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
-                    ForEach(results.videos) { video in
-                        VideoRow(video: video, showsMoreMenu: true, offersPlayNext: true) {
-                            dismissKeyboard()
-                            player.load(video)
-                        }
-                        .onAppear {
-                            guard lookaheadIDs.contains(video.id),
-                                  results.continuationToken != nil,
-                                  !model.isLoading else { return }
-                            Task { await model.loadMore() }
+                Section {
+                    if areVideosExpanded {
+                        let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
+                        ForEach(results.videos) { video in
+                            VideoRow(
+                                video: video,
+                                showsMoreMenu: true,
+                                offersPlayNext: true,
+                                playbackProgress: progressByVideoID[video.id]
+                            ) {
+                                dismissKeyboard()
+                                player.load(video)
+                            }
+                            .onAppear {
+                                guard lookaheadIDs.contains(video.id),
+                                      results.continuationToken != nil,
+                                      !model.isLoading else { return }
+                                Task { await model.loadMore() }
+                            }
                         }
                     }
                     if model.isLoading {
@@ -114,11 +136,33 @@ struct SearchContent: View {
                             Spacer()
                         }
                     }
+                } header: {
+                    collapsibleHeader("Videos", count: results.videos.count, isExpanded: $areVideosExpanded)
                 }
             }
         }
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)
+        .refreshable { await model.refresh() }
+    }
+
+    private func collapsibleHeader(
+        _ title: String,
+        count: Int,
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.22)) { isExpanded.wrappedValue.toggle() }
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(count)").foregroundStyle(.secondary)
+                Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

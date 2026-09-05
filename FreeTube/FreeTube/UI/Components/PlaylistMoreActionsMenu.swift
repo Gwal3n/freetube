@@ -7,10 +7,9 @@ import UIKit
 ///
 /// Auth-gating rules (per product spec):
 ///   - Open in browser, Copy URL: always shown
-///   - Add to favorites / Remove from favorites: shown only when signed in
+///   - Save playlist / Remove saved playlist: stored locally
 ///
-/// Favorites are stored locally in `FavoritePlaylist` (SwiftData) — no YouTube sync, so the
-/// auth gate is purely a UI affordance: when signed out, the menu is just the two URL actions.
+/// Saved playlists are stored locally in `FavoritePlaylist` (SwiftData) — no YouTube sync.
 @available(iOS 17.0, *)
 struct PlaylistMoreActionsMenu: View {
     let playlist: Playlist
@@ -33,16 +32,14 @@ struct PlaylistMoreActionsMenu: View {
                     Label("Copy URL", systemImage: "link")
                 }
             }
-            if isSignedIn {
-                Divider()
-                Button {
-                    toggleFavorite()
-                } label: {
-                    if isFavorite {
-                        Label("Remove from favorites", systemImage: "hand.thumbsup.fill")
-                    } else {
-                        Label("Add to favorites", systemImage: "hand.thumbsup")
-                    }
+            Divider()
+            Button {
+                toggleFavorite()
+            } label: {
+                if isFavorite {
+                    Label("Remove saved playlist", systemImage: "bookmark.fill")
+                } else {
+                    Label("Save playlist", systemImage: "bookmark")
                 }
             }
         } label: {
@@ -62,11 +59,6 @@ struct PlaylistMoreActionsMenu: View {
     private var playlistURL: URL? {
         let bare = playlist.id.hasPrefix("VL") ? String(playlist.id.dropFirst(2)) : playlist.id
         return URL(string: "https://www.youtube.com/playlist?list=\(bare)")
-    }
-
-    private var isSignedIn: Bool {
-        if case .loggedIn = AuthState.shared.status { return true }
-        return false
     }
 
     private var isFavorite: Bool {

@@ -42,13 +42,14 @@ struct SettingsScreen: View {
                         }
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
-                    Toggle("Show history progress", isOn: Bindable(model).showHistoryProgressBars)
+                    Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
+                    Toggle("Show comments", isOn: Bindable(model).showComments)
                     Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
                     Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("Prefetching starts only after playback is ready and loads the description plus the first comments page. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
+                    Text("Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
                 }
 
                 Section("Search") {

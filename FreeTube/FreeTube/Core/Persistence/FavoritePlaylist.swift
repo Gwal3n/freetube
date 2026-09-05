@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// User-saved YouTube playlist. Backs the "Add to favorites" action in the playlist detail
+/// User-saved YouTube playlist. Backs the "Save playlist" action in the playlist detail
 /// screen. Stored in SwiftData so it survives launches and stays in sync with the Library tab.
 @available(iOS 17.0, *)
 @Model

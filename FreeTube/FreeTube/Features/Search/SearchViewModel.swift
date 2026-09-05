@@ -139,6 +139,26 @@ final class SearchViewModel {
         }
     }
 
+    /// Refreshes the submitted query without removing the visible List, allowing the native
+    /// pull-to-refresh indicator to remain attached throughout the request.
+    func refresh() async {
+        guard let submittedQuery else { return }
+        searchGeneration &+= 1
+        let generation = searchGeneration
+        isLoading = true
+        defer { if searchGeneration == generation { isLoading = false } }
+        do {
+            let refreshed = try await service.search(
+                query: submittedQuery,
+                restricted: preferences.restrictedSearchMode
+            )
+            guard searchGeneration == generation else { return }
+            results = refreshed
+        } catch {
+            errorState = ErrorState(from: error)
+        }
+    }
+
     private func scheduleAutocomplete() {
         autocompleteTask?.cancel()
         let snapshot = query

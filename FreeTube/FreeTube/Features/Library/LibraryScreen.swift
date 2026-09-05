@@ -350,13 +350,7 @@ private struct LocalHistoryScreen: View {
     /// Match `PlayerStateManager.applyStoredResumePosition` exactly so a row never advertises
     /// progress for a video that playback considers finished or too close to an endpoint.
     private func playbackProgress(for entry: WatchHistoryEntry) -> Double? {
-        guard entry.lastPosition.isFinite,
-              entry.duration.isFinite,
-              entry.lastPosition >= 10,
-              entry.duration > 0,
-              entry.duration - entry.lastPosition >= 30,
-              entry.lastPosition < entry.duration * 0.95 else { return nil }
-        return entry.lastPosition / entry.duration
+        entry.resumableProgress
     }
 }
 

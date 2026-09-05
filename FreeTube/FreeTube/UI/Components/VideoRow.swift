@@ -93,6 +93,7 @@ struct VideoRow: View {
                 }
             }
             .frame(width: 168, height: 96)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(video.title)

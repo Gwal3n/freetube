@@ -1061,7 +1061,9 @@ final class PlayerStateManager {
                             self.installVideoDetails(info, for: video.id)
                         }
                         guard !Task.isCancelled else { return }
-                        await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
+                        if preferences.showComments {
+                            await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
+                        }
                     }
                 }
                 // Usually redundant — the optimistic `play()` above has either started the item or

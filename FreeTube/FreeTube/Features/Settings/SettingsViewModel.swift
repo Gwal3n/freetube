@@ -38,6 +38,11 @@ final class SettingsViewModel {
         set { preferences.showHistoryProgressBars = newValue }
     }
 
+    var showComments: Bool {
+        get { preferences.showComments }
+        set { preferences.showComments = newValue }
+    }
+
     var prefetchVideoDetails: Bool {
         get { preferences.prefetchVideoDetails }
         set { preferences.prefetchVideoDetails = newValue }

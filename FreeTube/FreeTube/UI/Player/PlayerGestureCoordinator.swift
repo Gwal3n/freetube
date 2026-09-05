@@ -33,6 +33,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var horizontalSeekDuration: TimeInterval?
     private var horizontalSeekPeakVelocity: CGFloat = 0
     private var rateBeforeBoost: Float?
+    private var wasPausedBeforeBoost = false
     private var lastPiPDismissalRequest: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
@@ -236,10 +237,14 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         switch gesture.state {
         case .began:
             guard let player,
-                  player.currentItem?.status == .readyToPlay,
-                  player.timeControlStatus != .paused else { return }
+                  player.currentItem?.status == .readyToPlay else { return }
+            wasPausedBeforeBoost = player.timeControlStatus == .paused
             rateBeforeBoost = player.rate > 0 ? player.rate : player.defaultRate
-            player.rate = 2
+            if wasPausedBeforeBoost {
+                player.playImmediately(atRate: 2)
+            } else {
+                player.rate = 2
+            }
             log.info("Hold recognized; temporary rate=2x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showFeedback(
@@ -263,8 +268,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         switch gesture.state {
         case .began:
+            guard rateBeforeBoost == nil else {
+                resetHorizontalSeek()
+                return
+            }
             endSeekSession(hideFeedback: false)
-            restorePlaybackRateIfNeeded()
             guard let player else { return }
             let current = player.currentTime().seconds
             let duration = player.currentItem?.duration.seconds ?? .nan
@@ -278,6 +286,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             horizontalSeekPeakVelocity = 0
             onSeekPreview(horizontalSeekStart)
         case .changed:
+            guard rateBeforeBoost == nil else {
+                onSeekPreview(nil)
+                resetHorizontalSeek()
+                return
+            }
             guard let start = horizontalSeekStart,
                   let duration = horizontalSeekDuration,
                   view.bounds.width > 0 else { return }
@@ -337,8 +350,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private func restorePlaybackRateIfNeeded() {
         guard let priorRate = rateBeforeBoost else { return }
         rateBeforeBoost = nil
-        guard let player, player.timeControlStatus != .paused else { return }
-        player.rate = priorRate
+        guard let player else { return }
+        if wasPausedBeforeBoost {
+            player.pause()
+        } else if player.timeControlStatus != .paused {
+            player.rate = priorRate
+        }
+        wasPausedBeforeBoost = false
     }
 
     private func beginSeekSession(with interval: TimeInterval, isForward: Bool) {

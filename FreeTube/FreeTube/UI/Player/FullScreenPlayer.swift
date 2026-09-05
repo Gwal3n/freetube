@@ -48,6 +48,7 @@ struct FullScreenPlayer: View {
     @State private var controlsHideTask: Task<Void, Never>?
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
+    @AppStorage("showComments") private var showComments = true
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
@@ -481,11 +482,13 @@ struct FullScreenPlayer: View {
                     playlistPanel
                 }
                 queuePanel
-                CommentsSection(
-                    videoID: video.id,
-                    countText: details?.commentsCountText ?? player.commentsCountText
-                )
-                    .id(video.id)
+                if showComments {
+                    CommentsSection(
+                        videoID: video.id,
+                        countText: details?.commentsCountText ?? player.commentsCountText
+                    )
+                        .id(video.id)
+                }
             }
             .padding(.vertical)
             // While the header is collapsing, counteract the ScrollView's own content movement.

@@ -19,7 +19,7 @@ struct PlaylistScreen: View {
     @Environment(\.openURL) private var openURL
 
     /// Reactive list of saved-playlist favorites so the More menu can show the right
-    /// "Add to favorites" / "Remove from favorites" state without a per-render fetch.
+    /// "Save playlist" / "Remove saved playlist" state without a per-render fetch.
     @Query private var favorites: [FavoritePlaylist]
 
     /// True after the user taps "More" — expands the metadata block to show the full description
@@ -333,9 +333,9 @@ struct PlaylistScreen: View {
                 toggleFavorite(playlist: details.playlist, isFavorite: isFavorite)
             } label: {
                 if isFavorite {
-                    Label("Remove from favorites", systemImage: "hand.thumbsup.fill")
+                    Label("Remove saved playlist", systemImage: "bookmark.fill")
                 } else {
-                    Label("Add to favorites", systemImage: "hand.thumbsup")
+                    Label("Save playlist", systemImage: "bookmark")
                 }
             }
         } label: {
