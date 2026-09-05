@@ -1,22 +1,12 @@
 import Foundation
 
-struct SubscriptionFeedRefresh: Sendable {
-    let succeeded: Int
-    let failed: Int
-}
-
-private enum FeedChannelResult: Sendable {
-    case success(channelID: String, videos: [Video])
-    case failure
-}
-
-protocol SubscriptionFeedServicing: Sendable {
-    func refresh(subscriptions: [LocalSubscription]) async -> SubscriptionFeedRefresh
-}
-
 /// Builds the device-local feed with bounded fan-out. A failed channel never fails the entire
 /// refresh and never erases that channel's last known cached videos.
 final class SubscriptionFeedService: SubscriptionFeedServicing {
+    private enum ChannelResult: Sendable {
+        case success(channelID: String, videos: [Video])
+        case failure
+    }
     private let channelService: any ChannelServicing
     private let writer: PersistenceWriter
 
@@ -36,7 +26,7 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
         // Four requests at a time is responsive without creating a burst for large CSV imports.
         for batchStart in stride(from: 0, to: subscriptions.count, by: 4) {
             let batch = Array(subscriptions[batchStart..<min(batchStart + 4, subscriptions.count)])
-            await withTaskGroup(of: FeedChannelResult.self) { group in
+            await withTaskGroup(of: ChannelResult.self) { group in
                 for subscription in batch {
                     group.addTask { [channelService] in
                         do {

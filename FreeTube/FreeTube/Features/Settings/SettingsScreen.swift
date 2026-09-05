@@ -67,6 +67,14 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
+                } header: {
+                    Text("Feed")
+                } footer: {
+                    Text("Hiding the tab keeps your local subscriptions and cached feed on this device.")
+                }
+
+                Section {
                     Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
                 } header: {
                     Text("Appearance")

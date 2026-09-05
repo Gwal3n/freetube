@@ -26,6 +26,8 @@ struct PlaylistScreen: View {
     /// and every available stat (view count + video count + creator). Collapsed by default so the
     /// header stays compact and the video list isn't pushed below the fold.
     @State private var isDetailsExpanded = false
+    @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @State private var playbackProgress: [String: Double] = [:]
 
     init(playlistID: String) {
         _model = State(wrappedValue: PlaylistViewModel(playlistID: playlistID))
@@ -73,6 +75,12 @@ struct PlaylistScreen: View {
         // top edge of the backdrop.
         .toolbarBackground(.hidden, for: .navigationBar)
         .task { await model.load() }
+        .task(id: "\(showHistoryProgressBars):" + (model.details?.videos.map(\.id).joined(separator: ",") ?? "")) {
+            let ids = model.details?.videos.map(\.id) ?? []
+            playbackProgress = showHistoryProgressBars
+                ? await PersistenceWriter.shared.watchProgress(videoIDs: ids)
+                : [:]
+        }
         .errorToast(Bindable(model).errorState)
     }
 
@@ -355,7 +363,10 @@ struct PlaylistScreen: View {
         let videos = details.videos
         LazyVStack(spacing: 0) {
             ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
-                VideoRow(video: video) {
+                VideoRow(
+                    video: video,
+                    playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
+                ) {
                     // Make sure the queue reflects the playlist's order before kicking off
                     // playback, so "next video" actually means the next playlist entry.
                     player.loadPlaylist(details, startAt: video)

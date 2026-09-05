@@ -33,8 +33,3 @@ final class SubscriptionFeedEntry {
         isLive = video.isLive
     }
 }
-
-struct SubscriptionFeedSnapshot: Sendable {
-    let video: Video
-    let sortDate: Date
-}

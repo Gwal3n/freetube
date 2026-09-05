@@ -12,6 +12,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var onSeekPreview: (TimeInterval?) -> Void
     var onTogglePlayback: () -> Void
     var onToggleControls: () -> Void
+    var onRestoreFromPictureInPicture: () -> Void
     var showsControls: Bool = false
     var entersPiPAutomatically: Bool = true
 
@@ -23,7 +24,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
             onTogglePlayback: onTogglePlayback,
-            onToggleControls: onToggleControls
+            onToggleControls: onToggleControls,
+            onRestoreFromPictureInPicture: onRestoreFromPictureInPicture
         )
     }
 
@@ -37,6 +39,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
         // Force the hierarchy to load before asking for `contentOverlayView`.
         _ = controller.view
         context.coordinator.install(on: controller)
+        controller.delegate = context.coordinator
         return controller
     }
 
@@ -55,7 +58,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
             onTogglePlayback: onTogglePlayback,
-            onToggleControls: onToggleControls
+            onToggleControls: onToggleControls,
+            onRestoreFromPictureInPicture: onRestoreFromPictureInPicture
         )
         context.coordinator.install(on: controller)
     }
@@ -65,5 +69,6 @@ struct PlayerSurface: UIViewControllerRepresentable {
         coordinator: PlayerGestureCoordinator
     ) {
         coordinator.uninstall()
+        controller.delegate = nil
     }
 }

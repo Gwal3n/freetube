@@ -4,6 +4,8 @@ import SwiftUI
 struct HistoryScreen: View {
     @State private var model = HistoryViewModel()
     @Environment(PlayerStateManager.self) private var player
+    @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @State private var playbackProgress: [String: Double] = [:]
 
     /// Distance from the end at which we kick off the next page. 5 keeps the next chunk warm
     /// before the user reaches the actual last row, so scrolling stays fluid.
@@ -12,7 +14,12 @@ struct HistoryScreen: View {
     var body: some View {
         List {
             ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in
-                VideoRow(video: video, showsMoreMenu: true) { player.load(video) }
+                VideoRow(
+                    video: video,
+                    showsMoreMenu: true,
+                    offersPlayNext: true,
+                    playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
+                ) { player.load(video) }
                     .swipeActions {
                         Button(role: .destructive) {
                             Task { await model.remove(video) }
@@ -37,6 +44,11 @@ struct HistoryScreen: View {
         .listStyle(.plain)
         .navigationTitle("History")
         .task { await model.load() }
+        .task(id: "\(showHistoryProgressBars):" + model.videos.map(\.id).joined(separator: ",")) {
+            playbackProgress = showHistoryProgressBars
+                ? await PersistenceWriter.shared.watchProgress(videoIDs: model.videos.map(\.id))
+                : [:]
+        }
         .refreshable { await model.load() }
         .errorToast(Bindable(model).errorState)
     }

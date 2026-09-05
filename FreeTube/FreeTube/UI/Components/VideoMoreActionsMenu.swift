@@ -64,6 +64,24 @@ struct VideoMoreActionsMenu: View {
             .disabled(player.currentVideo == nil || player.currentVideo?.id == video.id)
             Divider()
         }
+        if !video.channelID.isEmpty {
+            Button {
+                let channelID = video.channelID
+                if player.fullScreenPresented {
+                    player.fullScreenPresented = false
+                    Task { @MainActor in
+                        // Avoid asking UIKit to navigate underneath LNPopupUI in the same
+                        // presentation transaction as the expanded player's collapse.
+                        try? await Task.sleep(for: .milliseconds(180))
+                        NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
+                    }
+                } else {
+                    NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
+                }
+            } label: {
+                Label("Go to channel", systemImage: "person.crop.circle")
+            }
+        }
         Button {
             if let url = watchURL { UIApplication.shared.open(url) }
         } label: {

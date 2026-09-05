@@ -17,6 +17,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .feed
     @State private var searchActivation = 0
+    @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
     /// (for the list) read the same source of truth.
@@ -137,14 +138,22 @@ struct RootView: View {
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
             selectedTab = .search
         }
+        .onAppear {
+            if !showSubscriptionFeedTab, selectedTab == .feed { selectedTab = .search }
+        }
+        .onChange(of: showSubscriptionFeedTab) { _, isVisible in
+            if !isVisible, selectedTab == .feed { selectedTab = .search }
+        }
     }
 
     @ViewBuilder
     private var tabShell: some View {
         if #available(iOS 26.0, *) {
             TabView(selection: tabSelection) {
-                SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
-                    SubscriptionFeedScreen()
+                if showSubscriptionFeedTab {
+                    SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
+                        SubscriptionFeedScreen()
+                    }
                 }
 
                 SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search) {
@@ -173,9 +182,11 @@ struct RootView: View {
     /// native Liquid Glass tab bar, while Search remains an ordinary peer tab on every OS.
     private var legacyTabShell: some View {
         TabView(selection: tabSelection) {
-            SubscriptionFeedScreen()
-                .tabItem { Label("Feed", systemImage: "rectangle.stack") }
-                .tag(Tab.feed)
+            if showSubscriptionFeedTab {
+                SubscriptionFeedScreen()
+                    .tabItem { Label("Feed", systemImage: "rectangle.stack") }
+                    .tag(Tab.feed)
+            }
 
             HomeScreen(searchActivation: searchActivation)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
@@ -203,6 +214,10 @@ struct RootView: View {
         Binding(
             get: { selectedTab },
             set: { newTab in
+                if newTab == .feed, !showSubscriptionFeedTab {
+                    selectedTab = .search
+                    return
+                }
                 if newTab == .search, selectedTab == .search {
                     searchActivation &+= 1
                 }

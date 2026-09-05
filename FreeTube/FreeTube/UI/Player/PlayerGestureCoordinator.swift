@@ -16,6 +16,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var onSeekPreview: (TimeInterval?) -> Void
     private var onTogglePlayback: () -> Void
     private var onToggleControls: () -> Void
+    private var onRestoreFromPictureInPicture: () -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var continuationTapGesture: UITapGestureRecognizer?
     private var twoFingerTapGesture: UITapGestureRecognizer?
@@ -44,7 +45,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
         onTogglePlayback: @escaping () -> Void,
-        onToggleControls: @escaping () -> Void
+        onToggleControls: @escaping () -> Void,
+        onRestoreFromPictureInPicture: @escaping () -> Void
     ) {
         self.player = player
         self.lastPiPDismissalRequest = pipDismissalRequest
@@ -53,6 +55,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.onSeekPreview = onSeekPreview
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
+        self.onRestoreFromPictureInPicture = onRestoreFromPictureInPicture
     }
 
     /// AVPlayerViewController owns the automatic PiP controller privately. Temporarily disabling
@@ -76,7 +79,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
         onTogglePlayback: @escaping () -> Void,
-        onToggleControls: @escaping () -> Void
+        onToggleControls: @escaping () -> Void,
+        onRestoreFromPictureInPicture: @escaping () -> Void
     ) {
         self.player = player
         self.onSeekRelative = onSeekRelative
@@ -84,6 +88,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.onSeekPreview = onSeekPreview
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
+        self.onRestoreFromPictureInPicture = onRestoreFromPictureInPicture
     }
 
     func install(on controller: AVPlayerViewController) {
@@ -572,5 +577,18 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             let velocity = pan.velocity(in: pan.view)
             return abs(velocity.x) > abs(velocity.y) * 1.15
         }
+    }
+}
+
+// MARK: - Picture in Picture restoration
+
+@available(iOS 17.0, *)
+extension PlayerGestureCoordinator: AVPlayerViewControllerDelegate {
+    func playerViewController(
+        _ playerViewController: AVPlayerViewController,
+        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+    ) {
+        onRestoreFromPictureInPicture()
+        completionHandler(true)
     }
 }

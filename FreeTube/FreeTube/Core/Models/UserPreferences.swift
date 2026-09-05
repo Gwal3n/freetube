@@ -18,8 +18,11 @@ struct UserPreferences {
     /// cleanly for existing installs.
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
-    /// Shows locally stored resume progress along the bottom edge of History thumbnails.
+    /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
+    /// Removes the local-subscription Feed destination from the tab bar when disabled. Cached
+    /// entries remain on device so restoring the tab is immediate and does not force a refresh.
+    @AppStorage("showSubscriptionFeedTab") var showSubscriptionFeedTab: Bool = true
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5

@@ -53,6 +53,11 @@ final class SettingsViewModel {
         set { preferences.showHistoryProgressBars = newValue }
     }
 
+    var showSubscriptionFeedTab: Bool {
+        get { preferences.showSubscriptionFeedTab }
+        set { preferences.showSubscriptionFeedTab = newValue }
+    }
+
     var showComments: Bool {
         get { preferences.showComments }
         set { preferences.showComments = newValue }

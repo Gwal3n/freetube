@@ -113,7 +113,12 @@ struct FullScreenPlayer: View {
                         onTogglePlayback: {
                             player.togglePlayPause()
                         },
-                        onToggleControls: { togglePlayerControls() }
+                        onToggleControls: { togglePlayerControls() },
+                        onRestoreFromPictureInPicture: {
+                            player.miniPlayerVisible = true
+                            player.fullScreenPresented = true
+                            player.requestInlinePlaybackRestoration()
+                        }
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)

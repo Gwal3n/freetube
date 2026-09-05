@@ -4,6 +4,7 @@ import SwiftUI
 struct SubscriptionFeedScreen: View {
     @State private var model = SubscriptionFeedViewModel()
     @Environment(PlayerStateManager.self) private var player
+    @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
 
     var body: some View {
         NavigationStack {
@@ -24,12 +25,21 @@ struct SubscriptionFeedScreen: View {
                         video: video,
                         showsMoreMenu: true,
                         offersPlayNext: true,
-                        playbackProgress: model.playbackProgress[video.id]
+                        playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
                     ) {
                         player.load(video)
                     }
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
+                }
+
+                if model.canLoadMore {
+                    Button {
+                        Task { await model.loadMore() }
+                    } label: {
+                        Label("Load more", systemImage: "chevron.down")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
             .listStyle(.plain)

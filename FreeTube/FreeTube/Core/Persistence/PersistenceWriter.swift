@@ -22,10 +22,11 @@ actor PersistenceWriter {
 
     // MARK: - Subscription feed
 
-    func fetchSubscriptionFeed() -> [SubscriptionFeedSnapshot] {
-        let descriptor = FetchDescriptor<SubscriptionFeedEntry>(
+    func fetchSubscriptionFeed(limit: Int) -> [SubscriptionFeedSnapshot] {
+        var descriptor = FetchDescriptor<SubscriptionFeedEntry>(
             sortBy: [SortDescriptor(\SubscriptionFeedEntry.sortDate, order: .reverse)]
         )
+        descriptor.fetchLimit = max(1, limit)
         return ((try? modelContext.fetch(descriptor)) ?? []).map { entry in
             SubscriptionFeedSnapshot(
                 video: Video(
@@ -46,6 +47,10 @@ actor PersistenceWriter {
                 sortDate: entry.sortDate
             )
         }
+    }
+
+    func subscriptionFeedCount() -> Int {
+        (try? modelContext.fetchCount(FetchDescriptor<SubscriptionFeedEntry>())) ?? 0
     }
 
     /// Replaces only one successfully refreshed channel. Failed channels consequently retain
