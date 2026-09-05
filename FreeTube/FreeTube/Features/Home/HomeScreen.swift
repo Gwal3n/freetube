@@ -41,7 +41,6 @@ struct HomeScreen: View {
                 )
             }
             .contentShape(Rectangle())
-            .simultaneousGesture(searchBackGesture)
             .navigationTitle("Search")
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
@@ -133,26 +132,4 @@ struct HomeScreen: View {
         )
     }
 
-    /// In-place results are not a pushed navigation destination, so provide the familiar leading-
-    /// edge swipe explicitly. Requiring the gesture to begin at the edge keeps horizontal list-row
-    /// gestures and ordinary scrolling unaffected.
-    private var searchBackGesture: some Gesture {
-        DragGesture(minimumDistance: 12, coordinateSpace: .local)
-            .onEnded { value in
-                guard searchModel.submittedQuery != nil,
-                      value.startLocation.x <= 28,
-                      value.translation.width >= 72,
-                      abs(value.translation.width) > abs(value.translation.height)
-                else { return }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                leaveSearchResults()
-            }
-    }
-
-    /// Returns to the recent-search root without a navigation transition. The same native search
-    /// field stays mounted; only its query and the result content are reset.
-    private func leaveSearchResults() {
-        searchModel.query = ""
-        searchModel.clearResults()
-    }
 }

@@ -132,7 +132,7 @@ struct SearchContent: View {
                         }
                     }
                 } header: {
-                    collapsibleHeader("Videos", count: results.videos.count, isExpanded: $areVideosExpanded)
+                    collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
                 }
             }
         }
@@ -149,7 +149,7 @@ struct SearchContent: View {
 
     private func collapsibleHeader(
         _ title: String,
-        count: Int,
+        count: Int?,
         isExpanded: Binding<Bool>
     ) -> some View {
         Button {
@@ -158,7 +158,9 @@ struct SearchContent: View {
             HStack {
                 Text(title)
                 Spacer()
-                Text("\(count)").foregroundStyle(.secondary)
+                if let count {
+                    Text("\(count)").foregroundStyle(.secondary)
+                }
                 Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
             }
             .contentShape(Rectangle())
