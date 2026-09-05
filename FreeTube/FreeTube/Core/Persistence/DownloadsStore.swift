@@ -252,7 +252,7 @@ final class DownloadsStore {
     /// Other app data (SwiftData store, yt-dlp Python module) lives in
     /// `Application Support/`, not Documents, so the user only sees their media files.
     nonisolated static func downloadsDirectory() -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        AppDirectories.documents
     }
 
     /// Reads file attributes + xattr metadata for one file. Returns nil only when basic

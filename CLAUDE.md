@@ -380,7 +380,10 @@ and a rejected strategy is excluded before requesting the next candidate.
 ### User-initiated (Download button)
 
 - `DownloadManager.ensureDownloaded(video:quality:priority: .background)` from the explicit Download button in the player menu.
-- Files go to `Documents/Downloads/<videoID>.mp4` and are tracked in SwiftData as `DownloadedVideo`.
+- Files go to the app container's canonical `Documents/<videoID>.mp4` and are discovered through
+  `DownloadsStore` filesystem metadata. Resolve that directory through `AppDirectories.documents`:
+  embedded Python can corrupt Foundation's lazy `.documentDirectory` search-path result into a
+  nested stale-container path.
 - Visible in the Downloads screen, playable offline.
 
 ### Playback-side download (compatibility fallback)
@@ -523,7 +526,7 @@ YouTube serves stream URLs whose `n` parameter is obfuscated by a transform func
 
 We route yt-dlp's `deno` provider through `JavaScriptCore`. The bridge is **six pieces**, all installed by `PythonJSBridge.install()` at exactly one splice point inside our forked `freetube_yt_dlp(...)` entry — between `YtDlp()`'s init (which runs YoutubeDL-iOS's `injectFakePopen`) and `ydl.download` (which triggers JSC provider registration):
 
-1. **`builtins.eval_js(code: str) -> str`** — Python-callable hook that runs JS via `JSEvaluator.evaluate(_:)`. The caller's source is wrapped in an IIFE that fakes a `console` global (capturing `console.log` args to an array) and returns the joined captures, so yt-dlp's `console.log(JSON.stringify(jsc({...})))` payload works unchanged.
+1. **`builtins.eval_js(code: str) -> str`** — Python-callable hook that runs JS via `JSEvaluator.evaluate(_:)`. The caller's source is wrapped in an IIFE that fakes a `console` global and captures both `console.log` and `console.info`. Current EJS emits its JSON result through `console.info`; discarding that method produces an empty solver result followed by CDN 403s.
 
 2. **`yt_dlp_ejs` sys.modules shim** — yt-dlp gates the whole EJS path on `from yt_dlp.dependencies import yt_dlp_ejs as _has_ejs` being truthy. We synthesize three modules (`yt_dlp_ejs`, `.yt`, `.yt.solver`) in `sys.modules` with the package's exact API — `version`, `core()`, `lib()` — reading from our bundled `core.min.js` (the N/SIG solver, ~7 KB) and `lib.min.js` (meriyah + astring bundle, ~152 KB) via `EJSResources`. We also rebind `yt_dlp.dependencies.yt_dlp_ejs` after the fact in case it was imported before us.
 

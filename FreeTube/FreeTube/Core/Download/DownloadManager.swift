@@ -1327,24 +1327,16 @@ final class DownloadManager: TemporaryDownloading {
     /// Resolve Documents once, before embedded Python can alter process-level path state.
     /// Re-evaluating `.documentDirectory` after Python initialization produced a path with an
     /// obsolete app-container Documents directory appended inside the current container.
-    private static let downloadsDirectory = FileManager.default.urls(
-        for: .documentDirectory,
-        in: .userDomainMask
-    )[0]
+    private static let downloadsDirectory = AppDirectories.documents
 
     /// Reject placeholder/error-response files while still allowing very short clips.
     private static let minimumDownloadSize: Int64 = 64 * 1_024
 
     /// Builds a yt-dlp `-f` format string honoring the user's quality preference.
     ///
-    /// **yt-dlp evaluates `/` left-to-right and picks the FIRST clause that matches.** So clause
-    /// order matters a lot: we want it to prefer a single combined progressive file when one is
-    /// available (skips the Swift-side ffmpeg mux entirely), and only fall back to the split
-    /// `bestvideo,bestaudio` path when no combined file fits the cap.
-    ///
-    /// At 360p YouTube ships itag 18 (h264 + aac combined mp4) for nearly every video — so a 360p
-    /// preference should always end up as a single-file download. Above 360p YouTube only delivers
-    /// DASH-split streams, so the split clause kicks in and our ffmpeg mux joins them.
+    /// Selects separate MP4 video and M4A audio streams so our serialized Swift-side ffmpeg runner
+    /// can mux them. Avoid mixing `/` and `,` without grouping: yt-dlp parsed the old expression as
+    /// progressive itag 18 *plus* audio itag 140, downloading redundant audio and obscuring errors.
     ///
     /// Materializes a temporary Netscape-format `cookies.txt` from the user's stored YouTube
     /// cookie header, suitable for yt-dlp's `--cookies <path>` flag.
@@ -1404,18 +1396,12 @@ final class DownloadManager: TemporaryDownloading {
             return "bestaudio[ext=m4a]/bestaudio"
         }
         if let cap = quality.heightCap, cap > 0 {
-            return [
-                // 1. Single combined progressive mp4 within the height cap (itag 18 for 360p).
-                "best[height<=\(cap)][ext=mp4]",
-                // 2. Same but any container (covers rare webm progressive).
-                "best[height<=\(cap)]",
-                // 3. Fall back to split DASH streams — our Swift-side mux joins them.
-                "bestvideo[height<=\(cap)][ext=mp4],bestaudio[ext=m4a]",
-                // 4. Whatever yt-dlp considers best as a last resort.
-                "best"
-            ].joined(separator: "/")
+            // Select exactly one video-only MP4 and one M4A audio stream. The previous ungrouped
+            // slash/comma expression was parsed as `18,140`, redundantly pairing progressive
+            // itag 18 (which already has audio) with another audio track.
+            return "bestvideo[height<=\(cap)][ext=mp4],bestaudio[ext=m4a]"
         }
-        return "best[ext=mp4]/best/bestvideo[ext=mp4],bestaudio[ext=m4a]"
+        return "bestvideo[height<=1080][ext=mp4],bestaudio[ext=m4a]"
     }
 
     // MARK: - Networking gate + snapshots

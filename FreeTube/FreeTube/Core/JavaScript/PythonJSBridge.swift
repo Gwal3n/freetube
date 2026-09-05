@@ -81,9 +81,9 @@ nonisolated enum PythonJSBridge {
                 throw PythonError.exception(err, traceback: nil)
             }
 
-            let wrapped = wrapForStdoutCapture(code)
             do {
-                let result = try JSEvaluator.evaluate(wrapped)
+                let result = try JSEvaluator.evaluate(wrapForStdoutCapture(code))
+                log.debug("JavaScriptCore challenge completed with \(result.utf8.count, privacy: .public) output bytes")
                 return PythonObject(result)
             } catch {
                 let builtins = Python.import("builtins")
@@ -110,12 +110,14 @@ nonisolated enum PythonJSBridge {
         return """
         ;(function() {
             var __ftStdout = [];
-            var console = {
-                log: function() {
+            var __ftCapture = function() {
                     var parts = Array.prototype.map.call(arguments, function(a) { return String(a); });
                     __ftStdout.push(parts.join(' '));
-                },
-                error: function() {}, warn: function() {}, info: function() {}, debug: function() {}
+                };
+            var console = {
+                log: __ftCapture,
+                info: __ftCapture,
+                error: function() {}, warn: function() {}, debug: function() {}
             };
         \(userCode)
             return __ftStdout.join('\\n');

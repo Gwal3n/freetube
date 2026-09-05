@@ -212,7 +212,7 @@ final class FetchViewModel {
 
         let bestVideoOnly = videoOnly.max(by: Self.videoRank)
         let bestProgressive = progressive.max(by: Self.videoRank)
-        let bestAudioOnly = audioOnly.max { ($0.abr ?? 0) < ($1.abr ?? 0) }
+        let bestAudioOnly = audioOnly.max(by: Self.audioRank)
 
         if let v = bestVideoOnly {
             selectedVideoFormat = v
@@ -254,7 +254,37 @@ final class FetchViewModel {
         let rhsScore = codecTier(rhs.vcodec)
         if lhsScore != rhsScore { return lhsScore < rhsScore }
         if (lhs.height ?? 0) != (rhs.height ?? 0) { return (lhs.height ?? 0) < (rhs.height ?? 0) }
+        if protocolRank(lhs.protocolKind) != protocolRank(rhs.protocolKind) {
+            return protocolRank(lhs.protocolKind) < protocolRank(rhs.protocolKind)
+        }
         return (lhs.fps ?? 0) < (rhs.fps ?? 0)
+    }
+
+    /// Prefer yt-dlp's original/default language before bitrate. Alternate dubbed tracks often
+    /// share the same itag and bitrate, so ranking only by `abr` made selection effectively random.
+    private static func audioRank(_ lhs: RemoteFormat, _ rhs: RemoteFormat) -> Bool {
+        let lhsLanguage = lhs.languagePreference ?? 0
+        let rhsLanguage = rhs.languagePreference ?? 0
+        if lhsLanguage != rhsLanguage { return lhsLanguage < rhsLanguage }
+
+        let lhsAAC = lhs.acodec?.lowercased().contains("mp4a") == true ? 1 : 0
+        let rhsAAC = rhs.acodec?.lowercased().contains("mp4a") == true ? 1 : 0
+        if lhsAAC != rhsAAC { return lhsAAC < rhsAAC }
+        if protocolRank(lhs.protocolKind) != protocolRank(rhs.protocolKind) {
+            return protocolRank(lhs.protocolKind) < protocolRank(rhs.protocolKind)
+        }
+        return (lhs.abr ?? 0) < (rhs.abr ?? 0)
+    }
+
+    /// Direct CDN files are faster and provide determinate progress. HLS remains a useful
+    /// compatibility fallback; DASH-through-ffmpeg is the least predictable option on iOS.
+    private static func protocolRank(_ kind: RemoteFormat.ProtocolKind) -> Int {
+        switch kind {
+        case .https: return 3
+        case .hls: return 2
+        case .dash: return 1
+        case .unsupported: return 0
+        }
     }
 
     /// Higher tier = better for AVPlayer compatibility. Used by `videoRank`.

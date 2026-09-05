@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import Foundation
 import OSLog
@@ -252,7 +253,7 @@ final class URLDownloadManager {
         }
         preferences.recentFetchURLs = list
 
-        let extractor = media.extractor ?? media.uploader ?? "Link"
+        let extractor = media.uploader ?? media.extractor ?? "Link"
         let thumbURL = media.thumbnailURL
         Task { @MainActor in
             // Fetch the thumbnail bytes (best-effort). `DownloadsStore.write` will
@@ -305,12 +306,15 @@ final class URLDownloadManager {
             }
         }
 
+        let destination: URL
         switch mode {
         case .single(let format, let audioOnly):
-            return try await downloadSingle(format: format, audioOnly: audioOnly, conversion: conversion, baseName: baseName, fetchDir: fetchDir, key: key)
+            destination = try await downloadSingle(format: format, audioOnly: audioOnly, conversion: conversion, baseName: baseName, fetchDir: fetchDir, key: key)
         case .adaptive(let videoFmt, let audioFmt):
-            return try await downloadAdaptive(video: videoFmt, audio: audioFmt, conversion: conversion, baseName: baseName, fetchDir: fetchDir, key: key)
+            destination = try await downloadAdaptive(video: videoFmt, audio: audioFmt, conversion: conversion, baseName: baseName, fetchDir: fetchDir, key: key)
         }
+        try await validateOutput(at: destination, expectsVideo: video != nil)
+        return destination
     }
 
     /// Dispatch the single-source path (progressive, audio-only, or a video-only format the
@@ -523,11 +527,46 @@ final class URLDownloadManager {
         }
         args.append(destination.path)
 
-        log.info("[fetch] ffmpeg argv: \(args.joined(separator: " "), privacy: .public)")
+        log.info("[fetch] ffmpeg start protocol=\(url.pathExtension.lowercased(), privacy: .public) destination=\(destination.lastPathComponent, privacy: .public)")
         let exit = await FFmpegRunner.shared.run(args)
         guard exit == 0, FileManager.default.fileExists(atPath: destination.path) else {
             log.error("[fetch] ffmpeg HLS/DASH failed exit=\(exit, privacy: .public)")
             throw FetchError.muxFailed(exit: Int(exit))
+        }
+    }
+
+    /// Never publish a successful transfer merely because ffmpeg or URLSession left a path behind.
+    /// A valid result must be non-trivial, readable by AVFoundation, and contain the tracks the
+    /// user's selection requested.
+    private nonisolated func validateOutput(at url: URL, expectsVideo: Bool) async throws {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber,
+              size.int64Value >= 65_536 else {
+            try? FileManager.default.removeItem(at: url)
+            throw FetchError.invalidOutput
+        }
+
+        let asset = AVURLAsset(url: url)
+        do {
+            async let playableTask = asset.load(.isPlayable)
+            async let durationTask = asset.load(.duration)
+            async let videoTracksTask = asset.loadTracks(withMediaType: .video)
+            async let audioTracksTask = asset.loadTracks(withMediaType: .audio)
+            let (playable, duration, videoTracks, audioTracks) = try await (
+                playableTask, durationTask, videoTracksTask, audioTracksTask
+            )
+            guard playable,
+                  duration.seconds.isFinite,
+                  duration.seconds > 0,
+                  !audioTracks.isEmpty,
+                  !expectsVideo || !videoTracks.isEmpty else {
+                throw FetchError.invalidOutput
+            }
+            log.info("[fetch] validation passed size=\(size.int64Value, privacy: .public) duration=\(duration.seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
+        } catch {
+            log.error("[fetch] output validation failed for \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+            try? FileManager.default.removeItem(at: url)
+            throw FetchError.invalidOutput
         }
     }
 
@@ -549,14 +588,14 @@ final class URLDownloadManager {
         return ["-c:v", "copy"]
     }
 
-    /// Audio codec flags. When converting → MP3 via `libmp3lame`. Otherwise stream-copy
-    /// with the AAC-ADTS-to-ASC bitstream filter (a no-op for non-AAC inputs, required for
-    /// HLS AAC streams that ship in ADTS frames the MP4 muxer can't accept as-is).
+    /// Audio codec flags. When converting → MP3 via `libmp3lame`; otherwise stream-copy.
+    /// Do not force `aac_adtstoasc` here: it rejects Opus/WebM inputs with `EINVAL` (exit -22),
+    /// and ffmpeg's MP4 muxer automatically inserts the filter when an AAC/HLS input needs it.
     private nonisolated static func audioCodecArgs(conversion: ConversionOptions) -> [String] {
         if conversion.audioToMP3 {
             return ["-c:a", "libmp3lame", "-b:a", "192k"]
         }
-        return ["-c:a", "copy", "-bsf:a", "aac_adtstoasc"]
+        return ["-c:a", "copy"]
     }
 
     /// What extension the final file should land with. Audio-only outputs reuse the source
@@ -587,7 +626,7 @@ final class URLDownloadManager {
     /// names are `<11-char videoID>.mp4` and URL names are sanitized titles, which won't
     /// be 11 chars of `[A-Za-z0-9_-]`.
     nonisolated static func fetchDirectory() -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        AppDirectories.documents
     }
 
     /// Stable, unique filename stem for a downloaded URL. Combines two stable pieces:
@@ -699,6 +738,7 @@ enum FetchError: Error, LocalizedError {
     case httpStatus(Int)
     case cannotWrite(String)
     case muxFailed(exit: Int)
+    case invalidOutput
 
     var errorDescription: String? {
         switch self {
@@ -708,6 +748,7 @@ enum FetchError: Error, LocalizedError {
         case .httpStatus(let code): return "Server returned HTTP \(code)."
         case .cannotWrite(let path): return "Couldn't write to \(path)."
         case .muxFailed(let exit): return "ffmpeg failed (exit \(exit)). The stream may be DRM-protected."
+        case .invalidOutput: return "The downloaded media file was incomplete or unplayable."
         }
     }
 }

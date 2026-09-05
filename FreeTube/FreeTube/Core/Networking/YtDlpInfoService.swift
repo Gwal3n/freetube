@@ -144,6 +144,8 @@ final class YtDlpInfoService: Sendable {
         let fpsRaw = fmt.checking["fps"].flatMap(Double.init) ?? 0
         let vbrRaw = fmt.checking["vbr"].flatMap(Double.init) ?? 0
         let abrRaw = fmt.checking["abr"].flatMap(Double.init) ?? 0
+        let languageRaw = fmt.checking["language"].flatMap(String.init) ?? ""
+        let languagePreferenceRaw = fmt.checking["language_preference"].flatMap(Int.init)
 
         // `filesize` is preferred; `filesize_approx` is yt-dlp's estimate for streaming
         // formats. We treat either as good enough — the UI labels just say "≈ N MB".
@@ -176,6 +178,8 @@ final class YtDlpInfoService: Sendable {
             acodec: acodec,
             vbr: vbrRaw > 0 ? vbrRaw : nil,
             abr: abrRaw > 0 ? abrRaw : nil,
+            language: languageRaw.isEmpty ? nil : languageRaw,
+            languagePreference: languagePreferenceRaw,
             filesize: sizeInt > 0 ? sizeInt : nil,
             protocolKind: protocolKind,
             rawProtocol: protocolStr

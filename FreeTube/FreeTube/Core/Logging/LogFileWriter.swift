@@ -70,8 +70,7 @@ final class LogFileWriter {
     }
 
     nonisolated static func logsDirectory() -> URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
+        let docs = AppDirectories.documents
         return docs.appendingPathComponent("Logs", isDirectory: true)
     }
 

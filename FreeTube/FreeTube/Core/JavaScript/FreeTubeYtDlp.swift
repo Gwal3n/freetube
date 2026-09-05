@@ -78,7 +78,14 @@ public nonisolated func freetube_yt_dlp(
     // Step 5: actually run. yt-dlp's extractor chain will now find `deno` via our shim and
     // succeed at n-cipher solving — assuming the JS function yt-dlp extracts from player.js is
     // pure ES (no Web APIs, no `fetch`, etc.), which it is.
-    try ydl.download.throwing.dynamicallyCall(withArguments: all_urls)
+    let result = try ydl.download.throwing.dynamicallyCall(withArguments: all_urls)
+    if let exitCode = Int(result), exitCode != 0 {
+        throw NSError(
+            domain: "com.leshko.freetube.ytdlp",
+            code: exitCode,
+            userInfo: [NSLocalizedDescriptionKey: "yt-dlp failed with exit code \(exitCode)."]
+        )
+    }
 }
 
 /// Probe variant of `freetube_yt_dlp` — runs the same five-step setup (Python init via

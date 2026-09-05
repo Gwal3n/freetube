@@ -57,6 +57,10 @@ struct RemoteFormat: Identifiable, Sendable, Hashable {
     let vbr: Double?
     /// Total audio bitrate in kbps (yt-dlp `abr`).
     let abr: Double?
+    /// Language code reported by yt-dlp for alternate/dubbed audio tracks.
+    let language: String?
+    /// yt-dlp's preference score. Original/default audio is ranked above dubbed tracks.
+    let languagePreference: Int?
     /// Expected/actual file size in bytes. yt-dlp returns either `filesize` or
     /// `filesize_approx`; we coalesce.
     let filesize: Int64?
