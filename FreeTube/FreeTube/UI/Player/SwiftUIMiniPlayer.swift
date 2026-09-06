@@ -5,7 +5,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SwiftUIMiniPlayer: View {
     @Environment(PlayerStateManager.self) private var player
-    @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
+    @AppStorage("oledMiniPlayer") private var oledMiniPlayer = false
 
     let thumbnail: UIImage?
     let onExpand: () -> Void
@@ -68,7 +68,7 @@ struct SwiftUIMiniPlayer: View {
             .frame(height: 2)
         }
         .background {
-            if oledPlayerBackground {
+            if oledMiniPlayer {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .fill(Color.black)
             } else if #available(iOS 26.0, *) {

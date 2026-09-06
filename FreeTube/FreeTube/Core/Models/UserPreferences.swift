@@ -36,6 +36,8 @@ struct UserPreferences {
     /// Uses true black below the video surface for OLED displays instead of the translucent popup
     /// material. Off by default to preserve the standard native material appearance.
     @AppStorage("oledPlayerBackground") var oledPlayerBackground: Bool = false
+    /// Replaces Liquid Glass only for the compact mini-player with an opaque true-black surface.
+    @AppStorage("oledMiniPlayer") var oledMiniPlayer: Bool = false
     @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     /// When true, `LogFileWriter` opens a new file under `Documents/Logs/` on every app

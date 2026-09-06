@@ -95,6 +95,11 @@ final class SettingsViewModel {
         set { preferences.oledPlayerBackground = newValue }
     }
 
+    var oledMiniPlayer: Bool {
+        get { preferences.oledMiniPlayer }
+        set { preferences.oledMiniPlayer = newValue }
+    }
+
     var playerTopControls: [PlayerTopControl] {
         get { preferences.playerTopControls }
         set { preferences.playerTopControls = newValue }

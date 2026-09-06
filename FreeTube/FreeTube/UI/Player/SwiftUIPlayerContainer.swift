@@ -25,8 +25,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let transition = transitionProgress(in: proxy.size)
-            let expandedTopInset = verticalSizeClass == .compact ? 0 : proxy.safeAreaInsets.top
-            let miniBottomPadding = proxy.safeAreaInsets.bottom + 42
+            let systemInsets = PlayerLayoutMetrics.safeAreaInsets
+            let expandedTopInset = verticalSizeClass == .compact
+                || !player.playerPresentationGestureEnabled
+                ? 0
+                : systemInsets.top
+            let miniBottomPadding = PlayerLayoutMetrics.bottomTabBarClearance
 
             ZStack(alignment: .bottom) {
                 content
@@ -61,7 +65,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayer)
-                        .padding(.horizontal, 18)
+                        .padding(.horizontal, 16)
                         .padding(.bottom, miniBottomPadding)
                         .offset(
                             y: max(0, miniDismissTranslation)

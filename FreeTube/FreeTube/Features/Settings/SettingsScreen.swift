@@ -77,10 +77,11 @@ struct SettingsScreen: View {
 
                 Section {
                     Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
+                    Toggle("OLED mini-player", isOn: Bindable(model).oledMiniPlayer)
                 } header: {
                     Text("Appearance")
                 } footer: {
-                    Text("Uses a true black background for video information, Up Next, and comments.")
+                    Text("The expanded-player option uses true black for video information, Up Next, and comments. The mini-player option replaces its default Liquid Glass with true black.")
                 }
 
                 Section {
