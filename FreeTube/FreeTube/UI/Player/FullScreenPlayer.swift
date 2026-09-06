@@ -82,9 +82,14 @@ struct FullScreenPlayer: View {
                 ? min(360, proxy.size.width * 0.38)
                 : 0
             let surfaceWidth = proxy.size.width - chapterPanelWidth
-            let compactSurfaceHeight = surfaceWidth * 9 / 16
-            let expandedSurfaceHeight = usesPortraitFullscreen
+            // Landscape controls occupy the available viewport instead of insisting on a 16:9
+            // frame taller than a modern phone's safe height. AVPlayer aspect-fits the video in
+            // that region, preventing the timeline and bottom edge from being cropped.
+            let compactSurfaceHeight = isLandscape
                 ? proxy.size.height
+                : surfaceWidth * 9 / 16
+            let expandedSurfaceHeight = usesPortraitFullscreen || isLandscape
+                ? compactSurfaceHeight
                 : expandedPlayerSurfaceHeight(
                     width: surfaceWidth,
                     viewportHeight: proxy.size.height

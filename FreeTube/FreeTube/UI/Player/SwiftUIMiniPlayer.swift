@@ -71,11 +71,16 @@ struct SwiftUIMiniPlayer: View {
             if oledPlayerBackground {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.black)
+            } else if #available(iOS 26.0, *) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.clear)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
             } else {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.regularMaterial)
             }
         }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(.primary.opacity(0.1), lineWidth: 0.5)

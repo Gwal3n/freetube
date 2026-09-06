@@ -14,6 +14,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var presentationTranslation: CGFloat = 0
     @State private var miniDismissTranslation: CGFloat = 0
     @State private var dragIsVertical: Bool?
+    @State private var expandedDragStartedDown = false
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
         self.thumbnail = thumbnail
@@ -23,7 +24,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let transition = transitionProgress(in: proxy.size)
-            let miniBottomPadding = proxy.safeAreaInsets.bottom + 52
+            let miniBottomPadding: CGFloat = 10
 
             ZStack(alignment: .bottom) {
                 content
@@ -40,7 +41,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             )
                         )
                         .scaleEffect(1 - (0.018 * transition), anchor: .top)
-                        .offset(y: transition * (proxy.size.height + 28))
+                        .offset(y: expandedPlayerOffset(transition: transition, in: proxy.size))
                         .shadow(
                             color: .black.opacity(0.22 * transition),
                             radius: 18,
@@ -62,19 +63,29 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .animation(.smooth(duration: 0.28), value: player.fullScreenPresented)
-            .animation(.snappy(duration: 0.24), value: player.miniPlayerVisible)
         }
-        .ignoresSafeArea(.all, edges: player.fullScreenPresented ? .all : [])
     }
 
     private func transitionProgress(in size: CGSize) -> CGFloat {
+        if player.fullScreenPresented {
+            let fullTravel = size.height + 28
+            return min(1, max(0, presentationTranslation / fullTravel))
+        }
         let distance = max(280, min(420, size.height * 0.46))
-        let base: CGFloat = player.fullScreenPresented ? 0 : 1
-        return min(1, max(0, base + presentationTranslation / distance))
+        return min(1, max(0, 1 + presentationTranslation / distance))
     }
 
     private func miniOpacity(for transition: CGFloat) -> CGFloat {
         min(1, max(0, (transition - 0.68) / 0.32))
+    }
+
+    /// During a downward drag the sheet moves one point for every point travelled by the finger.
+    /// Settled and mini-to-expanded transitions still animate across the complete viewport.
+    private func expandedPlayerOffset(transition: CGFloat, in size: CGSize) -> CGFloat {
+        if player.fullScreenPresented, presentationTranslation > 0 {
+            return presentationTranslation
+        }
+        return transition * (size.height + 28)
     }
 
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {
@@ -85,15 +96,25 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                       !player.chapterListPresented,
                       player.playerPanelAtTop,
                       !player.playerPanelGestureStartedAwayFromTop else { return }
+                let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
+                if directionWasUndetermined {
+                    expandedDragStartedDown = value.translation.height > 0
+                }
+                guard expandedDragStartedDown else { return }
                 // A small amount of initial resistance preserves the pleasant top-edge rubber
                 // band before the whole player begins following the finger.
                 presentationTranslation = max(0, value.translation.height - 12)
             }
             .onEnded { value in
-                defer { dragIsVertical = nil }
-                guard player.fullScreenPresented, dragIsVertical == true else {
+                defer {
+                    dragIsVertical = nil
+                    expandedDragStartedDown = false
+                }
+                guard player.fullScreenPresented,
+                      dragIsVertical == true,
+                      expandedDragStartedDown else {
                     presentationTranslation = 0
                     return
                 }
