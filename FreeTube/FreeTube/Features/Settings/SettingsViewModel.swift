@@ -95,6 +95,11 @@ final class SettingsViewModel {
         set { preferences.oledPlayerBackground = newValue }
     }
 
+    var miniPlayerAppearance: MiniPlayerAppearance {
+        get { preferences.miniPlayerAppearance }
+        set { preferences.miniPlayerAppearance = newValue }
+    }
+
     var playerTopControls: [PlayerTopControl] {
         get { preferences.playerTopControls }
         set { preferences.playerTopControls = newValue }

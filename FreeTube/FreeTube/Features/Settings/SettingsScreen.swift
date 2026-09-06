@@ -77,10 +77,15 @@ struct SettingsScreen: View {
 
                 Section {
                     Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
+                    Picker("Mini-player appearance", selection: Bindable(model).miniPlayerAppearance) {
+                        ForEach(MiniPlayerAppearance.allCases) { appearance in
+                            Text(appearance.title).tag(appearance)
+                        }
+                    }
                 } header: {
                     Text("Appearance")
                 } footer: {
-                    Text("Uses a true black background for video information, Up Next, and comments.")
+                    Text("The expanded-player toggle uses true black for video information, Up Next, and comments. The mini-player can independently use native Liquid Glass or OLED black.")
                 }
 
                 Section {
