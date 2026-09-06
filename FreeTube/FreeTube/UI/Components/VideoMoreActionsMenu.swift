@@ -71,7 +71,7 @@ struct VideoMoreActionsMenu: View {
                 if player.fullScreenPresented {
                     player.fullScreenPresented = false
                     Task { @MainActor in
-                        // Avoid asking UIKit to navigate underneath LNPopupUI in the same
+                        // Avoid routing underneath the player presentation in the same
                         // presentation transaction as the expanded player's collapse.
                         try? await Task.sleep(for: .milliseconds(180))
                         NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)

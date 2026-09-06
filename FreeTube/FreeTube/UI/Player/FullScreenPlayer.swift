@@ -3,9 +3,8 @@ import UIKit
 
 import Kingfisher
 
-/// Expanded player content presented by `LNPopupUI` when the popup bar is opened. The popup chrome
-/// (close button) is provided by the library — this view renders the surface, transport controls,
-/// metadata, plus independently collapsible Up Next and Comments sections below.
+/// Expanded player content hosted by the app's SwiftUI player container. This view renders the
+/// surface, transport controls, metadata, and independently collapsible sections below.
 @available(iOS 17.0, *)
 struct FullScreenPlayer: View {
     @Environment(PlayerStateManager.self) private var player
@@ -254,30 +253,6 @@ struct FullScreenPlayer: View {
                           let video = player.currentVideo else { return }
                     loadDetailsIfNeeded(for: video)
                 }
-            // Pull-down-to-dismiss starting from the video surface.
-            //
-            // `AVPlayerViewController`'s internal `UIPanGestureRecognizer`s (scrubber, system
-            // controls) consume touches before they can reach LNPopupUI's outer pan, so the
-            // the popup host cannot reliably detect a gesture starting here. This explicit
-            // simultaneous gesture keeps AVPlayerViewController's controls working while allowing
-            // a pull begun on the video itself to collapse the popup.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 30, coordinateSpace: .global)
-                    .onEnded { value in
-                        guard !usesPortraitFullscreen else { return }
-                        let predicted = value.predictedEndTranslation
-                        let verticalIntent = abs(predicted.height) > abs(predicted.width) * 1.15
-                        guard verticalIntent else { return }
-                        let mostlyDown = value.translation.height > 90
-                            && abs(value.translation.width) < value.translation.height
-                        let fastFlick = predicted.height > 180
-                        if mostlyDown || fastFlick {
-                            @Bindable var p = player
-                            p.fullScreenPresented = false
-                        }
-                    }
-            )
-
             if let video = player.currentVideo, !usesPortraitFullscreen {
                 // **Two render modes for the lower section, picked by `pushedChannel`:**
                 //
@@ -367,9 +342,7 @@ struct FullScreenPlayer: View {
                     .ignoresSafeArea()
             }
         }
-        // Ensure the system status bar stays visible and gets light-content (white) glyphs against
-        // the dark material. LNPopupUI's `LNPopupContentHostingController` is a UIHostingController
-        // subclass that doesn't override status bar style, so SwiftUI's colorScheme drives it.
+        // Ensure the system status bar stays visible with light glyphs against the dark material.
         .preferredColorScheme(.dark)
         .statusBarHidden(portraitFullscreenActive)
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL
@@ -397,6 +370,12 @@ struct FullScreenPlayer: View {
             if !isPresented {
                 portraitVideoFullscreen = false
             }
+        }
+        .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
+            player.playerPresentationGestureEnabled = !isActive
+        }
+        .onDisappear {
+            player.playerPresentationGestureEnabled = true
         }
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
@@ -687,8 +666,7 @@ struct FullScreenPlayer: View {
                         p.fullScreenPresented = false
                         let channelID = video.channelID
                         Task { @MainActor in
-                            // Let LNPopupUI begin its collapse before presenting a new full-screen
-                            // controller; presenting both in the same transaction is ignored by UIKit.
+                            // Let the SwiftUI collapse animation begin before routing the tab below.
                             try? await Task.sleep(for: .milliseconds(180))
                             NotificationCenter.default.post(
                                 name: .freetubeOpenChannel,

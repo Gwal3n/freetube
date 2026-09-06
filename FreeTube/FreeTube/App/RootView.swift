@@ -1,5 +1,4 @@
 import SwiftUI
-import LNPopupUI
 import Kingfisher
 import UIKit
 
@@ -29,8 +28,6 @@ struct RootView: View {
     /// Cached thumbnail for the current video so the mini-player bar shows the actual preview instead
     /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
     @State private var thumbnail: UIImage?
-    /// Retained target for the UIKit swipe recognizers installed on LNPopupUI's native bar.
-    @State private var popupBarDismissGesture = PopupBarDismissGestureHandler()
 
     enum Tab: Hashable {
         case feed, search, library, downloads, settings
@@ -46,39 +43,8 @@ struct RootView: View {
     }
 
     var body: some View {
-        @Bindable var player = player
-
-        tabShell
-        .popup(
-            isBarPresented: $player.miniPlayerVisible,
-            isPopupOpen: $player.fullScreenPresented
-        ) {
-            // The popup's content closure is called once and its result is hosted; SwiftUI does NOT
-            // re-evaluate the closure on every parent body re-render. So any modifier that takes a
-            // captured value (like `.popupProgress(value)`) freezes at the closure-creation time.
-            // To get live progress updates we wrap the modifiers in `PopupContentWrapper`, which is
-            // itself a `View` observing the player — when `player.elapsed` changes, the wrapper's
-            // body re-renders and `.popupProgress(...)` re-applies with the new value.
-            PopupContentWrapper(thumbnail: thumbnail)
-        }
-        .popupInteractionStyle(player.chapterListPresented
-            || !player.playerPanelAtTop
-            || player.playerPanelGestureStartedAwayFromTop
-            ? UIViewController.PopupInteractionStyle.none
-            : UIViewController.PopupInteractionStyle.drag)
-        .popupCloseButtonStyle(LNPopupCloseButton.Style.none)
-        .popupBarStyle(LNPopupBar.Style.prominent)
-        // LNPopupController's marquee animation corrupts the native title/subtitle layout on
-        // iOS 26. Static native labels are the last known-good configuration: they truncate long
-        // text but remain vertically centred and never animate out of the bar.
-        .popupBarMarqueeScrollEnabled(false)
-        // Explicitly enable the thin progress line at the bottom of the popup bar so playback
-        // and download progress are always visible without expanding the player.
-        .popupBarProgressViewStyle(.bottom)
-        .popupBarCustomizer { popupBar in
-            popupBarDismissGesture.install(on: popupBar) {
-                player.dismiss()
-            }
+        SwiftUIPlayerContainer(thumbnail: thumbnail) {
+            tabShell
         }
         .overlay(alignment: .top) {
             if let notice = player.queueNotice {
@@ -104,17 +70,13 @@ struct RootView: View {
         .task {
             await SessionManager.shared.bootstrap()
         }
-        // Refresh the cached thumbnail whenever the user picks a new video. The mini-player's
-        // `PopupContentWrapper` reads this so the bar shows the actual preview.
+        // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
+        // mini-player can show the actual preview.
         .onChange(of: player.currentVideo?.id, initial: true) {
             loadThumbnailForCurrentVideo()
         }
-        // Force a light-content status bar (white glyphs) while the full-screen player is up.
-        // SwiftUI's `.preferredColorScheme(.dark)` on the popup content doesn't propagate through
-        // LNPopupUI's hosting chain to UIKit's status-bar style, but flipping the window's
-        // `overrideUserInterfaceStyle = .dark` does — UIKit recomputes the status bar trait from
-        // that, gets `.dark`, and switches the bar to light content. We restore `.unspecified` when
-        // the popup collapses so the rest of the app honors the system appearance again.
+        // Force light status-bar glyphs while the dark expanded player is visible, then restore
+        // the app's normal appearance when it returns to the mini-player.
         .onChange(of: player.fullScreenPresented) { _, presented in
             updateStatusBarOverride(forFullScreenOpen: presented)
             if presented {
@@ -300,110 +262,4 @@ struct RootView: View {
         }
     }
 
-}
-
-/// Hosts the popup's `FullScreenPlayer` and all of its `popup*(...)` metadata modifiers.
-///
-/// **Why this exists:** `RootView.popup { ... }` calls its content closure once at popup-presentation
-/// time, so captured metadata freezes there. Wrapping the content in a real
-/// `View` makes SwiftUI's observation system re-render the body when the player's state changes.
-///
-/// Progress is deliberately emitted by the leaf `PopupProgressObserver`; keeping that half-second
-/// observation out of this wrapper prevents the native title labels from being rebuilt every tick.
-/// Made non-private so `MacRootView` can reuse the same popup chrome when running on
-/// Mac via "Designed for iPad" — same look as the iOS mini-bar, same drag-to-expand
-/// behavior, no duplicated styling.
-@available(iOS 17.0, *)
-struct PopupContentWrapper: View {
-    @Environment(PlayerStateManager.self) private var player
-    let thumbnail: UIImage?
-
-    @State private var subtitleText: String = ""
-
-    var body: some View {
-        FullScreenPlayer()
-            .popupTitle(player.currentVideo?.title ?? "", subtitle: subtitleText)
-            .popupImage(image)
-            .popupBarLeadingButtons {
-                ToolbarItemGroup(placement: .popupBar) {
-                    Button {
-                        player.dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Color.secondary)
-                    }
-                    .contentShape(.interaction, Rectangle().inset(by: -10))
-                    .accessibilityLabel("Close player")
-                }
-            }
-            // Progress changes every half-second. Isolate that observation from this wrapper so
-            // LNPopupUI does not receive a freshly rebuilt title/subtitle on every playback tick;
-            // repeatedly resetting its native labels made mini-player text distort or disappear.
-            .overlay { PopupProgressObserver() }
-            .popupBarButtons {
-                ToolbarItemGroup(placement: .popupBar) {
-                    Button {
-                        player.togglePlayPause()
-                    } label: {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .foregroundStyle(Color.primary)
-                    }
-                    .contentShape(.interaction, Rectangle().inset(by: -10))
-                    .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
-                }
-            }
-            .onChange(of: player.loadState, initial: true) { old, new in
-                // Self.log.info("onChange.loadState old=\(String(describing: old), privacy: .public) new=\(String(describing: new), privacy: .public)")
-                subtitleText = computedSubtitle
-            }
-            .onChange(of: player.currentVideo?.id, initial: true) { old, new in
-                // Self.log.info("onChange.video old=\(old ?? "nil", privacy: .public) new=\(new ?? "nil", privacy: .public)")
-                subtitleText = computedSubtitle
-            }
-    }
-
-    /// Static helper for the few external callers that still want a snapshot.
-    static func progress(for player: PlayerStateManager) -> Float {
-        if case .downloading(let progress, _) = player.loadState {
-            return Float(progress ?? 0)
-        }
-        guard player.duration > 0 else { return 0 }
-        return Float(min(1, max(0, player.elapsed / player.duration)))
-    }
-
-    private var computedSubtitle: String { subtitle }
-
-    private var subtitle: String {
-        switch player.loadState {
-        case .resolving:
-            return "Preparing…"
-        case .downloading(let progress, let phase):
-            guard let progress else { return "Processing…" }
-            let percent = Int(progress * 100)
-            if let phase, phase == "video" || phase == "audio" {
-                return "Downloading \(phase) \(percent)%"
-            }
-            return "Downloading \(percent)%"
-        case .failed(let msg):
-            return msg
-        // `.buffering` reads as the channel name rather than a status: playback has already been
-        // requested at that point, so the bar should look like it's playing, not preparing.
-        case .idle, .buffering, .readyToPlay:
-            return player.currentVideo?.channelName ?? ""
-        }
-    }
-
-    /// The real thumbnail from the moment of tap. Only a genuine file transfer (`.downloading`,
-    /// the legacy yt-dlp fallback) swaps in the download glyph — during resolve and buffering the
-    /// thumbnail is already decoded, so showing a placeholder instead only makes the tap feel slow.
-    private var image: Image {
-        if case .downloading = player.loadState {
-            return Image(systemName: "arrow.down.circle.fill")
-        }
-        if let thumbnail {
-            return Image(uiImage: thumbnail)
-        }
-        return Image(systemName: "play.rectangle.fill")
-    }
 }

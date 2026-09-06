@@ -73,16 +73,18 @@ final class PlayerStateManager {
     private(set) var pipDismissalRequest = 0
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
-    /// Shared with RootView so LNPopupUI's global drag can be paused only while the chapter panel
-    /// owns vertical gestures.
+    /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
+    /// panel owns vertical gestures.
     var chapterListPresented: Bool = false
-    /// Prevents LNPopupUI's ancestor pan from taking over a scroll that began while the details
+    /// Prevents the presentation container from taking over a scroll that began while the details
     /// panel was away from its top edge. The user can scroll back to the top and see the native
     /// rubber band; a fresh downward gesture then collapses the player.
     var playerPanelAtTop: Bool = true
     /// Latched for the lifetime of a touch that began while the panel was scrolled. This prevents
-    /// reaching the top during one long gesture from handing that same touch to LNPopupUI.
+    /// reaching the top during one long gesture from handing that same touch to the container.
     var playerPanelGestureStartedAwayFromTop: Bool = false
+    /// Disabled while the in-place portrait fullscreen mode owns the entire viewport.
+    var playerPresentationGestureEnabled: Bool = true
 
     func removeFromUpNext(videoID: String) {
         if activePlaylist != nil {
@@ -264,7 +266,7 @@ final class PlayerStateManager {
     /// the YouTube `WatchHistoryEntry` schema), queue recommendation fill (no related-video
     /// surface for arbitrary URLs), and `ensureDownloaded` (file is on disk).
     /// **What we keep:** `currentVideo` (synthetic so the mini-player title/subtitle still
-    /// render), `miniPlayerVisible` flipped true so LNPopupUI shows the bar, NowPlayingCenter
+    /// render), `miniPlayerVisible` flipped true so the SwiftUI mini-player appears, NowPlayingCenter
     /// update for lock-screen artwork, and the standard observe/loadItem flow so errors and
     /// playback state still surface through the existing UI.
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
@@ -749,6 +751,7 @@ final class PlayerStateManager {
         chapterListPresented = false
         playerPanelAtTop = true
         playerPanelGestureStartedAwayFromTop = false
+        playerPresentationGestureEnabled = true
         currentVideo = nil
         loadState = .idle
         hasEnded = false
