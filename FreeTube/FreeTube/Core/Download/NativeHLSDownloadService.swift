@@ -204,8 +204,8 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     static func isAuthorizationFailure(_ error: Error) -> Bool {
         guard let nativeError = error as? NativeHLSError else { return false }
         switch nativeError {
-        case .http(401), .http(403): true
-        default: false
+        case .http(401), .http(403): return true
+        default: return false
         }
     }
 
