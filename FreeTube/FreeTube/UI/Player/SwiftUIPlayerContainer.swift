@@ -65,21 +65,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     @ViewBuilder
     private func tabContent(transition: CGFloat, size: CGSize) -> some View {
-        if #available(iOS 26.1, *) {
+        if #available(iOS 26.0, *) {
             content
                 .allowsHitTesting(!player.fullScreenPresented)
                 .tabViewBottomAccessory(isEnabled: player.miniPlayerVisible) {
                     miniPlayer(transition: transition, size: size)
                         .padding(.horizontal, 10)
-                }
-        } else if #available(iOS 26.0, *) {
-            content
-                .allowsHitTesting(!player.fullScreenPresented)
-                .tabViewBottomAccessory {
-                    if player.miniPlayerVisible {
-                        miniPlayer(transition: transition, size: size)
-                            .padding(.horizontal, 10)
-                    }
                 }
         } else {
             content
