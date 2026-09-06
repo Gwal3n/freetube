@@ -36,7 +36,6 @@ struct UserPreferences {
     /// Uses true black below the video surface for OLED displays instead of the translucent popup
     /// material. Off by default to preserve the standard native material appearance.
     @AppStorage("oledPlayerBackground") var oledPlayerBackground: Bool = false
-    @AppStorage("miniPlayerAppearance") var miniPlayerAppearanceRaw: String = MiniPlayerAppearance.liquidGlass.rawValue
     @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     /// When true, `LogFileWriter` opens a new file under `Documents/Logs/` on every app
@@ -141,11 +140,6 @@ struct UserPreferences {
     var appearanceMode: AppearanceMode {
         get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
         nonmutating set { appearanceModeRaw = newValue.rawValue }
-    }
-
-    var miniPlayerAppearance: MiniPlayerAppearance {
-        get { MiniPlayerAppearance(rawValue: miniPlayerAppearanceRaw) ?? .liquidGlass }
-        nonmutating set { miniPlayerAppearanceRaw = newValue.rawValue }
     }
 
     var downloadCacheLimit: DownloadCacheLimit {

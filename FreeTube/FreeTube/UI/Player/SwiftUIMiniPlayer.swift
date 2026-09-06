@@ -5,7 +5,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SwiftUIMiniPlayer: View {
     @Environment(PlayerStateManager.self) private var player
-    @AppStorage("miniPlayerAppearance") private var appearanceRaw = MiniPlayerAppearance.liquidGlass.rawValue
+    @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
 
     let thumbnail: UIImage?
     let onExpand: () -> Void
@@ -68,7 +68,7 @@ struct SwiftUIMiniPlayer: View {
             .frame(height: 2)
         }
         .background {
-            if appearance == .oled {
+            if oledPlayerBackground {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .fill(Color.black)
             } else if #available(iOS 26.0, *) {
@@ -131,9 +131,5 @@ struct SwiftUIMiniPlayer: View {
         }
         guard player.duration > 0 else { return 0 }
         return CGFloat(min(1, max(0, player.elapsed / player.duration)))
-    }
-
-    private var appearance: MiniPlayerAppearance {
-        MiniPlayerAppearance(rawValue: appearanceRaw) ?? .liquidGlass
     }
 }

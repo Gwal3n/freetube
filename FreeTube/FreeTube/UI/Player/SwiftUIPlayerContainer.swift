@@ -7,6 +7,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SwiftUIPlayerContainer<Content: View>: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     let thumbnail: UIImage?
     let content: Content
@@ -24,9 +25,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let transition = transitionProgress(in: proxy.size)
+            let expandedTopInset = verticalSizeClass == .compact ? 0 : proxy.safeAreaInsets.top
+            let miniBottomPadding = proxy.safeAreaInsets.bottom + 42
 
             ZStack(alignment: .bottom) {
-                tabContent(transition: transition, size: proxy.size)
+                content
+                    .allowsHitTesting(!player.fullScreenPresented)
 
                 if player.miniPlayerVisible {
                     Color.black
@@ -35,10 +39,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(1)
 
                     FullScreenPlayer()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        // Extend only through the home-indicator region. The top remains in the
-                        // safe area, so the status bar and Dynamic Island never cover controls.
-                        .ignoresSafeArea(.container, edges: .bottom)
+                        .frame(
+                            width: proxy.size.width,
+                            height: max(0, proxy.size.height - expandedTopInset)
+                        )
                         .background(Color.black)
                         .clipShape(
                             RoundedRectangle(
@@ -56,46 +60,26 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(2)
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
+                    SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayer)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, miniBottomPadding)
+                        .offset(
+                            y: max(0, miniDismissTranslation)
+                                + min(0, presentationTranslation)
+                        )
+                        .opacity(miniOpacity(for: transition))
+                        .scaleEffect(0.98 + (0.02 * miniOpacity(for: transition)))
+                        .allowsHitTesting(!player.fullScreenPresented)
+                        .zIndex(3)
+                        .simultaneousGesture(miniPlayerGesture(in: proxy.size))
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .animation(.smooth(duration: 0.28), value: player.fullScreenPresented)
         }
-    }
-
-    @ViewBuilder
-    private func tabContent(transition: CGFloat, size: CGSize) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .allowsHitTesting(!player.fullScreenPresented)
-                .tabViewBottomAccessory(isEnabled: player.miniPlayerVisible) {
-                    miniPlayer(transition: transition, size: size)
-                        .padding(.horizontal, 10)
-                }
-        } else {
-            content
-                .allowsHitTesting(!player.fullScreenPresented)
-                .overlay(alignment: .bottom) {
-                    if player.miniPlayerVisible {
-                        miniPlayer(transition: transition, size: size)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 50)
-                    }
-                }
-        }
-    }
-
-    @ViewBuilder
-    private func miniPlayer(transition: CGFloat, size: CGSize) -> some View {
-        SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayer)
-            .offset(
-                y: max(0, miniDismissTranslation)
-                    + min(0, presentationTranslation)
-            )
-            .opacity(miniOpacity(for: transition))
-            .scaleEffect(0.98 + (0.02 * miniOpacity(for: transition)))
-            .allowsHitTesting(player.miniPlayerVisible && !player.fullScreenPresented)
-            .simultaneousGesture(miniPlayerGesture(in: size))
+        // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
+        // FullScreenPlayer itself is inset below the portrait status area.
+        .ignoresSafeArea()
     }
 
     private func transitionProgress(in size: CGSize) -> CGFloat {

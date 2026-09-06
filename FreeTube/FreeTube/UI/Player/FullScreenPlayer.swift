@@ -99,12 +99,6 @@ struct FullScreenPlayer: View {
                 : max(0, expandedSurfaceHeight - compactSurfaceHeight)
             let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
             let surfaceHeight = expandedSurfaceHeight - consumedCollapse
-            let controlSize = playerControlSize(
-                in: CGSize(width: surfaceWidth, height: surfaceHeight),
-                isLandscape: isLandscape
-            )
-            let controlOriginX = (surfaceWidth - controlSize.width) / 2
-            let controlOriginY = (surfaceHeight - controlSize.height) / 2
 
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
@@ -167,7 +161,7 @@ struct FullScreenPlayer: View {
                             .buttonStyle(.plain)
                         ),
                         bottomTimelinePadding: timelineBottomPadding(
-                            in: controlSize
+                            in: CGSize(width: surfaceWidth, height: proxy.size.height)
                         ),
                         onTogglePlayPause: {
                             player.togglePlayPause()
@@ -201,7 +195,6 @@ struct FullScreenPlayer: View {
                             p.fullScreenPresented = false
                         }
                     )
-                    .frame(width: controlSize.width, height: controlSize.height)
                     if let previewTime = scrubberSeekPreview,
                        let tile = player.storyboard?.tile(
                            at: previewTime,
@@ -211,16 +204,16 @@ struct FullScreenPlayer: View {
                        ) {
                         StoryboardPreview(tile: tile)
                             .position(
-                                x: controlOriginX + storyboardPreviewX(
+                                x: storyboardPreviewX(
                                     for: previewTime,
                                     duration: player.duration,
-                                    surfaceWidth: controlSize.width
+                                    surfaceWidth: surfaceWidth
                                 ),
                                 y: max(
                                     58,
-                                    controlOriginY + controlSize.height
+                                    surfaceHeight
                                         - timelineBottomPadding(
-                                            in: controlSize
+                                            in: CGSize(width: surfaceWidth, height: proxy.size.height)
                                         )
                                         - 68
                                 )
@@ -234,10 +227,9 @@ struct FullScreenPlayer: View {
                             onSkip: { player.confirmSponsorBlockSkip() },
                             onDismiss: { player.dismissSponsorBlockNotice() },
                             bottomPadding: timelineBottomPadding(
-                                in: controlSize
+                                in: CGSize(width: surfaceWidth, height: proxy.size.height)
                             ) + 46
                         )
-                        .frame(width: controlSize.width, height: controlSize.height)
                     }
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
@@ -405,25 +397,9 @@ struct FullScreenPlayer: View {
     /// The video remains full-width in landscape. When its 16:9 height exceeds a short phone
     /// viewport, lift only the timeline by that overflow so the picture geometry does not change.
     private func timelineBottomPadding(in availableSize: CGSize) -> CGFloat {
-        if verticalSizeClass == .compact { return 8 }
         let aspectHeight = availableSize.width * 9 / 16
-        return max(8, aspectHeight - availableSize.height + 16)
-    }
-
-    /// The AVPlayer surface aspect-fits the source inside its container. Landscape chrome must use
-    /// that same rectangle rather than the full phone screen, otherwise the title is drawn into
-    /// the notch and the timeline floats below or beyond the visible picture.
-    private func playerControlSize(in container: CGSize, isLandscape: Bool) -> CGSize {
-        guard isLandscape, container.width > 0, container.height > 0 else { return container }
-        let presentation = player.videoPresentationSize
-        let aspect = presentation.width > 0 && presentation.height > 0
-            ? presentation.width / presentation.height
-            : 16 / 9
-        let widthAtFullHeight = container.height * aspect
-        if widthAtFullHeight <= container.width {
-            return CGSize(width: widthAtFullHeight, height: container.height)
-        }
-        return CGSize(width: container.width, height: container.width / aspect)
+        guard verticalSizeClass == .compact else { return 8 }
+        return max(22, aspectHeight - availableSize.height + 16)
     }
 
     /// Uses AVPlayer's display-correct dimensions for portrait/tall media. Tall videos start at
