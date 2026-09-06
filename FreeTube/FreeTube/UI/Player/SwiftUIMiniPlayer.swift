@@ -19,7 +19,7 @@ struct SwiftUIMiniPlayer: View {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 52)
+                        .frame(width: 34, height: 50)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close player")
@@ -27,8 +27,8 @@ struct SwiftUIMiniPlayer: View {
                 Button(action: onExpand) {
                     HStack(spacing: 10) {
                         artwork
-                            .frame(width: 76, height: 44)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .frame(width: 72, height: 42)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(player.currentVideo?.title ?? "")
@@ -52,13 +52,13 @@ struct SwiftUIMiniPlayer: View {
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 52)
+                        .frame(width: 42, height: 50)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             }
             .padding(.horizontal, 4)
-            .frame(height: 58)
+            .frame(height: 56)
 
             GeometryReader { proxy in
                 Capsule()
@@ -69,24 +69,24 @@ struct SwiftUIMiniPlayer: View {
         }
         .background {
             if oledPlayerBackground {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .fill(Color.black)
             } else if #available(iOS 26.0, *) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .fill(.clear)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 17))
             } else {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .fill(.regularMaterial)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(.primary.opacity(0.1), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(.primary.opacity(0.08), lineWidth: 0.5)
         }
-        .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.13), radius: 10, y: 4)
+        .contentShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
     }
 
     @ViewBuilder

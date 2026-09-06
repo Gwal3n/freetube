@@ -7,6 +7,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SwiftUIPlayerContainer<Content: View>: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     let thumbnail: UIImage?
     let content: Content
@@ -24,15 +25,24 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let transition = transitionProgress(in: proxy.size)
-            let miniBottomPadding: CGFloat = 10
+            let expandedTopInset = verticalSizeClass == .compact ? 0 : proxy.safeAreaInsets.top
+            let miniBottomPadding = proxy.safeAreaInsets.bottom + 42
 
             ZStack(alignment: .bottom) {
                 content
                     .allowsHitTesting(!player.fullScreenPresented)
 
                 if player.miniPlayerVisible {
+                    Color.black
+                        .opacity(max(0, 1 - transition * 1.4))
+                        .allowsHitTesting(false)
+                        .zIndex(1)
+
                     FullScreenPlayer()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .frame(
+                            width: proxy.size.width,
+                            height: max(0, proxy.size.height - expandedTopInset)
+                        )
                         .background(Color.black)
                         .clipShape(
                             RoundedRectangle(
@@ -51,9 +61,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayer)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 18)
                         .padding(.bottom, miniBottomPadding)
-                        .offset(y: max(0, miniDismissTranslation))
+                        .offset(
+                            y: max(0, miniDismissTranslation)
+                                + min(0, presentationTranslation)
+                        )
                         .opacity(miniOpacity(for: transition))
                         .scaleEffect(0.98 + (0.02 * miniOpacity(for: transition)))
                         .allowsHitTesting(!player.fullScreenPresented)
@@ -64,6 +77,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
             .animation(.smooth(duration: 0.28), value: player.fullScreenPresented)
         }
+        // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
+        // FullScreenPlayer itself is inset below the portrait status area.
+        .ignoresSafeArea()
     }
 
     private func transitionProgress(in size: CGSize) -> CGFloat {
@@ -103,6 +119,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     expandedDragStartedDown = value.translation.height > 0
                 }
                 guard expandedDragStartedDown else { return }
+                player.playerPresentationGestureActive = true
                 // A small amount of initial resistance preserves the pleasant top-edge rubber
                 // band before the whole player begins following the finger.
                 presentationTranslation = max(0, value.translation.height - 12)
@@ -111,6 +128,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 defer {
                     dragIsVertical = nil
                     expandedDragStartedDown = false
+                    player.playerPresentationGestureActive = false
                 }
                 guard player.fullScreenPresented,
                       dragIsVertical == true,

@@ -565,6 +565,7 @@ struct FullScreenPlayer: View {
                     player.playerPanelGestureStartedAwayFromTop = false
                 }
         )
+        .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
     }
 

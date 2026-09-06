@@ -85,6 +85,10 @@ final class PlayerStateManager {
     var playerPanelGestureStartedAwayFromTop: Bool = false
     /// Disabled while the in-place portrait fullscreen mode owns the entire viewport.
     var playerPresentationGestureEnabled: Bool = true
+    /// True only after the outer SwiftUI container has accepted a downward collapse drag. The
+    /// details ScrollView pauses for that gesture so its rubber band cannot move metadata faster
+    /// than the player surface that contains it.
+    var playerPresentationGestureActive: Bool = false
 
     func removeFromUpNext(videoID: String) {
         if activePlaylist != nil {
@@ -752,6 +756,7 @@ final class PlayerStateManager {
         playerPanelAtTop = true
         playerPanelGestureStartedAwayFromTop = false
         playerPresentationGestureEnabled = true
+        playerPresentationGestureActive = false
         currentVideo = nil
         loadState = .idle
         hasEnded = false
