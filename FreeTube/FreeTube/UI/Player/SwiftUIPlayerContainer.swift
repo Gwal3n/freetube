@@ -16,6 +16,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var miniDismissTranslation: CGFloat = 0
     @State private var dragIsVertical: Bool?
     @State private var expandedDragStartedDown = false
+    @State private var suppressMiniPlayerTap = false
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
         self.thumbnail = thumbnail
@@ -64,8 +65,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(2)
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
-                    SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayer)
-                        .padding(.horizontal, 16)
+                    SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayerFromTap)
+                        .padding(.horizontal, 20)
                         .padding(.bottom, miniBottomPadding)
                         .offset(
                             y: max(0, miniDismissTranslation)
@@ -156,6 +157,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
                 guard !player.fullScreenPresented else { return }
+                suppressMiniPlayerTap = true
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
                 if value.translation.height < 0 {
@@ -167,7 +169,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
             }
             .onEnded { value in
-                defer { dragIsVertical = nil }
+                defer {
+                    dragIsVertical = nil
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(180))
+                        suppressMiniPlayerTap = false
+                    }
+                }
                 guard !player.fullScreenPresented, dragIsVertical == true else {
                     presentationTranslation = 0
                     miniDismissTranslation = 0
@@ -210,5 +218,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             player.fullScreenPresented = true
         }
         player.requestInlinePlaybackRestoration()
+    }
+
+    private func expandPlayerFromTap() {
+        guard !suppressMiniPlayerTap else { return }
+        expandPlayer()
     }
 }

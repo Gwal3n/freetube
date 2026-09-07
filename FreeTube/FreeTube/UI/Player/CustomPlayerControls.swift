@@ -15,6 +15,7 @@ struct CustomPlayerControls: View {
     let hasNext: Bool
     let videoTitle: String
     let channelName: String
+    let usesLandscapeLayout: Bool
     let showsCollapseButton: Bool
     let additionalTopControls: AnyView
     let bottomTimelinePadding: CGFloat
@@ -28,9 +29,6 @@ struct CustomPlayerControls: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(isVisible ? 0.28 : 0)
-                .allowsHitTesting(false)
-
             VStack(spacing: 0) {
                 HStack {
                     if showsCollapseButton {
@@ -42,7 +40,9 @@ struct CustomPlayerControls: View {
                     } else {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(videoTitle)
-                                .font(.subheadline.weight(.semibold))
+                                .font(usesLandscapeLayout
+                                    ? .title3.weight(.semibold)
+                                    : .subheadline.weight(.semibold))
                                 .lineLimit(1)
                             if !channelName.isEmpty {
                                 Text(channelName)

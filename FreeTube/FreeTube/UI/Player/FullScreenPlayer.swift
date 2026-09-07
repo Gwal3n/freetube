@@ -104,6 +104,9 @@ struct FullScreenPlayer: View {
                 isLandscape: isLandscape,
                 hasChapterSidebar: chapterPanelWidth > 0
             )
+            let displayedVideoFrame = playerVideoFrame(
+                in: CGSize(width: surfaceWidth, height: surfaceHeight)
+            )
 
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
@@ -142,6 +145,11 @@ struct FullScreenPlayer: View {
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
+                    Color.black
+                        .opacity(playerControlsVisible ? 0.28 : 0)
+                        .frame(width: displayedVideoFrame.width, height: displayedVideoFrame.height)
+                        .position(x: displayedVideoFrame.midX, y: displayedVideoFrame.midY)
+                        .allowsHitTesting(false)
                     CustomPlayerControls(
                         isVisible: playerControlsVisible,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
@@ -156,6 +164,7 @@ struct FullScreenPlayer: View {
                         hasNext: hasNext,
                         videoTitle: player.currentVideo?.title ?? "",
                         channelName: player.currentVideo?.channelName ?? "",
+                        usesLandscapeLayout: isLandscape,
                         showsCollapseButton: !isLandscape && !usesPortraitFullscreen,
                         additionalTopControls: AnyView(
                             HStack(spacing: 0) {
@@ -406,9 +415,27 @@ struct FullScreenPlayer: View {
     /// The video remains full-width in landscape. When its 16:9 height exceeds a short phone
     /// viewport, lift only the timeline by that overflow so the picture geometry does not change.
     private func timelineBottomPadding(in availableSize: CGSize) -> CGFloat {
-        if verticalSizeClass == .compact { return 8 }
+        if verticalSizeClass == .compact { return 16 }
         let aspectHeight = availableSize.width * 9 / 16
         return max(8, aspectHeight - availableSize.height + 16)
+    }
+
+    /// AVPlayer's `.resizeAspect` presentation rectangle inside the black player surface. The
+    /// controls remain usable in their safe frame, while the dimming layer covers only pixels
+    /// occupied by the video instead of assuming every source is 16:9.
+    private func playerVideoFrame(in container: CGSize) -> CGRect {
+        let full = CGRect(origin: .zero, size: container)
+        guard container.width > 0, container.height > 0 else { return full }
+        let presentation = player.videoPresentationSize
+        guard presentation.width > 0, presentation.height > 0 else { return full }
+        let videoAspect = presentation.width / presentation.height
+        let containerAspect = container.width / container.height
+        if videoAspect > containerAspect {
+            let height = container.width / videoAspect
+            return CGRect(x: 0, y: (container.height - height) / 2, width: container.width, height: height)
+        }
+        let width = container.height * videoAspect
+        return CGRect(x: (container.width - width) / 2, y: 0, width: width, height: container.height)
     }
 
     /// Keeps landscape chrome inside the visible widescreen picture and outside the notch. Tall
@@ -587,7 +614,8 @@ struct FullScreenPlayer: View {
                         .id(video.id)
                 }
             }
-            .padding(.vertical)
+            .padding(.top, 6)
+            .padding(.bottom)
             // While the header is collapsing, counteract the ScrollView's own content movement.
             // Use real padding rather than a visual offset: an offset does not enlarge the
             // ScrollView's measured content and made the final comments unreachable by exactly
