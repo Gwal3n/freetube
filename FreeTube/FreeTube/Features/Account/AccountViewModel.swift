@@ -24,10 +24,16 @@ final class AccountViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            info = try await service.fetchAccountInfo()
+            let loadedInfo = try await service.fetchAccountInfo()
+            guard !Task.isCancelled else { return }
+            info = loadedInfo
+        } catch is CancellationError {
+            return
         } catch YouTubeServiceError.notAuthenticated {
+            guard !Task.isCancelled else { return }
             info = nil
         } catch {
+            guard !Task.isCancelled else { return }
             errorState = ErrorState(from: error)
         }
     }

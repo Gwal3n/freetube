@@ -26,12 +26,18 @@ final class LibraryViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            library = try await service.fetchLibrary()
+            let loadedLibrary = try await service.fetchLibrary()
+            guard !Task.isCancelled else { return }
+            library = loadedLibrary
+        } catch is CancellationError {
+            return
         } catch YouTubeServiceError.notAuthenticated {
+            guard !Task.isCancelled else { return }
             // No cookies / signed-out — the library menu degrades to "sign in" prompts and
             // shouldn't surface a toast for this expected state.
             library = nil
         } catch {
+            guard !Task.isCancelled else { return }
             errorState = ErrorState(from: error)
         }
     }

@@ -35,6 +35,7 @@ struct LibraryScreen: View {
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount = 0
     @State private var path: [Destination] = []
+    @State private var didLoadRootData = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -56,11 +57,11 @@ struct LibraryScreen: View {
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
             }
-            .task {
-                localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
-                localPlaylistCount = await localPlaylistCountFromStore()
-                await accountModel.load()
-                if accountModel.info != nil { await libraryModel.load() }
+            // Tie cold-start work to the visible root. A first navigation push cancels this task,
+            // preventing late count/account mutations from invalidating the List mid-transition.
+            .task(id: path.isEmpty) {
+                guard path.isEmpty, !didLoadRootData else { return }
+                await loadRootData()
             }
             .refreshable {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
@@ -83,7 +84,9 @@ struct LibraryScreen: View {
             .errorToast(Bindable(libraryModel).errorState)
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task {
-                    localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
+                    let count = await PersistenceWriter.shared.watchHistoryCount()
+                    guard path.isEmpty else { return }
+                    localHistoryCount = count
                 }
             }
             .onChange(of: navigationRequest?.id) { _, _ in
@@ -91,9 +94,30 @@ struct LibraryScreen: View {
                 path.append(route(for: destination))
             }
             .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
-                Task { localPlaylistCount = await localPlaylistCountFromStore() }
+                Task {
+                    let count = await localPlaylistCountFromStore()
+                    guard path.isEmpty else { return }
+                    localPlaylistCount = count
+                }
             }
         }
+    }
+
+    private func loadRootData() async {
+        let historyCount = await PersistenceWriter.shared.watchHistoryCount()
+        guard !Task.isCancelled, path.isEmpty else { return }
+        let playlistCount = await localPlaylistCountFromStore()
+        guard !Task.isCancelled, path.isEmpty else { return }
+        localHistoryCount = historyCount
+        localPlaylistCount = playlistCount
+
+        await accountModel.load()
+        guard !Task.isCancelled, path.isEmpty else { return }
+        if accountModel.info != nil {
+            await libraryModel.load()
+            guard !Task.isCancelled, path.isEmpty else { return }
+        }
+        didLoadRootData = true
     }
 
     private func localPlaylistCountFromStore() async -> Int {
