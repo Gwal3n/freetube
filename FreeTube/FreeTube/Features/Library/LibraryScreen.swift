@@ -136,51 +136,73 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            NavigationLink(value: Destination.history) {
-                HStack(spacing: 14) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Local history")
-                        Text(countSubtitle(localHistoryCount, noun: "video"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            Button {
+                openLocalDestination(.history)
+            } label: {
+                localDestinationRow(
+                    title: "Local history",
+                    subtitle: countSubtitle(localHistoryCount, noun: "video"),
+                    systemImage: "clock.arrow.circlepath"
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isLink)
 
-            NavigationLink(value: Destination.subscriptions) {
-                HStack(spacing: 14) {
-                    Image(systemName: "person.2.fill")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Local subscriptions")
-                        Text(countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            Button {
+                openLocalDestination(.subscriptions)
+            } label: {
+                localDestinationRow(
+                    title: "Local subscriptions",
+                    subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
+                    systemImage: "person.2.fill"
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isLink)
 
-            NavigationLink(value: Destination.playlists) {
-                HStack(spacing: 14) {
-                    Image(systemName: "music.note.list")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Local playlists")
-                        Text(countSubtitle(localPlaylistCount, noun: "playlist"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            Button {
+                openLocalDestination(.playlists)
+            } label: {
+                localDestinationRow(
+                    title: "Local playlists",
+                    subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
+                    systemImage: "music.note.list"
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isLink)
         }
+    }
+
+    private func openLocalDestination(_ destination: Destination) {
+        withAnimation(.default) {
+            path.append(destination)
+        }
+    }
+
+    private func localDestinationRow(
+        title: String,
+        subtitle: String,
+        systemImage: String
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.forward")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .foregroundStyle(.primary)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Account header
