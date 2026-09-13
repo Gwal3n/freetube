@@ -67,6 +67,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // Keep the container's simultaneous drag (which preserves panel scrolling),
                         // but prevent controls beneath an accepted vertical drag from firing too.
                         .environment(\.isEnabled, !playerActionsSuppressed)
+                        // The UIKit-backed player stays mounted for a seamless mini/expanded
+                        // transition. Once settled in mini mode it is fully off-screen, but must
+                        // also leave hit testing explicitly so it cannot intercept Library rows
+                        // through its original hosting-controller bounds.
+                        .allowsHitTesting(player.fullScreenPresented)
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(
@@ -79,6 +84,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .offset(
                             y: max(0, miniDismissTranslation)
                                 + min(0, presentationTranslation)
+                                + miniHandoffOffset(for: transition)
                         )
                         .opacity(miniOpacity(for: transition))
                         .allowsHitTesting(!player.fullScreenPresented)
@@ -110,7 +116,17 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func miniOpacity(for transition: CGFloat) -> CGFloat {
-        min(1, max(0, (transition - 0.68) / 0.32))
+        // Fade over most of the handoff instead of squeezing the entire appearance into the last
+        // few frames. Smoothstep keeps both ends soft without adding a second animation owner.
+        let progress = min(1, max(0, (transition - 0.18) / 0.82))
+        return progress * progress * (3 - 2 * progress)
+    }
+
+    /// A small upward lift visually connects a miniplayer tap to the expanded sheet travelling
+    /// upward. Because this derives from the same transition value, interactive swipes and the
+    /// reverse collapse remain perfectly synchronized with the fade.
+    private func miniHandoffOffset(for transition: CGFloat) -> CGFloat {
+        -12 * (1 - miniOpacity(for: transition))
     }
 
     /// During a downward drag the sheet moves one point for every point travelled by the finger.

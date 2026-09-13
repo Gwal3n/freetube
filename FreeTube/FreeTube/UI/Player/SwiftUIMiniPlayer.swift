@@ -44,9 +44,7 @@ struct SwiftUIMiniPlayer: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(MiniPlayerExpandButtonStyle(
-                    suppressPressedAppearance: player.fullScreenPresented
-                ))
+                .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Expand player")
 
@@ -123,25 +121,4 @@ struct SwiftUIMiniPlayer: View {
         }
     }
 
-}
-
-/// A restrained press response for the miniplayer's primary action. Suppressing the pressed
-/// appearance while expanded prevents SwiftUI from replaying a retained highlight when the
-/// always-mounted miniplayer fades back in after a collapse.
-@available(iOS 17.0, *)
-private struct MiniPlayerExpandButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    let suppressPressedAppearance: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        let isPressed = configuration.isPressed && !suppressPressedAppearance
-        configuration.label
-            .scaleEffect(isPressed && !reduceMotion ? 0.985 : 1)
-            .opacity(isPressed ? 0.72 : 1)
-            .animation(
-                reduceMotion ? nil : .easeOut(duration: isPressed ? 0.08 : 0.14),
-                value: isPressed
-            )
-    }
 }
