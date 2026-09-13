@@ -141,16 +141,10 @@ struct FullScreenPlayer: View {
                         // Letterbox pixels are already black, so covering them has no visible cost.
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
-                    CustomPlayerControls(
+                    PlayerTransportOverlay(
                         isVisible: playerControlsVisible,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
-                        isPlaying: player.isPlaying,
-                        hasEnded: player.hasEnded,
-                        elapsed: scrubberSeekPreview ?? gestureSeekPreview ?? player.elapsed,
-                        duration: player.duration,
-                        isLive: player.currentVideo?.isLive == true,
-                        sponsorSegments: player.sponsorBlockSegments,
-                        chapters: player.chapters,
+                        previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
                         videoTitle: player.currentVideo?.title ?? "",
@@ -810,7 +804,6 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func playerActions(_ video: Video) -> some View {
         let videoURL = watchURL(video)
-        let currentTimeURL = watchURLAtCurrentTime(video)
         let downloadedFileURL = downloads.localFile(for: video.id)
         PlayerActionBar(
             isSavedToPlaylist: isSavedToPersonalPlaylist,
@@ -829,8 +822,8 @@ struct FullScreenPlayer: View {
                 }
             },
             onCopyURLAtCurrentTime: {
-                if let currentTimeURL {
-                    UIPasteboard.general.string = currentTimeURL.absoluteString
+                if let url = watchURLAtCurrentTime(video) {
+                    UIPasteboard.general.string = url.absoluteString
                 }
             },
             onShareDownloadedFile: {
