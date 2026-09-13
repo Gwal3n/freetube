@@ -18,6 +18,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var dragIsVertical: Bool?
     @State private var expandedDragStartedDown = false
     @State private var suppressMiniPlayerTap = false
+    @State private var playerActionsSuppressed = false
+    @State private var actionSuppressionReleaseTask: Task<Void, Never>?
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
         self.thumbnail = thumbnail
@@ -62,6 +64,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // UIKit-backed video surfaces can visually outrun SwiftUI move
                         // transitions. Position is animated by the container offset instead.
                         .transition(.opacity)
+                        // Keep the container's simultaneous drag (which preserves panel scrolling),
+                        // but prevent controls beneath an accepted vertical drag from firing too.
+                        .environment(\.isEnabled, !playerActionsSuppressed)
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(
@@ -78,6 +83,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .opacity(miniOpacity(for: transition))
                         .allowsHitTesting(!player.fullScreenPresented)
                         .zIndex(3)
+                        .environment(\.isEnabled, !playerActionsSuppressed)
                         .simultaneousGesture(miniPlayerGesture(in: proxy.size))
                 }
             }
@@ -88,6 +94,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
         // FullScreenPlayer itself is inset below the portrait status area.
         .ignoresSafeArea()
+        .onDisappear {
+            actionSuppressionReleaseTask?.cancel()
+            playerActionsSuppressed = false
+        }
     }
 
     private func transitionProgress(in size: CGSize) -> CGFloat {
@@ -128,6 +138,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     expandedDragStartedDown = value.translation.height > 0
                 }
                 guard expandedDragStartedDown else { return }
+                suppressPlayerActionsForPresentationDrag()
                 player.playerPresentationGestureActive = true
                 // A small amount of initial resistance preserves the pleasant top-edge rubber
                 // band before the whole player begins following the finger.
@@ -138,6 +149,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     dragIsVertical = nil
                     expandedDragStartedDown = false
                     player.playerPresentationGestureActive = false
+                    releasePlayerActionsAfterPresentationDrag()
                 }
                 guard player.fullScreenPresented,
                       dragIsVertical == true,
@@ -164,6 +176,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 suppressMiniPlayerTap = true
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
+                suppressPlayerActionsForPresentationDrag()
                 if value.translation.height < 0 {
                     presentationTranslation = value.translation.height
                     miniDismissTranslation = 0
@@ -175,6 +188,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             .onEnded { value in
                 defer {
                     dragIsVertical = nil
+                    releasePlayerActionsAfterPresentationDrag()
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(180))
                         suppressMiniPlayerTap = false
@@ -213,6 +227,24 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         guard dragIsVertical == nil,
               max(abs(translation.width), abs(translation.height)) >= 8 else { return }
         dragIsVertical = abs(translation.height) > abs(translation.width) * 1.1
+    }
+
+    /// A simultaneous presentation drag must remain compatible with the panel ScrollView, but it
+    /// must not also complete a button press that began under the finger. Keep controls disabled
+    /// through the end of the UIKit touch-delivery cycle, then restore them promptly.
+    private func suppressPlayerActionsForPresentationDrag() {
+        actionSuppressionReleaseTask?.cancel()
+        playerActionsSuppressed = true
+    }
+
+    private func releasePlayerActionsAfterPresentationDrag() {
+        guard playerActionsSuppressed else { return }
+        actionSuppressionReleaseTask?.cancel()
+        actionSuppressionReleaseTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            playerActionsSuppressed = false
+        }
     }
 
     private func expandPlayer() {

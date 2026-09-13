@@ -96,10 +96,6 @@ struct FullScreenPlayer: View {
                 isLandscape: isLandscape,
                 hasChapterSidebar: chapterPanelWidth > 0
             )
-            let displayedVideoFrame = playerVideoFrame(
-                in: CGSize(width: surfaceWidth, height: surfaceHeight)
-            )
-
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 // Pinning the ZStack to width × width*9/16 keeps the surface a stable height
@@ -139,8 +135,11 @@ struct FullScreenPlayer: View {
                     DownloadProgressOverlay(state: player.loadState)
                     Color.black
                         .opacity(playerControlsVisible ? 0.28 : 0)
-                        .frame(width: displayedVideoFrame.width, height: displayedVideoFrame.height)
-                        .position(x: displayedVideoFrame.midX, y: displayedVideoFrame.midY)
+                        // Dim the stable player surface rather than AVPlayer's presentation rect.
+                        // The latter changes from unknown/full-size to the decoded aspect ratio
+                        // as a new item becomes ready, which made non-16:9 videos flash unevenly.
+                        // Letterbox pixels are already black, so covering them has no visible cost.
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
                     CustomPlayerControls(
                         isVisible: playerControlsVisible,
@@ -409,24 +408,6 @@ struct FullScreenPlayer: View {
         if verticalSizeClass == .compact { return 16 }
         let aspectHeight = availableSize.width * 9 / 16
         return max(8, aspectHeight - availableSize.height + 16)
-    }
-
-    /// AVPlayer's `.resizeAspect` presentation rectangle inside the black player surface. The
-    /// controls remain usable in their safe frame, while the dimming layer covers only pixels
-    /// occupied by the video instead of assuming every source is 16:9.
-    private func playerVideoFrame(in container: CGSize) -> CGRect {
-        let full = CGRect(origin: .zero, size: container)
-        guard container.width > 0, container.height > 0 else { return full }
-        let presentation = player.videoPresentationSize
-        guard presentation.width > 0, presentation.height > 0 else { return full }
-        let videoAspect = presentation.width / presentation.height
-        let containerAspect = container.width / container.height
-        if videoAspect > containerAspect {
-            let height = container.width / videoAspect
-            return CGRect(x: 0, y: (container.height - height) / 2, width: container.width, height: height)
-        }
-        let width = container.height * videoAspect
-        return CGRect(x: (container.width - width) / 2, y: 0, width: width, height: container.height)
     }
 
     /// Keeps landscape chrome inside the visible widescreen picture and outside the notch. Tall
