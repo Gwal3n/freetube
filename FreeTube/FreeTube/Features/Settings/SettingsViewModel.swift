@@ -86,7 +86,7 @@ final class SettingsViewModel {
         get { preferences.allowAudioMixing }
         set {
             preferences.allowAudioMixing = newValue
-            AudioSessionConfigurator.configure(allowMixing: newValue)
+            AudioSessionConfigurator.configure(allowMixing: newValue, activate: false)
         }
     }
 

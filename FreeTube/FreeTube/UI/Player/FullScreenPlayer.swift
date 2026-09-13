@@ -696,7 +696,7 @@ struct FullScreenPlayer: View {
     private func metadata(_ video: Video) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.smooth(duration: 0.24)) {
                     isDetailsExpanded.toggle()
                 }
                 if isDetailsExpanded {
@@ -801,7 +801,7 @@ struct FullScreenPlayer: View {
                 loadDetailsIfNeeded(for: video)
             },
             onExpand: {
-                withAnimation(.easeInOut(duration: 0.2)) { isDetailsExpanded = true }
+                withAnimation(.smooth(duration: 0.24)) { isDetailsExpanded = true }
                 loadDetailsIfNeeded(for: video)
             }
         )

@@ -8,7 +8,6 @@ import UIKit
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
-    let onDismissSearchPresentation: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @State private var arePlaylistsExpanded = false
@@ -39,7 +38,6 @@ struct SearchContent: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     dismissKeyboard()
-                    onDismissSearchPresentation()
                 }
             }
         }
@@ -136,7 +134,7 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
-        .scrollDismissesKeyboard(.immediately)
+        .scrollDismissesKeyboard(.interactively)
         .refreshable { await model.refresh() }
         .task(id: progressLookupID(for: results.videos)) {
             await loadProgress(for: results.videos)
@@ -188,7 +186,6 @@ struct SearchContent: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     dismissKeyboard()
-                    onDismissSearchPresentation()
                 }
         } else {
             ScrollView {
@@ -204,7 +201,7 @@ struct SearchContent: View {
                     }
                 )
             }
-            .scrollDismissesKeyboard(.immediately)
+            .scrollDismissesKeyboard(.interactively)
         }
     }
 
@@ -243,7 +240,7 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
-        .scrollDismissesKeyboard(.immediately)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private func dismissKeyboard() {
@@ -299,7 +296,7 @@ struct ConditionalSearchable: ViewModifier {
 
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(text: $text, isPresented: $isPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt))
+            content.searchable(text: $text, isPresented: $isPresented, prompt: Text(prompt))
         } else {
             content
         }

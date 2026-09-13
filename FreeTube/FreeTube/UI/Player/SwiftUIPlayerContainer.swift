@@ -57,13 +57,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                                 style: .continuous
                             )
                         )
-                        .scaleEffect(1 - (0.018 * transition), anchor: .top)
                         .offset(y: expandedPlayerOffset(transition: transition, in: proxy.size))
-                        .shadow(
-                            color: .black.opacity(0.22 * transition),
-                            radius: 18,
-                            y: 8
-                        )
                         .zIndex(2)
                         .transition(.asymmetric(
                             insertion: reduceMotion ? .opacity : .move(edge: .bottom),
@@ -71,7 +65,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         ))
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
-                    SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayerFromTap)
+                    SwiftUIMiniPlayer(
+                        thumbnail: thumbnail,
+                        onExpand: expandPlayerFromTap,
+                        onDismiss: { dismissMiniPlayer(in: proxy.size) }
+                    )
                         .padding(.horizontal, 20)
                         .padding(.bottom, miniBottomPadding)
                         .offset(
@@ -79,7 +77,6 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                                 + min(0, presentationTranslation)
                         )
                         .opacity(miniOpacity(for: transition))
-                        .scaleEffect(0.98 + (0.02 * miniOpacity(for: transition)))
                         .allowsHitTesting(!player.fullScreenPresented)
                         .zIndex(3)
                         .simultaneousGesture(miniPlayerGesture(in: proxy.size))
@@ -120,6 +117,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
                 guard player.fullScreenPresented,
+                      verticalSizeClass != .compact,
                       player.playerPresentationGestureEnabled,
                       !player.chapterListPresented,
                       player.playerPanelAtTop,
@@ -230,5 +228,24 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     private func expandPlayerFromTap() {
         guard !suppressMiniPlayerTap else { return }
         expandPlayer()
+    }
+
+    private func dismissMiniPlayer(in size: CGSize) {
+        suppressMiniPlayerTap = true
+        guard !reduceMotion else {
+            player.dismiss()
+            suppressMiniPlayerTap = false
+            return
+        }
+        withAnimation(
+            .interactiveSpring(response: 0.3, dampingFraction: 0.92),
+            completionCriteria: .logicallyComplete
+        ) {
+            miniDismissTranslation = max(90, size.height * 0.14)
+        } completion: {
+            player.dismiss()
+            miniDismissTranslation = 0
+            suppressMiniPlayerTap = false
+        }
     }
 }

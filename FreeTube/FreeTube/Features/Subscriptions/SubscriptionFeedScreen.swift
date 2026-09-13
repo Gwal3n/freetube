@@ -11,6 +11,21 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
+                if model.isRefreshing {
+                    HStack(spacing: 10) {
+                        ProgressView(
+                            value: Double(model.refreshedChannels),
+                            total: Double(max(1, model.refreshChannelCount))
+                        )
+                        Text(verbatim: "\(model.refreshedChannels)/\(model.refreshChannelCount)")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .listRowSeparator(.hidden)
+                    .accessibilityLabel("Refreshing subscriptions")
+                    .accessibilityValue("\(model.refreshedChannels) of \(model.refreshChannelCount)")
+                }
+
                 if model.failedChannelCount > 0 {
                     Section {
                         Label(
@@ -43,29 +58,16 @@ struct SubscriptionFeedScreen: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
+
+                if player.miniPlayerVisible && !player.fullScreenPresented {
+                    Color.clear
+                        .frame(height: 66)
+                        .listRowSeparator(.hidden)
+                        .accessibilityHidden(true)
+                }
             }
             .listStyle(.plain)
             .navigationTitle("Feed")
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if model.isRefreshing {
-                    VStack(spacing: 6) {
-                        HStack {
-                            Text("Refreshing subscriptions")
-                            Spacer()
-                            Text(verbatim: "\(model.refreshedChannels) / \(model.refreshChannelCount)")
-                                .monospacedDigit()
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        ProgressView(value: Double(model.refreshedChannels), total: Double(max(1, model.refreshChannelCount)))
-                    }
-                    .padding(12)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                    .allowsHitTesting(false)
-                }
-            }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)

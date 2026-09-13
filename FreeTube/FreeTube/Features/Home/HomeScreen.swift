@@ -34,15 +34,11 @@ struct HomeScreen: View {
                     model: searchModel,
                     onRunSearch: { query in
                         Task { await runSearch(query: query) }
-                    },
-                    onDismissSearchPresentation: {
-                        isSearchPresented = false
                     }
                 )
             }
             .contentShape(Rectangle())
             .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.inline)
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
                 isPresented: $isSearchPresented,

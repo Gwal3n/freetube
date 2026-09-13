@@ -179,7 +179,7 @@ struct PlaylistScreen: View {
 
             if shouldShowMoreButton(for: details.playlist.descriptionText) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { isDetailsExpanded.toggle() }
+                    withAnimation(.smooth(duration: 0.24)) { isDetailsExpanded.toggle() }
                 } label: {
                     HStack(spacing: 4) {
                         Text(isDetailsExpanded ? "Less" : "More details")

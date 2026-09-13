@@ -26,7 +26,7 @@ struct VideoCard: View {
             Button(action: onTap) {
                 thumbnail
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .accessibilityElement(children: .combine)
             .accessibilityLabel(Text(verbatim: "\(video.title), \(video.channelName)"))
 
@@ -75,7 +75,7 @@ struct VideoCard: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video)

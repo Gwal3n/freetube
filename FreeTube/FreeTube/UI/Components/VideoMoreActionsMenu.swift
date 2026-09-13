@@ -77,15 +77,12 @@ struct VideoMoreActionsMenu: View {
         if !video.channelID.isEmpty {
             Button {
                 let channelID = video.channelID
-                if player.fullScreenPresented {
-                    player.fullScreenPresented = false
-                    Task { @MainActor in
-                        // Avoid routing underneath the player presentation in the same
-                        // presentation transaction as the expanded player's collapse.
-                        try? await Task.sleep(for: .milliseconds(180))
-                        NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
-                    }
-                } else {
+                let wasExpanded = player.fullScreenPresented
+                if wasExpanded { player.fullScreenPresented = false }
+                Task { @MainActor in
+                    // Let the native Menu finish dismissing before mutating its NavigationStack.
+                    // An expanded player also needs time to reveal the selected tab first.
+                    try? await Task.sleep(for: .milliseconds(wasExpanded ? 180 : 100))
                     NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
                 }
             } label: {

@@ -498,6 +498,10 @@ final class PlayerStateManager {
             return
         }
         log.info("play()")
+        AudioSessionConfigurator.configure(
+            allowMixing: preferences.allowAudioMixing,
+            activate: true
+        )
         player.play()
         isPlaying = true
         publishNowPlayingWhenAlone()
@@ -1624,7 +1628,7 @@ final class PlayerStateManager {
     private func publishNowPlayingWhenAlone() {
         guard preferences.allowAudioMixing,
               !AVAudioSession.sharedInstance().isOtherAudioPlaying else { return }
-        AudioSessionConfigurator.configure(allowMixing: true)
+        AudioSessionConfigurator.configure(allowMixing: true, activate: true)
         log.info("Publishing Now Playing for FreeTube as the only active audio source")
         updateNowPlaying()
     }

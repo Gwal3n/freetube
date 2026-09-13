@@ -48,7 +48,7 @@ struct VideoRow: View {
             Button(action: onTap) {
                 content
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .accessibilityElement(children: .combine)
 
             if showsMoreMenu {
@@ -69,6 +69,7 @@ struct VideoRow: View {
                 .tint(.accentColor)
             }
         }
+        .listRowSeparator(.hidden)
     }
 
     private var content: some View {

@@ -9,17 +9,18 @@ struct SwiftUIMiniPlayer: View {
 
     let thumbnail: UIImage?
     let onExpand: () -> Void
+    let onDismiss: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Button {
-                    player.dismiss()
+                    onDismiss()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 34, height: 50)
+                        .frame(width: 44, height: 50)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close player")
@@ -52,7 +53,7 @@ struct SwiftUIMiniPlayer: View {
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.body.weight(.semibold))
-                        .frame(width: 42, height: 50)
+                        .frame(width: 44, height: 50)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
