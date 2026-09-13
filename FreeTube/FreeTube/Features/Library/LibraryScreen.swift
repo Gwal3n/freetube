@@ -15,12 +15,16 @@ import Kingfisher
 /// signed out would route to an error toast — clearer to just gate the whole menu.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    /// Library-owned destinations use value navigation so every local row participates in the
-    /// same bound `NavigationPath` as cross-feature channel and playlist routes.
-    private enum LocalDestination: Hashable {
+    /// One strongly typed route set for both local rows and cross-feature requests. Avoiding a
+    /// heterogeneous `NavigationPath` lets SwiftUI resolve the first push up front, preserving the
+    /// same native transition on a destination's cold and warm openings.
+    private enum Destination: Hashable {
         case history
         case subscriptions
         case playlists
+        case channel(String)
+        case playlist(String)
+        case localPlaylist(String)
     }
 
     let navigationRequest: AppNavigationRequest?
@@ -30,7 +34,7 @@ struct LibraryScreen: View {
     @State private var localHistoryCount = 0
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount = 0
-    @State private var path = NavigationPath()
+    @State private var path: [Destination] = []
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -42,18 +46,14 @@ struct LibraryScreen: View {
                 }
             }
             .navigationTitle("Library")
-            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
-                switch destination {
-                case .channel(let id): ChannelScreen(channelID: id)
-                case .playlist(let id): PlaylistScreen(playlistID: id)
-                case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
-                }
-            }
-            .navigationDestination(for: LocalDestination.self) { destination in
+            .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .history: LocalHistoryScreen()
                 case .subscriptions: LocalSubscriptionsScreen()
                 case .playlists: LocalPlaylistsScreen()
+                case .channel(let id): ChannelScreen(channelID: id)
+                case .playlist(let id): PlaylistScreen(playlistID: id)
+                case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
             }
             .task {
@@ -88,7 +88,7 @@ struct LibraryScreen: View {
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
-                path.append(destination)
+                path.append(route(for: destination))
             }
             .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
                 Task { localPlaylistCount = await localPlaylistCountFromStore() }
@@ -101,10 +101,18 @@ struct LibraryScreen: View {
         return playlists.count
     }
 
+    private func route(for destination: AppNavigationRequest.Destination) -> Destination {
+        switch destination {
+        case .channel(let id): .channel(id)
+        case .playlist(let id): .playlist(id)
+        case .localPlaylist(let id): .localPlaylist(id)
+        }
+    }
+
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            NavigationLink(value: LocalDestination.history) {
+            NavigationLink(value: Destination.history) {
                 HStack(spacing: 14) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.title3)
@@ -119,7 +127,7 @@ struct LibraryScreen: View {
                 }
             }
 
-            NavigationLink(value: LocalDestination.subscriptions) {
+            NavigationLink(value: Destination.subscriptions) {
                 HStack(spacing: 14) {
                     Image(systemName: "person.2.fill")
                         .font(.title3)
@@ -134,7 +142,7 @@ struct LibraryScreen: View {
                 }
             }
 
-            NavigationLink(value: LocalDestination.playlists) {
+            NavigationLink(value: Destination.playlists) {
                 HStack(spacing: 14) {
                     Image(systemName: "music.note.list")
                         .font(.title3)
