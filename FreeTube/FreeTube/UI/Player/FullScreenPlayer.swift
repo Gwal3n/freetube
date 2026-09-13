@@ -158,12 +158,31 @@ struct FullScreenPlayer: View {
                         usesLandscapeLayout: isLandscape,
                         showsCollapseButton: !isLandscape && !usesPortraitFullscreen,
                         additionalTopControls: AnyView(
-                            HStack(spacing: 0) {
-                                ForEach(visiblePlayerTopControls) { control in
-                                    playerTopControl(control)
+                            PlayerTopControls(
+                                controls: visiblePlayerTopControls,
+                                playbackRate: player.playbackRate,
+                                isMuted: player.isMuted,
+                                isLooping: player.isLoopingCurrentVideo,
+                                isAutoplayEnabled: autoplayNext,
+                                isFullscreen: isLandscape || portraitFullscreenActive,
+                                onSetPlaybackRate: { rate in
+                                    player.setPlaybackRate(rate)
+                                    showPlayerControls()
+                                },
+                                onToggleLoop: {
+                                    player.toggleLoopCurrentVideo()
+                                    showPlayerControls()
+                                },
+                                onToggleMute: {
+                                    player.toggleMute()
+                                    showPlayerControls()
+                                },
+                                onToggleFullscreen: toggleFullscreen,
+                                onToggleAutoplay: {
+                                    autoplayNext.toggle()
+                                    showPlayerControls()
                                 }
-                            }
-                            .buttonStyle(.plain)
+                            )
                         ),
                         bottomTimelinePadding: timelineBottomPadding(
                             in: controlFrame.size
@@ -475,36 +494,19 @@ struct FullScreenPlayer: View {
         return min(max(trackX, minimumCenterX), surfaceWidth - minimumCenterX)
     }
 
-    @ViewBuilder
-    private var fullscreenButton: some View {
-        Button {
-            if isPortraitVideo {
-                withAnimation(.smooth(duration: 0.3)) {
-                    portraitVideoFullscreen.toggle()
-                    player.chapterListPresented = false
-                }
-                if portraitVideoFullscreen {
-                    requestPlayerOrientation(.portrait)
-                }
-            } else {
-                requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
+    private func toggleFullscreen() {
+        if isPortraitVideo {
+            withAnimation(.smooth(duration: 0.3)) {
+                portraitVideoFullscreen.toggle()
+                player.chapterListPresented = false
             }
-            showPlayerControls()
-        } label: {
-            Image(systemName: verticalSizeClass == .compact || portraitFullscreenActive
-                ? "arrow.down.right.and.arrow.up.left"
-                : "arrow.up.left.and.arrow.down.right")
-                .font(.body.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+            if portraitVideoFullscreen {
+                requestPlayerOrientation(.portrait)
+            }
+        } else {
+            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
         }
-        .accessibilityLabel(
-            verticalSizeClass == .compact || portraitFullscreenActive
-                ? "Exit fullscreen"
-                : "Enter fullscreen"
-        )
+        showPlayerControls()
     }
 
     private var portraitFullscreenActive: Bool {
@@ -916,76 +918,6 @@ struct FullScreenPlayer: View {
         return PlayerTopControl.decodeOrder(playerTopControlOrderRaw).filter { !hidden.contains($0) }
     }
 
-    @ViewBuilder
-    private func playerTopControl(_ control: PlayerTopControl) -> some View {
-        switch control {
-        case .speed:
-            speedPlayerMenu
-        case .loop:
-            loopPlayerButton
-        case .mute:
-            mutePlayerButton
-        case .fullscreen:
-            fullscreenButton
-        case .autoplay:
-            autoplayPlayerButton
-        }
-    }
-
-    @ViewBuilder
-    private var speedPlayerMenu: some View {
-        Menu {
-            ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
-                Button {
-                    player.setPlaybackRate(rate)
-                    showPlayerControls()
-                } label: {
-                    if abs(player.playbackRate - rate) < 0.01 {
-                        Label(rateLabel(rate), systemImage: "checkmark")
-                    } else {
-                        Text(rateLabel(rate))
-                    }
-                }
-            }
-        } label: {
-            Text(rateLabel(player.playbackRate))
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(minWidth: 42, minHeight: 36)
-                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
-        }
-    }
-
-    private func rateLabel(_ rate: Double) -> String {
-        rate == 1 ? "1×" : "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
-    }
-
-    @ViewBuilder
-    private var mutePlayerButton: some View {
-        Button {
-            player.toggleMute()
-            showPlayerControls()
-        } label: {
-            Image(systemName: player.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .playerTopControl()
-        }
-        .accessibilityLabel(player.isMuted ? "Unmute" : "Mute")
-    }
-
-    @ViewBuilder
-    private var loopPlayerButton: some View {
-        Button {
-            player.toggleLoopCurrentVideo()
-            showPlayerControls()
-        } label: {
-            Image(systemName: "repeat.1")
-                .playerTopControl()
-                .opacity(player.isLoopingCurrentVideo ? 1 : 0.58)
-        }
-        .accessibilityLabel("Loop video")
-        .accessibilityValue(player.isLoopingCurrentVideo ? "On" : "Off")
-    }
-
     private func watchURL(_ video: Video) -> URL? {
         URL(string: "https://www.youtube.com/watch?v=\(video.id)")
     }
@@ -995,24 +927,6 @@ struct FullScreenPlayer: View {
         let seconds = Int(player.elapsed)
         return URL(string: "https://youtu.be/\(video.id)?t=\(seconds)")
             ?? URL(string: "https://youtu.be/\(video.id)")
-    }
-
-    // MARK: - Queue controls
-
-    /// Autoplay belongs with playback behavior, so keep it available with the player's other
-    /// configurable top controls instead of coupling it to the Up Next panel's expanded state.
-    @ViewBuilder
-    private var autoplayPlayerButton: some View {
-        Button {
-            autoplayNext.toggle()
-            showPlayerControls()
-        } label: {
-            Image(systemName: autoplayNext ? "play.circle.fill" : "play.circle")
-                .playerTopControl()
-                .opacity(autoplayNext ? 1 : 0.58)
-        }
-        .accessibilityLabel("Autoplay next")
-        .accessibilityValue(autoplayNext ? "On" : "Off")
     }
 
     private func openPlaylist(_ playlistID: String) {
