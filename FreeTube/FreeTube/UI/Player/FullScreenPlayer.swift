@@ -807,70 +807,37 @@ struct FullScreenPlayer: View {
 
     @ViewBuilder
     private func playerActions(_ video: Video) -> some View {
-        HStack(spacing: 4) {
-            Button {
+        let videoURL = watchURL(video)
+        let currentTimeURL = watchURLAtCurrentTime(video)
+        let downloadedFileURL = downloads.localFile(for: video.id)
+        PlayerActionBar(
+            isSavedToPlaylist: isSavedToPersonalPlaylist,
+            watchURL: videoURL,
+            downloadedFileURL: downloadedFileURL,
+            downloadState: downloadPresentationState(
+                for: video,
+                downloadedFileURL: downloadedFileURL
+            ),
+            onSaveToPlaylist: {
                 saveToPlaylistVideo = video
-            } label: {
-                Image(systemName: isSavedToPersonalPlaylist ? "bookmark.fill" : "bookmark")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .accessibilityLabel("Save to playlist")
-
-            Menu {
-                if let url = watchURL(video) {
-                    ShareLink(item: url) {
-                        Label("Share…", systemImage: "square.and.arrow.up")
-                    }
-                    Link(destination: url) {
-                        Label("Open in browser", systemImage: "safari")
-                    }
-                    Button {
-                        UIPasteboard.general.string = url.absoluteString
-                    } label: {
-                        Label("Copy URL", systemImage: "link")
-                    }
+            },
+            onCopyURL: {
+                if let videoURL {
+                    UIPasteboard.general.string = videoURL.absoluteString
                 }
-                Button {
-                    if let url = watchURLAtCurrentTime(video) {
-                        UIPasteboard.general.string = url.absoluteString
-                    }
-                } label: {
-                    Label("Copy URL at current time", systemImage: "clock")
+            },
+            onCopyURLAtCurrentTime: {
+                if let currentTimeURL {
+                    UIPasteboard.general.string = currentTimeURL.absoluteString
                 }
-                if let localFile = downloads.localFile(for: video.id) {
-                    Button {
-                        shareFileURL = localFile
-                    } label: {
-                        Label("Share downloaded file…", systemImage: "doc")
-                    }
-                }
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .accessibilityLabel("Share")
-
-            Button {
+            },
+            onShareDownloadedFile: {
+                shareFileURL = downloadedFileURL
+            },
+            onDownload: {
                 startDownload(video)
-            } label: {
-                downloadButtonLabel(for: video)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .disabled(isDownloadActive(for: video) || downloads.localFile(for: video.id) != nil)
-            .accessibilityLabel(downloadAccessibilityLabel(for: video))
-        }
+        )
     }
 
     private func refreshPersonalPlaylistMembership() async {
@@ -883,23 +850,13 @@ struct FullScreenPlayer: View {
         isSavedToPersonalPlaylist = isSaved
     }
 
-    @ViewBuilder
-    private func downloadButtonLabel(for video: Video) -> some View {
-        if downloads.localFile(for: video.id) != nil {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title3.weight(.semibold))
-        } else if isDownloadActive(for: video) {
-            ProgressView().controlSize(.small)
-        } else {
-            Image(systemName: "arrow.down.circle")
-                .font(.title3.weight(.semibold))
-        }
-    }
-
-    private func downloadAccessibilityLabel(for video: Video) -> String {
-        if downloads.localFile(for: video.id) != nil { return "Downloaded" }
-        if isDownloadActive(for: video) { return "Downloading" }
-        return "Download"
+    private func downloadPresentationState(
+        for video: Video,
+        downloadedFileURL: URL?
+    ) -> PlayerDownloadPresentationState {
+        if downloadedFileURL != nil { return .downloaded }
+        if isDownloadActive(for: video) { return .downloading }
+        return .available
     }
 
     private func isDownloadActive(for video: Video) -> Bool {
