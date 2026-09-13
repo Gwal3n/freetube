@@ -15,6 +15,14 @@ import Kingfisher
 /// signed out would route to an error toast — clearer to just gate the whole menu.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
+    /// Library-owned destinations use value navigation so every local row participates in the
+    /// same bound `NavigationPath` as cross-feature channel and playlist routes.
+    private enum LocalDestination: Hashable {
+        case history
+        case subscriptions
+        case playlists
+    }
+
     let navigationRequest: AppNavigationRequest?
     @State private var libraryModel = LibraryViewModel()
     @State private var accountModel = AccountViewModel()
@@ -39,6 +47,13 @@ struct LibraryScreen: View {
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
+                }
+            }
+            .navigationDestination(for: LocalDestination.self) { destination in
+                switch destination {
+                case .history: LocalHistoryScreen()
+                case .subscriptions: LocalSubscriptionsScreen()
+                case .playlists: LocalPlaylistsScreen()
                 }
             }
             .task {
@@ -89,9 +104,7 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            NavigationLink {
-                LocalHistoryScreen()
-            } label: {
+            NavigationLink(value: LocalDestination.history) {
                 HStack(spacing: 14) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.title3)
@@ -106,9 +119,7 @@ struct LibraryScreen: View {
                 }
             }
 
-            NavigationLink {
-                LocalSubscriptionsScreen()
-            } label: {
+            NavigationLink(value: LocalDestination.subscriptions) {
                 HStack(spacing: 14) {
                     Image(systemName: "person.2.fill")
                         .font(.title3)
@@ -123,9 +134,7 @@ struct LibraryScreen: View {
                 }
             }
 
-            NavigationLink {
-                LocalPlaylistsScreen()
-            } label: {
+            NavigationLink(value: LocalDestination.playlists) {
                 HStack(spacing: 14) {
                     Image(systemName: "music.note.list")
                         .font(.title3)
