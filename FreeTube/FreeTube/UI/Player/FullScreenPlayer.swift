@@ -24,17 +24,6 @@ struct FullScreenPlayer: View {
     @State private var saveToPlaylistVideo: Video?
     @State private var isSavedToPersonalPlaylist = false
     @State private var downloadError: ErrorState?
-    /// Currently-pushed channel (nil = panel mode). When non-nil, the lower section swaps the
-    /// metadata + comments/queue panel for a NavigationStack rooted at `ChannelScreen`. Keeping
-    /// the NavigationStack **conditionally mounted** is what makes the panel-mode background
-    /// match the transport row: SwiftUI's NavigationStack container paints opaque under its
-    /// content, so any thinMaterial inside it stacks on top of an opaque layer and reads darker
-    /// than the rest of the popup. With the stack absent in panel mode, the outer VStack's
-    /// thinMaterial paints through cleanly.
-    @State private var pushedChannel: ChannelPresentation?
-    /// Path for deeper pushes inside the channel flow (e.g. ChannelScreen → ChannelTabScreen).
-    /// Only meaningful while `pushedChannel != nil`.
-    @State private var channelPath = NavigationPath()
     @State private var playerControlsVisible = true
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
@@ -52,12 +41,6 @@ struct FullScreenPlayer: View {
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
-
-    /// Hashable wrapper so `.navigationDestination(for:)` can match the channel id and push
-    /// `ChannelScreen` onto `channelPath`.
-    struct ChannelPresentation: Identifiable, Hashable {
-        let id: String
-    }
 
     var body: some View {
         // Single dark-blur material under EVERYTHING — status bar inset, video chrome, transport,
@@ -278,47 +261,21 @@ struct FullScreenPlayer: View {
                           prefetchVideoDetails,
                           let video = player.currentVideo else { return }
                     loadDetailsIfNeeded(for: video)
-                }
+            }
             if let video = player.currentVideo, !usesPortraitFullscreen {
-                // **Two render modes for the lower section, picked by `pushedChannel`:**
-                //
-                // 1. **Panel mode (default, channel == nil):** plain ScrollView, NO
-                //    NavigationStack. The outer VStack's `.background { thinMaterial }` paints
-                //    behind it directly — exactly the same backdrop the transport row above
-                //    shows. This is what makes the visual treatment consistent.
-                //
-                // 2. **Channel-pushed mode (channel != nil):** NavigationStack rooted at
-                //    `ChannelScreen`, with its own thinMaterial inside since the stack's UIKit
-                //    container paints opaque. Channel's own internal NavigationLinks (to
-                //    ChannelTabScreen / PlaylistScreen) push further into this stack.
-                //
-                // The previous version kept the NavigationStack mounted in both modes — that
-                // forced us to paint an inner thinMaterial under the comments/queue panel,
-                // which stacked on top of the stack's opaque container and read noticeably
-                // darker than the transport row. Mounting the stack only when needed fixes it.
-                Group {
-                    if let channel = pushedChannel {
-                        channelStack(channel)
-                    } else {
-                        panel(
-                            video,
-                            collapseRange: collapseRange,
-                            minimumContentHeight: max(
-                                0,
-                                proxy.size.height - compactSurfaceHeight + collapseRange
-                            )
-                        )
-                    }
-                }
-                // Reset description state, (best-effort) prefetch the snippet, AND pop any
-                // pushed channel screen whenever the user picks a new video — otherwise tapping
-                // the next video in the queue would leave a stale channel push on screen.
+                panel(
+                    video,
+                    collapseRange: collapseRange,
+                    minimumContentHeight: max(
+                        0,
+                        proxy.size.height - compactSurfaceHeight + collapseRange
+                    )
+                )
+                // Reset description state and prefetch the snippet when the video changes.
                 .onChange(of: video.id) { _, _ in
                     details = nil
                     isDetailsExpanded = false
                     detailsLoadFailed = false
-                    pushedChannel = nil
-                    channelPath = NavigationPath()
                     prefetchDescriptionIfAvailable(for: video)
                 }
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
@@ -413,7 +370,7 @@ struct FullScreenPlayer: View {
         }
     }
 
-    // MARK: - Lower section: panel vs channel-push
+    // MARK: - Lower section
 
     /// The video remains full-width in landscape. When its 16:9 height exceeds a short phone
     /// viewport, lift only the timeline by that overflow so the picture geometry does not change.
@@ -606,55 +563,6 @@ struct FullScreenPlayer: View {
         )
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
-    }
-
-    /// NavigationStack rooted at `ChannelScreen`. Mounted only when `pushedChannel != nil`.
-    /// Internal `NavigationLink`s inside `ChannelScreen` push onto `channelPath`; popping the
-    /// last item via our back button returns to panel mode.
-    @ViewBuilder
-    private func channelStack(_ root: ChannelPresentation) -> some View {
-        NavigationStack(path: $channelPath) {
-            channelDestination(root, isRoot: true)
-                .navigationDestination(for: ChannelPresentation.self) { channel in
-                    channelDestination(channel, isRoot: false)
-                }
-        }
-    }
-
-    /// Single channel destination — used for both the root channel (pushed from the player) and
-    /// any further pushes via NavigationLink. The back button pops `channelPath` when there's
-    /// something on it, otherwise clears `pushedChannel` to return to panel mode.
-    @ViewBuilder
-    private func channelDestination(_ channel: ChannelPresentation, isRoot: Bool) -> some View {
-        ZStack(alignment: .topLeading) {
-            ChannelScreen(channelID: channel.id)
-                .toolbar(.hidden, for: .navigationBar)
-                // Solid black, matching the playlist push inside this same NavigationStack.
-                // We deliberately don't use `.thinMaterial` here — pushed destinations inside
-                // the popup body use opaque black for visual consistency with PlaylistScreen,
-                // while the panel-mode comments/queue area keeps the popup's outer thinMaterial.
-                .background {
-                    Color.black.ignoresSafeArea()
-                }
-
-            Button {
-                if !channelPath.isEmpty {
-                    channelPath.removeLast()
-                } else {
-                    pushedChannel = nil
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 12)
-            .padding(.top, 8)
-        }
     }
 
     // MARK: - Metadata
