@@ -9,6 +9,9 @@ struct FullScreenPlayer: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var downloads = DownloadManager.shared
 
+    let presentationArtwork: UIImage?
+    let coversLiveVideoDuringExpansion: Bool
+
     /// Async-loaded description / details for the currently-playing video. Fetched on demand when
     /// the user taps "More" under the channel row.
     @State private var details: VideoInfo?
@@ -114,7 +117,11 @@ struct FullScreenPlayer: View {
                             player.requestInlinePlaybackRestoration()
                         }
                     )
-                    PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
+                    PlayerArtworkBackdrop(
+                        artwork: player.currentArtwork ?? presentationArtwork,
+                        state: player.loadState,
+                        forceVisible: coversLiveVideoDuringExpansion
+                    )
                     DownloadProgressOverlay(state: player.loadState)
                     Color.black
                         .opacity(playerControlsVisible ? 0.28 : 0)
