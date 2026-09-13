@@ -55,6 +55,12 @@ struct HomeScreen: View {
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                // `.searchable(isPresented:)` does not always clear its presentation binding when
+                // UIKit dismisses the keyboard interactively. Leaving it true pins the expanded
+                // search drawer at the top even though search is no longer active.
+                isSearchPresented = false
+            }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in
                 if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -113,6 +119,7 @@ struct HomeScreen: View {
         try? modelContext.save()
         if let directVideo = searchModel.directVideo(from: trimmed) {
             searchModel.clearResults()
+            isSearchPresented = false
             player.load(directVideo)
             // Give the resolution task created by `load` the first opportunity to start. Metadata
             // is useful polish, but it must remain behind the playback-critical request.

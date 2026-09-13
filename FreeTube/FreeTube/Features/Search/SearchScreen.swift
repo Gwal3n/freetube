@@ -10,6 +10,7 @@ struct SearchContent: View {
     let onRunSearch: (String) -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismissSearch) private var dismissSearch
     @State private var arePlaylistsExpanded = false
     @State private var areChannelsExpanded = true
     @State private var areVideosExpanded = true
@@ -37,7 +38,7 @@ struct SearchContent: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    dismissKeyboard()
+                    dismissNativeSearch()
                 }
             }
         }
@@ -110,7 +111,7 @@ struct SearchContent: View {
                                 offersPlayNext: true,
                                 playbackProgress: progressByVideoID[video.id]
                             ) {
-                                dismissKeyboard()
+                                dismissNativeSearch()
                                 player.load(video)
                             }
                             .onAppear {
@@ -185,7 +186,7 @@ struct SearchContent: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    dismissKeyboard()
+                    dismissNativeSearch()
                 }
         } else {
             ScrollView {
@@ -250,6 +251,14 @@ struct SearchContent: View {
             from: nil,
             for: nil
         )
+    }
+
+    /// Ends SwiftUI's search presentation as well as resigning the UIKit first responder. Calling
+    /// only `resignFirstResponder` leaves `.searchable(isPresented:)` logically active and pins
+    /// its expanded drawer after the keyboard has gone away.
+    private func dismissNativeSearch() {
+        dismissSearch()
+        dismissKeyboard()
     }
 
 }

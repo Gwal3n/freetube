@@ -229,6 +229,8 @@ final class PlayerStateManager {
     /// Tear-down hook for tests / app lifecycle. Call before releasing the manager. We avoid `deinit`
     /// here so we don't have to reach into main-actor-isolated state from a nonisolated context.
     func tearDownObservers() {
+        playerPresentationTask?.cancel()
+        playerPresentationTask = nil
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         itemStatusObservation?.invalidate()
         itemPresentationSizeObservation?.invalidate()
@@ -318,8 +320,7 @@ final class PlayerStateManager {
         // recommendation chain. setCurrent appends to the queue dataset for upcoming-up UI;
         // we just zero it for arbitrary files.
         queueAcceptsRecommendations = false
-        miniPlayerVisible = true
-        fullScreenPresented = true
+        presentPlayer(for: synthetic.id, expanded: true)
         elapsed = 0
         duration = 0
         hasEnded = false
@@ -401,10 +402,7 @@ final class PlayerStateManager {
         } else {
             queue.replace(with: [video])
         }
-        miniPlayerVisible = true
-        if expandPlayer {
-            fullScreenPresented = true
-        }
+        presentPlayer(for: video.id, expanded: expandPlayer)
         loadState = .resolving
         // Wipe transport state from the previous video so a stray time-observer tick during the
         // transition (the periodic callback can fire AFTER currentVideo flips but BEFORE the new
@@ -491,6 +489,33 @@ final class PlayerStateManager {
     private var recommendationTask: Task<Void, Never>?
     private var contentPrefetchTask: Task<Void, Never>?
     private var queueNoticeDismissTask: Task<Void, Never>?
+    private var playerPresentationTask: Task<Void, Never>?
+
+    /// Mounts the complete player in its settled mini position before expanding it for a first
+    /// launch. `AVPlayerViewController` does not reliably participate in a SwiftUI insertion
+    /// transition; staging one frame makes the initial opening use the same proven offset path as
+    /// tapping an existing mini-player, so the video surface and surrounding chrome travel as one.
+    private func presentPlayer(for videoID: String, expanded: Bool) {
+        playerPresentationTask?.cancel()
+        let wasVisible = miniPlayerVisible
+        miniPlayerVisible = true
+        guard expanded else { return }
+
+        if wasVisible {
+            fullScreenPresented = true
+            return
+        }
+
+        fullScreenPresented = false
+        playerPresentationTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled,
+                  let self,
+                  self.miniPlayerVisible,
+                  self.currentVideo?.id == videoID else { return }
+            self.fullScreenPresented = true
+        }
+    }
 
     func play() {
         if hasEnded {
@@ -739,6 +764,8 @@ final class PlayerStateManager {
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         resolutionTask = nil
+        playerPresentationTask?.cancel()
+        playerPresentationTask = nil
         recommendationTask?.cancel()
         recommendationTask = nil
         contentPrefetchTask?.cancel()

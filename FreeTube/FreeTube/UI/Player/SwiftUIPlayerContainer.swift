@@ -59,10 +59,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         )
                         .offset(y: expandedPlayerOffset(transition: transition, in: proxy.size))
                         .zIndex(2)
-                        .transition(.asymmetric(
-                            insertion: reduceMotion ? .opacity : .move(edge: .bottom),
-                            removal: .opacity
-                        ))
+                        // UIKit-backed video surfaces can visually outrun SwiftUI move
+                        // transitions. Position is animated by the container offset instead.
+                        .transition(.opacity)
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(
