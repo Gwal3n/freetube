@@ -19,17 +19,20 @@ struct PlayerArtworkBackdrop: View {
     let state: PlayerStateManager.LoadState
 
     var body: some View {
-        if coversPlayerSurface, let artwork {
-            Image(uiImage: artwork)
-                .resizable()
-                // `.fill` rather than `.fit`: YouTube's `hqdefault` thumbnails are 4:3 with the
-                // frame letterboxed inside them, and fitting a 4:3 image into our 16:9 area would
-                // show those baked-in black bars plus fresh pillarboxing. Filling crops them off.
-                .aspectRatio(contentMode: .fill)
-                .clipped()
-                .allowsHitTesting(false)
-                .transition(.opacity)
+        Group {
+            if coversPlayerSurface, let artwork {
+                Image(uiImage: artwork)
+                    .resizable()
+                    // `.fill` rather than `.fit`: YouTube's `hqdefault` thumbnails are 4:3 with the
+                    // frame letterboxed inside them, and fitting a 4:3 image into our 16:9 area would
+                    // show those baked-in black bars plus fresh pillarboxing. Filling crops them off.
+                    .aspectRatio(contentMode: .fill)
+                    .clipped()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.2), value: coversPlayerSurface)
     }
 
     /// True while the player has nothing of its own to draw. `.failed` is included so the error

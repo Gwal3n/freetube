@@ -111,8 +111,8 @@ struct FullScreenPlayer: View {
                 // item).
                 // Layer order is load-bearing. `AVPlayerViewController` paints an opaque black
                 // background, so the thumbnail has to sit *above* `PlayerSurface` to be visible at
-                // all — it hides itself once `loadState` reaches `.readyToPlay`. The `.animation`
-                // on the container is what turns that hand-off into a crossfade instead of a cut.
+                // all — it hides itself once `loadState` reaches `.readyToPlay`. The artwork view
+                // owns that crossfade so load-state changes cannot animate player geometry.
                 ZStack {
                     Color.black
                     PlayerSurface(
@@ -245,7 +245,6 @@ struct FullScreenPlayer: View {
                     }
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
-                .animation(.easeOut(duration: 0.2), value: player.loadState)
                 .onAppear { showPlayerControls() }
                 .onDisappear { controlsHideTask?.cancel() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
