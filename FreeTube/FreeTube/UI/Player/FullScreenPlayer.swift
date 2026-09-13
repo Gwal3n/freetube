@@ -117,6 +117,15 @@ struct FullScreenPlayer: View {
                             player.requestInlinePlaybackRestoration()
                         }
                     )
+                    // AVPlayerViewController's ready video layer can jump to its destination
+                    // before SwiftUI finishes translating the expanded container. Hide that live
+                    // UIKit surface during the handoff; playback continues underneath and fades
+                    // back in with the presentation artwork once the container has settled.
+                    .opacity(coversLiveVideoDuringExpansion ? 0 : 1)
+                    .animation(
+                        .easeOut(duration: 0.14),
+                        value: coversLiveVideoDuringExpansion
+                    )
                     PlayerArtworkBackdrop(
                         artwork: player.currentArtwork ?? presentationArtwork,
                         state: player.loadState,

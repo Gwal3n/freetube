@@ -306,7 +306,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         }
         // The cover must exist before the first animated frame; fading it in would briefly expose
         // the UIKit surface at its destination and recreate the same windowing artifact.
-        withTransaction(Transaction(animation: nil)) {
+        var insertionTransaction = Transaction(animation: nil)
+        insertionTransaction.disablesAnimations = true
+        withTransaction(insertionTransaction) {
             coversLiveVideoDuringExpansion = true
         }
         expansionCoverTask = Task { @MainActor in
