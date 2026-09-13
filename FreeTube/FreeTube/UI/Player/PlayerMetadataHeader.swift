@@ -1,0 +1,103 @@
+import SwiftUI
+
+import Kingfisher
+
+/// The presentation-only header shown beneath the player surface.
+///
+/// State ownership and side effects deliberately remain in `FullScreenPlayer`; this view only
+/// gives the title, statistics, channel, and action row one consistent layout.
+@available(iOS 17.0, *)
+struct PlayerMetadataHeader<Actions: View>: View {
+    let video: Video
+    let statsText: String
+    let isDetailsExpanded: Bool
+    let canOpenChannel: Bool
+    let onToggleDetails: () -> Void
+    let onOpenChannel: () -> Void
+    let actions: Actions
+
+    init(
+        video: Video,
+        statsText: String,
+        isDetailsExpanded: Bool,
+        canOpenChannel: Bool,
+        onToggleDetails: @escaping () -> Void,
+        onOpenChannel: @escaping () -> Void,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.video = video
+        self.statsText = statsText
+        self.isDetailsExpanded = isDetailsExpanded
+        self.canOpenChannel = canOpenChannel
+        self.onToggleDetails = onToggleDetails
+        self.onOpenChannel = onOpenChannel
+        self.actions = actions()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: onToggleDetails) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(video.title)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Image(systemName: isDetailsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if video.isLive || !statsText.isEmpty {
+                HStack(spacing: 7) {
+                    if video.isLive {
+                        Text("LIVE")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                    }
+                    if !statsText.isEmpty {
+                        Text(statsText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                if canOpenChannel {
+                    Button(action: onOpenChannel) {
+                        channelRow
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    channelRow
+                }
+                Spacer(minLength: 4)
+                actions
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var channelRow: some View {
+        HStack(spacing: 12) {
+            KFImage(video.channelThumbnailURL)
+                .thumbnail(size: CGSize(width: 32, height: 32)) {
+                    Circle().fill(.gray.opacity(0.2))
+                }
+                .resizable()
+                .scaledToFill()
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+
+            Text(video.channelName)
+                .font(.subheadline)
+                .lineLimit(1)
+        }
+    }
+}

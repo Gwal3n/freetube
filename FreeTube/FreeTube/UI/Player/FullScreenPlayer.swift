@@ -1,8 +1,6 @@
 import SwiftUI
 import UIKit
 
-import Kingfisher
-
 /// Expanded player content hosted by the app's SwiftUI player container. This view renders the
 /// surface, transport controls, metadata, and independently collapsible sections below.
 @available(iOS 17.0, *)
@@ -686,92 +684,34 @@ struct FullScreenPlayer: View {
 
     @ViewBuilder
     private func metadata(_ video: Video) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
+        PlayerMetadataHeader(
+            video: video,
+            statsText: detailsStatsRow(video: video),
+            isDetailsExpanded: isDetailsExpanded,
+            canOpenChannel: !video.channelID.isEmpty,
+            onToggleDetails: {
                 withAnimation(.smooth(duration: 0.24)) {
                     isDetailsExpanded.toggle()
                 }
                 if isDetailsExpanded {
                     loadDetailsIfNeeded(for: video)
                 }
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(video.title)
-                        .font(.title3.weight(.semibold))
-                        .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                    Image(systemName: isDetailsExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            let statsRow = detailsStatsRow(video: video)
-            if video.isLive || !statsRow.isEmpty {
-                HStack(spacing: 7) {
-                    if video.isLive {
-                        Text("LIVE")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.red, in: RoundedRectangle(cornerRadius: 3))
-                    }
-                    if !statsRow.isEmpty {
-                        Text(statsRow)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            },
+            onOpenChannel: {
+                @Bindable var p = player
+                p.fullScreenPresented = false
+                let channelID = video.channelID
+                Task { @MainActor in
+                    // Let the SwiftUI collapse animation begin before routing the tab below.
+                    try? await Task.sleep(for: .milliseconds(180))
+                    NotificationCenter.default.post(
+                        name: .freetubeOpenChannel,
+                        object: channelID
+                    )
                 }
             }
-            // Tapping anywhere on the channel row pushes the channel detail screen onto the
-            // popup's internal NavigationStack — banner, subscribe button, latest videos,
-            // shorts, playlists. Pushing (rather than presenting) keeps the video surface and
-            // transport controls visible at the top; only the panel area below is replaced.
-            HStack(spacing: 8) {
-                if !video.channelID.isEmpty {
-                    Button {
-                        @Bindable var p = player
-                        p.fullScreenPresented = false
-                        let channelID = video.channelID
-                        Task { @MainActor in
-                            // Let the SwiftUI collapse animation begin before routing the tab below.
-                            try? await Task.sleep(for: .milliseconds(180))
-                            NotificationCenter.default.post(
-                                name: .freetubeOpenChannel,
-                                object: channelID
-                            )
-                        }
-                    } label: {
-                        channelRow(video)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    channelRow(video)
-                }
-                Spacer(minLength: 4)
-                playerActions(video)
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    @ViewBuilder
-    private func channelRow(_ video: Video) -> some View {
-        HStack(spacing: 12) {
-            KFImage(video.channelThumbnailURL)
-                .thumbnail(size: CGSize(width: 32, height: 32)) {
-                    Circle().fill(.gray.opacity(0.2))
-                }
-                .resizable()
-                .scaledToFill()
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-
-            Text(video.channelName)
-                .font(.subheadline)
-                .lineLimit(1)
+        ) {
+            playerActions(video)
         }
     }
 
