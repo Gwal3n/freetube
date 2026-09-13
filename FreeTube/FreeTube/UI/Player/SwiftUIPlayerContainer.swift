@@ -8,6 +8,7 @@ import UIKit
 struct SwiftUIPlayerContainer<Content: View>: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let thumbnail: UIImage?
     let content: Content
@@ -42,6 +43,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .opacity(max(0, 1 - transition * 1.4))
                         .allowsHitTesting(false)
                         .zIndex(1)
+                        .transition(.opacity)
 
                     FullScreenPlayer()
                         .frame(
@@ -63,6 +65,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             y: 8
                         )
                         .zIndex(2)
+                        .transition(.asymmetric(
+                            insertion: reduceMotion ? .opacity : .move(edge: .bottom),
+                            removal: .opacity
+                        ))
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(thumbnail: thumbnail, onExpand: expandPlayerFromTap)
@@ -80,7 +86,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .animation(.smooth(duration: 0.28), value: player.fullScreenPresented)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: player.fullScreenPresented)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: player.miniPlayerVisible)
         }
         // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
         // FullScreenPlayer itself is inset below the portrait status area.

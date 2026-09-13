@@ -8,6 +8,8 @@ final class SubscriptionFeedViewModel {
     private(set) var videos: [Video] = []
     private(set) var playbackProgress: [String: Double] = [:]
     private(set) var isRefreshing = false
+    private(set) var refreshedChannels = 0
+    private(set) var refreshChannelCount = 0
     private(set) var hasLoaded = false
     private(set) var failedChannelCount = 0
     private(set) var canLoadMore = false
@@ -45,11 +47,20 @@ final class SubscriptionFeedViewModel {
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
-        let result = await service.refresh(subscriptions: subscriptions.subscriptions)
+        refreshedChannels = 0
+        refreshChannelCount = subscriptions.subscriptions.count
+        let result = await service.refresh(subscriptions: subscriptions.subscriptions) { [weak self] completed, total in
+            await self?.updateRefreshProgress(completed: completed, total: total)
+        }
         failedChannelCount = result.failed
         visibleLimit = pageSize
         await loadCache()
         isRefreshing = false
+    }
+
+    private func updateRefreshProgress(completed: Int, total: Int) {
+        refreshedChannels = completed
+        refreshChannelCount = total
     }
 
     func loadMore() async {

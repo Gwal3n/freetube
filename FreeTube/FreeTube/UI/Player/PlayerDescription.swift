@@ -11,6 +11,7 @@ struct PlayerDescription: View {
     let loadFailed: Bool
     let onSeek: (TimeInterval) -> Void
     let onRetry: () -> Void
+    let onExpand: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -37,7 +38,18 @@ struct PlayerDescription: View {
                     Text("\(likesText) likes").font(.caption).foregroundStyle(.secondary)
                 }
             } else if let text {
-                Text(text).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                Button(action: onExpand) {
+                    Text(text)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Expand description")
             }
         }
         .padding(.horizontal)

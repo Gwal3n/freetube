@@ -77,16 +77,7 @@ struct CommentsSection: View {
                 Task { await model.load() }
             }
         } label: {
-            HStack {
-                SectionHeader(title: commentsTitle)
-                Spacer()
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
-            }
-            .contentShape(Rectangle())
+            PlayerSectionHeading(title: commentsTitle, isExpanded: isExpanded)
         }
         .buttonStyle(.plain)
         .padding(.horizontal)

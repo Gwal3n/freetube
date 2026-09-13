@@ -46,6 +46,26 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .navigationTitle("Feed")
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if model.isRefreshing {
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text("Refreshing subscriptions")
+                            Spacer()
+                            Text(verbatim: "\(model.refreshedChannels) / \(model.refreshChannelCount)")
+                                .monospacedDigit()
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        ProgressView(value: Double(model.refreshedChannels), total: Double(max(1, model.refreshChannelCount)))
+                    }
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    .allowsHitTesting(false)
+                }
+            }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)

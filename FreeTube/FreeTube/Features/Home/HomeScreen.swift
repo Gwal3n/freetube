@@ -42,6 +42,7 @@ struct HomeScreen: View {
             }
             .contentShape(Rectangle())
             .navigationTitle("Search")
+            .navigationBarTitleDisplayMode(.inline)
             .modifier(ConditionalSearchable(
                 text: $searchModel.query,
                 isPresented: $isSearchPresented,
@@ -105,6 +106,9 @@ struct HomeScreen: View {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         searchModel.query = trimmed
+        // Respond immediately; network completion must not later dismiss a keyboard the user
+        // has reopened to edit a different query.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         if let existing = history.first(where: { $0.query == trimmed }) {
             existing.searchedAt = .now
         } else {
@@ -123,14 +127,6 @@ struct HomeScreen: View {
             return
         }
         await searchModel.submit()
-        // Keep native search presentation (and therefore the visible query + clear button), but
-        // dismiss the keyboard once results arrive.
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
-        )
     }
 
 }

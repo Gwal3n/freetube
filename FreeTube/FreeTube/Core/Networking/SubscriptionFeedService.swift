@@ -18,7 +18,8 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
         self.writer = writer
     }
 
-    func refresh(subscriptions: [LocalSubscription]) async -> SubscriptionFeedRefresh {
+    func refresh(subscriptions: [LocalSubscription], onProgress: @Sendable (Int, Int) async -> Void) async -> SubscriptionFeedRefresh {
+        await onProgress(0, subscriptions.count)
         await writer.pruneSubscriptionFeed(validChannelIDs: Set(subscriptions.map(\.id)))
         var succeeded = 0
         var failed = 0
@@ -47,6 +48,7 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
                     case .failure:
                         failed += 1
                     }
+                    await onProgress(succeeded + failed, subscriptions.count)
                 }
             }
         }

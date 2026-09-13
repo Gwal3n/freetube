@@ -44,7 +44,6 @@ struct SearchContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .simultaneousGesture(dismissSearchPresentationGesture)
         .onChange(of: model.submittedQuery) { _, _ in
             arePlaylistsExpanded = false
             areChannelsExpanded = true
@@ -256,17 +255,6 @@ struct SearchContent: View {
         )
     }
 
-    /// `.scrollDismissesKeyboard` resigns UIKit's first responder but does not consistently update
-    /// `.searchable(isPresented:)` on iOS 26. End the native presentation after a real vertical
-    /// content drag so the navigation title and search bar return to their matching idle state.
-    private var dismissSearchPresentationGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .onEnded { value in
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
-                dismissKeyboard()
-                onDismissSearchPresentation()
-            }
-    }
 }
 
 /// Inline field used on Mac, where native `.searchable` collapses to a toolbar button.
@@ -311,7 +299,7 @@ struct ConditionalSearchable: ViewModifier {
 
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(text: $text, isPresented: $isPresented, prompt: Text(prompt))
+            content.searchable(text: $text, isPresented: $isPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt))
         } else {
             content
         }

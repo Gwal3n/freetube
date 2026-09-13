@@ -799,6 +799,10 @@ struct FullScreenPlayer: View {
             onRetry: {
                 details = nil
                 loadDetailsIfNeeded(for: video)
+            },
+            onExpand: {
+                withAnimation(.easeInOut(duration: 0.2)) { isDetailsExpanded = true }
+                loadDetailsIfNeeded(for: video)
             }
         )
     }
@@ -1253,32 +1257,14 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private var queuePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Button {
-                    withAnimation(.smooth(duration: 0.28)) {
-                        isQueueExpanded.toggle()
-                    }
-                } label: {
-                    HStack {
-                        SectionHeader(title: "Up next")
-                        Spacer()
-                    }
-                    .contentShape(Rectangle())
+            Button {
+                withAnimation(.smooth(duration: 0.28)) {
+                    isQueueExpanded.toggle()
                 }
-                .buttonStyle(.plain)
-                Button {
-                    withAnimation(.smooth(duration: 0.28)) {
-                        isQueueExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: isQueueExpanded ? "chevron.up" : "chevron.down")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                }
-                .buttonStyle(.plain)
+            } label: {
+                PlayerSectionHeading(title: "Up next", isExpanded: isQueueExpanded)
             }
+            .buttonStyle(.plain)
             .padding(.horizontal)
             // `List` is the cleanest source of drag-to-reorder + swipe-to-delete in SwiftUI. We're
             // already inside a ScrollView, so we cap the list with a generous fixed height so it
@@ -1351,35 +1337,23 @@ struct FullScreenPlayer: View {
         isExpanded: Binding<Bool>,
         onOpen: (() -> Void)? = nil
     ) -> some View {
-        HStack {
+        HStack(spacing: 8) {
             Button {
                 isExpanded.wrappedValue.toggle()
             } label: {
-                SectionHeader(title: title)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                PlayerSectionHeading(title: title, isExpanded: isExpanded.wrappedValue)
             }
             .buttonStyle(.plain)
             if let onOpen {
                 Button(action: onOpen) {
                     Image(systemName: "arrow.up.right")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(width: 32, height: 32)
+                        .font(.footnote.weight(.semibold))
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open playlist")
             }
-            Button {
-                isExpanded.wrappedValue.toggle()
-            } label: {
-                Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal)
     }
