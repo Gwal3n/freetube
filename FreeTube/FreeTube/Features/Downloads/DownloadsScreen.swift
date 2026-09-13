@@ -80,7 +80,7 @@ struct DownloadsScreen: View {
                     if savedItems.isEmpty {
                         EmptyStateView(systemImage: "arrow.down.circle",
                                        title: "No downloads",
-                                       message: "Tap a video to play — it will be saved here automatically.")
+                                       message: "Download a video from the player or a link to watch it offline.")
                     }
                     ForEach(savedItems) { item in
                         savedItemRow(item)

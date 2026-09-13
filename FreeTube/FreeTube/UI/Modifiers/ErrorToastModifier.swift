@@ -2,6 +2,7 @@ import SwiftUI
 
 /// CLAUDE.md §12: "Show errors via a single `ErrorToast` view modifier reading `errorState`."
 struct ErrorToastModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var errorState: ErrorState?
 
     func body(content: Content) -> some View {
@@ -19,9 +20,10 @@ struct ErrorToastModifier: ViewModifier {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.footnote)
-                                .padding(4)
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Dismiss error")
                     }
                     .padding(12)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -33,7 +35,7 @@ struct ErrorToastModifier: ViewModifier {
                     }
                 }
             }
-            .animation(.spring(), value: errorState?.id)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: errorState?.id)
     }
 }
 

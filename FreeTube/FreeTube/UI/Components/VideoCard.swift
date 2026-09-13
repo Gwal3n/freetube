@@ -39,28 +39,13 @@ struct VideoCard: View {
     }
 
     private var thumbnail: some View {
-        ZStack(alignment: .bottomTrailing) {
-            KFImage(video.thumbnailURL)
-                .thumbnail(size: CGSize(width: 400, height: 225)) {
-                    Color.gray.opacity(0.2)
-                }
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .aspectRatio(16/9, contentMode: .fill)
-                .clipped()
-
-            if !video.durationString.isEmpty {
-                Text(video.durationString)
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(video.isLive ? Color.red : Color.black.opacity(0.75))
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .padding(6)
-            }
+        GeometryReader { proxy in
+            VideoThumbnail(
+                video: video,
+                size: CGSize(width: proxy.size.width, height: proxy.size.width * 9 / 16)
+            )
         }
+        .aspectRatio(16 / 9, contentMode: .fit)
     }
 
     private var metadataRow: some View {
@@ -78,7 +63,7 @@ struct VideoCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(video.title)
-                            .font(.subheadline.weight(.semibold))
+                            .font(MediaStyle.title)
                             .lineLimit(2)
                         Text(metadataLine)
                             .font(.caption)

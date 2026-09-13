@@ -55,7 +55,9 @@ struct SubscriptionFeedScreen: View {
             }
             .refreshable { await model.refresh() }
             .overlay {
-                if !model.hasSubscriptions && model.videos.isEmpty {
+                if !model.hasLoaded {
+                    MediaListPlaceholder()
+                } else if !model.hasSubscriptions && model.videos.isEmpty {
                     ContentUnavailableView(
                         "No subscriptions",
                         systemImage: "rectangle.stack.person.crop",
@@ -68,12 +70,12 @@ struct SubscriptionFeedScreen: View {
                         description: Text("Pull down to refresh your subscriptions.")
                     )
                 } else if model.videos.isEmpty && model.isRefreshing {
-                    ProgressView("Refreshing subscriptions…")
+                    MediaListPlaceholder()
                 }
             }
             .task { await model.load() }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
-                Task { await model.load() }
+                Task { await model.refreshProgress() }
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }

@@ -60,12 +60,7 @@ struct SwiftUIMiniPlayer: View {
             .padding(.horizontal, 4)
             .frame(height: 56)
 
-            GeometryReader { proxy in
-                Capsule()
-                    .fill(Color.red)
-                    .frame(width: proxy.size.width * progress, height: 2)
-            }
-            .frame(height: 2)
+            MiniPlayerProgress()
         }
         .background {
             if oledMiniPlayer {
@@ -125,11 +120,4 @@ struct SwiftUIMiniPlayer: View {
         }
     }
 
-    private var progress: CGFloat {
-        if case .downloading(let progress, _) = player.loadState {
-            return CGFloat(min(1, max(0, progress ?? 0)))
-        }
-        guard player.duration > 0 else { return 0 }
-        return CGFloat(min(1, max(0, player.elapsed / player.duration)))
-    }
 }

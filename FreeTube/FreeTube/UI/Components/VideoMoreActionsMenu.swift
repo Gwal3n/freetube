@@ -27,6 +27,14 @@ struct VideoMoreActionsMenu: View {
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
 
+    init(video: Video, offersPlayNext: Bool = false, onRemoveFromUpNext: (() -> Void)? = nil) {
+        self.video = video
+        self.offersPlayNext = offersPlayNext
+        self.onRemoveFromUpNext = onRemoveFromUpNext
+        let videoID = video.id
+        _favorites = Query(filter: #Predicate<FavoriteVideo> { $0.videoID == videoID })
+    }
+
     var body: some View {
         Menu {
             menuContent
@@ -34,10 +42,11 @@ struct VideoMoreActionsMenu: View {
             Image(systemName: "ellipsis")
                 .font(.body)
                 .foregroundStyle(.secondary)
-                .frame(width: 32, height: 32)
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("More video actions")
         // Same UIActivityViewController bridge the full-screen player uses for "Open in…".
         // ShareLink would serialize `file://` URLs as plain text inside a Menu and lose the
         // mp4 UTType, so the system share sheet wouldn't show the apps that can handle it.

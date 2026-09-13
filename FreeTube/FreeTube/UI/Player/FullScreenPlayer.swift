@@ -787,66 +787,20 @@ struct FullScreenPlayer: View {
 
     /// Shows the video description in a YouTube-like collapsed-by-default block. Tapping the video
     /// title expands it and lazily fetches the full details payload.
-    @ViewBuilder
     private func detailsSection(video: Video) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if isDetailsExpanded {
-                expandedDetailsBody(video: video)
-            } else {
-                collapsedDetailsBody(video: video)
+        PlayerDescription(
+            text: availableDescription(video: video),
+            parts: details?.descriptionParts ?? [],
+            likesText: (details?.likeCount).flatMap { $0 > 0 ? formatCount($0) : nil },
+            isExpanded: isDetailsExpanded,
+            isLoading: isLoadingDetails,
+            loadFailed: detailsLoadFailed,
+            onSeek: { player.seek(to: $0) },
+            onRetry: {
+                details = nil
+                loadDetailsIfNeeded(for: video)
             }
-        }
-        .padding(.horizontal)
-        .animation(.easeInOut(duration: 0.2), value: isDetailsExpanded)
-    }
-
-    @ViewBuilder
-    private func collapsedDetailsBody(video: Video) -> some View {
-        if let snippet = inlineDescriptionSnippet(video: video) {
-            Text(snippet)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-    }
-
-    @ViewBuilder
-    private func expandedDetailsBody(video: Video) -> some View {
-        // Full description text (from the loaded details, falling back to the search-result snippet).
-        if let text = availableDescription(video: video) {
-            RichDescriptionText(
-                parts: details?.descriptionParts ?? [],
-                fallback: text,
-                onSeek: { player.seek(to: $0) }
-            )
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-        } else if isLoadingDetails {
-            HStack {
-                ProgressView().controlSize(.small)
-                Text("Loading details…").font(.caption).foregroundStyle(.secondary)
-            }
-        } else if detailsLoadFailed {
-            HStack(spacing: 8) {
-                Text("Description unavailable")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Button("Retry") {
-                    details = nil
-                    loadDetailsIfNeeded(for: video)
-                }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.bordered)
-            }
-        }
-
-        // Like count if we got it from the details payload.
-        if let likes = details?.likeCount, likes > 0 {
-            Text("\(formatCount(likes)) likes")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-
+        )
     }
 
     /// Picks the description text to render in the 2-line collapsed preview. Prefer the loaded

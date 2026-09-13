@@ -109,6 +109,7 @@ struct VideoDetailScreen: View {
     private func recommendedBlock(_ info: VideoInfo) -> some View {
         if !info.recommended.isEmpty {
             SectionHeader(title: "Up next")
+                .padding(.horizontal)
             ForEach(info.recommended) { video in
                 VideoRow(video: video) {
                     player.load(video)

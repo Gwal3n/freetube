@@ -12,6 +12,7 @@ struct SubscriptionsScreen: View {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if !model.channels.isEmpty {
                         SectionHeader(title: "Subscriptions")
+                            .padding(.horizontal)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 16) {
                                 ForEach(model.channels) { channel in
@@ -28,6 +29,7 @@ struct SubscriptionsScreen: View {
                     }
 
                     SectionHeader(title: "Latest from your subscriptions")
+                        .padding(.horizontal)
                     ForEach(model.feedVideos) { video in
                         VideoCard(video: video, onTap: { player.load(video) }, showsMoreMenu: true)
                     }

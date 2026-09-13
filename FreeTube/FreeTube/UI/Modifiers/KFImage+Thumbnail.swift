@@ -19,16 +19,18 @@ extension KFImage {
     /// displayed size avoids decoding a 1MB JPEG into memory for a 36pt avatar.
     func thumbnail<Placeholder: View>(
         size: CGSize,
+        scale: CGFloat = 3,
+        fadeDuration: TimeInterval = 0.15,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) -> KFImage {
         self
             .placeholder(placeholder)
             .setProcessor(DownsamplingImageProcessor(size: CGSize(
-                width: size.width * 3,
-                height: size.height * 3
+                width: size.width * scale,
+                height: size.height * scale
             )))
             .cacheOriginalImage()
-            .fade(duration: 0.15)
+            .fade(duration: fadeDuration)
             .cancelOnDisappear(true)
     }
 }

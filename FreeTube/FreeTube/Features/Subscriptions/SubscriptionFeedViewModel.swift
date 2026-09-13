@@ -8,6 +8,7 @@ final class SubscriptionFeedViewModel {
     private(set) var videos: [Video] = []
     private(set) var playbackProgress: [String: Double] = [:]
     private(set) var isRefreshing = false
+    private(set) var hasLoaded = false
     private(set) var failedChannelCount = 0
     private(set) var canLoadMore = false
 
@@ -32,7 +33,13 @@ final class SubscriptionFeedViewModel {
 
     func load() async {
         await loadCache()
+        hasLoaded = true
         if videos.isEmpty, hasSubscriptions { await refresh() }
+    }
+
+    /// History changes affect progress only; preserve the feed rows and pagination.
+    func refreshProgress() async {
+        playbackProgress = await writer.watchProgress(videoIDs: videos.map(\.id))
     }
 
     func refresh() async {

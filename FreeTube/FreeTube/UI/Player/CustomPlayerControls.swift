@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct CustomPlayerControls: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isVisible: Bool
     let isSeekPreviewActive: Bool
     let isPlaying: Bool
@@ -105,8 +106,8 @@ struct CustomPlayerControls: View {
         }
         .allowsHitTesting(isVisible)
         .accessibilityHidden(!isVisible && !isSeekPreviewActive)
-        .animation(.easeInOut(duration: 0.24), value: isVisible)
-        .animation(.easeInOut(duration: 0.12), value: isSeekPreviewActive)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
     }
 
 }

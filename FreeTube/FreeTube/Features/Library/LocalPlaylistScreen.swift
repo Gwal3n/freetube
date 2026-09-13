@@ -183,7 +183,9 @@ struct LocalPlaylistScreen: View {
     private func playlistHeader(_ local: LocalPlaylistDetails) -> some View {
         VStack(spacing: 14) {
             KFImage(local.playlist.thumbnailURL)
-                .placeholder { Image(systemName: "music.note.list").font(.largeTitle).foregroundStyle(.secondary) }
+                .thumbnail(size: CGSize(width: 400, height: 225)) {
+                    Image(systemName: "music.note.list").font(.largeTitle).foregroundStyle(.secondary)
+                }
                 .resizable()
                 .scaledToFill()
                 .frame(maxWidth: .infinity)

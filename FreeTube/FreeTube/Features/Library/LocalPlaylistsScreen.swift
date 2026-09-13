@@ -119,7 +119,9 @@ struct LocalPlaylistsScreen: View {
     private func playlistRow(_ playlist: LocalPlaylistSnapshot) -> some View {
         HStack(spacing: 12) {
             KFImage(playlist.thumbnailURL)
-                .placeholder { Image(systemName: "music.note.list").foregroundStyle(.secondary) }
+                .thumbnail(size: CGSize(width: 72, height: 44)) {
+                    Image(systemName: "music.note.list").foregroundStyle(.secondary)
+                }
                 .resizable()
                 .scaledToFill()
                 .frame(width: 72, height: 44)

@@ -12,7 +12,6 @@ struct SectionHeader: View {
             Spacer()
             trailing
         }
-        .padding(.horizontal)
         .padding(.top, 4)
     }
 }

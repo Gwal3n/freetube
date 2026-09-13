@@ -9,6 +9,7 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct VideoRow: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let video: Video
     var showsMoreMenu: Bool
     var offersPlayNext: Bool
@@ -54,7 +55,7 @@ struct VideoRow: View {
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
             } else if reservesMoreMenuSpace {
                 Color.clear
-                    .frame(width: 32, height: 32)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .accessibilityHidden(true)
             }
         }
@@ -71,52 +72,18 @@ struct VideoRow: View {
     }
 
     private var content: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack(alignment: .bottomTrailing) {
-                KFImage(video.thumbnailURL)
-                    .thumbnail(size: CGSize(width: 168, height: 96)) {
-                        Color.gray.opacity(0.2)
-                    }
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 168, height: 96)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                if !video.durationString.isEmpty {
-                    Text(video.durationString)
-                        .font(.caption2)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(video.isLive ? Color.red : Color.black.opacity(0.75))
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
-                        .padding(4)
-                }
-
-                if let playbackProgress {
-                    GeometryReader { proxy in
-                        VStack(spacing: 0) {
-                            Spacer()
-                            ZStack(alignment: .leading) {
-                                Color.black.opacity(0.32)
-                                Color.red
-                                    .frame(width: proxy.size.width * min(max(playbackProgress, 0), 1))
-                            }
-                            .frame(height: 3)
-                        }
-                    }
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                }
-            }
-            .frame(width: 168, height: 96)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        HStack(alignment: .top, spacing: MediaStyle.spacing) {
+            VideoThumbnail(
+                video: video,
+                size: CGSize(width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
+                             height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81),
+                progress: playbackProgress
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(video.title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
+                    .font(MediaStyle.title)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 Text(video.channelName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -128,7 +95,8 @@ struct VideoRow: View {
                         .lineLimit(1)
                 }
             }
-            Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }

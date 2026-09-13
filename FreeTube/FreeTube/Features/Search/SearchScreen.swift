@@ -27,7 +27,7 @@ struct SearchContent: View {
             } else if let results = model.results {
                 resultsList(results)
             } else if model.isLoading {
-                LoadingView()
+                MediaListPlaceholder()
             } else if !history.isEmpty {
                 historyList
             } else {
