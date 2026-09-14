@@ -1,16 +1,8 @@
 import SwiftUI
 
-/// Library is the user's home for everything tied to their YouTube account. When signed in we
-/// render the account header followed by a menu of six destinations:
-///   - Watch history (`HistoryScreen` backed by `HistoryResponse`)
-///   - Playlists (list of user-owned playlists from `AccountLibraryResponse`)
-///   - Your videos (the user's own uploads — opens `ChannelScreen(channelID:)`)
-///   - Subscriptions (channels you follow — opens `SubscriptionsScreen`)
-///   - Liked videos (special playlist `VLLL` — opens `PlaylistScreen`)
-///   - Watch later (special playlist `VLWL` — opens `PlaylistScreen`)
-///
-/// When signed out we show a single sign-in CTA and hide the menu. Tapping any item while
-/// signed out would route to an error toast — clearer to just gate the whole menu.
+/// Device-local library following NewPipe's account-free model. Remote channel and playlist
+/// destinations remain available when linked from other parts of the app, but this root owns
+/// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -21,20 +13,12 @@ struct LibraryScreen: View {
         case history
         case subscriptions
         case playlists
-        case accountHistory
-        case accountPlaylists
-        case accountSubscriptions
-        case unavailableChannel
         case channel(String)
         case playlist(String)
         case localPlaylist(String)
     }
 
     let navigationRequest: AppNavigationRequest?
-    @State private var libraryModel = LibraryViewModel()
-    @State private var accountModel = AccountViewModel()
-    @State private var showingLogin = false
-    @State private var isSigningOut = false
     @State private var localHistoryCount = 0
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount = 0
@@ -44,11 +28,7 @@ struct LibraryScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                accountSection
                 localHistorySection
-                if accountModel.info != nil {
-                    menuSection
-                }
             }
             .navigationTitle("Library")
             .navigationDestination(for: Destination.self) { destination in
@@ -57,20 +37,6 @@ struct LibraryScreen: View {
                 case .subscriptions:
                     LocalSubscriptionsScreen { path.append(.channel($0)) }
                 case .playlists: LocalPlaylistsScreen()
-                case .accountHistory: HistoryScreen()
-                case .accountPlaylists:
-                    UserPlaylistsScreen(
-                        playlists: libraryModel.library?.playlists ?? [],
-                        onOpenPlaylist: { path.append(.playlist($0)) }
-                    )
-                case .accountSubscriptions:
-                    SubscribedChannelsScreen { path.append(.channel($0)) }
-                case .unavailableChannel:
-                    ContentUnavailableView(
-                        "No Channel Found",
-                        systemImage: "person.crop.rectangle",
-                        description: Text("Pull down in Library to refresh your account information.")
-                    )
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
@@ -85,22 +51,7 @@ struct LibraryScreen: View {
             .refreshable {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 localPlaylistCount = await localPlaylistCountFromStore()
-                await accountModel.load()
-                if accountModel.info != nil { await libraryModel.load() }
             }
-            .sheet(isPresented: $showingLogin) {
-                LoginScreen()
-                    .onDisappear {
-                        // After the login sheet closes, re-fetch account info — if cookies
-                        // landed, the next `fetchAccountInfo` will return non-nil and the menu
-                        // appears immediately.
-                        Task {
-                            await accountModel.load()
-                            await libraryModel.load()
-                        }
-                    }
-            }
-            .errorToast(Bindable(libraryModel).errorState)
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task {
                     let count = await PersistenceWriter.shared.watchHistoryCount()
@@ -130,12 +81,6 @@ struct LibraryScreen: View {
         localHistoryCount = historyCount
         localPlaylistCount = playlistCount
 
-        await accountModel.load()
-        guard !Task.isCancelled, path.isEmpty else { return }
-        if accountModel.info != nil {
-            await libraryModel.load()
-            guard !Task.isCancelled, path.isEmpty else { return }
-        }
         didLoadRootData = true
     }
 
@@ -184,100 +129,6 @@ struct LibraryScreen: View {
     private func openLocalDestination(_ destination: Destination) {
         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             path.append(destination)
-        }
-    }
-
-    // MARK: - Account header
-
-    @ViewBuilder
-    private var accountSection: some View {
-        LibraryAccountSection(
-            info: accountModel.info,
-            isSigningOut: isSigningOut,
-            onSignIn: { showingLogin = true },
-            onSignOut: { Task { await signOut() } }
-        )
-    }
-
-    private func signOut() async {
-        guard !isSigningOut else { return }
-        isSigningOut = true
-        defer { isSigningOut = false }
-        await accountModel.signOut()
-        libraryModel.clear()
-    }
-
-    // MARK: - Menu
-
-    /// Five destinations as a single section (Movies removed — YouTubeKit doesn't expose it).
-    /// Each row renders a custom `HStack { icon, VStack(title, subtitle) }` so we can show a
-    /// count under the title. Subtitles are best-effort: when the library response hasn't
-    /// loaded yet they read "—" and update reactively once `libraryModel.library` populates.
-    @ViewBuilder
-    private var menuSection: some View {
-        Section {
-            menuRow(
-                title: "Watch history",
-                subtitle: countSubtitle(libraryModel.library?.historyCount, noun: "video"),
-                systemImage: "clock.fill",
-                destination: .accountHistory
-            )
-
-            menuRow(
-                title: "Playlists",
-                subtitle: countSubtitle(libraryModel.library?.playlists.count, noun: "playlist"),
-                systemImage: "rectangle.stack.fill",
-                destination: .accountPlaylists
-            )
-
-            menuRow(
-                title: "Your videos",
-                subtitle: "Your YouTube channel",
-                systemImage: "person.crop.rectangle.fill",
-                destination: libraryModel.library?.userChannelID.map(Destination.channel) ?? .unavailableChannel
-            )
-
-            menuRow(
-                title: "Subscriptions",
-                subtitle: "Channels you follow",
-                systemImage: "person.2.fill",
-                destination: .accountSubscriptions
-            )
-
-            // VLLL — YouTube's well-known playlist ID for the signed-in user's Liked Videos.
-            menuRow(
-                title: "Liked videos",
-                subtitle: countSubtitle(libraryModel.library?.likedCount, noun: "video"),
-                systemImage: "hand.thumbsup.fill",
-                destination: .playlist("VLLL")
-            )
-
-            // VLWL — Watch Later.
-            menuRow(
-                title: "Watch later",
-                subtitle: countSubtitle(libraryModel.library?.watchLaterCount, noun: "video"),
-                systemImage: "clock.arrow.circlepath",
-                destination: .playlist("VLWL")
-            )
-        }
-    }
-
-    /// Custom row builder so we can put the count under the title (the system's `Label` only
-    /// shows a single line of text next to its icon). Every row writes to the same typed path,
-    /// avoiding a second implicit navigation state owned by individual `NavigationLink`s.
-    @ViewBuilder
-    private func menuRow(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        destination: Destination
-    ) -> some View {
-        LibraryDestinationRow(
-            title: title,
-            subtitle: subtitle,
-            systemImage: systemImage
-        ) {
-            openLocalDestination(destination)
         }
     }
 
@@ -406,41 +257,5 @@ private struct LocalHistoryScreen: View {
         let existingIDs = Set(entries.map(\.videoID))
         entries.append(contentsOf: page.filter { !existingIDs.contains($0.videoID) })
         hasMore = page.count == pageSize
-    }
-}
-
-// MARK: - User playlists list
-
-/// Simple list of user-owned playlists. Each row pushes `PlaylistScreen` for the playlist's
-/// detail view (videos + actions). Reuses `PlaylistRow` so the visual matches search/channel.
-@available(iOS 17.0, *)
-private struct UserPlaylistsScreen: View {
-    let playlists: [Playlist]
-    let onOpenPlaylist: (String) -> Void
-
-    var body: some View {
-        Group {
-            if playlists.isEmpty {
-                ContentUnavailableView(
-                    "No Playlists",
-                    systemImage: "rectangle.stack",
-                    description: Text("Playlists you create on YouTube will appear here.")
-                )
-            } else {
-                List {
-                    ForEach(playlists) { playlist in
-                        PlaylistRow(
-                            playlist: playlist,
-                            onTap: { onOpenPlaylist(playlist.id) },
-                            showsMoreMenu: true
-                        )
-                        .accessibilityAddTraits(.isLink)
-                    }
-                }
-                .listStyle(.plain)
-            }
-        }
-        .navigationTitle("Playlists")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }

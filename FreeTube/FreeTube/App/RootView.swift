@@ -7,7 +7,7 @@ import UIKit
 /// Tab layout (5):
 /// - Feed (latest cached videos from local subscriptions)
 /// - Search (search field, suggestions, results, and local recent searches)
-/// - Library (subsumes the former Account + Subscriptions tabs; includes Favorites/Recents/Playlists/Login)
+/// - Library (device-local history, subscriptions, and playlists)
 /// - Downloads (saved videos, transfer queue, and yt-dlp link downloads)
 /// - Settings (preferences, quality, reset-session)
 @available(iOS 17.0, *)
