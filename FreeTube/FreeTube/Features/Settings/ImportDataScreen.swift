@@ -3,6 +3,44 @@ import UniformTypeIdentifiers
 
 @available(iOS 17.0, *)
 struct ImportDataScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private enum DataOperation {
+        case exporting
+        case restoring
+        case importingSubscriptions
+        case importingPlaylists(completed: Int, total: Int)
+
+        var title: String {
+            switch self {
+            case .exporting: "Preparing Backup"
+            case .restoring: "Restoring Backup"
+            case .importingSubscriptions: "Importing Subscriptions"
+            case .importingPlaylists: "Importing Playlists"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .exporting:
+                "Collecting your settings and local data…"
+            case .restoring:
+                "Replacing local data from your backup…"
+            case .importingSubscriptions:
+                "Adding channels to Local Subscriptions…"
+            case .importingPlaylists(let completed, let total):
+                "Importing playlist \(min(completed + 1, total)) of \(total)…"
+            }
+        }
+
+        var progress: Double? {
+            guard case .importingPlaylists(let completed, let total) = self, total > 0 else {
+                return nil
+            }
+            return Double(completed) / Double(total)
+        }
+    }
+
     @State private var showingSubscriptionImporter = false
     @State private var showingPlaylistImporter = false
     @State private var showingBackupImporter = false
@@ -10,10 +48,12 @@ struct ImportDataScreen: View {
     @State private var confirmsBackupRestore = false
     @State private var pendingBackup: AppBackup?
     @State private var exportDocument = AppBackupDocument(data: Data())
-    @State private var isImporting = false
+    @State private var activeOperation: DataOperation?
     @State private var resultMessage: String?
     @State private var errorMessage: String?
     private let playlistService = LocalPlaylistService()
+
+    private var isWorking: Bool { activeOperation != nil }
 
     var body: some View {
         Form {
@@ -23,13 +63,13 @@ struct ImportDataScreen: View {
                 } label: {
                     Label("Export All Settings and Data", systemImage: "square.and.arrow.up")
                 }
-                .disabled(isImporting)
+                .disabled(isWorking)
                 Button {
                     showingBackupImporter = true
                 } label: {
                     Label("Restore Full Backup", systemImage: "arrow.clockwise.icloud")
                 }
-                .disabled(isImporting)
+                .disabled(isWorking)
             } header: {
                 Text("Full Backup")
             } footer: {
@@ -42,27 +82,35 @@ struct ImportDataScreen: View {
                 } label: {
                     Label("Import Subscriptions CSV", systemImage: "person.2.badge.plus")
                 }
-                .disabled(isImporting)
+                .disabled(isWorking)
                 Button {
                     showingPlaylistImporter = true
                 } label: {
                     Label("Import Playlist CSV Files", systemImage: "music.note.list")
                 }
-                .disabled(isImporting)
+                .disabled(isWorking)
             } footer: {
                 Text("Imports stay on this device. Each playlist CSV becomes a separate personal playlist.")
             }
 
-            if isImporting {
-                Section("Importing") {
+            if let activeOperation {
+                Section(activeOperation.title) {
                     HStack(spacing: 12) {
-                        ProgressView()
-                        Text("Working with your data…")
+                        if let progress = activeOperation.progress {
+                            ProgressView(value: progress)
+                                .frame(width: 44)
+                        } else {
+                            ProgressView()
+                        }
+                        Text(activeOperation.detail)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.2), value: isWorking)
         .navigationTitle("Import Data")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
@@ -115,9 +163,9 @@ struct ImportDataScreen: View {
     }
 
     private func exportAllData() async {
-        guard !isImporting else { return }
-        isImporting = true
-        defer { isImporting = false }
+        guard !isWorking else { return }
+        activeOperation = .exporting
+        defer { activeOperation = nil }
         do {
             let backup = try await AppBackupService.shared.makeBackup()
             exportDocument = AppBackupDocument(data: try AppBackupService.shared.encode(backup))
@@ -140,10 +188,10 @@ struct ImportDataScreen: View {
     }
 
     private func restorePendingBackup() async {
-        guard let backup = pendingBackup, !isImporting else { return }
-        isImporting = true
+        guard let backup = pendingBackup, !isWorking else { return }
+        activeOperation = .restoring
         defer {
-            isImporting = false
+            activeOperation = nil
             pendingBackup = nil
         }
         do {
@@ -155,6 +203,9 @@ struct ImportDataScreen: View {
     }
 
     private func importSubscriptions(_ result: Result<[URL], Error>) {
+        guard !isWorking else { return }
+        activeOperation = .importingSubscriptions
+        defer { activeOperation = nil }
         do {
             guard let url = try result.get().first else { return }
             let accessed = url.startAccessingSecurityScopedResource()
@@ -167,13 +218,15 @@ struct ImportDataScreen: View {
     }
 
     private func importPlaylists(_ result: Result<[URL], Error>) async {
-        guard !isImporting else { return }
-        isImporting = true
-        defer { isImporting = false }
+        guard !isWorking else { return }
+        defer { activeOperation = nil }
         do {
+            let urls = try result.get()
+            guard !urls.isEmpty else { return }
+            activeOperation = .importingPlaylists(completed: 0, total: urls.count)
             var imported = 0
             var skipped = [String]()
-            for url in try result.get() {
+            for (index, url) in urls.enumerated() {
                 let accessed = url.startAccessingSecurityScopedResource()
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 do {
@@ -185,6 +238,7 @@ struct ImportDataScreen: View {
                 } catch {
                     skipped.append(url.lastPathComponent)
                 }
+                activeOperation = .importingPlaylists(completed: index + 1, total: urls.count)
             }
             if imported > 0 {
                 let skippedNote = skipped.isEmpty ? "" : " Skipped: \(skipped.joined(separator: ", "))."
