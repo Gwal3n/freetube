@@ -20,8 +20,6 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var suppressMiniPlayerTap = false
     @State private var playerActionsSuppressed = false
     @State private var actionSuppressionReleaseTask: Task<Void, Never>?
-    @State private var coversLiveVideoDuringExpansion = false
-    @State private var expansionCoverTask: Task<Void, Never>?
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
         self.thumbnail = thumbnail
@@ -49,10 +47,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(1)
                         .transition(.opacity)
 
-                    FullScreenPlayer(
-                        presentationArtwork: thumbnail,
-                        coversLiveVideoDuringExpansion: coversLiveVideoDuringExpansion
-                    )
+                    FullScreenPlayer()
                         .frame(
                             width: proxy.size.width,
                             height: max(0, proxy.size.height - expandedTopInset)
@@ -107,24 +102,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         .ignoresSafeArea()
         .onDisappear {
             actionSuppressionReleaseTask?.cancel()
-            expansionCoverTask?.cancel()
             playerActionsSuppressed = false
-            coversLiveVideoDuringExpansion = false
-        }
-        .onChange(of: player.fullScreenPresented) { wasPresented, isPresented in
-            if isPresented, !wasPresented, !coversLiveVideoDuringExpansion {
-                beginExpansionCover()
-            } else if !isPresented {
-                expansionCoverTask?.cancel()
-                coversLiveVideoDuringExpansion = false
-            }
-        }
-        .onChange(of: player.miniPlayerVisible) { wasVisible, isVisible in
-            // A first launch deliberately mounts in mini position for one frame before expanding.
-            // Prepare the artwork during that staging frame, before UIKit can paint at the top.
-            if isVisible, !wasVisible, !player.fullScreenPresented {
-                beginExpansionCover()
-            }
         }
         .onChange(of: player.playerExpansionRequest) { _, _ in
             // Feed/Search selections and first playback launches arrive here instead of mutating
@@ -293,38 +271,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func expandPlayer() {
-        beginExpansionCover()
         withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.88)) {
             presentationTranslation = 0
             miniDismissTranslation = 0
             player.fullScreenPresented = true
         }
         player.requestInlinePlaybackRestoration()
-    }
-
-    /// `AVPlayerViewController` can paint at its destination before SwiftUI finishes moving its
-    /// host. Keep a SwiftUI-owned frame above it for the duration of the upward handoff, then
-    /// reveal live playback only after the container has settled.
-    private func beginExpansionCover() {
-        expansionCoverTask?.cancel()
-        guard !reduceMotion else {
-            coversLiveVideoDuringExpansion = false
-            return
-        }
-        // The cover must exist before the first animated frame; fading it in would briefly expose
-        // the UIKit surface at its destination and recreate the same windowing artifact.
-        var insertionTransaction = Transaction(animation: nil)
-        insertionTransaction.disablesAnimations = true
-        withTransaction(insertionTransaction) {
-            coversLiveVideoDuringExpansion = true
-        }
-        expansionCoverTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.14)) {
-                coversLiveVideoDuringExpansion = false
-            }
-        }
     }
 
     private func expandPlayerFromTap() {

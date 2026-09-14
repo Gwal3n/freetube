@@ -9,9 +9,6 @@ struct FullScreenPlayer: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var downloads = DownloadManager.shared
 
-    let presentationArtwork: UIImage?
-    let coversLiveVideoDuringExpansion: Bool
-
     /// Async-loaded description / details for the currently-playing video. Fetched on demand when
     /// the user taps "More" under the channel row.
     @State private var details: VideoInfo?
@@ -95,40 +92,29 @@ struct FullScreenPlayer: View {
                 // owns that crossfade so load-state changes cannot animate player geometry.
                 ZStack {
                     Color.black
-                    if !coversLiveVideoDuringExpansion {
-                        PlayerSurface(
-                            player: player.player,
-                            pipDismissalRequest: player.pipDismissalRequest,
-                            onSeekRelative: { seconds in
-                                player.seekRelative(by: seconds)
-                            },
-                            onSeekAbsolute: { seconds in
-                                player.seek(to: seconds)
-                            },
-                            onSeekPreview: { seconds in
-                                gestureSeekPreview = seconds
-                            },
-                            onTogglePlayback: {
-                                player.togglePlayPause()
-                            },
-                            onToggleControls: { togglePlayerControls() },
-                            onRestoreFromPictureInPicture: {
-                                player.miniPlayerVisible = true
-                                player.fullScreenPresented = true
-                                player.requestInlinePlaybackRestoration()
-                            }
-                        )
-                        // UIKit opacity and SwiftUI transforms do not reliably constrain an
-                        // AVPlayerLayer. Removing its controller during the short handoff is what
-                        // guarantees there is no ready video left compositing at the final top
-                        // position. The shared AVPlayer continues playback while detached.
-                        .transition(.identity)
-                    }
-                    PlayerArtworkBackdrop(
-                        artwork: player.currentArtwork ?? presentationArtwork,
-                        state: player.loadState,
-                        forceVisible: coversLiveVideoDuringExpansion
+                    PlayerSurface(
+                        player: player.player,
+                        pipDismissalRequest: player.pipDismissalRequest,
+                        onSeekRelative: { seconds in
+                            player.seekRelative(by: seconds)
+                        },
+                        onSeekAbsolute: { seconds in
+                            player.seek(to: seconds)
+                        },
+                        onSeekPreview: { seconds in
+                            gestureSeekPreview = seconds
+                        },
+                        onTogglePlayback: {
+                            player.togglePlayPause()
+                        },
+                        onToggleControls: { togglePlayerControls() },
+                        onRestoreFromPictureInPicture: {
+                            player.miniPlayerVisible = true
+                            player.fullScreenPresented = true
+                            player.requestInlinePlaybackRestoration()
+                        }
                     )
+                    PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
                     Color.black
                         .opacity(playerControlsVisible ? 0.28 : 0)
