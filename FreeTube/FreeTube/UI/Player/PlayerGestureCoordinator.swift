@@ -435,6 +435,12 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     ) {
         guard let view = feedbackView else { return }
         feedbackWorkItem?.cancel()
+        // A fresh gesture must take ownership from an in-flight fade immediately. Otherwise the
+        // old animation can keep driving the presentation layer toward zero after a later tap has
+        // restored the model alpha, making rapid seek feedback flicker or disappear.
+        feedbackLabel?.layer.removeAllAnimations()
+        feedbackBlurView?.layer.removeAllAnimations()
+        outlinedFeedbackLabel?.layer.removeAllAnimations()
 
         let label: UILabel
         if outlined {
@@ -529,11 +535,21 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private func hideFeedback() {
         feedbackWorkItem?.cancel()
         feedbackWorkItem = nil
-        UIView.animate(withDuration: 0.2) { [weak self] in
+        let updates = { [weak self] in
             self?.feedbackLabel?.alpha = 0
             self?.feedbackBlurView?.alpha = 0
             self?.outlinedFeedbackLabel?.alpha = 0
         }
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            updates()
+            return
+        }
+        UIView.animate(
+            withDuration: 0.2,
+            delay: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut],
+            animations: updates
+        )
     }
 
     /// Delays AVKit's tap-to-toggle-controls recognizer just long enough to determine whether the
