@@ -126,6 +126,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 beginExpansionCover()
             }
         }
+        .onChange(of: player.playerExpansionRequest) { _, _ in
+            // Feed/Search selections and first playback launches arrive here instead of mutating
+            // `fullScreenPresented` behind the container's back. Use the exact same coordinated
+            // path as a direct tap on the miniplayer.
+            guard player.miniPlayerVisible, !player.fullScreenPresented else { return }
+            expandPlayer()
+        }
     }
 
     private func transitionProgress(in size: CGSize) -> CGFloat {

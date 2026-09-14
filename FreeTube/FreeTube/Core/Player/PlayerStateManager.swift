@@ -71,6 +71,10 @@ final class PlayerStateManager {
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
     /// the user explicitly reopens the expanded player.
     private(set) var pipDismissalRequest = 0
+    /// Monotonic request consumed by `SwiftUIPlayerContainer`. Playback commands request an
+    /// expansion instead of setting presentation state directly, giving the container a chance to
+    /// stage its SwiftUI artwork before the UIKit video surface begins moving.
+    private(set) var playerExpansionRequest = 0
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
     /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
@@ -501,8 +505,11 @@ final class PlayerStateManager {
         miniPlayerVisible = true
         guard expanded else { return }
 
+        // Already expanded: changing the current item must not replay the presentation animation.
+        guard !fullScreenPresented else { return }
+
         if wasVisible {
-            fullScreenPresented = true
+            playerExpansionRequest &+= 1
             return
         }
 
@@ -513,7 +520,7 @@ final class PlayerStateManager {
                   let self,
                   self.miniPlayerVisible,
                   self.currentVideo?.id == videoID else { return }
-            self.fullScreenPresented = true
+            self.playerExpansionRequest &+= 1
         }
     }
 
