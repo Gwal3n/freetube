@@ -19,12 +19,12 @@ final class PlayerDetailsModel {
     private var loadTask: Task<Void, Never>?
     private let store: VideoContentPrefetchStore
 
-    init(store: VideoContentPrefetchStore = .shared) {
-        self.store = store
+    init() {
+        self.store = .shared
     }
 
-    deinit {
-        loadTask?.cancel()
+    init(store: VideoContentPrefetchStore) {
+        self.store = store
     }
 
     func reset(for videoID: String) {
@@ -51,12 +51,13 @@ final class PlayerDetailsModel {
         let requestedVideoID = video.id
         let descriptionSnippet = video.descriptionSnippet?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let store = self.store
         isLoading = true
         loadFailed = false
         loadTask = Task { [weak self] in
-            guard let self else { return }
             do {
                 let info = try await store.fetchDetails(videoID: requestedVideoID)
+                guard let self else { return }
                 guard !Task.isCancelled,
                       videoID == requestedVideoID,
                       player.currentVideo?.id == requestedVideoID else { return }
@@ -69,11 +70,13 @@ final class PlayerDetailsModel {
             } catch is CancellationError {
                 // Changing videos cancels presentation work; the shared cache remains reusable.
             } catch {
+                guard let self else { return }
                 guard videoID == requestedVideoID,
                       player.currentVideo?.id == requestedVideoID else { return }
                 loadFailed = true
             }
 
+            guard let self else { return }
             guard videoID == requestedVideoID else { return }
             isLoading = false
             loadTask = nil
