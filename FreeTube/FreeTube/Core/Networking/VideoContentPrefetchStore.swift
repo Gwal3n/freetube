@@ -15,6 +15,9 @@ final class VideoContentPrefetchStore {
 
     private var entries: [String: Entry] = [:]
     private var detailTasks: [String: Task<VideoInfo, Error>] = [:]
+    private var commentTasks: [String: Task<CommentThread, Error>] = [:]
+    private var recency: [String] = []
+    private let capacity = 12
     private let videoService: any VideoServicing
     private let commentService: any CommentServicing
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "ContentPrefetch")
@@ -39,11 +42,13 @@ final class VideoContentPrefetchStore {
             // Prefetch is optional polish. The normal UI path remains available for retry.
             log.notice("Content prefetch failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
         }
-        trimIfNeeded()
     }
 
     func fetchDetails(videoID: String) async throws -> VideoInfo {
-        if let cached = entries[videoID]?.details { return cached }
+        if let cached = entries[videoID]?.details {
+            markRecentlyUsed(videoID)
+            return cached
+        }
         if let task = detailTasks[videoID] { return try await task.value }
 
         let service = videoService
@@ -55,6 +60,8 @@ final class VideoContentPrefetchStore {
             entry.details = details
             entries[videoID] = entry
             detailTasks[videoID] = nil
+            markRecentlyUsed(videoID)
+            trimIfNeeded()
             return details
         } catch {
             detailTasks[videoID] = nil
@@ -63,31 +70,57 @@ final class VideoContentPrefetchStore {
     }
 
     func fetchComments(videoID: String) async throws -> CommentThread {
-        if let cached = entries[videoID]?.comments { return cached }
+        if let cached = entries[videoID]?.comments {
+            markRecentlyUsed(videoID)
+            return cached
+        }
+        if let task = commentTasks[videoID] { return try await task.value }
         let details = try await fetchDetails(videoID: videoID)
         return try await fetchComments(videoID: videoID, details: details)
     }
 
     private func fetchComments(videoID: String, details: VideoInfo) async throws -> CommentThread {
-        if let cached = entries[videoID]?.comments { return cached }
-        let thread: CommentThread
-        if details.commentsAvailability == .disabled {
-            thread = CommentThread(comments: [], continuationToken: nil, availability: .disabled)
-        } else if let token = details.commentsContinuationToken {
-            thread = try await commentService.fetchComments(videoID: videoID, continuation: token)
-        } else {
-            thread = try await commentService.fetchComments(videoID: videoID, continuation: nil)
+        if let cached = entries[videoID]?.comments {
+            markRecentlyUsed(videoID)
+            return cached
         }
-        var entry = entries[videoID] ?? Entry()
-        entry.comments = thread
-        entries[videoID] = entry
-        return thread
+        if let task = commentTasks[videoID] { return try await task.value }
+
+        let service = commentService
+        let task = Task<CommentThread, Error> {
+            if details.commentsAvailability == .disabled {
+                return CommentThread(comments: [], continuationToken: nil, availability: .disabled)
+            }
+            if let token = details.commentsContinuationToken {
+                return try await service.fetchComments(videoID: videoID, continuation: token)
+            }
+            return try await service.fetchComments(videoID: videoID, continuation: nil)
+        }
+        commentTasks[videoID] = task
+        do {
+            let thread = try await task.value
+            var entry = entries[videoID] ?? Entry()
+            entry.comments = thread
+            entries[videoID] = entry
+            commentTasks[videoID] = nil
+            markRecentlyUsed(videoID)
+            trimIfNeeded()
+            return thread
+        } catch {
+            commentTasks[videoID] = nil
+            throw error
+        }
     }
 
     private func trimIfNeeded() {
-        guard entries.count > 12 else { return }
-        for key in Array(entries.keys.prefix(entries.count - 12)) {
-            entries.removeValue(forKey: key)
+        while entries.count > capacity, let oldest = recency.first {
+            recency.removeFirst()
+            entries.removeValue(forKey: oldest)
         }
+    }
+
+    private func markRecentlyUsed(_ videoID: String) {
+        recency.removeAll { $0 == videoID }
+        recency.append(videoID)
     }
 }
