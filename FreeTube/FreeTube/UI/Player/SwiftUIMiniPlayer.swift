@@ -5,6 +5,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SwiftUIMiniPlayer: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("oledMiniPlayer") private var oledMiniPlayer = false
 
     let thumbnail: UIImage?
@@ -19,7 +20,7 @@ struct SwiftUIMiniPlayer: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(secondaryForeground)
                         .frame(width: 44, height: 50)
                 }
                 .buttonStyle(.plain)
@@ -29,15 +30,17 @@ struct SwiftUIMiniPlayer: View {
                     HStack(spacing: 10) {
                         artwork
                             .frame(width: 72, height: 42)
+                            .clipped()
                             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(player.currentVideo?.title ?? "")
                                 .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(primaryForeground)
                                 .lineLimit(1)
                             Text(subtitle)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(secondaryForeground)
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,13 +57,19 @@ struct SwiftUIMiniPlayer: View {
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.body.weight(.semibold))
+                        .foregroundStyle(primaryForeground)
                         .frame(width: 44, height: 50)
+                        .contentTransition(.symbolEffect(.replace))
+                        .animation(
+                            reduceMotion ? nil : InterfaceMotion.quick,
+                            value: player.isPlaying
+                        )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             }
             .padding(.horizontal, 4)
-            .frame(height: 56)
+            .frame(height: 56, alignment: .center)
 
             MiniPlayerProgress()
         }
@@ -127,6 +136,14 @@ struct SwiftUIMiniPlayer: View {
             return "Expand player"
         }
         return "Expand player, \(title)"
+    }
+
+    private var primaryForeground: Color {
+        oledMiniPlayer ? .white : .primary
+    }
+
+    private var secondaryForeground: Color {
+        oledMiniPlayer ? .white.opacity(0.66) : .secondary
     }
 
 }
