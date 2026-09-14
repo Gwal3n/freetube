@@ -156,41 +156,29 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            Button {
+            LibraryDestinationRow(
+                title: "Local history",
+                subtitle: countSubtitle(localHistoryCount, noun: "video"),
+                systemImage: "clock.arrow.circlepath"
+            ) {
                 openLocalDestination(.history)
-            } label: {
-                localDestinationRow(
-                    title: "Local history",
-                    subtitle: countSubtitle(localHistoryCount, noun: "video"),
-                    systemImage: "clock.arrow.circlepath"
-                )
             }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityAddTraits(.isLink)
 
-            Button {
+            LibraryDestinationRow(
+                title: "Local subscriptions",
+                subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
+                systemImage: "person.2.fill"
+            ) {
                 openLocalDestination(.subscriptions)
-            } label: {
-                localDestinationRow(
-                    title: "Local subscriptions",
-                    subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
-                    systemImage: "person.2.fill"
-                )
             }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityAddTraits(.isLink)
 
-            Button {
+            LibraryDestinationRow(
+                title: "Local playlists",
+                subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
+                systemImage: "music.note.list"
+            ) {
                 openLocalDestination(.playlists)
-            } label: {
-                localDestinationRow(
-                    title: "Local playlists",
-                    subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
-                    systemImage: "music.note.list"
-                )
             }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityAddTraits(.isLink)
         }
     }
 
@@ -198,31 +186,6 @@ struct LibraryScreen: View {
         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             path.append(destination)
         }
-    }
-
-    private func localDestinationRow(
-        title: String,
-        subtitle: String,
-        systemImage: String
-    ) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.title3)
-                .foregroundStyle(.tint)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.forward")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-        }
-        .foregroundStyle(.primary)
-        .contentShape(Rectangle())
     }
 
     // MARK: - Account header
@@ -334,31 +297,13 @@ struct LibraryScreen: View {
         systemImage: String,
         destination: Destination
     ) -> some View {
-        Button {
+        LibraryDestinationRow(
+            title: title,
+            subtitle: subtitle,
+            systemImage: systemImage
+        ) {
             openLocalDestination(destination)
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.title3)
-                    .foregroundStyle(.tint)
-                    .frame(width: 28, alignment: .center)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.forward")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .foregroundStyle(.primary)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(ResponsiveButtonStyle())
-        .accessibilityAddTraits(.isLink)
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't
