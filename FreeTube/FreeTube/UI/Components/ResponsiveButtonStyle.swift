@@ -6,8 +6,18 @@ struct ResponsiveButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.68 : 1)
-            .scaleEffect(reduceMotion || !configuration.isPressed ? 1 : 0.995)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: configuration.isPressed)
+            // Keep acknowledgement visible without the bright/dark flash produced by the old
+            // 32% opacity drop. Touch-down is deliberately quicker than release: the interface
+            // answers the finger immediately, then settles without snapping back.
+            .opacity(configuration.isPressed ? 0.84 : 1)
+            .scaleEffect(reduceMotion || !configuration.isPressed ? 1 : 0.985)
+            .animation(
+                reduceMotion
+                    ? nil
+                    : (configuration.isPressed
+                        ? .easeOut(duration: 0.07)
+                        : .smooth(duration: 0.16)),
+                value: configuration.isPressed
+            )
     }
 }

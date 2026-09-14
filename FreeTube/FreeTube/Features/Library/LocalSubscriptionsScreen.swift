@@ -25,7 +25,7 @@ struct LocalSubscriptionsScreen: View {
                         } label: {
                             ChannelRow(channel: subscription.channel)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ResponsiveButtonStyle())
                         .accessibilityAddTraits(.isLink)
                     }
                     .onDelete(perform: store.remove)

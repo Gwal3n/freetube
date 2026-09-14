@@ -25,7 +25,7 @@ struct ChannelRow: View {
     var body: some View {
         if let onTap {
             Button(action: onTap) { content }
-                .buttonStyle(.plain)
+                .buttonStyle(ResponsiveButtonStyle())
         } else {
             content
         }

@@ -21,7 +21,7 @@ struct PlaylistRow: View {
         HStack(spacing: 0) {
             if let onTap {
                 Button(action: onTap) { content }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ResponsiveButtonStyle())
             } else {
                 content
             }

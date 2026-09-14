@@ -37,7 +37,7 @@ struct SubscribedChannelsScreen: View {
                         } label: {
                             ChannelRow(channel: channel)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ResponsiveButtonStyle())
                         .accessibilityAddTraits(.isLink)
                         .onAppear { prefetchIfNeeded(currentIndex: index) }
                     }

@@ -73,7 +73,7 @@ struct SearchContent: View {
                                 } label: {
                                     ChannelRow(channel: channel)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ResponsiveButtonStyle())
                                 .accessibilityAddTraits(.isLink)
                             }
                         }

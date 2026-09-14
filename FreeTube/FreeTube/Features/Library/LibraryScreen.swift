@@ -164,7 +164,7 @@ struct LibraryScreen: View {
                     systemImage: "clock.arrow.circlepath"
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .accessibilityAddTraits(.isLink)
 
             Button {
@@ -176,7 +176,7 @@ struct LibraryScreen: View {
                     systemImage: "person.2.fill"
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .accessibilityAddTraits(.isLink)
 
             Button {
@@ -188,7 +188,7 @@ struct LibraryScreen: View {
                     systemImage: "music.note.list"
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .accessibilityAddTraits(.isLink)
         }
     }
@@ -356,7 +356,7 @@ struct LibraryScreen: View {
             .foregroundStyle(.primary)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ResponsiveButtonStyle())
         .accessibilityAddTraits(.isLink)
     }
 
