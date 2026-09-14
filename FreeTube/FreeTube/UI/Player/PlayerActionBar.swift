@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Presentation state for the player's download control. The download manager and its side
-/// effects remain owned by `FullScreenPlayer`; this value only determines button chrome.
+/// effects remain outside this view; this value only determines button chrome.
 @available(iOS 17.0, *)
 enum PlayerDownloadPresentationState: Equatable {
     case available

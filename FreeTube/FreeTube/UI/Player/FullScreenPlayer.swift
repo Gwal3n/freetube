@@ -7,16 +7,13 @@ import UIKit
 struct FullScreenPlayer: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @State private var downloads = DownloadManager.shared
-
     @State private var detailsModel = PlayerDetailsModel()
     @State private var controlsVisibility = PlayerControlsVisibilityModel()
+    @State private var actionsModel = PlayerActionsModel()
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
     @State private var saveToPlaylistVideo: Video?
-    @State private var isSavedToPersonalPlaylist = false
-    @State private var downloadError: ErrorState?
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
@@ -337,12 +334,17 @@ struct FullScreenPlayer: View {
             AddToPlaylistSheet(video: video)
         }
         .task(id: player.currentVideo?.id) {
-            await refreshPersonalPlaylistMembership()
+            await actionsModel.refreshPlaylistMembership(for: player.currentVideo?.id)
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
-            Task { await refreshPersonalPlaylistMembership() }
+            Task {
+                await actionsModel.refreshPlaylistMembership(for: player.currentVideo?.id)
+            }
         }
-        .errorToast($downloadError)
+        .errorToast(Binding(
+            get: { actionsModel.downloadError },
+            set: { actionsModel.downloadError = $0 }
+        ))
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
                 portraitVideoFullscreen = false
@@ -517,13 +519,13 @@ struct FullScreenPlayer: View {
     @ViewBuilder
     private func playerActions(_ video: Video) -> some View {
         let videoURL = watchURL(video)
-        let downloadedFileURL = downloads.localFile(for: video.id)
+        let downloadedFileURL = actionsModel.downloadedFile(for: video.id)
         PlayerActionBar(
-            isSavedToPlaylist: isSavedToPersonalPlaylist,
+            isSavedToPlaylist: actionsModel.isSavedToPersonalPlaylist,
             watchURL: videoURL,
             downloadedFileURL: downloadedFileURL,
-            downloadState: downloadPresentationState(
-                for: video,
+            downloadState: actionsModel.downloadState(
+                for: video.id,
                 downloadedFileURL: downloadedFileURL
             ),
             onSaveToPlaylist: {
@@ -543,49 +545,9 @@ struct FullScreenPlayer: View {
                 shareFileURL = downloadedFileURL
             },
             onDownload: {
-                startDownload(video)
+                actionsModel.startDownload(video)
             }
         )
-    }
-
-    private func refreshPersonalPlaylistMembership() async {
-        guard let videoID = player.currentVideo?.id else {
-            isSavedToPersonalPlaylist = false
-            return
-        }
-        let isSaved = await LocalPlaylistService().isInPersonalPlaylist(videoID: videoID)
-        guard player.currentVideo?.id == videoID else { return }
-        isSavedToPersonalPlaylist = isSaved
-    }
-
-    private func downloadPresentationState(
-        for video: Video,
-        downloadedFileURL: URL?
-    ) -> PlayerDownloadPresentationState {
-        if downloadedFileURL != nil { return .downloaded }
-        if isDownloadActive(for: video) { return .downloading }
-        return .available
-    }
-
-    private func isDownloadActive(for video: Video) -> Bool {
-        downloads.activeTasks.contains { snapshot in
-            guard snapshot.videoID == video.id else { return false }
-            switch snapshot.state {
-            case .queued, .downloading, .paused: return true
-            case .completed, .failed: return false
-            }
-        }
-    }
-
-    private func startDownload(_ video: Video) {
-        let quality = UserPreferences().preferredQuality
-        Task {
-            do {
-                _ = try await downloads.ensureDownloaded(video: video, quality: quality)
-            } catch {
-                downloadError = ErrorState(from: error)
-            }
-        }
     }
 
     // MARK: - Transport
