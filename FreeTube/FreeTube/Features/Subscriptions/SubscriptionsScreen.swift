@@ -34,11 +34,13 @@ struct SubscriptionsScreen: View {
                         VideoCard(video: video, onTap: { player.load(video) }, showsMoreMenu: true)
                     }
 
-                    if model.isLoading { LoadingView() }
+                    if model.isLoading && model.feedVideos.isEmpty { subscriptionFeedPlaceholder }
                     if model.feedVideos.isEmpty && !model.isLoading {
-                        EmptyStateView(systemImage: "rectangle.stack.person.crop",
-                                       title: "Nothing new",
-                                       message: "Subscribe to channels to see their latest videos here.")
+                        ContentUnavailableView(
+                            "Nothing New",
+                            systemImage: "rectangle.stack.person.crop",
+                            description: Text("Subscribe to channels to see their latest videos here.")
+                        )
                     }
                 }
                 .padding(.vertical, 8)
@@ -65,5 +67,23 @@ struct SubscriptionsScreen: View {
                 .clipShape(Circle())
             Text(channel.name).font(.caption).lineLimit(1).frame(maxWidth: 80)
         }
+    }
+
+    private var subscriptionFeedPlaceholder: some View {
+        VStack(spacing: 14) {
+            ForEach(0..<4, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 10) {
+                    RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous)
+                        .fill(.quaternary)
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                    RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 13)
+                    RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 150, height: 9)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading subscriptions")
     }
 }

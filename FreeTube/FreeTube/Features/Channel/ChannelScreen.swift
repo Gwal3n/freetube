@@ -23,7 +23,7 @@ struct ChannelScreen: View {
 
                 Section { menuRows(for: details) }
             } else if model.isLoading {
-                Section { LoadingView() }
+                Section { channelHeaderPlaceholder }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
@@ -36,6 +36,38 @@ struct ChannelScreen: View {
     }
 
     // MARK: - Header
+
+    /// Static, content-shaped loading state. It reserves the final header and menu geometry so
+    /// the screen does not visibly reflow when channel metadata arrives.
+    private var channelHeaderPlaceholder: some View {
+        VStack(spacing: 14) {
+            Circle()
+                .fill(.quaternary)
+                .frame(width: 88, height: 88)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.quaternary)
+                .frame(width: 180, height: 20)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.quaternary)
+                .frame(width: 110, height: 11)
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.quaternary)
+                        .frame(width: 28, height: 28)
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 13)
+                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 90, height: 9)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading channel")
+        .allowsHitTesting(false)
+    }
 
     /// Banner + avatar + name + subscriber count + subscribe button, rendered as a single
     /// edge-to-edge list row. Uses cleared insets so the banner stretches full width.

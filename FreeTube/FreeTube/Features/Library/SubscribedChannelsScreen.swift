@@ -22,12 +22,12 @@ struct SubscribedChannelsScreen: View {
     var body: some View {
         Group {
             if model.channels.isEmpty && model.isLoading {
-                LoadingView()
+                subscriptionPlaceholder
             } else if model.channels.isEmpty {
-                EmptyStateView(
+                ContentUnavailableView(
+                    "No Subscriptions",
                     systemImage: "person.2.fill",
-                    title: "No subscriptions",
-                    message: "Channels you subscribe to on YouTube will show up here."
+                    description: Text("Channels you subscribe to on YouTube will appear here.")
                 )
             } else {
                 List {
@@ -69,6 +69,26 @@ struct SubscribedChannelsScreen: View {
         guard currentIndex >= model.channels.count - prefetchLookahead else { return }
         guard model.canLoadMore else { return }
         Task { await model.loadMore() }
+    }
+
+    private var subscriptionPlaceholder: some View {
+        List {
+            ForEach(0..<7, id: \.self) { _ in
+                HStack(spacing: MediaStyle.spacing) {
+                    Circle().fill(.quaternary).frame(width: 48, height: 48)
+                    VStack(alignment: .leading, spacing: 7) {
+                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
+                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 110, height: 9)
+                    }
+                }
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .scrollDisabled(true)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading subscriptions")
     }
 }
 

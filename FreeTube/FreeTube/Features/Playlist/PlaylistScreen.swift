@@ -62,7 +62,7 @@ struct PlaylistScreen: View {
                     videosList(details)
                         .padding(.vertical)
                 } else if model.isLoading {
-                    LoadingView().padding(.top, 60)
+                    playlistPlaceholder
                 }
             }
         }
@@ -86,6 +86,33 @@ struct PlaylistScreen: View {
     }
 
     // MARK: - Blurred artwork backdrop
+
+    /// Reserves the same broad geometry as the loaded artwork, metadata, and first rows. Keeping
+    /// this static avoids shimmer work and prevents the whole page from jumping after resolution.
+    private var playlistPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.quaternary)
+                .aspectRatio(16 / 9, contentMode: .fit)
+            RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(height: 20)
+            RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 150, height: 11)
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: MediaStyle.spacing) {
+                    RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
+                        .fill(.quaternary)
+                        .frame(width: 144, height: 81)
+                    VStack(alignment: .leading, spacing: 9) {
+                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
+                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 90, height: 9)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading playlist")
+        .allowsHitTesting(false)
+    }
 
     /// Heavily-blurred, dimmed copy of the playlist artwork. Layered behind the header section
     /// via the surrounding `ZStack`. Extends up under the status/navigation bar via
@@ -364,38 +391,46 @@ struct PlaylistScreen: View {
     @ViewBuilder
     private func videosList(_ details: PlaylistDetails) -> some View {
         let videos = details.videos
-        LazyVStack(spacing: 0) {
-            ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
-                VideoRow(
-                    video: video,
-                    playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
-                ) {
-                    // Make sure the queue reflects the playlist's order before kicking off
-                    // playback, so "next video" actually means the next playlist entry.
-                    player.loadPlaylist(details, startAt: video)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 6)
-                .onAppear {
-                    // Trigger the next-page fetch when the row 5 from the bottom appears.
-                    // PlaylistService caches the continuation token on the response struct, so
-                    // each `loadMore` advances the cursor for subsequent calls.
-                    if index >= videos.count - 5, model.canLoadMore {
-                        Task { await model.loadMore() }
+        if videos.isEmpty && !model.isLoadingMore {
+            ContentUnavailableView(
+                "No Videos",
+                systemImage: "rectangle.stack",
+                description: Text("This playlist doesn’t contain any available videos.")
+            )
+            .padding(.vertical, 24)
+        } else {
+            LazyVStack(spacing: 0) {
+                ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
+                    VideoRow(
+                        video: video,
+                        playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
+                    ) {
+                        // Make sure the queue reflects the playlist's order before kicking off
+                        // playback, so "next video" actually means the next playlist entry.
+                        player.loadPlaylist(details, startAt: video)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 6)
+                    .onAppear {
+                        // Trigger the next-page fetch when the row 5 from the bottom appears.
+                        // PlaylistService caches the continuation token on the response struct, so
+                        // each `loadMore` advances the cursor for subsequent calls.
+                        if index >= videos.count - 5, model.canLoadMore {
+                            Task { await model.loadMore() }
+                        }
                     }
                 }
-            }
-            if model.canLoadMore || model.isLoadingMore {
+                if model.canLoadMore || model.isLoadingMore {
                 // Bottom spinner that doubles as a safety-net trigger for very short lists
                 // where the 5-row lookahead doesn't fire.
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-                .onAppear {
-                    if model.canLoadMore { Task { await model.loadMore() } }
+                    ProgressView("Loading more…")
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .accessibilityLabel("Loading more playlist videos")
+                        .onAppear {
+                            if model.canLoadMore { Task { await model.loadMore() } }
+                        }
                 }
             }
         }

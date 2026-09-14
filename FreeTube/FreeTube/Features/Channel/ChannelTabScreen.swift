@@ -77,15 +77,20 @@ struct ChannelTabScreen: View {
     private func videoList(_ videos: [Video]) -> some View {
         if kind == .allVideos, videos.isEmpty,
            (!model.hasLoadedVideos(for: videoSort) || model.isLoadingVideos(for: videoSort)) {
-            LoadingView()
+            MediaListPlaceholder()
         } else if videos.isEmpty {
-            EmptyStateView(systemImage: "tray", title: "Nothing here", message: "This channel hasn't posted any \(title.lowercased()) yet.")
+            ContentUnavailableView(
+                "Nothing Here",
+                systemImage: "tray",
+                description: Text("This channel hasn’t posted any \(title.lowercased()) yet.")
+            )
         } else {
             List {
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                     VideoRow(video: video) { player.load(video) }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
                         .onAppear { prefetchIfNeeded(currentIndex: index, total: videos.count) }
                 }
                 if canLoadMoreCurrentContent {
@@ -99,7 +104,11 @@ struct ChannelTabScreen: View {
     @ViewBuilder
     private func playlistList(_ playlists: [Playlist]) -> some View {
         if playlists.isEmpty {
-            EmptyStateView(systemImage: "rectangle.stack", title: "No playlists", message: "This channel has no public playlists.")
+            ContentUnavailableView(
+                "No Playlists",
+                systemImage: "rectangle.stack",
+                description: Text("This channel has no public playlists.")
+            )
         } else {
             List {
                 ForEach(Array(playlists.enumerated()), id: \.element.id) { index, playlist in
@@ -110,6 +119,7 @@ struct ChannelTabScreen: View {
                     }
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
                     .buttonStyle(.plain)
                     .onAppear { prefetchIfNeeded(currentIndex: index, total: playlists.count) }
                 }
@@ -125,11 +135,10 @@ struct ChannelTabScreen: View {
     /// flight. Also acts as a tap target — appearing on screen kicks off `loadMore` for cases
     /// where the user scrolled past the lookahead trigger before the previous page completed.
     private var loadMoreFooter: some View {
-        HStack {
-            Spacer()
-            ProgressView()
-            Spacer()
-        }
+        ProgressView("Loading more…")
+            .controlSize(.small)
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("Loading more \(title.lowercased())")
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .onAppear {
