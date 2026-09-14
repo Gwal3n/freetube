@@ -103,18 +103,21 @@ struct ChannelScreen: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button {
-                Task { await model.toggleSubscribe() }
-            } label: {
-                Text(channel.isSubscribed ? "Subscribed" : "Subscribe")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(channel.isSubscribed ? Color.gray.opacity(0.2) : Color.red)
-                    .foregroundStyle(channel.isSubscribed ? Color.primary : Color.white)
-                    .clipShape(Capsule())
+            Group {
+                if channel.isSubscribed {
+                    Button("Subscribed") {
+                        Task { await model.toggleSubscribe() }
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button("Subscribe") {
+                        Task { await model.toggleSubscribe() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                }
             }
-            .buttonStyle(ResponsiveButtonStyle())
+            .controlSize(.regular)
             .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity)
