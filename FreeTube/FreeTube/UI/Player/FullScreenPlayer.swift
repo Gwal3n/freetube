@@ -10,18 +10,17 @@ struct FullScreenPlayer: View {
     @State private var downloads = DownloadManager.shared
 
     @State private var detailsModel = PlayerDetailsModel()
+    @State private var controlsVisibility = PlayerControlsVisibilityModel()
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
     @State private var saveToPlaylistVideo: Video?
     @State private var isSavedToPersonalPlaylist = false
     @State private var downloadError: ErrorState?
-    @State private var playerControlsVisible = true
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
     @State private var panelScrollGestureActive = false
-    @State private var controlsHideTask: Task<Void, Never>?
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
@@ -113,7 +112,7 @@ struct FullScreenPlayer: View {
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)
                     Color.black
-                        .opacity(playerControlsVisible ? 0.28 : 0)
+                        .opacity(controlsVisibility.isVisible ? 0.28 : 0)
                         // Dim the stable player surface rather than AVPlayer's presentation rect.
                         // The latter changes from unknown/full-size to the decoded aspect ratio
                         // as a new item becomes ready, which made non-16:9 videos flash unevenly.
@@ -121,7 +120,7 @@ struct FullScreenPlayer: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
                     PlayerTransportOverlay(
-                        isVisible: playerControlsVisible,
+                        isVisible: controlsVisibility.isVisible,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
                         previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
                         hasPrevious: hasPrevious,
@@ -238,7 +237,7 @@ struct FullScreenPlayer: View {
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
                 .onAppear { showPlayerControls() }
-                .onDisappear { controlsHideTask?.cancel() }
+                .onDisappear { controlsVisibility.cancelAutoHide() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
@@ -592,24 +591,11 @@ struct FullScreenPlayer: View {
     // MARK: - Transport
 
     private func togglePlayerControls() {
-        playerControlsVisible ? hidePlayerControls() : showPlayerControls()
+        controlsVisibility.toggle(isPlaying: player.isPlaying)
     }
 
     private func showPlayerControls() {
-        controlsHideTask?.cancel()
-        withAnimation(.easeOut(duration: 0.18)) { playerControlsVisible = true }
-        guard player.isPlaying else { return }
-        controlsHideTask = Task {
-            do { try await Task.sleep(for: .seconds(3)) } catch { return }
-            guard !Task.isCancelled else { return }
-            hidePlayerControls()
-        }
-    }
-
-    private func hidePlayerControls() {
-        controlsHideTask?.cancel()
-        controlsHideTask = nil
-        withAnimation(.easeIn(duration: 0.18)) { playerControlsVisible = false }
+        controlsVisibility.show(isPlaying: player.isPlaying)
     }
 
     private var hasPrevious: Bool {
