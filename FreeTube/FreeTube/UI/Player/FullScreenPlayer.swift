@@ -95,37 +95,35 @@ struct FullScreenPlayer: View {
                 // owns that crossfade so load-state changes cannot animate player geometry.
                 ZStack {
                     Color.black
-                    PlayerSurface(
-                        player: player.player,
-                        pipDismissalRequest: player.pipDismissalRequest,
-                        onSeekRelative: { seconds in
-                            player.seekRelative(by: seconds)
-                        },
-                        onSeekAbsolute: { seconds in
-                            player.seek(to: seconds)
-                        },
-                        onSeekPreview: { seconds in
-                            gestureSeekPreview = seconds
-                        },
-                        onTogglePlayback: {
-                            player.togglePlayPause()
-                        },
-                        onToggleControls: { togglePlayerControls() },
-                        onRestoreFromPictureInPicture: {
-                            player.miniPlayerVisible = true
-                            player.fullScreenPresented = true
-                            player.requestInlinePlaybackRestoration()
-                        }
-                    )
-                    // AVPlayerViewController's ready video layer can jump to its destination
-                    // before SwiftUI finishes translating the expanded container. Hide that live
-                    // UIKit surface during the handoff; playback continues underneath and fades
-                    // back in with the presentation artwork once the container has settled.
-                    .opacity(coversLiveVideoDuringExpansion ? 0 : 1)
-                    .animation(
-                        .easeOut(duration: 0.14),
-                        value: coversLiveVideoDuringExpansion
-                    )
+                    if !coversLiveVideoDuringExpansion {
+                        PlayerSurface(
+                            player: player.player,
+                            pipDismissalRequest: player.pipDismissalRequest,
+                            onSeekRelative: { seconds in
+                                player.seekRelative(by: seconds)
+                            },
+                            onSeekAbsolute: { seconds in
+                                player.seek(to: seconds)
+                            },
+                            onSeekPreview: { seconds in
+                                gestureSeekPreview = seconds
+                            },
+                            onTogglePlayback: {
+                                player.togglePlayPause()
+                            },
+                            onToggleControls: { togglePlayerControls() },
+                            onRestoreFromPictureInPicture: {
+                                player.miniPlayerVisible = true
+                                player.fullScreenPresented = true
+                                player.requestInlinePlaybackRestoration()
+                            }
+                        )
+                        // UIKit opacity and SwiftUI transforms do not reliably constrain an
+                        // AVPlayerLayer. Removing its controller during the short handoff is what
+                        // guarantees there is no ready video left compositing at the final top
+                        // position. The shared AVPlayer continues playback while detached.
+                        .transition(.identity)
+                    }
                     PlayerArtworkBackdrop(
                         artwork: player.currentArtwork ?? presentationArtwork,
                         state: player.loadState,
