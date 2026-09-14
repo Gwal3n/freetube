@@ -8,6 +8,7 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct PlayerQueueSections: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let showsUpNext: Bool
     let upNextInitialCount: Int
@@ -85,7 +86,8 @@ struct PlayerQueueSections: View {
         if let playlist = player.activePlaylist {
             VStack(alignment: .leading, spacing: 8) {
                 collapsiblePanelHeader(
-                    title: "Playlist · \(playlist.title)",
+                    title: "Playlist",
+                    detail: playlist.title,
                     isExpanded: $isPlaylistExpanded,
                     onOpen: { onOpenPlaylist(playlist.id) }
                 )
@@ -99,12 +101,14 @@ struct PlayerQueueSections: View {
                                     .frame(maxWidth: .infinity)
                                     .frame(height: Self.queueRowHeight)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ResponsiveButtonStyle())
                             .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         }
                         ForEach(displayedPlaylistIndices, id: \.self) { index in
                             queueRow(player.queue.items[index], preservesPlaylistContext: true)
                                 .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                                 .frame(height: Self.queueRowHeight)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
@@ -116,8 +120,9 @@ struct PlayerQueueSections: View {
                                     .frame(maxWidth: .infinity)
                                     .frame(height: Self.queueRowHeight)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ResponsiveButtonStyle())
                             .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         } else if player.canLoadMorePlaylistItems {
                             loadMoreQueueButton(isLoading: player.isLoadingMorePlaylistVideos) {
                                 await player.loadMorePlaylistItems()
@@ -138,13 +143,13 @@ struct PlayerQueueSections: View {
     private var queuePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation(.smooth(duration: 0.28)) {
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
                     isQueueExpanded.toggle()
                 }
             } label: {
                 PlayerSectionHeading(title: "Up next", isExpanded: isQueueExpanded)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .padding(.horizontal)
 
             ZStack(alignment: .top) {
@@ -152,6 +157,7 @@ struct PlayerQueueSections: View {
                     ForEach(displayedUpNextVideos) { video in
                         queueRow(video, preservesPlaylistContext: false)
                             .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
@@ -171,9 +177,10 @@ struct PlayerQueueSections: View {
                             }
                             .frame(height: Self.queueRowHeight)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ResponsiveButtonStyle())
                         .disabled(player.isLoadingMoreRecommendations)
                         .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
                 }
@@ -211,16 +218,23 @@ struct PlayerQueueSections: View {
 
     private func collapsiblePanelHeader(
         title: String,
+        detail: String? = nil,
         isExpanded: Binding<Bool>,
         onOpen: (() -> Void)? = nil
     ) -> some View {
         HStack(spacing: 8) {
             Button {
-                isExpanded.wrappedValue.toggle()
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                    isExpanded.wrappedValue.toggle()
+                }
             } label: {
-                PlayerSectionHeading(title: title, isExpanded: isExpanded.wrappedValue)
+                PlayerSectionHeading(
+                    title: title,
+                    detail: detail,
+                    isExpanded: isExpanded.wrappedValue
+                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             if let onOpen {
                 Button(action: onOpen) {
                     Image(systemName: "arrow.up.right")
@@ -228,7 +242,7 @@ struct PlayerQueueSections: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel("Open playlist")
             }
         }
@@ -254,9 +268,10 @@ struct PlayerQueueSections: View {
             }
             .frame(height: Self.queueRowHeight)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ResponsiveButtonStyle())
         .disabled(isLoading)
         .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
     }
 
@@ -312,7 +327,7 @@ struct PlayerQueueSections: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
 
             VideoMoreActionsMenu(
                 video: video,

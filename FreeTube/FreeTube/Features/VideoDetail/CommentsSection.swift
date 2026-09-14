@@ -8,6 +8,7 @@ struct CommentsSection: View {
     /// header never brings the comment tree (or its network work) into play until the user asks.
     @State private var isExpanded = false
     @State private var expandedReplyCommentIDs: Set<String> = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(videoID: String, countText: String? = nil) {
         self.countText = countText
@@ -54,9 +55,10 @@ struct CommentsSection: View {
                         }
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(.smooth(duration: 0.24), value: isExpanded)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.24), value: isExpanded)
         .errorToast(Bindable(model).errorState)
         // Covers state restoration where the section mounts expanded. The normal collapsed state
         // performs no request; the header button lazily loads on first expansion.
@@ -70,23 +72,27 @@ struct CommentsSection: View {
     @ViewBuilder
     private var header: some View {
         Button {
-            withAnimation(.smooth(duration: 0.24)) {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
                 isExpanded.toggle()
             }
             if isExpanded && model.comments.isEmpty && !model.isLoading {
                 Task { await model.load() }
             }
         } label: {
-            PlayerSectionHeading(title: commentsTitle, isExpanded: isExpanded)
+            PlayerSectionHeading(
+                title: "Comments",
+                detail: normalizedCountText,
+                isExpanded: isExpanded
+            )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ResponsiveButtonStyle())
         .padding(.horizontal)
     }
 
-    private var commentsTitle: String {
+    private var normalizedCountText: String? {
         guard let count = countText?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !count.isEmpty else { return "Comments" }
-        return "Comments · \(count)"
+              !count.isEmpty else { return nil }
+        return count
     }
 
     @ViewBuilder
