@@ -7,9 +7,12 @@ struct AddToPlaylistSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var playlists: [LocalPlaylistSnapshot] = []
     @State private var containingIDs = Set<String>()
+    @State private var pendingPlaylistIDs = Set<String>()
     @State private var newTitle = ""
     @State private var isCreating = false
+    @State private var isLoading = true
     @FocusState private var titleFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
 
     var body: some View {
@@ -39,13 +42,15 @@ struct AddToPlaylistSheet: View {
                 } else {
                     Section {
                         Button {
-                            withAnimation(.snappy) { isCreating = true }
+                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                                isCreating = true
+                            }
                             Task { @MainActor in
                                 await Task.yield()
                                 titleFocused = true
                             }
                         } label: {
-                            Label("New Playlist", systemImage: "plus.circle")
+                            Label("New playlist", systemImage: "plus.circle")
                                 .foregroundStyle(.primary)
                         }
                     }
@@ -53,8 +58,8 @@ struct AddToPlaylistSheet: View {
 
                 playlistSection("Personal", playlists: personalPlaylists)
             }
-            .animation(.snappy, value: isCreating)
-            .navigationTitle("Save to Playlist")
+            .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: isCreating)
+            .navigationTitle("Save to playlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
             .task { await reload() }
@@ -67,7 +72,14 @@ struct AddToPlaylistSheet: View {
     private func playlistSection(_ title: String, playlists: [LocalPlaylistSnapshot]) -> some View {
         if !playlists.isEmpty || title == "Personal" {
             Section(title) {
-                if playlists.isEmpty {
+                if isLoading {
+                    HStack(spacing: 10) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading playlists…")
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                } else if playlists.isEmpty {
                     Text("No personal playlists yet.").foregroundStyle(.secondary)
                 }
                 ForEach(playlists) { playlist in
@@ -76,14 +88,19 @@ struct AddToPlaylistSheet: View {
                             Text(playlist.title)
                                 .foregroundStyle(.primary)
                             Spacer()
-                            Image(systemName: containingIDs.contains(playlist.id) ? "checkmark.circle.fill" : "plus.circle")
-                                .font(.title3)
-                                .foregroundStyle(.primary)
-                                .contentTransition(.symbolEffect(.replace))
+                            if pendingPlaylistIDs.contains(playlist.id) {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: containingIDs.contains(playlist.id) ? "checkmark.circle.fill" : "plus.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(.primary)
+                                    .contentTransition(.symbolEffect(.replace))
+                            }
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .disabled(pendingPlaylistIDs.contains(playlist.id))
                 }
             }
         }
@@ -94,6 +111,8 @@ struct AddToPlaylistSheet: View {
     }
 
     private func reload() async {
+        isLoading = true
+        defer { isLoading = false }
         playlists = await service.playlists()
         var ids = Set<String>()
         for playlist in playlists {
@@ -105,6 +124,9 @@ struct AddToPlaylistSheet: View {
     }
 
     private func toggle(_ playlistID: String) async {
+        guard !pendingPlaylistIDs.contains(playlistID) else { return }
+        pendingPlaylistIDs.insert(playlistID)
+        defer { pendingPlaylistIDs.remove(playlistID) }
         if containingIDs.contains(playlistID) {
             await service.remove(videoID: video.id, from: playlistID)
             containingIDs.remove(playlistID)
@@ -120,7 +142,9 @@ struct AddToPlaylistSheet: View {
         let id = await service.create(title: title)
         await service.add(video: video, to: id)
         newTitle = ""
-        isCreating = false
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+            isCreating = false
+        }
         await reload()
     }
 }

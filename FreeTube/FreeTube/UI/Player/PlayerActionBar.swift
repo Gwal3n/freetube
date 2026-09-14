@@ -34,7 +34,7 @@ struct PlayerActionBar: View {
                     .contentShape(Rectangle())
                     .contentTransition(.symbolEffect(.replace))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
             .accessibilityLabel("Save to playlist")
 
@@ -64,7 +64,7 @@ struct PlayerActionBar: View {
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
             .accessibilityLabel("Share")
 
@@ -73,9 +73,10 @@ struct PlayerActionBar: View {
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
             .disabled(downloadState != .available)
+            .opacity(downloadState == .downloading ? 0.72 : 1)
             .accessibilityLabel(downloadAccessibilityLabel)
         }
     }
