@@ -90,7 +90,7 @@ struct ChannelTabScreen: View {
                     VideoRow(video: video) { player.load(video) }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
+                        .listRowInsets(MediaStyle.listRowInsets)
                         .onAppear { prefetchIfNeeded(currentIndex: index, total: videos.count) }
                 }
                 if canLoadMoreCurrentContent {
@@ -119,7 +119,7 @@ struct ChannelTabScreen: View {
                     }
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
+                    .listRowInsets(MediaStyle.listRowInsets)
                     .buttonStyle(.plain)
                     .onAppear { prefetchIfNeeded(currentIndex: index, total: playlists.count) }
                 }

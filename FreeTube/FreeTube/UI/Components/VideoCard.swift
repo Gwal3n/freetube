@@ -66,7 +66,7 @@ struct VideoCard: View {
                             .font(MediaStyle.title)
                             .lineLimit(2)
                         Text(metadataLine)
-                            .font(.caption)
+                            .font(MediaStyle.metadata)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -81,6 +81,6 @@ struct VideoCard: View {
                 VideoMoreActionsMenu(video: video)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, MediaStyle.cardHorizontalPadding)
     }
 }

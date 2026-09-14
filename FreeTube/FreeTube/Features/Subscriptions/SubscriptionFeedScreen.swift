@@ -47,7 +47,7 @@ struct SubscriptionFeedScreen: View {
                         player.load(video)
                     }
                     .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
+                    .listRowInsets(MediaStyle.listRowInsets)
                 }
 
                 if model.canLoadMore {

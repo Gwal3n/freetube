@@ -10,6 +10,7 @@ final class HistoryViewModel {
     /// Separate flag for "load more in progress" so the row-level prefetch trigger can avoid
     /// firing duplicate continuation requests while the previous page is still en route.
     private(set) var isLoadingMore: Bool = false
+    private(set) var hasLoaded: Bool = false
     /// Continuation token from the most recent response. Nil → no more pages, the list is done.
     private(set) var continuationToken: String?
     var errorState: ErrorState?
@@ -22,7 +23,10 @@ final class HistoryViewModel {
 
     func load() async {
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
         do {
             let page = try await service.fetch()
             videos = page.videos

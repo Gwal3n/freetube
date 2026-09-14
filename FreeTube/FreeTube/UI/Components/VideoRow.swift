@@ -86,12 +86,12 @@ struct VideoRow: View {
                     .font(MediaStyle.title)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 Text(video.channelName)
-                    .font(.caption)
+                    .font(MediaStyle.metadata)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if !statsLine.isEmpty {
                     Text(statsLine)
-                        .font(.caption2)
+                        .font(MediaStyle.tertiaryMetadata)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

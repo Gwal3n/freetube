@@ -20,6 +20,7 @@ struct HistoryScreen: View {
                     offersPlayNext: true,
                     playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
                 ) { player.load(video) }
+                    .listRowInsets(MediaStyle.listRowInsets)
                     .swipeActions {
                         Button(role: .destructive) {
                             Task { await model.remove(video) }
@@ -32,17 +33,27 @@ struct HistoryScreen: View {
             if model.continuationToken != nil {
                 // Footer spinner — also acts as a fallback trigger if the prefetch lookahead
                 // hasn't fired (e.g. when the list is very short).
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-                .listRowSeparator(.hidden)
-                .onAppear { Task { await model.loadMore() } }
+                ProgressView("Loading more…")
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("Loading more history")
+                    .listRowSeparator(.hidden)
+                    .onAppear { Task { await model.loadMore() } }
             }
         }
         .listStyle(.plain)
         .navigationTitle("History")
+        .overlay {
+            if !model.hasLoaded && model.videos.isEmpty {
+                MediaListPlaceholder()
+            } else if model.hasLoaded && model.videos.isEmpty && !model.isLoading {
+                ContentUnavailableView(
+                    "No History",
+                    systemImage: "clock.arrow.circlepath",
+                    description: Text("Videos in your YouTube watch history will appear here.")
+                )
+            }
+        }
         .task { await model.load() }
         .task(id: "\(showHistoryProgressBars):" + model.videos.map(\.id).joined(separator: ",")) {
             playbackProgress = showHistoryProgressBars
