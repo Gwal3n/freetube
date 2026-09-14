@@ -115,6 +115,8 @@ struct DownloadedVideoRow<MenuContent: View>: View {
                 }
             }
         }
+        .listRowSeparator(.hidden)
+        .listRowInsets(MediaStyle.listRowInsets)
     }
 
     @ViewBuilder

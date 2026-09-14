@@ -75,6 +75,8 @@ struct SearchContent: View {
                                 }
                                 .buttonStyle(ResponsiveButtonStyle())
                                 .accessibilityAddTraits(.isLink)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(MediaStyle.listRowInsets)
                             }
                         }
                     } header: {

@@ -20,7 +20,6 @@ struct HistoryScreen: View {
                     offersPlayNext: true,
                     playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
                 ) { player.load(video) }
-                    .listRowInsets(MediaStyle.listRowInsets)
                     .swipeActions {
                         Button(role: .destructive) {
                             Task { await model.remove(video) }

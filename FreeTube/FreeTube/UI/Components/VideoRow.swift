@@ -71,6 +71,7 @@ struct VideoRow: View {
             }
         }
         .listRowSeparator(.hidden)
+        .listRowInsets(MediaStyle.listRowInsets)
     }
 
     private var rowAccessibilityLabel: String {

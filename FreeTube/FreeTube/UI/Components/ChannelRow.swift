@@ -23,12 +23,16 @@ struct ChannelRow: View {
     }
 
     var body: some View {
-        if let onTap {
-            Button(action: onTap) { content }
-                .buttonStyle(ResponsiveButtonStyle())
-        } else {
-            content
+        Group {
+            if let onTap {
+                Button(action: onTap) { content }
+                    .buttonStyle(ResponsiveButtonStyle())
+            } else {
+                content
+            }
         }
+        .listRowSeparator(.hidden)
+        .listRowInsets(MediaStyle.listRowInsets)
     }
 
     private var content: some View {
