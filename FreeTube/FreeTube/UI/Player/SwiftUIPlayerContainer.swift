@@ -86,7 +86,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                                 + min(0, presentationTranslation)
                                 + miniHandoffOffset(for: transition)
                         )
-                        .opacity(miniOpacity(for: transition))
+                        .opacity(miniOpacity(for: transition) * miniDismissOpacity)
                         .allowsHitTesting(!player.fullScreenPresented)
                         .zIndex(3)
                         .environment(\.isEnabled, !playerActionsSuppressed)
@@ -233,7 +233,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         return
                     }
                     withAnimation(
-                        .interactiveSpring(response: 0.22, dampingFraction: 1),
+                        .smooth(duration: 0.16),
                         completionCriteria: .logicallyComplete
                     ) {
                         miniDismissTranslation = occlusionTravel
@@ -290,7 +290,17 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     /// The miniplayer sits immediately above the tab bar. Moving it by its own rendered height
     /// is enough for the system bar to occlude it; sending it farther down makes dismissal feel
     /// detached from the interface and unnecessarily lengthens the close-button animation.
-    private var miniPlayerOcclusionTravel: CGFloat { 64 }
+    private var miniPlayerOcclusionTravel: CGFloat { 78 }
+
+    /// Keep small exploratory drags visually solid, then fade continuously as the bar enters the
+    /// tab bar. It is fully transparent before its state is removed, avoiding a visible pause at
+    /// the animation completion boundary.
+    private var miniDismissOpacity: CGFloat {
+        let fadeStart: CGFloat = 24
+        let fadeDistance = miniPlayerOcclusionTravel - fadeStart
+        let progress = (miniDismissTranslation - fadeStart) / fadeDistance
+        return 1 - min(1, max(0, progress))
+    }
 
     private func dismissMiniPlayer() {
         suppressMiniPlayerTap = true
@@ -299,7 +309,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             return
         }
         withAnimation(
-            .smooth(duration: 0.2),
+            .smooth(duration: 0.18),
             completionCriteria: .logicallyComplete
         ) {
             miniDismissTranslation = miniPlayerOcclusionTravel
