@@ -237,7 +237,7 @@ struct LocalPlaylistScreen: View {
                 .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ResponsiveButtonStyle())
         .foregroundStyle(.primary)
         .accessibilityLabel(label)
     }

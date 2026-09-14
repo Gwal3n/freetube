@@ -114,7 +114,7 @@ struct ChannelScreen: View {
                     .foregroundStyle(channel.isSubscribed ? Color.primary : Color.white)
                     .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
             .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity)

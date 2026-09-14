@@ -214,7 +214,7 @@ struct PlaylistScreen: View {
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ResponsiveButtonStyle())
     }
 
     /// "More actions" pill — same capsule chrome as the primary actions, just with an ellipsis

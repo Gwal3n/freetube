@@ -113,11 +113,12 @@ struct SearchContent: View {
                                 Spacer()
                                 Text("\(results.playlists.count)")
                                     .foregroundStyle(.secondary)
-                                Image(systemName: arePlaylistsExpanded ? "chevron.up" : "chevron.down")
+                                Image(systemName: "chevron.right")
+                                    .rotationEffect(.degrees(arePlaylistsExpanded ? 90 : 0))
                             }
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ResponsiveButtonStyle())
                     }
                 }
                 if !results.videos.isEmpty {
@@ -186,11 +187,12 @@ struct SearchContent: View {
                 if let count {
                     Text("\(count)").foregroundStyle(.secondary)
                 }
-                Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ResponsiveButtonStyle())
     }
 
     private func progressLookupID(for videos: [Video]) -> String {
