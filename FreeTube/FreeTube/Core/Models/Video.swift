@@ -76,8 +76,6 @@ extension Video {
     /// API didn't return a count, so callers can hide the label entirely.
     var viewCountString: String {
         guard let viewCount, viewCount > 0 else { return "" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
         if viewCount >= 1_000_000_000 {
             return "\(trim(Double(viewCount) / 1_000_000_000))B views"
         }

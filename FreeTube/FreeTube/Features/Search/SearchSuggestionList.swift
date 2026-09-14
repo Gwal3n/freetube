@@ -25,7 +25,8 @@ struct SearchSuggestionList: View {
                         .padding(.leading)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel("Search for \(suggestion.text)")
 
                     Button {
                         onFill(suggestion)
@@ -34,10 +35,11 @@ struct SearchSuggestionList: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 44, height: 44)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel("Fill search with \(suggestion.text)")
                 }
                 Divider()
+                    .padding(.leading, 52)
             }
         }
     }
