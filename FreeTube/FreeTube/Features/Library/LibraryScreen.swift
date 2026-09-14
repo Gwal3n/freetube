@@ -282,10 +282,10 @@ struct LibraryScreen: View {
                 if let channelID = libraryModel.library?.userChannelID {
                     ChannelScreen(channelID: channelID)
                 } else {
-                    EmptyStateView(
-                        systemImage: "person.crop.rectangle.fill",
-                        title: "No channel detected",
-                        message: "Your YouTube channel ID wasn't returned in the library response. Try refreshing the Library screen."
+                    ContentUnavailableView(
+                        "No Channel Found",
+                        systemImage: "person.crop.rectangle",
+                        description: Text("Pull down in Library to refresh your account information.")
                     )
                 }
             }
@@ -372,12 +372,13 @@ private struct LocalHistoryScreen: View {
     var body: some View {
         Group {
             if entries.isEmpty && isLoading {
-                LoadingView()
+                ProgressView("Loading History…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if entries.isEmpty {
-                EmptyStateView(
+                ContentUnavailableView(
+                    "No Local History",
                     systemImage: "clock.arrow.circlepath",
-                    title: "No local history",
-                    message: "Videos you watch will appear here only on this device."
+                    description: Text("Videos you watch will appear here on this device.")
                 )
             } else {
                 List {
@@ -485,10 +486,10 @@ private struct UserPlaylistsScreen: View {
     var body: some View {
         Group {
             if playlists.isEmpty {
-                EmptyStateView(
+                ContentUnavailableView(
+                    "No Playlists",
                     systemImage: "rectangle.stack",
-                    title: "No playlists",
-                    message: "Playlists you create on YouTube will appear here."
+                    description: Text("Playlists you create on YouTube will appear here.")
                 )
             } else {
                 List {

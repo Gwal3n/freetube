@@ -4,6 +4,7 @@ import UIKit
 
 @available(iOS 17.0, *)
 struct DownloadsScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let navigationRequest: AppNavigationRequest?
     @State private var model = DownloadsViewModel()
     /// File-system + xattr backed downloads list. Replaces the SwiftData `@Query` —
@@ -78,9 +79,13 @@ struct DownloadsScreen: View {
 
                 Section {
                     if savedItems.isEmpty {
-                        EmptyStateView(systemImage: "arrow.down.circle",
-                                       title: "No downloads",
-                                       message: "Download a video from the player or a link to watch it offline.")
+                        ContentUnavailableView(
+                            "No Downloads",
+                            systemImage: "arrow.down.circle",
+                            description: Text("Download a video from the player or a link to watch it offline.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
                     }
                     ForEach(savedItems) { item in
                         savedItemRow(item)
@@ -200,6 +205,7 @@ struct DownloadsScreen: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Cancel download")
         }
     }
 
@@ -213,6 +219,9 @@ struct DownloadsScreen: View {
                 ProgressView(value: value)
                 Text("\(Int(value * 100))%").font(.caption2).foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Downloading")
+            .accessibilityValue("\(Int(value * 100)) percent")
         case .paused:
             Text("Paused").font(.caption).foregroundStyle(.secondary)
         case .completed:
@@ -315,7 +324,11 @@ struct DownloadsScreen: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.down.circle.fill")
-                        .symbolEffect(.pulse, options: .repeating, value: inProgress.count)
+                        .symbolEffect(
+                            .pulse,
+                            options: reduceMotion ? .nonRepeating : .repeating,
+                            value: inProgress.count
+                        )
                         .foregroundStyle(.tint)
                     Text(verbatim: "\(inProgress.count)")
                         .font(.caption.weight(.semibold))
