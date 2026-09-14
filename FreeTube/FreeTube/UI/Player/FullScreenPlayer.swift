@@ -277,20 +277,10 @@ struct FullScreenPlayer: View {
             .frame(width: proxy.size.width, alignment: .leading)
 
             if player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
-                ChapterListPanel(
-                    chapters: player.chapters,
-                    elapsed: player.elapsed,
+                PlayerChapterOverlay(
                     isLandscape: isLandscape,
                     usesOLEDBackground: oledPlayerBackground,
-                    onSeek: { target in
-                        player.seek(to: target)
-                        showPlayerControls()
-                    },
-                    onDismiss: {
-                        withAnimation(.snappy(duration: 0.28)) {
-                            player.chapterListPresented = false
-                        }
-                    }
+                    onInteraction: showPlayerControls
                 )
                 .frame(
                     width: isLandscape ? chapterPanelWidth : proxy.size.width,
