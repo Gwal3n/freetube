@@ -49,7 +49,8 @@ struct VideoRow: View {
                 content
             }
             .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityElement(children: .combine)
+            .accessibilityLabel(rowAccessibilityLabel)
+            .accessibilityHint("Plays video")
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
@@ -70,6 +71,12 @@ struct VideoRow: View {
             }
         }
         .listRowSeparator(.hidden)
+    }
+
+    private var rowAccessibilityLabel: String {
+        [video.title, video.channelName, statsLine, video.durationString]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 
     private var content: some View {

@@ -49,10 +49,11 @@ struct PlaylistMoreActionsMenu: View {
             Image(systemName: "ellipsis")
                 .font(.body)
                 .foregroundStyle(.secondary)
-                .frame(width: 32, height: 32)
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("More playlist actions")
         .task { isSaved = await localService.isRemoteSaved(id: playlist.id) }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { isSaved = await localService.isRemoteSaved(id: playlist.id) }

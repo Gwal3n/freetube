@@ -27,8 +27,9 @@ struct VideoCard: View {
                 thumbnail
             }
             .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(Text(verbatim: "\(video.title), \(video.channelName)"))
+            // The metadata control below performs the same action and carries the complete
+            // spoken label. Exposing both would make VoiceOver announce every card twice.
+            .accessibilityHidden(true)
 
             // Metadata row is split into its own HStack so the ellipsis Menu can live as a
             // sibling of the title/avatar tap target (which still routes to `onTap`). Nesting
@@ -76,11 +77,19 @@ struct VideoCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel(cardAccessibilityLabel)
+            .accessibilityHint("Plays video")
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video)
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)
+    }
+
+    private var cardAccessibilityLabel: String {
+        [video.title, metadataLine, video.durationString]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 }

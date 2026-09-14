@@ -9,6 +9,7 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct PlaylistRow: View {
     let playlist: Playlist
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Optional tap handler. **Leave nil when wrapping this row inside a `NavigationLink`** —
     /// an inner `Button` swallows the link's tap and pushing never happens. We only attach a
@@ -44,7 +45,9 @@ struct PlaylistRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(playlist.title).font(.subheadline.weight(.semibold)).lineLimit(2)
+                Text(playlist.title)
+                    .font(MediaStyle.title)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 if let count = playlist.videoCount {
                     Text("\(count) videos").font(.caption).foregroundStyle(.secondary)
                 }
@@ -54,5 +57,6 @@ struct PlaylistRow: View {
             // its own disclosure chevron. Drawing one here was rendering a duplicate accessory.
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }

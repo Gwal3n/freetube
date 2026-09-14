@@ -101,6 +101,7 @@ struct AddToPlaylistSheet: View {
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .disabled(pendingPlaylistIDs.contains(playlist.id))
+                    .accessibilityValue(containingIDs.contains(playlist.id) ? "Saved" : "Not saved")
                 }
             }
         }

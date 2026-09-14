@@ -15,6 +15,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let onToggleDetails: () -> Void
     let onOpenChannel: () -> Void
     let actions: Actions
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(
         video: Video,
@@ -45,10 +46,14 @@ struct PlayerMetadataHeader<Actions: View>: View {
                     Image(systemName: isDetailsExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel(video.title)
+            .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint("Shows or hides video details")
 
             if video.isLive || !statsText.isEmpty {
                 HStack(spacing: 7) {
@@ -68,20 +73,32 @@ struct PlayerMetadataHeader<Actions: View>: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                if canOpenChannel {
-                    Button(action: onOpenChannel) {
-                        channelRow
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    channelRow
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    channelControl
+                    Spacer(minLength: 4)
+                    actions
                 }
-                Spacer(minLength: 4)
-                actions
+                VStack(alignment: .leading, spacing: 4) {
+                    channelControl
+                    actions
+                }
             }
         }
         .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private var channelControl: some View {
+        if canOpenChannel {
+            Button(action: onOpenChannel) {
+                channelRow
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel("Open channel, \(video.channelName)")
+        } else {
+            channelRow
+        }
     }
 
     private var channelRow: some View {
@@ -97,7 +114,8 @@ struct PlayerMetadataHeader<Actions: View>: View {
 
             Text(video.channelName)
                 .font(.subheadline)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
         }
+        .frame(minHeight: 44)
     }
 }
