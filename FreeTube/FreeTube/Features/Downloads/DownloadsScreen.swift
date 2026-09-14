@@ -190,44 +190,10 @@ struct DownloadsScreen: View {
 
     @ViewBuilder
     private func transferRow(_ snapshot: DownloadTaskSnapshot) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(snapshot.title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
-                progress(for: snapshot.state)
-            }
-            Spacer()
-            Button(role: .destructive) {
+        DownloadTransferRow(snapshot: snapshot) {
+            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                 model.cancel(snapshot)
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Cancel download")
-        }
-    }
-
-    @ViewBuilder
-    private func progress(for state: DownloadTaskSnapshot.State) -> some View {
-        switch state {
-        case .queued:
-            Text("Queued").font(.caption).foregroundStyle(.secondary)
-        case .downloading(let value):
-            VStack(alignment: .leading, spacing: 2) {
-                ProgressView(value: value)
-                Text("\(Int(value * 100))%").font(.caption2).foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Downloading")
-            .accessibilityValue("\(Int(value * 100)) percent")
-        case .paused:
-            Text("Paused").font(.caption).foregroundStyle(.secondary)
-        case .completed:
-            Text("Completed").font(.caption).foregroundStyle(.green)
-        case .failed(let message):
-            Text(message).font(.caption).foregroundStyle(.red)
         }
     }
 
@@ -235,46 +201,13 @@ struct DownloadsScreen: View {
 
     @ViewBuilder
     private func savedItemRow(_ item: SavedItem) -> some View {
-        HStack(spacing: 12) {
-            thumbnail(data: item.thumbnailData)
-                .frame(width: 96, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(2)
-                if !item.channelName.isEmpty {
-                    Text(item.channelName).font(.caption).foregroundStyle(.secondary)
-                }
-                HStack(spacing: 6) {
-                    Text(formatSize(item.fileSize))
-                    if let dur = item.duration {
-                        Text(verbatim: "• \(formatDuration(dur))")
-                    }
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if !isSelecting {
-                rowMenu(item)
-                    .buttonStyle(.plain)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // In selection mode, List's own selection binding handles taps. Out of selection
-            // mode, tapping the row plays the file.
-            if !isSelecting {
-                playLocal(item)
-            }
-        }
-        .swipeActions {
-            if !isSelecting {
-                Button(role: .destructive) {
-                    pendingSingleDelete = item
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
+        DownloadedVideoRow(
+            item: item,
+            isSelecting: isSelecting,
+            onPlay: { playLocal(item) },
+            onDelete: { pendingSingleDelete = item }
+        ) {
+            rowMenu(item).buttonStyle(.plain)
         }
     }
 
@@ -482,30 +415,6 @@ struct DownloadsScreen: View {
     }
 
     // MARK: - Helpers
-
-    @ViewBuilder
-    private func thumbnail(data: Data?) -> some View {
-        if let data, let image = UIImage(data: data) {
-            Image(uiImage: image).resizable().scaledToFill()
-        } else {
-            Color.gray.opacity(0.2)
-        }
-    }
-
-    private func formatSize(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
-    }
-
-    /// Compact mm:ss / hh:mm:ss for the row's duration line.
-    private func formatDuration(_ seconds: TimeInterval) -> String {
-        guard seconds.isFinite, seconds > 0 else { return "" }
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%d:%02d", m, s)
-    }
 
     private func playLocal(_ item: SavedItem) {
         if item.isFromURL {
