@@ -9,15 +9,7 @@ struct FullScreenPlayer: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var downloads = DownloadManager.shared
 
-    /// Async-loaded description / details for the currently-playing video. Fetched on demand when
-    /// the user taps "More" under the channel row.
-    @State private var details: VideoInfo?
-    /// Are we currently fetching `details`? Drives the spinner in the description area.
-    @State private var isLoadingDetails = false
-    @State private var detailsLoadFailed = false
-    /// True when the user has expanded the description block — shows full text instead of a
-    /// truncated preview, and tries to load extended details (tags etc.) if not yet loaded.
-    @State private var isDetailsExpanded = false
+    @State private var detailsModel = PlayerDetailsModel()
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
@@ -255,6 +247,9 @@ struct FullScreenPlayer: View {
                     panelScrollOffset = 0
                     player.playerPanelAtTop = true
                     player.playerPanelGestureStartedAwayFromTop = false
+                    if let videoID = player.currentVideo?.id {
+                        detailsModel.reset(for: videoID)
+                    }
                     showPlayerControls()
                 }
                 .onChange(of: player.loadState, initial: true) { _, state in
@@ -267,7 +262,7 @@ struct FullScreenPlayer: View {
                     guard state == .readyToPlay,
                           prefetchVideoDetails,
                           let video = player.currentVideo else { return }
-                    loadDetailsIfNeeded(for: video)
+                    detailsModel.loadIfNeeded(for: video, player: player)
             }
             if let video = player.currentVideo, !usesPortraitFullscreen {
                 panel(
@@ -278,12 +273,6 @@ struct FullScreenPlayer: View {
                         proxy.size.height - compactSurfaceHeight + collapseRange
                     )
                 )
-                // Reset description presentation when the video changes.
-                .onChange(of: video.id) { _, _ in
-                    details = nil
-                    isDetailsExpanded = false
-                    detailsLoadFailed = false
-                }
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
                 // metadata column so its title and rows cannot extend underneath Chapters.
                 .frame(width: surfaceWidth, alignment: .leading)
@@ -458,36 +447,35 @@ struct FullScreenPlayer: View {
                     .reportPlayerPanelScrollOffset()
                 PlayerInformationPanel(
                     video: video,
-                    statsText: detailsStatsRow(video: video),
-                    descriptionText: availableDescription(video: video),
-                    descriptionParts: details?.descriptionParts ?? [],
-                    likesText: (details?.likeCount).flatMap {
-                        $0 > 0 ? formatCount($0) : nil
-                    },
-                    commentsCountText: details?.commentsCountText ?? player.commentsCountText,
-                    isDetailsExpanded: isDetailsExpanded,
-                    isLoadingDetails: isLoadingDetails,
-                    detailsLoadFailed: detailsLoadFailed,
+                    statsText: detailsModel.statsText(for: video),
+                    descriptionText: detailsModel.description(for: video),
+                    descriptionParts: detailsModel.details?.descriptionParts ?? [],
+                    likesText: detailsModel.likesText,
+                    commentsCountText: detailsModel.commentsCountText(
+                        fallback: player.commentsCountText
+                    ),
+                    isDetailsExpanded: detailsModel.isExpanded,
+                    isLoadingDetails: detailsModel.isLoading,
+                    detailsLoadFailed: detailsModel.loadFailed,
                     showsUpNext: showUpNext,
                     upNextInitialCount: upNextInitialCount,
                     showsComments: showComments,
                     onToggleDetails: {
                         withAnimation(.smooth(duration: 0.24)) {
-                            isDetailsExpanded.toggle()
+                            detailsModel.isExpanded.toggle()
                         }
-                        if isDetailsExpanded {
-                            loadDetailsIfNeeded(for: video)
+                        if detailsModel.isExpanded {
+                            detailsModel.loadIfNeeded(for: video, player: player)
                         }
                     },
                     onExpandDetails: {
                         withAnimation(.smooth(duration: 0.24)) {
-                            isDetailsExpanded = true
+                            detailsModel.isExpanded = true
                         }
-                        loadDetailsIfNeeded(for: video)
+                        detailsModel.loadIfNeeded(for: video, player: player)
                     },
                     onRetryDetails: {
-                        details = nil
-                        loadDetailsIfNeeded(for: video)
+                        detailsModel.retry(for: video, player: player)
                     },
                     onOpenChannel: {
                         openChannel(video.channelID)
@@ -523,77 +511,6 @@ struct FullScreenPlayer: View {
         )
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
-    }
-
-    // MARK: - Description / details (between channel row and comments)
-
-    private func availableDescription(video: Video) -> String? {
-        if let fetched = details?.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !fetched.isEmpty {
-            return fetched
-        }
-        if let snippet = video.descriptionSnippet?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !snippet.isEmpty {
-            return snippet
-        }
-        return nil
-    }
-
-    /// `42K views • Uploaded 3 days ago`, omitting any pieces we don't have.
-    private func detailsStatsRow(video: Video) -> String {
-        var parts: [String] = []
-        if let viewsText = details?.viewCountText?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !viewsText.isEmpty {
-            parts.append(viewsText)
-        } else if let views = video.viewCount, views > 0 {
-            parts.append("\(formatCount(views)) views")
-        }
-        if let uploadDateText = details?.uploadDateText?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !uploadDateText.isEmpty {
-            parts.append("Uploaded \(uploadDateText)")
-        } else if let published = video.publishedAt {
-            parts.append("Uploaded \(published.formatted(date: .abbreviated, time: .omitted))")
-        } else if let relative = video.publishedRelative, !relative.isEmpty {
-            parts.append("Uploaded \(relative)")
-        }
-        return parts.joined(separator: " • ")
-    }
-
-    private func formatCount(_ n: Int) -> String {
-        if n >= 1_000_000_000 { return String(format: "%.1fB", Double(n) / 1_000_000_000) }
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
-        return "\(n)"
-    }
-
-    /// Lazy fetch invoked when the user expands the description. One `VideoService.fetchMoreInfo`
-    /// call per video; subsequent expansions reuse the cached result in `details`.
-    private func loadDetailsIfNeeded(for video: Video) {
-        guard details == nil, !isLoadingDetails else { return }
-        isLoadingDetails = true
-        detailsLoadFailed = false
-        Task { [videoID = video.id] in
-            defer { Task { @MainActor in isLoadingDetails = false } }
-            do {
-                let info = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
-                await MainActor.run {
-                    // Drop the result if the user switched videos before this returned.
-                    guard player.currentVideo?.id == videoID else { return }
-                    details = info
-                    player.installVideoDetails(info, for: videoID)
-                    let fetched = info.descriptionText?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    let snippet = video.descriptionSnippet?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    detailsLoadFailed = (fetched?.isEmpty ?? true) && (snippet?.isEmpty ?? true)
-                }
-            } catch {
-                await MainActor.run {
-                    guard player.currentVideo?.id == videoID else { return }
-                    detailsLoadFailed = true
-                }
-            }
-        }
     }
 
     // MARK: - Player actions
