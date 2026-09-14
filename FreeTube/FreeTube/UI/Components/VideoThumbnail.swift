@@ -12,7 +12,7 @@ struct VideoThumbnail: View {
     var body: some View {
         KFImage(video.thumbnailURL)
             .thumbnail(size: size, scale: displayScale, fadeDuration: reduceMotion ? 0 : 0.15) {
-                Rectangle().fill(.quaternary)
+                Rectangle().fill(MediaStyle.placeholderFill)
             }
             .resizable()
             .scaledToFill()

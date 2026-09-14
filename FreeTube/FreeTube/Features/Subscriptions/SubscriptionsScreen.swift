@@ -59,7 +59,7 @@ struct SubscriptionsScreen: View {
         VStack(spacing: 6) {
             KFImage(channel.thumbnailURL)
                 .thumbnail(size: CGSize(width: 64, height: 64)) {
-                    Circle().fill(.gray.opacity(0.2))
+                    Circle().fill(MediaStyle.placeholderFill)
                 }
                 .resizable()
                 .scaledToFill()

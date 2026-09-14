@@ -77,7 +77,7 @@ struct ChannelScreen: View {
             if let banner = channel.bannerURL {
                 KFImage(banner)
                     .thumbnail(size: CGSize(width: 400, height: 120)) {
-                        Color.gray.opacity(0.2)
+                        MediaStyle.placeholderFill
                     }
                     .resizable()
                     .scaledToFill()
@@ -87,7 +87,7 @@ struct ChannelScreen: View {
 
             KFImage(channel.thumbnailURL)
                 .thumbnail(size: CGSize(width: 88, height: 88)) {
-                    Circle().fill(.gray.opacity(0.2))
+                    Circle().fill(MediaStyle.placeholderFill)
                 }
                 .resizable()
                 .scaledToFill()

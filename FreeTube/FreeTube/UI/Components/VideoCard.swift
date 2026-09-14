@@ -55,7 +55,7 @@ struct VideoCard: View {
                 HStack(alignment: .top, spacing: 12) {
                     KFImage(video.channelThumbnailURL)
                         .thumbnail(size: CGSize(width: 36, height: 36)) {
-                            Circle().fill(.gray.opacity(0.2))
+                            Circle().fill(MediaStyle.placeholderFill)
                         }
                         .resizable()
                         .scaledToFill()

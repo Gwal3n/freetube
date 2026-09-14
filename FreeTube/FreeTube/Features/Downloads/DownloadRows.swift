@@ -124,7 +124,7 @@ struct DownloadedVideoRow<MenuContent: View>: View {
         if let data = item.thumbnailData, let image = UIImage(data: data) {
             Image(uiImage: image).resizable().scaledToFill()
         } else {
-            Color.secondary.opacity(0.12)
+            MediaStyle.placeholderFill
                 .overlay { Image(systemName: "play.rectangle").foregroundStyle(.secondary) }
         }
     }

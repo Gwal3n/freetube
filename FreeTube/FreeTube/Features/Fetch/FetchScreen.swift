@@ -212,7 +212,7 @@ struct FetchQueueRow: View {
     @ViewBuilder
     private var placeholderThumbnail: some View {
         ZStack {
-            Color.gray.opacity(0.18)
+            MediaStyle.placeholderFill
             Image(systemName: stateIconName)
                 .foregroundStyle(.secondary)
         }

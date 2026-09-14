@@ -42,7 +42,7 @@ struct VideoDetailScreen: View {
             ZStack {
                 KFImage(model.info?.video.thumbnailURL)
                     .thumbnail(size: CGSize(width: 400, height: 225)) {
-                        Color.gray.opacity(0.2)
+                        MediaStyle.placeholderFill
                     }
                     .resizable()
                     .scaledToFill()

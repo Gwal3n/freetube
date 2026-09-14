@@ -105,7 +105,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         HStack(spacing: 12) {
             KFImage(video.channelThumbnailURL)
                 .thumbnail(size: CGSize(width: 32, height: 32)) {
-                    Circle().fill(.gray.opacity(0.2))
+                    Circle().fill(MediaStyle.placeholderFill)
                 }
                 .resizable()
                 .scaledToFill()

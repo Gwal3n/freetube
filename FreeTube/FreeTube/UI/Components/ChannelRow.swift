@@ -39,7 +39,7 @@ struct ChannelRow: View {
         HStack(spacing: 12) {
             KFImage(channel.thumbnailURL)
                 .thumbnail(size: CGSize(width: 48, height: 48)) {
-                    Circle().fill(.gray.opacity(0.2))
+                    Circle().fill(MediaStyle.placeholderFill)
                 }
                 .resizable()
                 .scaledToFill()

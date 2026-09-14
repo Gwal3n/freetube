@@ -284,7 +284,7 @@ struct PlayerQueueSections: View {
                     ZStack(alignment: .bottomTrailing) {
                         KFImage(video.thumbnailURL)
                             .thumbnail(size: CGSize(width: 80, height: 45)) {
-                                Color.gray.opacity(0.2)
+                                MediaStyle.placeholderFill
                             }
                             .resizable()
                             .scaledToFill()

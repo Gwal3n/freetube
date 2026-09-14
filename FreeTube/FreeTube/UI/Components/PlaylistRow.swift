@@ -39,12 +39,12 @@ struct PlaylistRow: View {
         HStack(spacing: 12) {
             KFImage(playlist.thumbnailURL)
                 .thumbnail(size: CGSize(width: 96, height: 56)) {
-                    Color.gray.opacity(0.2)
+                    MediaStyle.placeholderFill
                 }
                 .resizable()
                 .scaledToFill()
                 .frame(width: 96, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(playlist.title)

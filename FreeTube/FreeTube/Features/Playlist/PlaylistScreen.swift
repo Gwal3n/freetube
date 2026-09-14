@@ -159,7 +159,7 @@ struct PlaylistScreen: View {
         let url = details.playlist.thumbnailURL ?? details.videos.first?.thumbnailURL
         KFImage(url)
             .thumbnail(size: CGSize(width: 400, height: 225)) {
-                Color.gray.opacity(0.15)
+                MediaStyle.placeholderFill
             }
             .resizable()
             .scaledToFill()
