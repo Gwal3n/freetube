@@ -10,6 +10,7 @@ struct AddToPlaylistSheet: View {
     @State private var pendingPlaylistIDs = Set<String>()
     @State private var newTitle = ""
     @State private var isCreating = false
+    @State private var isSavingNewPlaylist = false
     @State private var isLoading = true
     @FocusState private var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -30,12 +31,18 @@ struct AddToPlaylistSheet: View {
                             Button {
                                 Task { await createAndSave() }
                             } label: {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.primary)
+                                if isSavingNewPlaylist {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .frame(width: 28, height: 28)
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.primary)
+                                }
                             }
                             .buttonStyle(.plain)
-                            .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSavingNewPlaylist)
                         }
                     }
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -61,11 +68,17 @@ struct AddToPlaylistSheet: View {
             .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: isCreating)
             .navigationTitle("Save to playlist")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .disabled(hasPendingWrites)
+                }
+            }
             .task { await reload() }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(hasPendingWrites)
     }
 
     @ViewBuilder
@@ -111,6 +124,10 @@ struct AddToPlaylistSheet: View {
         playlists.filter { !$0.isSavedFromYouTube }
     }
 
+    private var hasPendingWrites: Bool {
+        isSavingNewPlaylist || !pendingPlaylistIDs.isEmpty
+    }
+
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
@@ -139,7 +156,9 @@ struct AddToPlaylistSheet: View {
 
     private func createAndSave() async {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return }
+        guard !title.isEmpty, !isSavingNewPlaylist else { return }
+        isSavingNewPlaylist = true
+        defer { isSavingNewPlaylist = false }
         let id = await service.create(title: title)
         await service.add(video: video, to: id)
         newTitle = ""

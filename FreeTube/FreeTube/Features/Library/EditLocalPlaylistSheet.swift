@@ -7,6 +7,7 @@ struct EditLocalPlaylistSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
     @State private var descriptionText: String
+    @State private var isSaving = false
 
     init(playlist: LocalPlaylistSnapshot, onSave: @escaping (String, String?) async -> Void) {
         self.playlist = playlist
@@ -31,19 +32,38 @@ struct EditLocalPlaylistSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let cleanDescription = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        Task {
-                            await onSave(title.trimmingCharacters(in: .whitespacesAndNewlines), cleanDescription.isEmpty ? nil : cleanDescription)
-                            dismiss()
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("Save")
                         }
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(cleanTitle.isEmpty || isSaving)
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(isSaving)
+    }
+
+    private var cleanTitle: String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func save() async {
+        guard !cleanTitle.isEmpty, !isSaving else { return }
+        isSaving = true
+        let cleanDescription = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        await onSave(cleanTitle, cleanDescription.isEmpty ? nil : cleanDescription)
+        isSaving = false
+        dismiss()
     }
 }
