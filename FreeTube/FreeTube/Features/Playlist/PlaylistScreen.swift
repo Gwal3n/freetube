@@ -15,7 +15,6 @@ struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.openURL) private var openURL
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isSavedLocally = false
     @State private var isSavingLocally = false
     private let localPlaylistService = LocalPlaylistService()
@@ -47,7 +46,7 @@ struct PlaylistScreen: View {
                     // the very top of the screen.
                     VStack(alignment: .leading, spacing: 16) {
                         artworkHeader(details)
-                        metadataBlock(details)
+                        PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
                         actionToolbar(details)
                     }
                     .padding(.top, 12)
@@ -169,138 +168,6 @@ struct PlaylistScreen: View {
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
-    }
-
-    // MARK: - Metadata
-
-    /// Title + always-visible labeled stat rows (Videos, Views, Description) + a collapsible
-    /// description preview/full toggle. The "More details" pill no longer hides the counters —
-    /// they're shown unconditionally so the user sees them on first render. The button now only
-    /// toggles the description between a 2-line preview and the full text.
-    ///
-    /// **Why the fallback on Videos:** YouTubeKit's `processNewInfoModel` doesn't extract
-    /// `videoCount` / `viewCount` — only the legacy `playlistHeaderRenderer` path does. Most
-    /// modern playlists arrive in the new format, so `playlist.videoCount` is nil even for
-    /// large playlists. We fall back to `details.videos.count` (with a `+` suffix when there
-    /// are more pages to load) so the row never says "nil videos".
-    @ViewBuilder
-    private func metadataBlock(_ details: PlaylistDetails) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(details.playlist.title)
-                .font(.title3.weight(.semibold))
-                .lineLimit(3)
-
-            if let channelName = details.playlist.channelName, !channelName.isEmpty {
-                Text(channelName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            // Stats rows — always rendered. Videos has a guaranteed fallback; Views and
-            // Description self-hide when nil/empty.
-            VStack(alignment: .leading, spacing: 6) {
-                statRow(label: "Videos", value: videoCountLabel(for: details))
-                statRow(label: "Views", value: viewsLabel(for: details))
-                descriptionRow(details.playlist.descriptionText)
-            }
-
-            if shouldShowMoreButton(for: details.playlist.descriptionText) {
-                Button {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                        isDetailsExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(isDetailsExpanded ? "Less" : "More details")
-                        Image(systemName: isDetailsExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2.weight(.bold))
-                    }
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal)
-    }
-
-    /// "{N} videos" using YouTubeKit's parsed total when present, otherwise the loaded count
-    /// with a `+` when more pages remain.
-    private func videoCountLabel(for details: PlaylistDetails) -> String {
-        if let total = details.playlist.videoCount {
-            return "\(total)"
-        }
-        let suffix = details.continuationToken != nil ? "+" : ""
-        return "\(details.videos.count)\(suffix)"
-    }
-
-    /// Compact view count string, or nil if YouTube didn't return one (new-format playlists).
-    private func viewsLabel(for details: PlaylistDetails) -> String? {
-        guard let views = details.playlist.viewCount else { return nil }
-        return formattedAbbreviated(views)
-    }
-
-    /// Description row — switches between a 2-line preview (collapsed) and the full untruncated
-    /// text (expanded). Hidden entirely when the playlist has no description.
-    @ViewBuilder
-    private func descriptionRow(_ text: String?) -> some View {
-        if let text, !text.isEmpty {
-            HStack(alignment: .top, spacing: 8) {
-                Text("Description")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 84, alignment: .leading)
-                Text(text)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(isDetailsExpanded ? nil : 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    /// We only show "More details" when there's a description that could plausibly need
-    /// expansion. With no description, the counter rows are static and there's nothing to toggle.
-    private func shouldShowMoreButton(for description: String?) -> Bool {
-        guard let description, !description.isEmpty else { return false }
-        // Cheap heuristic — anything over ~100 chars likely wraps past 2 lines on iPhone widths.
-        return description.count > 100
-    }
-
-    /// Single labeled stat row. Hides itself when the value is nil/empty so the expanded block
-    /// only shows fields YouTube actually returned. Uses top alignment so multi-line values
-    /// (like the description) wrap underneath their own column without dragging the label down
-    /// to the middle of the block.
-    @ViewBuilder
-    private func statRow(label: String, value: String?) -> some View {
-        if let value, !value.isEmpty {
-            HStack(alignment: .top, spacing: 8) {
-                Text(label)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 84, alignment: .leading)
-                Text(value)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func formattedAbbreviated(_ value: Int) -> String {
-        if value >= 1_000_000_000 { return String(format: "%.1fB", Double(value) / 1_000_000_000) }
-        if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
-        if value >= 1_000 { return String(format: "%.1fK", Double(value) / 1_000) }
-        return "\(value)"
     }
 
     // MARK: - Glass toolbar
