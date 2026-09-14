@@ -42,14 +42,10 @@ struct CommentsSection: View {
                             Button {
                                 Task { await model.loadMore() }
                             } label: {
-                                Text("Load more")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 7)
-                                    .background(.ultraThinMaterial, in: Capsule())
+                                Label("Load more", systemImage: "chevron.down")
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal)
                         }
