@@ -11,17 +11,17 @@ final class PlayerControlsVisibilityModel {
 
     private var hideTask: Task<Void, Never>?
 
-    func toggle(isPlaying: Bool) {
+    func toggle(isPlaying: Bool, reduceMotion: Bool) {
         if isVisible {
-            hide()
+            hide(reduceMotion: reduceMotion)
         } else {
-            show(isPlaying: isPlaying)
+            show(isPlaying: isPlaying, reduceMotion: reduceMotion)
         }
     }
 
-    func show(isPlaying: Bool) {
+    func show(isPlaying: Bool, reduceMotion: Bool) {
         cancelAutoHide()
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
             isVisible = true
         }
         guard isPlaying else { return }
@@ -33,13 +33,13 @@ final class PlayerControlsVisibilityModel {
                 return
             }
             guard !Task.isCancelled else { return }
-            self?.hide()
+            self?.hide(reduceMotion: reduceMotion)
         }
     }
 
-    func hide() {
+    func hide(reduceMotion: Bool) {
         cancelAutoHide()
-        withAnimation(.easeIn(duration: 0.18)) {
+        withAnimation(reduceMotion ? nil : .easeIn(duration: 0.18)) {
             isVisible = false
         }
     }

@@ -35,6 +35,7 @@ struct SponsorBlockSkipOverlay: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 28, height: 28)
                     }
+                    .contentShape(.interaction, Rectangle().inset(by: -8))
                     .accessibilityLabel("Dismiss")
                 }
                 .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 8))

@@ -80,9 +80,11 @@ struct PlayerTopControls: View {
             Text(rateLabel(playbackRate))
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(minWidth: 42, minHeight: 36)
+                .frame(minWidth: 44, minHeight: 44)
                 .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
         }
+        .accessibilityLabel("Playback speed")
+        .accessibilityValue(rateLabel(playbackRate))
     }
 
     private func rateLabel(_ rate: Double) -> String {

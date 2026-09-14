@@ -51,6 +51,7 @@ struct ChapterListPanel: View {
                         .background(.quaternary, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .contentShape(.interaction, Rectangle().inset(by: -7))
                 .accessibilityLabel("Close chapters")
             }
             .padding(.horizontal, 16)

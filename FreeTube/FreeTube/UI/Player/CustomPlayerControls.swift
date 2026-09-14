@@ -37,6 +37,7 @@ struct CustomPlayerControls: View {
                             Image(systemName: "chevron.down")
                                 .playerTopControl()
                         }
+                        .accessibilityLabel("Minimize player")
                         Spacer()
                     } else {
                         VStack(alignment: .leading, spacing: 1) {
@@ -70,6 +71,7 @@ struct CustomPlayerControls: View {
                         Image(systemName: "backward.end.fill").playerCenterControl()
                     }
                     .disabled(!hasPrevious)
+                    .accessibilityLabel("Previous video")
                     Button(action: onTogglePlayPause) {
                         Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
                             .font(.system(size: 34, weight: .semibold))
@@ -83,6 +85,7 @@ struct CustomPlayerControls: View {
                         Image(systemName: "forward.end.fill").playerCenterControl()
                     }
                     .disabled(!hasNext)
+                    .accessibilityLabel("Next video")
                 }
                 .buttonStyle(.plain)
                 .opacity(isVisible ? 1 : 0)
@@ -116,7 +119,7 @@ extension Image {
     func playerTopControl() -> some View {
         font(.body.weight(.bold))
             .foregroundStyle(.white)
-            .frame(width: 36, height: 36)
+            .frame(width: 44, height: 44)
             .contentShape(Circle())
             .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
     }

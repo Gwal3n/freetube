@@ -7,6 +7,7 @@ import UIKit
 struct FullScreenPlayer: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var detailsModel = PlayerDetailsModel()
     @State private var controlsVisibility = PlayerControlsVisibilityModel()
     @State private var actionsModel = PlayerActionsModel()
@@ -543,11 +544,17 @@ struct FullScreenPlayer: View {
     // MARK: - Transport
 
     private func togglePlayerControls() {
-        controlsVisibility.toggle(isPlaying: player.isPlaying)
+        controlsVisibility.toggle(
+            isPlaying: player.isPlaying,
+            reduceMotion: reduceMotion
+        )
     }
 
     private func showPlayerControls() {
-        controlsVisibility.show(isPlaying: player.isPlaying)
+        controlsVisibility.show(
+            isPlaying: player.isPlaying,
+            reduceMotion: reduceMotion
+        )
     }
 
     private var hasPrevious: Bool {

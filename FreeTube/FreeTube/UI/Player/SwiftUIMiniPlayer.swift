@@ -46,7 +46,8 @@ struct SwiftUIMiniPlayer: View {
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Expand player")
+                .accessibilityLabel(expandAccessibilityLabel)
+                .accessibilityHint("Shows the full player")
 
                 Button {
                     player.togglePlayPause()
@@ -119,6 +120,13 @@ struct SwiftUIMiniPlayer: View {
         case .idle, .buffering, .readyToPlay:
             return player.currentVideo?.channelName ?? ""
         }
+    }
+
+    private var expandAccessibilityLabel: String {
+        guard let title = player.currentVideo?.title, !title.isEmpty else {
+            return "Expand player"
+        }
+        return "Expand player, \(title)"
     }
 
 }
