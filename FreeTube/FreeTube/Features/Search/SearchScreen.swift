@@ -8,6 +8,7 @@ import UIKit
 struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
+    let onOpenDestination: (AppNavigationRequest.Destination) -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismissSearch) private var dismissSearch
@@ -66,12 +67,14 @@ struct SearchContent: View {
                     Section {
                         if areChannelsExpanded {
                             ForEach(results.channels) { channel in
-                                NavigationLink {
-                                    ChannelScreen(channelID: channel.id)
+                                Button {
+                                    dismissNativeSearch()
+                                    onOpenDestination(.channel(channel.id))
                                 } label: {
                                     ChannelRow(channel: channel)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityAddTraits(.isLink)
                             }
                         }
                     } header: {
@@ -86,12 +89,15 @@ struct SearchContent: View {
                     Section {
                         if arePlaylistsExpanded {
                             ForEach(results.playlists) { playlist in
-                                NavigationLink {
-                                    PlaylistScreen(playlistID: playlist.id)
-                                } label: {
-                                    PlaylistRow(playlist: playlist, showsMoreMenu: true)
-                                }
-                                .buttonStyle(.plain)
+                                PlaylistRow(
+                                    playlist: playlist,
+                                    onTap: {
+                                        dismissNativeSearch()
+                                        onOpenDestination(.playlist(playlist.id))
+                                    },
+                                    showsMoreMenu: true
+                                )
+                                .accessibilityAddTraits(.isLink)
                             }
                         }
                     } header: {

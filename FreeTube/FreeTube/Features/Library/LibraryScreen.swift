@@ -22,6 +22,10 @@ struct LibraryScreen: View {
         case history
         case subscriptions
         case playlists
+        case accountHistory
+        case accountPlaylists
+        case accountSubscriptions
+        case unavailableChannel
         case channel(String)
         case playlist(String)
         case localPlaylist(String)
@@ -50,8 +54,23 @@ struct LibraryScreen: View {
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .history: LocalHistoryScreen()
-                case .subscriptions: LocalSubscriptionsScreen()
+                case .subscriptions:
+                    LocalSubscriptionsScreen { path.append(.channel($0)) }
                 case .playlists: LocalPlaylistsScreen()
+                case .accountHistory: HistoryScreen()
+                case .accountPlaylists:
+                    UserPlaylistsScreen(
+                        playlists: libraryModel.library?.playlists ?? [],
+                        onOpenPlaylist: { path.append(.playlist($0)) }
+                    )
+                case .accountSubscriptions:
+                    SubscribedChannelsScreen { path.append(.channel($0)) }
+                case .unavailableChannel:
+                    ContentUnavailableView(
+                        "No Channel Found",
+                        systemImage: "person.crop.rectangle",
+                        description: Text("Pull down in Library to refresh your account information.")
+                    )
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
@@ -261,75 +280,61 @@ struct LibraryScreen: View {
             menuRow(
                 title: "Watch history",
                 subtitle: countSubtitle(libraryModel.library?.historyCount, noun: "video"),
-                systemImage: "clock.fill"
-            ) {
-                HistoryScreen()
-            }
+                systemImage: "clock.fill",
+                destination: .accountHistory
+            )
 
             menuRow(
                 title: "Playlists",
                 subtitle: countSubtitle(libraryModel.library?.playlists.count, noun: "playlist"),
-                systemImage: "rectangle.stack.fill"
-            ) {
-                UserPlaylistsScreen(playlists: libraryModel.library?.playlists ?? [])
-            }
+                systemImage: "rectangle.stack.fill",
+                destination: .accountPlaylists
+            )
 
             menuRow(
                 title: "Your videos",
                 subtitle: "Your YouTube channel",
-                systemImage: "person.crop.rectangle.fill"
-            ) {
-                if let channelID = libraryModel.library?.userChannelID {
-                    ChannelScreen(channelID: channelID)
-                } else {
-                    ContentUnavailableView(
-                        "No Channel Found",
-                        systemImage: "person.crop.rectangle",
-                        description: Text("Pull down in Library to refresh your account information.")
-                    )
-                }
-            }
+                systemImage: "person.crop.rectangle.fill",
+                destination: libraryModel.library?.userChannelID.map(Destination.channel) ?? .unavailableChannel
+            )
 
             menuRow(
                 title: "Subscriptions",
                 subtitle: "Channels you follow",
-                systemImage: "person.2.fill"
-            ) {
-                SubscribedChannelsScreen()
-            }
+                systemImage: "person.2.fill",
+                destination: .accountSubscriptions
+            )
 
             // VLLL — YouTube's well-known playlist ID for the signed-in user's Liked Videos.
             menuRow(
                 title: "Liked videos",
                 subtitle: countSubtitle(libraryModel.library?.likedCount, noun: "video"),
-                systemImage: "hand.thumbsup.fill"
-            ) {
-                PlaylistScreen(playlistID: "VLLL")
-            }
+                systemImage: "hand.thumbsup.fill",
+                destination: .playlist("VLLL")
+            )
 
             // VLWL — Watch Later.
             menuRow(
                 title: "Watch later",
                 subtitle: countSubtitle(libraryModel.library?.watchLaterCount, noun: "video"),
-                systemImage: "clock.arrow.circlepath"
-            ) {
-                PlaylistScreen(playlistID: "VLWL")
-            }
+                systemImage: "clock.arrow.circlepath",
+                destination: .playlist("VLWL")
+            )
         }
     }
 
     /// Custom row builder so we can put the count under the title (the system's `Label` only
-    /// shows a single line of text next to its icon). Pushes the given destination in the
-    /// surrounding NavigationStack.
+    /// shows a single line of text next to its icon). Every row writes to the same typed path,
+    /// avoiding a second implicit navigation state owned by individual `NavigationLink`s.
     @ViewBuilder
-    private func menuRow<Destination: View>(
+    private func menuRow(
         title: String,
         subtitle: String,
         systemImage: String,
-        @ViewBuilder destination: () -> Destination
+        destination: Destination
     ) -> some View {
-        NavigationLink {
-            destination()
+        Button {
+            openLocalDestination(destination)
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
@@ -343,8 +348,16 @@ struct LibraryScreen: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
+            .foregroundStyle(.primary)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isLink)
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't
@@ -482,6 +495,7 @@ private struct LocalHistoryScreen: View {
 @available(iOS 17.0, *)
 private struct UserPlaylistsScreen: View {
     let playlists: [Playlist]
+    let onOpenPlaylist: (String) -> Void
 
     var body: some View {
         Group {
@@ -494,12 +508,12 @@ private struct UserPlaylistsScreen: View {
             } else {
                 List {
                     ForEach(playlists) { playlist in
-                        NavigationLink {
-                            PlaylistScreen(playlistID: playlist.id)
-                        } label: {
-                            PlaylistRow(playlist: playlist, showsMoreMenu: true)
-                        }
-                        .buttonStyle(.plain)
+                        PlaylistRow(
+                            playlist: playlist,
+                            onTap: { onOpenPlaylist(playlist.id) },
+                            showsMoreMenu: true
+                        )
+                        .accessibilityAddTraits(.isLink)
                     }
                 }
                 .listStyle(.plain)

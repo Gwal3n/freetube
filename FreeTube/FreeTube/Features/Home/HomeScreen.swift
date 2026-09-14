@@ -34,7 +34,8 @@ struct HomeScreen: View {
                     model: searchModel,
                     onRunSearch: { query in
                         Task { await runSearch(query: query) }
-                    }
+                    },
+                    onOpenDestination: { path.append($0) }
                 )
             }
             .contentShape(Rectangle())

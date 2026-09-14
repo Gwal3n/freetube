@@ -3,8 +3,8 @@ import Observation
 
 /// Pushed when the user taps "My subscriptions" in the Library menu. Lists every channel the
 /// signed-in user follows (paginated via `AccountSubscriptionsResponse.Continuation`). Each row
-/// shows the channel's avatar + name + subscriber line via `ChannelRow`, wrapped in a
-/// `NavigationLink` that pushes `ChannelScreen`.
+/// shows the channel's avatar + name + subscriber line via `ChannelRow`. Selection is routed
+/// through Library's single typed navigation path so cold and warm pushes behave identically.
 ///
 /// Named distinctly from the existing `SubscriptionsScreen` (which shows the *feed of latest
 /// videos* from your subscriptions, not the channel list) — file names must be unique within
@@ -12,6 +12,7 @@ import Observation
 /// entry point elsewhere if you want a chronological video stream.
 @available(iOS 17.0, *)
 struct SubscribedChannelsScreen: View {
+    let onOpenChannel: (String) -> Void
     @State private var model = SubscriptionsListViewModel()
 
     /// Lookahead distance (in rows) at which the next page is prefetched. Matches the pattern
@@ -31,12 +32,13 @@ struct SubscribedChannelsScreen: View {
             } else {
                 List {
                     ForEach(Array(model.channels.enumerated()), id: \.element.id) { index, channel in
-                        NavigationLink {
-                            ChannelScreen(channelID: channel.id)
+                        Button {
+                            onOpenChannel(channel.id)
                         } label: {
                             ChannelRow(channel: channel)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(.isLink)
                         .onAppear { prefetchIfNeeded(currentIndex: index) }
                     }
                     if model.canLoadMore || model.isLoadingMore {
