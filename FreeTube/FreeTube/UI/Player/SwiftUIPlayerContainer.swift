@@ -77,7 +77,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     SwiftUIMiniPlayer(
                         thumbnail: thumbnail,
                         onExpand: expandPlayerFromTap,
-                        onDismiss: { dismissMiniPlayer(in: proxy.size) }
+                        onDismiss: dismissMiniPlayer
                     )
                         .padding(.horizontal, 20)
                         .padding(.bottom, miniBottomPadding)
@@ -227,15 +227,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 if presentationTranslation < -90 || predicted < -190 {
                     expandPlayer()
                 } else if miniDismissTranslation > 70 || predicted > 170 {
+                    let occlusionTravel = miniPlayerOcclusionTravel
+                    if miniDismissTranslation >= occlusionTravel {
+                        finishMiniPlayerDismissal()
+                        return
+                    }
                     withAnimation(
-                        .interactiveSpring(response: 0.34, dampingFraction: 0.9),
+                        .interactiveSpring(response: 0.22, dampingFraction: 1),
                         completionCriteria: .logicallyComplete
                     ) {
-                        miniDismissTranslation = size.height * 0.25
+                        miniDismissTranslation = occlusionTravel
                     } completion: {
-                        player.dismiss()
-                        presentationTranslation = 0
-                        miniDismissTranslation = 0
+                        finishMiniPlayerDismissal()
                     }
                 } else {
                     withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.82)) {
@@ -284,22 +287,31 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         expandPlayer()
     }
 
-    private func dismissMiniPlayer(in size: CGSize) {
+    /// The miniplayer sits immediately above the tab bar. Moving it by its own rendered height
+    /// is enough for the system bar to occlude it; sending it farther down makes dismissal feel
+    /// detached from the interface and unnecessarily lengthens the close-button animation.
+    private var miniPlayerOcclusionTravel: CGFloat { 64 }
+
+    private func dismissMiniPlayer() {
         suppressMiniPlayerTap = true
         guard !reduceMotion else {
-            player.dismiss()
-            suppressMiniPlayerTap = false
+            finishMiniPlayerDismissal()
             return
         }
         withAnimation(
-            .interactiveSpring(response: 0.3, dampingFraction: 0.92),
+            .smooth(duration: 0.2),
             completionCriteria: .logicallyComplete
         ) {
-            miniDismissTranslation = max(90, size.height * 0.14)
+            miniDismissTranslation = miniPlayerOcclusionTravel
         } completion: {
-            player.dismiss()
-            miniDismissTranslation = 0
-            suppressMiniPlayerTap = false
+            finishMiniPlayerDismissal()
         }
+    }
+
+    private func finishMiniPlayerDismissal() {
+        player.dismiss()
+        presentationTranslation = 0
+        miniDismissTranslation = 0
+        suppressMiniPlayerTap = false
     }
 }
