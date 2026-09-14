@@ -49,7 +49,7 @@ struct AddToPlaylistSheet: View {
                 } else {
                     Section {
                         Button {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                                 isCreating = true
                             }
                             Task { @MainActor in
@@ -65,7 +65,7 @@ struct AddToPlaylistSheet: View {
 
                 playlistSection("Personal", playlists: personalPlaylists)
             }
-            .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: isCreating)
+            .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isCreating)
             .navigationTitle("Save to playlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -162,7 +162,7 @@ struct AddToPlaylistSheet: View {
         let id = await service.create(title: title)
         await service.add(video: video, to: id)
         newTitle = ""
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             isCreating = false
         }
         await reload()

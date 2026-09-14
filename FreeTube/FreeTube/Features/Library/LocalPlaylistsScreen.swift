@@ -179,19 +179,19 @@ struct LocalPlaylistsScreen: View {
     private func deleteSelectedPlaylists() async {
         await service.delete(ids: selectedPlaylistIDs)
         selectedPlaylistIDs.removeAll()
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) { editMode = .inactive }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) { editMode = .inactive }
         await reload()
     }
 
     private func beginEditing() {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             selectedPlaylistIDs.removeAll()
             editMode = .active
         }
     }
 
     private func finishEditing() {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             editMode = .inactive
             selectedPlaylistIDs.removeAll()
         }

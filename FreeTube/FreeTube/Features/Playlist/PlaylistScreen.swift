@@ -207,7 +207,7 @@ struct PlaylistScreen: View {
 
             if shouldShowMoreButton(for: details.playlist.descriptionText) {
                 Button {
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                         isDetailsExpanded.toggle()
                     }
                 } label: {

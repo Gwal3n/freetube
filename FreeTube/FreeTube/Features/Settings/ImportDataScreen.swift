@@ -110,7 +110,7 @@ struct ImportDataScreen: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(reduceMotion ? nil : .smooth(duration: 0.2), value: isWorking)
+        .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isWorking)
         .navigationTitle("Import Data")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(

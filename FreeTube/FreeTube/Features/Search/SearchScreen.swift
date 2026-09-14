@@ -102,7 +102,7 @@ struct SearchContent: View {
                         }
                     } header: {
                         Button {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                                 arePlaylistsExpanded.toggle()
                             }
                         } label: {
@@ -170,7 +170,7 @@ struct SearchContent: View {
         isExpanded: Binding<Bool>
     ) -> some View {
         Button {
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                 isExpanded.wrappedValue.toggle()
             }
         } label: {

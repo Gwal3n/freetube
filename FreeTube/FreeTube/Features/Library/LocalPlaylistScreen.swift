@@ -255,7 +255,7 @@ struct LocalPlaylistScreen: View {
     }
 
     private func beginEditing() {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             selectedVideoIDs.removeAll()
             editingMode = .playlist
             editMode = .active
@@ -263,7 +263,7 @@ struct LocalPlaylistScreen: View {
     }
 
     private func finishEditing() {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             editMode = .inactive
             editingMode = nil
             selectedVideoIDs.removeAll()

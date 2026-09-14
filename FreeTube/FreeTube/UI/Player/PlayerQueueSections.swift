@@ -143,7 +143,7 @@ struct PlayerQueueSections: View {
     private var queuePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     isQueueExpanded.toggle()
                 }
             } label: {
@@ -224,7 +224,7 @@ struct PlayerQueueSections: View {
     ) -> some View {
         HStack(spacing: 8) {
             Button {
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     isExpanded.wrappedValue.toggle()
                 }
             } label: {

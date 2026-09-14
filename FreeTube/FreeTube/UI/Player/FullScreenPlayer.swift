@@ -453,7 +453,7 @@ struct FullScreenPlayer: View {
                     upNextInitialCount: upNextInitialCount,
                     showsComments: showComments,
                     onToggleDetails: {
-                        withAnimation(.smooth(duration: 0.24)) {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             detailsModel.isExpanded.toggle()
                         }
                         if detailsModel.isExpanded {
@@ -461,7 +461,7 @@ struct FullScreenPlayer: View {
                         }
                     },
                     onExpandDetails: {
-                        withAnimation(.smooth(duration: 0.24)) {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             detailsModel.isExpanded = true
                         }
                         detailsModel.loadIfNeeded(for: video, player: player)

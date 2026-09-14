@@ -25,7 +25,7 @@ struct CommentRow: View {
 
             if isLongComment {
                 Button(isBodyExpanded ? "Show less" : "Read more") {
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.22)) {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                         isBodyExpanded.toggle()
                     }
                 }

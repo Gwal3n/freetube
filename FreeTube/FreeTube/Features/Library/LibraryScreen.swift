@@ -195,7 +195,7 @@ struct LibraryScreen: View {
     }
 
     private func openLocalDestination(_ destination: Destination) {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             path.append(destination)
         }
     }

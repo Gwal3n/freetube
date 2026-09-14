@@ -67,7 +67,7 @@ struct RootView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: player.queueNotice?.id)
+        .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
         .task {
             await SessionManager.shared.bootstrap()
         }

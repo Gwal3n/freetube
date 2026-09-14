@@ -35,7 +35,7 @@ struct ErrorToastModifier: ViewModifier {
                     }
                 }
             }
-            .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: errorState?.id)
+            .animation(reduceMotion ? nil : InterfaceMotion.notice, value: errorState?.id)
     }
 }
 
