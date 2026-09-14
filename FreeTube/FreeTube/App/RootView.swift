@@ -14,6 +14,7 @@ import UIKit
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedTab: Tab = .feed
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
@@ -66,7 +67,7 @@ struct RootView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.snappy(duration: 0.24), value: player.queueNotice?.id)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: player.queueNotice?.id)
         .task {
             await SessionManager.shared.bootstrap()
         }

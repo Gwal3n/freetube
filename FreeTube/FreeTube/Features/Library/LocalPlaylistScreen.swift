@@ -18,6 +18,7 @@ struct LocalPlaylistScreen: View {
     @State private var selectedVideoIDs = Set<String>()
     @State private var showingVideoDeleteConfirmation = false
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
 
     var body: some View {
@@ -254,7 +255,7 @@ struct LocalPlaylistScreen: View {
     }
 
     private func beginEditing() {
-        withAnimation(.snappy) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
             selectedVideoIDs.removeAll()
             editingMode = .playlist
             editMode = .active
@@ -262,7 +263,7 @@ struct LocalPlaylistScreen: View {
     }
 
     private func finishEditing() {
-        withAnimation(.snappy) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
             editMode = .inactive
             editingMode = nil
             selectedVideoIDs.removeAll()

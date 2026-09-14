@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct CommentRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let comment: Comment
     var onLike: () -> Void = {}
     var repliesTitle: String? = nil
@@ -24,7 +25,7 @@ struct CommentRow: View {
 
             if isLongComment {
                 Button(isBodyExpanded ? "Show less" : "Read more") {
-                    withAnimation(.smooth(duration: 0.22)) {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.22)) {
                         isBodyExpanded.toggle()
                     }
                 }

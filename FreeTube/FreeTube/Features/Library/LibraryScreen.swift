@@ -15,6 +15,7 @@ import Kingfisher
 /// signed out would route to an error toast — clearer to just gate the whole menu.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// One strongly typed route set for both local rows and cross-feature requests. Avoiding a
     /// heterogeneous `NavigationPath` lets SwiftUI resolve the first push up front, preserving the
     /// same native transition on a destination's cold and warm openings.
@@ -194,7 +195,7 @@ struct LibraryScreen: View {
     }
 
     private func openLocalDestination(_ destination: Destination) {
-        withAnimation(.default) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
             path.append(destination)
         }
     }

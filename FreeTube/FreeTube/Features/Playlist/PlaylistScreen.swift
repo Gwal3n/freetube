@@ -15,6 +15,7 @@ struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isSavedLocally = false
     @State private var isSavingLocally = false
     private let localPlaylistService = LocalPlaylistService()
@@ -206,7 +207,9 @@ struct PlaylistScreen: View {
 
             if shouldShowMoreButton(for: details.playlist.descriptionText) {
                 Button {
-                    withAnimation(.smooth(duration: 0.24)) { isDetailsExpanded.toggle() }
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                        isDetailsExpanded.toggle()
+                    }
                 } label: {
                     HStack(spacing: 4) {
                         Text(isDetailsExpanded ? "Less" : "More details")

@@ -3,6 +3,7 @@ import Kingfisher
 
 @available(iOS 17.0, *)
 struct LocalPlaylistsScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var playlists: [LocalPlaylistSnapshot] = []
     @State private var showingCreate = false
     @State private var newTitle = ""
@@ -178,19 +179,19 @@ struct LocalPlaylistsScreen: View {
     private func deleteSelectedPlaylists() async {
         await service.delete(ids: selectedPlaylistIDs)
         selectedPlaylistIDs.removeAll()
-        withAnimation { editMode = .inactive }
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) { editMode = .inactive }
         await reload()
     }
 
     private func beginEditing() {
-        withAnimation(.snappy) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
             selectedPlaylistIDs.removeAll()
             editMode = .active
         }
     }
 
     private func finishEditing() {
-        withAnimation(.snappy) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
             editMode = .inactive
             selectedPlaylistIDs.removeAll()
         }

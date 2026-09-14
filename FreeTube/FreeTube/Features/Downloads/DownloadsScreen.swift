@@ -333,7 +333,7 @@ struct DownloadsScreen: View {
                     Text(verbatim: "\(inProgress.count)")
                         .font(.caption.weight(.semibold))
                         .contentTransition(.numericText())
-                        .animation(.spring, value: inProgress.count)
+                        .animation(reduceMotion ? nil : .spring, value: inProgress.count)
                 }
             }
         }
