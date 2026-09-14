@@ -278,12 +278,11 @@ struct FullScreenPlayer: View {
                         proxy.size.height - compactSurfaceHeight + collapseRange
                     )
                 )
-                // Reset description state and prefetch the snippet when the video changes.
+                // Reset description presentation when the video changes.
                 .onChange(of: video.id) { _, _ in
                     details = nil
                     isDetailsExpanded = false
                     detailsLoadFailed = false
-                    prefetchDescriptionIfAvailable(for: video)
                 }
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
                 // metadata column so its title and rows cannot extend underneath Chapters.
@@ -457,19 +456,46 @@ struct FullScreenPlayer: View {
                     // Keep the geometry probe alive so it reliably emits scroll preferences.
                     .frame(height: 1)
                     .reportPlayerPanelScrollOffset()
-                metadata(video)
-                detailsSection(video: video)
-                PlayerQueueSections(
+                PlayerInformationPanel(
+                    video: video,
+                    statsText: detailsStatsRow(video: video),
+                    descriptionText: availableDescription(video: video),
+                    descriptionParts: details?.descriptionParts ?? [],
+                    likesText: (details?.likeCount).flatMap {
+                        $0 > 0 ? formatCount($0) : nil
+                    },
+                    commentsCountText: details?.commentsCountText ?? player.commentsCountText,
+                    isDetailsExpanded: isDetailsExpanded,
+                    isLoadingDetails: isLoadingDetails,
+                    detailsLoadFailed: detailsLoadFailed,
                     showsUpNext: showUpNext,
                     upNextInitialCount: upNextInitialCount,
+                    showsComments: showComments,
+                    onToggleDetails: {
+                        withAnimation(.smooth(duration: 0.24)) {
+                            isDetailsExpanded.toggle()
+                        }
+                        if isDetailsExpanded {
+                            loadDetailsIfNeeded(for: video)
+                        }
+                    },
+                    onExpandDetails: {
+                        withAnimation(.smooth(duration: 0.24)) {
+                            isDetailsExpanded = true
+                        }
+                        loadDetailsIfNeeded(for: video)
+                    },
+                    onRetryDetails: {
+                        details = nil
+                        loadDetailsIfNeeded(for: video)
+                    },
+                    onOpenChannel: {
+                        openChannel(video.channelID)
+                    },
+                    onSeek: { player.seek(to: $0) },
                     onOpenPlaylist: openPlaylist
-                )
-                if showComments {
-                    CommentsSection(
-                        videoID: video.id,
-                        countText: details?.commentsCountText ?? player.commentsCountText
-                    )
-                        .id(video.id)
+                ) {
+                    playerActions(video)
                 }
             }
             .padding(.top, 6)
@@ -499,70 +525,7 @@ struct FullScreenPlayer: View {
         .scrollContentBackground(.hidden)
     }
 
-    // MARK: - Metadata
-
-    @ViewBuilder
-    private func metadata(_ video: Video) -> some View {
-        PlayerMetadataHeader(
-            video: video,
-            statsText: detailsStatsRow(video: video),
-            isDetailsExpanded: isDetailsExpanded,
-            canOpenChannel: !video.channelID.isEmpty,
-            onToggleDetails: {
-                withAnimation(.smooth(duration: 0.24)) {
-                    isDetailsExpanded.toggle()
-                }
-                if isDetailsExpanded {
-                    loadDetailsIfNeeded(for: video)
-                }
-            },
-            onOpenChannel: {
-                @Bindable var p = player
-                p.fullScreenPresented = false
-                let channelID = video.channelID
-                Task { @MainActor in
-                    // Let the SwiftUI collapse animation begin before routing the tab below.
-                    try? await Task.sleep(for: .milliseconds(180))
-                    NotificationCenter.default.post(
-                        name: .freetubeOpenChannel,
-                        object: channelID
-                    )
-                }
-            }
-        ) {
-            playerActions(video)
-        }
-    }
-
     // MARK: - Description / details (between channel row and comments)
-
-    /// Shows the video description in a YouTube-like collapsed-by-default block. Tapping the video
-    /// title expands it and lazily fetches the full details payload.
-    private func detailsSection(video: Video) -> some View {
-        PlayerDescription(
-            text: availableDescription(video: video),
-            parts: details?.descriptionParts ?? [],
-            likesText: (details?.likeCount).flatMap { $0 > 0 ? formatCount($0) : nil },
-            isExpanded: isDetailsExpanded,
-            isLoading: isLoadingDetails,
-            loadFailed: detailsLoadFailed,
-            onSeek: { player.seek(to: $0) },
-            onRetry: {
-                details = nil
-                loadDetailsIfNeeded(for: video)
-            },
-            onExpand: {
-                withAnimation(.smooth(duration: 0.24)) { isDetailsExpanded = true }
-                loadDetailsIfNeeded(for: video)
-            }
-        )
-    }
-
-    /// Picks the description text to render in the 2-line collapsed preview. Prefer the loaded
-    /// details (more complete), fall back to the search-result snippet.
-    private func inlineDescriptionSnippet(video: Video) -> String? {
-        availableDescription(video: video)
-    }
 
     private func availableDescription(video: Video) -> String? {
         if let fetched = details?.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -601,14 +564,6 @@ struct FullScreenPlayer: View {
         if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
         if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
         return "\(n)"
-    }
-
-    /// Best-effort: if `descriptionSnippet` is already on the `Video` (from search/home), we have
-    /// something to show without hitting the network. Don't preemptively fetch the full details —
-    /// the user might never tap "More".
-    private func prefetchDescriptionIfAvailable(for video: Video) {
-        // Intentional no-op. The fetch happens on the user's first "More" tap.
-        _ = video
     }
 
     /// Lazy fetch invoked when the user expands the description. One `VideoService.fetchMoreInfo`
@@ -762,6 +717,16 @@ struct FullScreenPlayer: View {
         let seconds = Int(player.elapsed)
         return URL(string: "https://youtu.be/\(video.id)?t=\(seconds)")
             ?? URL(string: "https://youtu.be/\(video.id)")
+    }
+
+    private func openChannel(_ channelID: String) {
+        @Bindable var p = player
+        p.fullScreenPresented = false
+        Task { @MainActor in
+            // Let the SwiftUI collapse animation begin before routing the tab below.
+            try? await Task.sleep(for: .milliseconds(180))
+            NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
+        }
     }
 
     private func openPlaylist(_ playlistID: String) {
