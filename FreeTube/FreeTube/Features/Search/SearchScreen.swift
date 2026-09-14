@@ -129,7 +129,11 @@ struct SearchContent: View {
                                     offersPlayNext: true,
                                     playbackProgress: progressByVideoID[video.id]
                                 ) {
-                                    dismissNativeSearch()
+                                    // Playback overlays this screen, so preserve the native search
+                                    // session and its results for the user's return. Calling
+                                    // `dismissSearch()` here can clear the bound query, which in
+                                    // turn intentionally resets `SearchViewModel.results`.
+                                    dismissKeyboard()
                                     player.load(video)
                                 }
                                 .onAppear {
