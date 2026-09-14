@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import UIKit
 
 extension KFImage {
     /// Standard thumbnail-loading configuration applied at every remote-image call site.
@@ -23,14 +24,15 @@ extension KFImage {
         fadeDuration: TimeInterval = 0.15,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) -> KFImage {
-        self
+        let effectiveFadeDuration = UIAccessibility.isReduceMotionEnabled ? 0 : fadeDuration
+        return self
             .placeholder(placeholder)
             .setProcessor(DownsamplingImageProcessor(size: CGSize(
                 width: size.width * scale,
                 height: size.height * scale
             )))
             .cacheOriginalImage()
-            .fade(duration: fadeDuration)
+            .fade(duration: effectiveFadeDuration)
             .cancelOnDisappear(true)
     }
 }
