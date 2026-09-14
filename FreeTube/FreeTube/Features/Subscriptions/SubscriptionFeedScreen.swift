@@ -85,6 +85,17 @@ struct SubscriptionFeedScreen: View {
                         systemImage: "rectangle.stack.person.crop",
                         description: Text("Channels you subscribe to locally will appear here.")
                     )
+                } else if model.videos.isEmpty && model.didLastRefreshCompletelyFail {
+                    ContentUnavailableView {
+                        Label("Unable to Refresh", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Your subscriptions couldn’t be refreshed. Check your connection and try again.")
+                    } actions: {
+                        Button("Try Again") {
+                            Task { await model.refresh() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 } else if model.videos.isEmpty && !model.isRefreshing {
                     ContentUnavailableView(
                         "Nothing new",

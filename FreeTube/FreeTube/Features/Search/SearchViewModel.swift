@@ -96,6 +96,7 @@ final class SearchViewModel {
         autocompleteTask?.cancel()
         suggestions = []
         results = nil
+        errorState = nil
         self.submittedQuery = submittedQuery
         isLoading = true
         defer {
@@ -115,12 +116,14 @@ final class SearchViewModel {
             self.submittedQuery = submittedQuery
             suggestions = []
         } catch {
-            errorState = ErrorState(from: error)
+            log.notice("Search failed: \(String(describing: error), privacy: .public)")
+            errorState = ErrorState(message: "Search couldn’t be completed. Please try again.")
         }
     }
 
     func loadMore() async {
         guard let token = results?.continuationToken, !isLoading else { return }
+        errorState = nil
         isLoading = true
         defer { isLoading = false }
         do {
@@ -135,7 +138,8 @@ final class SearchViewModel {
                 continuationToken: next.continuationToken
             )
         } catch {
-            errorState = ErrorState(from: error)
+            log.notice("Loading more search results failed: \(String(describing: error), privacy: .public)")
+            errorState = ErrorState(message: "More results couldn’t be loaded. Please try again.")
         }
     }
 
@@ -145,6 +149,7 @@ final class SearchViewModel {
         guard let submittedQuery else { return }
         searchGeneration &+= 1
         let generation = searchGeneration
+        errorState = nil
         isLoading = true
         defer { if searchGeneration == generation { isLoading = false } }
         do {
@@ -155,7 +160,8 @@ final class SearchViewModel {
             guard searchGeneration == generation else { return }
             results = refreshed
         } catch {
-            errorState = ErrorState(from: error)
+            log.notice("Refreshing search failed: \(String(describing: error), privacy: .public)")
+            errorState = ErrorState(message: "Search results couldn’t be refreshed. Please try again.")
         }
     }
 

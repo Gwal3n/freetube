@@ -33,6 +33,13 @@ final class SubscriptionFeedViewModel {
 
     var hasSubscriptions: Bool { !subscriptions.subscriptions.isEmpty }
 
+    var didLastRefreshCompletelyFail: Bool {
+        hasLoaded
+            && !isRefreshing
+            && refreshChannelCount > 0
+            && failedChannelCount >= refreshChannelCount
+    }
+
     func load() async {
         await loadCache()
         hasLoaded = true

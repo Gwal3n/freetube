@@ -11,6 +11,7 @@ struct SearchContent: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismissSearch) private var dismissSearch
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var arePlaylistsExpanded = false
     @State private var areChannelsExpanded = true
     @State private var areVideosExpanded = true
@@ -31,10 +32,10 @@ struct SearchContent: View {
             } else if !history.isEmpty {
                 historyList
             } else {
-                EmptyStateView(
+                ContentUnavailableView(
+                    "Search YouTube",
                     systemImage: "magnifyingglass",
-                    title: "Search YouTube",
-                    message: "Find videos, channels, and playlists."
+                    description: Text("Find videos, channels, and playlists.")
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -53,95 +54,107 @@ struct SearchContent: View {
 
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
-        List {
-            if !results.channels.isEmpty {
-                Section {
-                    if areChannelsExpanded {
-                        ForEach(results.channels) { channel in
-                            NavigationLink {
-                                ChannelScreen(channelID: channel.id)
-                            } label: {
-                                ChannelRow(channel: channel)
+        if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
+            ContentUnavailableView(
+                "No Results",
+                systemImage: "magnifyingglass",
+                description: Text("No results were found for “\(model.submittedQuery ?? model.query)”.")
+            )
+        } else {
+            List {
+                if !results.channels.isEmpty {
+                    Section {
+                        if areChannelsExpanded {
+                            ForEach(results.channels) { channel in
+                                NavigationLink {
+                                    ChannelScreen(channelID: channel.id)
+                                } label: {
+                                    ChannelRow(channel: channel)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                    } header: {
+                        collapsibleHeader(
+                            "Channels",
+                            count: results.channels.count,
+                            isExpanded: $areChannelsExpanded
+                        )
                     }
-                } header: {
-                    collapsibleHeader("Channels", count: results.channels.count, isExpanded: $areChannelsExpanded)
+                }
+                if !results.playlists.isEmpty {
+                    Section {
+                        if arePlaylistsExpanded {
+                            ForEach(results.playlists) { playlist in
+                                NavigationLink {
+                                    PlaylistScreen(playlistID: playlist.id)
+                                } label: {
+                                    PlaylistRow(playlist: playlist, showsMoreMenu: true)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    } header: {
+                        Button {
+                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                                arePlaylistsExpanded.toggle()
+                            }
+                        } label: {
+                            HStack {
+                                Text("Playlists")
+                                Spacer()
+                                Text("\(results.playlists.count)")
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: arePlaylistsExpanded ? "chevron.up" : "chevron.down")
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                if !results.videos.isEmpty {
+                    Section {
+                        if areVideosExpanded {
+                            let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
+                            ForEach(results.videos) { video in
+                                VideoRow(
+                                    video: video,
+                                    showsMoreMenu: true,
+                                    offersPlayNext: true,
+                                    playbackProgress: progressByVideoID[video.id]
+                                ) {
+                                    dismissNativeSearch()
+                                    player.load(video)
+                                }
+                                .onAppear {
+                                    guard lookaheadIDs.contains(video.id),
+                                          results.continuationToken != nil,
+                                          !model.isLoading else { return }
+                                    Task { await model.loadMore() }
+                                }
+                            }
+                        }
+                        if model.isLoading {
+                            ProgressView("Loading more…")
+                                .controlSize(.small)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .listRowSeparator(.hidden)
+                                .accessibilityLabel("Loading more search results")
+                        }
+                    } header: {
+                        collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
+                    }
                 }
             }
-            if !results.playlists.isEmpty {
-                Section {
-                    if arePlaylistsExpanded {
-                        ForEach(results.playlists) { playlist in
-                            NavigationLink {
-                                PlaylistScreen(playlistID: playlist.id)
-                            } label: {
-                                PlaylistRow(playlist: playlist, showsMoreMenu: true)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                } header: {
-                    Button {
-                        withAnimation(.snappy(duration: 0.22)) {
-                            arePlaylistsExpanded.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Text("Playlists")
-                            Spacer()
-                            Text("\(results.playlists.count)")
-                                .foregroundStyle(.secondary)
-                            Image(systemName: arePlaylistsExpanded ? "chevron.up" : "chevron.down")
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
+            .listStyle(.plain)
+            .scrollDismissesKeyboard(.interactively)
+            .refreshable { await model.refresh() }
+            .task(id: progressLookupID(for: results.videos)) {
+                await loadProgress(for: results.videos)
             }
-            if !results.videos.isEmpty {
-                Section {
-                    if areVideosExpanded {
-                        let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
-                        ForEach(results.videos) { video in
-                            VideoRow(
-                                video: video,
-                                showsMoreMenu: true,
-                                offersPlayNext: true,
-                                playbackProgress: progressByVideoID[video.id]
-                            ) {
-                                dismissNativeSearch()
-                                player.load(video)
-                            }
-                            .onAppear {
-                                guard lookaheadIDs.contains(video.id),
-                                      results.continuationToken != nil,
-                                      !model.isLoading else { return }
-                                Task { await model.loadMore() }
-                            }
-                        }
-                    }
-                    if model.isLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
-                    }
-                } header: {
-                    collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
-                }
+            .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
+                Task { await loadProgress(for: results.videos) }
             }
-        }
-        .listStyle(.plain)
-        .scrollDismissesKeyboard(.interactively)
-        .refreshable { await model.refresh() }
-        .task(id: progressLookupID(for: results.videos)) {
-            await loadProgress(for: results.videos)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
-            Task { await loadProgress(for: results.videos) }
         }
     }
 
@@ -151,7 +164,9 @@ struct SearchContent: View {
         isExpanded: Binding<Bool>
     ) -> some View {
         Button {
-            withAnimation(.snappy(duration: 0.22)) { isExpanded.wrappedValue.toggle() }
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                isExpanded.wrappedValue.toggle()
+            }
         } label: {
             HStack {
                 Text(title)

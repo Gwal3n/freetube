@@ -3,8 +3,8 @@ import SwiftUI
 /// Static placeholders preserve the shape of a browsing list without continuous shimmer work.
 struct MediaListPlaceholder: View {
     var body: some View {
-        VStack(spacing: 20) {
-            ForEach(0..<5, id: \.self) { _ in
+        List {
+            ForEach(0..<6, id: \.self) { _ in
                 HStack(spacing: MediaStyle.spacing) {
                     RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                         .fill(.quaternary)
@@ -15,10 +15,12 @@ struct MediaListPlaceholder: View {
                         RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 70, height: 9)
                     }
                 }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8))
             }
-            Spacer(minLength: 0)
         }
-        .padding()
+        .listStyle(.plain)
+        .scrollDisabled(true)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading videos")
