@@ -1,6 +1,4 @@
 import SwiftUI
-import SwiftData
-import Kingfisher
 
 /// Library is the user's home for everything tied to their YouTube account. When signed in we
 /// render the account header followed by a menu of six destinations:
@@ -36,6 +34,7 @@ struct LibraryScreen: View {
     @State private var libraryModel = LibraryViewModel()
     @State private var accountModel = AccountViewModel()
     @State private var showingLogin = false
+    @State private var isSigningOut = false
     @State private var localHistoryCount = 0
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount = 0
@@ -192,44 +191,20 @@ struct LibraryScreen: View {
 
     @ViewBuilder
     private var accountSection: some View {
-        Section {
-            if let info = accountModel.info {
-                HStack(spacing: 12) {
-                    KFImage(info.avatarURL)
-                        .thumbnail(size: CGSize(width: 56, height: 56)) {
-                            Circle().fill(.gray.opacity(0.2))
-                        }
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 56, height: 56)
-                        .clipShape(Circle())
-                    VStack(alignment: .leading) {
-                        Text(info.displayName).font(.headline)
-                        if let handle = info.handle, !handle.isEmpty {
-                            Text(handle).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Button("Sign out") {
-                        Task {
-                            await accountModel.signOut()
-                            libraryModel.clear()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                }
-            } else {
-                Button {
-                    showingLogin = true
-                } label: {
-                    Label("Sign in to YouTube", systemImage: "person.crop.circle.badge.plus")
-                }
-            }
-        } footer: {
-            if accountModel.info == nil {
-                Text("Sign in to access your watch history, playlists, liked videos, and Watch Later.")
-            }
-        }
+        LibraryAccountSection(
+            info: accountModel.info,
+            isSigningOut: isSigningOut,
+            onSignIn: { showingLogin = true },
+            onSignOut: { Task { await signOut() } }
+        )
+    }
+
+    private func signOut() async {
+        guard !isSigningOut else { return }
+        isSigningOut = true
+        defer { isSigningOut = false }
+        await accountModel.signOut()
+        libraryModel.clear()
     }
 
     // MARK: - Menu
