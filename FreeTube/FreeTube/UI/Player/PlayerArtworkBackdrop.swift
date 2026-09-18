@@ -15,6 +15,8 @@ import UIKit
 /// keeps the system playback controls reachable through the artwork.
 @available(iOS 17.0, *)
 struct PlayerArtworkBackdrop: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let artwork: UIImage?
     let state: PlayerStateManager.LoadState
 
@@ -32,7 +34,7 @@ struct PlayerArtworkBackdrop: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.2), value: coversPlayerSurface)
+        .animation(reduceMotion ? nil : InterfaceMotion.quick, value: coversPlayerSurface)
     }
 
     /// True while the player has nothing of its own to draw. `.failed` is included so the error

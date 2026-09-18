@@ -171,7 +171,7 @@ struct FullScreenPlayer: View {
                         },
                         onShowChapters: {
                             guard !player.chapters.isEmpty else { return }
-                            withAnimation(.snappy(duration: 0.28)) {
+                            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                                 player.chapterListPresented.toggle()
                             }
                             showPlayerControls()
@@ -361,7 +361,7 @@ struct FullScreenPlayer: View {
 
     private func toggleFullscreen() {
         if isPortraitVideo {
-            withAnimation(.smooth(duration: 0.3)) {
+            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                 portraitVideoFullscreen.toggle()
                 player.chapterListPresented = false
             }

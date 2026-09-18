@@ -7,6 +7,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerChapterOverlay: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let isLandscape: Bool
     let usesOLEDBackground: Bool
@@ -23,7 +24,7 @@ struct PlayerChapterOverlay: View {
                 onInteraction()
             },
             onDismiss: {
-                withAnimation(.snappy(duration: 0.28)) {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     player.chapterListPresented = false
                 }
             }
