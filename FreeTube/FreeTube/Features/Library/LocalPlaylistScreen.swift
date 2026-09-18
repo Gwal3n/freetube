@@ -32,9 +32,9 @@ struct LocalPlaylistScreen: View {
                 ForEach(details.videos) { video in
                     VideoRow(
                         video: video,
-                        showsMoreMenu: editingMode == nil,
-                        offersPlayNext: editingMode == nil,
-                        reservesMoreMenuSpace: true
+                        accessory: editingMode == nil
+                            ? .actions(offersPlayNext: true)
+                            : .reserved
                     ) {
                         if editingMode != nil {
                             if selectedVideoIDs.contains(video.id) {

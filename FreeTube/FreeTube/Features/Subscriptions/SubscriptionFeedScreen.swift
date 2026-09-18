@@ -40,8 +40,7 @@ struct SubscriptionFeedScreen: View {
                 ForEach(model.videos) { video in
                     VideoRow(
                         video: video,
-                        showsMoreMenu: true,
-                        offersPlayNext: true,
+                        accessory: .actions(offersPlayNext: true),
                         playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
                     ) {
                         player.load(video)

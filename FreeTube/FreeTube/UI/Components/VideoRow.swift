@@ -3,35 +3,34 @@ import Kingfisher
 
 /// Horizontal compact video row — used in search results, history, library lists.
 ///
-/// Set `showsMoreMenu: true` to render a trailing ellipsis Menu next to the row content
-/// (open in browser, copy URL, favorites, add to playlist, downloads). The Menu lives as a
-/// sibling of the main tap target so taps on it don't trigger `onTap`.
+/// Its accessory mode deliberately describes the few supported row contexts instead of exposing
+/// independent flags that can form visually invalid combinations.
 @available(iOS 17.0, *)
 struct VideoRow: View {
+    enum Accessory {
+        case none
+        case actions(offersPlayNext: Bool)
+        case reserved
+    }
+
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let video: Video
-    var showsMoreMenu: Bool
-    var offersPlayNext: Bool
+    var accessory: Accessory
     var playbackProgress: Double?
-    var reservesMoreMenuSpace: Bool
     var onTap: () -> Void
 
     /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
     /// closure syntax as optional row capabilities are added.
     init(
         video: Video,
-        showsMoreMenu: Bool = false,
-        offersPlayNext: Bool = false,
+        accessory: Accessory = .none,
         playbackProgress: Double? = nil,
-        reservesMoreMenuSpace: Bool = false,
         onTap: @escaping () -> Void = {}
     ) {
         self.video = video
-        self.showsMoreMenu = showsMoreMenu
-        self.offersPlayNext = offersPlayNext
+        self.accessory = accessory
         self.playbackProgress = playbackProgress
-        self.reservesMoreMenuSpace = reservesMoreMenuSpace
         self.onTap = onTap
     }
 
@@ -52,9 +51,12 @@ struct VideoRow: View {
             .accessibilityLabel(rowAccessibilityLabel)
             .accessibilityHint("Plays video")
 
-            if showsMoreMenu {
+            switch accessory {
+            case .none:
+                EmptyView()
+            case .actions(let offersPlayNext):
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
-            } else if reservesMoreMenuSpace {
+            case .reserved:
                 Color.clear
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .accessibilityHidden(true)
@@ -72,6 +74,11 @@ struct VideoRow: View {
         }
         .listRowSeparator(.hidden)
         .listRowInsets(MediaStyle.listRowInsets)
+    }
+
+    private var offersPlayNext: Bool {
+        guard case .actions(let offersPlayNext) = accessory else { return false }
+        return offersPlayNext
     }
 
     private var rowAccessibilityLabel: String {

@@ -16,8 +16,7 @@ struct HistoryScreen: View {
             ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in
                 VideoRow(
                     video: video,
-                    showsMoreMenu: true,
-                    offersPlayNext: true,
+                    accessory: .actions(offersPlayNext: true),
                     playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
                 ) { player.load(video) }
                     .swipeActions {

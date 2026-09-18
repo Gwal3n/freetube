@@ -28,8 +28,7 @@ struct LocalHistoryScreen: View {
                                 let video = video(from: entry)
                                 VideoRow(
                                     video: video,
-                                    showsMoreMenu: true,
-                                    offersPlayNext: true,
+                                    accessory: .actions(offersPlayNext: true),
                                     playbackProgress: showHistoryProgressBars ? entry.resumableProgress : nil
                                 ) {
                                     player.load(video)

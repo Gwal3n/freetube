@@ -128,8 +128,7 @@ struct SearchContent: View {
                             ForEach(results.videos) { video in
                                 VideoRow(
                                     video: video,
-                                    showsMoreMenu: true,
-                                    offersPlayNext: true,
+                                    accessory: .actions(offersPlayNext: true),
                                     playbackProgress: progressByVideoID[video.id]
                                 ) {
                                     // Playback overlays this screen, so preserve the native search
