@@ -154,7 +154,7 @@ final class ChannelViewModel {
                     userInfo: [NSLocalizedDescriptionKey: "YouTube returned an empty sorted Videos tab."]
                 ))
             }
-            videoTabs[sort] = remote
+            videoTabs[sort] = enrichingChannelMetadata(in: remote)
         } catch {
             // Preserve the old behavior as an explicit fallback: sort the already-loaded newest
             // page locally, but do not pretend it is a complete server-sorted result.
@@ -182,13 +182,41 @@ final class ChannelViewModel {
             } else {
                 page = try await service.fetchVideosNextPage(channelID: channelID, sort: sort)
             }
+            let enrichedPage = enrichingChannelMetadata(in: page)
             videoTabs[sort] = ChannelTab(
-                items: current.items + page.items,
-                continuationToken: page.continuationToken
+                items: current.items + enrichedPage.items,
+                continuationToken: enrichedPage.continuationToken
             )
         } catch {
             errorState = ErrorState(from: error)
         }
+    }
+
+    /// Sorted channel responses sometimes omit owner metadata because every row implicitly belongs
+    /// to the channel being browsed. Reattach the already-loaded header identity at this boundary so
+    /// all row consumers receive complete `Video` values, including continuation pages.
+    private func enrichingChannelMetadata(in tab: ChannelTab<Video>) -> ChannelTab<Video> {
+        guard let channel = details?.channel else { return tab }
+        return ChannelTab(
+            items: tab.items.map { video in
+                Video(
+                    id: video.id,
+                    title: video.title,
+                    channelID: video.channelID.isEmpty ? channel.id : video.channelID,
+                    channelName: video.channelName.isEmpty ? channel.name : video.channelName,
+                    channelThumbnailURL: video.channelThumbnailURL ?? channel.thumbnailURL,
+                    thumbnailURL: video.thumbnailURL,
+                    duration: video.duration,
+                    viewCount: video.viewCount,
+                    publishedAt: video.publishedAt,
+                    publishedRelative: video.publishedRelative,
+                    descriptionSnippet: video.descriptionSnippet,
+                    isLive: video.isLive,
+                    isShort: video.isShort
+                )
+            },
+            continuationToken: tab.continuationToken
+        )
     }
 }
 
