@@ -109,43 +109,48 @@ struct CommentsSection: View {
 
         if comment.replyCount > 0, comment.replyContinuationToken != nil {
             if expandedReplyCommentIDs.contains(comment.id) {
-                if model.loadingReplyCommentIDs.contains(comment.id), model.repliesByCommentID[comment.id] == nil {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(.leading, 32)
-                } else {
-                    ForEach(model.repliesByCommentID[comment.id] ?? []) { reply in
-                        CommentRow(
-                            comment: reply,
-                            onLike: { Task { await model.toggleLike(reply) } }
-                        )
-                        .padding(.leading, 20)
-                    }
-
-                    if model.loadingReplyCommentIDs.contains(comment.id) {
+                Group {
+                    if model.loadingReplyCommentIDs.contains(comment.id), model.repliesByCommentID[comment.id] == nil {
                         ProgressView()
                             .controlSize(.small)
                             .padding(.leading, 32)
-                    } else if model.replyContinuationTokens[comment.id] != nil {
-                        Button("Load more replies") {
-                            Task { await model.loadMoreReplies(for: comment) }
+                    } else {
+                        ForEach(model.repliesByCommentID[comment.id] ?? []) { reply in
+                            CommentRow(
+                                comment: reply,
+                                onLike: { Task { await model.toggleLike(reply) } }
+                            )
+                            .padding(.leading, 20)
                         }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.blue)
-                        .padding(.leading, 32)
+
+                        if model.loadingReplyCommentIDs.contains(comment.id) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(.leading, 32)
+                        } else if model.replyContinuationTokens[comment.id] != nil {
+                            Button("Load more replies") {
+                                Task { await model.loadMoreReplies(for: comment) }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .padding(.leading, 32)
+                        }
                     }
                 }
+                .transition(.opacity)
             }
         }
     }
 
     private func toggleReplies(for comment: Comment) {
-        if expandedReplyCommentIDs.contains(comment.id) {
-            expandedReplyCommentIDs.remove(comment.id)
-        } else {
-            expandedReplyCommentIDs.insert(comment.id)
-            Task { await model.loadReplies(for: comment) }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+            if expandedReplyCommentIDs.contains(comment.id) {
+                expandedReplyCommentIDs.remove(comment.id)
+            } else {
+                expandedReplyCommentIDs.insert(comment.id)
+                Task { await model.loadReplies(for: comment) }
+            }
         }
     }
 }
