@@ -94,15 +94,17 @@ struct PlayerInformationPanel<Actions: View>: View {
                 onExpand: onExpandDetails
             )
 
-            PlayerQueueSections(
-                showsUpNext: showsUpNext,
-                upNextInitialCount: upNextInitialCount,
-                onOpenPlaylist: onOpenPlaylist
-            )
+            VStack(alignment: .leading, spacing: 0) {
+                PlayerQueueSections(
+                    showsUpNext: showsUpNext,
+                    upNextInitialCount: upNextInitialCount,
+                    onOpenPlaylist: onOpenPlaylist
+                )
 
-            if showsComments {
-                CommentsSection(videoID: video.id, countText: commentsCountText)
-                    .id(video.id)
+                if showsComments {
+                    CommentsSection(videoID: video.id, countText: commentsCountText)
+                        .id(video.id)
+                }
             }
         }
     }

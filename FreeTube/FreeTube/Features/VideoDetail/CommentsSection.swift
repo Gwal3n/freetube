@@ -41,15 +41,7 @@ struct CommentsSection: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                         } else if model.continuationToken != nil {
-                            Button {
-                                Task { await model.loadMore() }
-                            } label: {
-                                Label("Load more", systemImage: "chevron.down")
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal)
+                            loadMoreCommentsButton
                         }
                     }
                 }
@@ -65,6 +57,27 @@ struct CommentsSection: View {
                 await model.load()
             }
         }
+    }
+
+    @ViewBuilder
+    private var loadMoreCommentsButton: some View {
+        let button = Button {
+            Task { await model.loadMore() }
+        } label: {
+            Label("Load more", systemImage: "chevron.down")
+        }
+        .controlSize(.small)
+
+        Group {
+            if #available(iOS 26.0, *) {
+                button.buttonStyle(.glass)
+            } else {
+                button.buttonStyle(.bordered)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal)
+        .padding(.bottom, 12)
     }
 
     @ViewBuilder

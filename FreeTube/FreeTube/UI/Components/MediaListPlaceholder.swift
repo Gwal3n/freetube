@@ -10,10 +10,17 @@ struct MediaListPlaceholder: View {
                         .fill(.quaternary)
                         .frame(width: 144, height: 81)
                     VStack(alignment: .leading, spacing: 9) {
-                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
-                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(.quaternary)
+                            .frame(maxWidth: 190)
+                            .frame(height: 12)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(.quaternary)
+                            .frame(maxWidth: 130)
+                            .frame(height: 12)
                         RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 70, height: 9)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .mediaListRow()
             }
