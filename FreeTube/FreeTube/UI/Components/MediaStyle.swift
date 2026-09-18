@@ -20,3 +20,11 @@ enum InterfaceMotion {
     static let content = Animation.smooth(duration: 0.24)
     static let notice = Animation.smooth(duration: 0.25)
 }
+
+extension View {
+    /// Applies the shared browsing-row geometry at the List's immediate child boundary.
+    func mediaListRow() -> some View {
+        listRowSeparator(.hidden)
+            .listRowInsets(MediaStyle.listRowInsets)
+    }
+}

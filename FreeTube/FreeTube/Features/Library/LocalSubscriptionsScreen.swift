@@ -29,8 +29,7 @@ struct LocalSubscriptionsScreen: View {
                         }
                         .buttonStyle(ResponsiveButtonStyle())
                         .accessibilityAddTraits(.isLink)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(MediaStyle.listRowInsets)
+                        .mediaListRow()
                     }
                     .onDelete(perform: store.remove)
                 }

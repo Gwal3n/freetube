@@ -72,8 +72,7 @@ struct VideoRow: View {
                 .tint(.accentColor)
             }
         }
-        .listRowSeparator(.hidden)
-        .listRowInsets(MediaStyle.listRowInsets)
+        .mediaListRow()
     }
 
     private var offersPlayNext: Bool {

@@ -31,8 +31,7 @@ struct PlaylistRow: View {
                 PlaylistMoreActionsMenu(playlist: playlist)
             }
         }
-        .listRowSeparator(.hidden)
-        .listRowInsets(MediaStyle.listRowInsets)
+        .mediaListRow()
     }
 
     private var content: some View {

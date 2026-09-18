@@ -15,8 +15,7 @@ struct MediaListPlaceholder: View {
                         RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 70, height: 9)
                     }
                 }
-                .listRowSeparator(.hidden)
-                .listRowInsets(MediaStyle.listRowInsets)
+                .mediaListRow()
             }
         }
         .listStyle(.plain)

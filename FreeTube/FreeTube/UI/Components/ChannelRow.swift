@@ -31,8 +31,7 @@ struct ChannelRow: View {
                 content
             }
         }
-        .listRowSeparator(.hidden)
-        .listRowInsets(MediaStyle.listRowInsets)
+        .mediaListRow()
     }
 
     private var content: some View {

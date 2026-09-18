@@ -88,9 +88,7 @@ struct ChannelTabScreen: View {
             List {
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                     VideoRow(video: video) { player.load(video) }
-                        .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
-                        .listRowInsets(MediaStyle.listRowInsets)
                         .onAppear { prefetchIfNeeded(currentIndex: index, total: videos.count) }
                 }
                 if canLoadMoreCurrentContent {
@@ -117,9 +115,8 @@ struct ChannelTabScreen: View {
                     } label: {
                         PlaylistRow(playlist: playlist)
                     }
-                    .listRowSeparator(.hidden)
+                    .mediaListRow()
                     .listRowBackground(Color.clear)
-                    .listRowInsets(MediaStyle.listRowInsets)
                     .buttonStyle(.plain)
                     .onAppear { prefetchIfNeeded(currentIndex: index, total: playlists.count) }
                 }

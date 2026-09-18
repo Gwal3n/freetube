@@ -39,6 +39,7 @@ struct SubscribedChannelsScreen: View {
                         }
                         .buttonStyle(ResponsiveButtonStyle())
                         .accessibilityAddTraits(.isLink)
+                        .mediaListRow()
                         .onAppear { prefetchIfNeeded(currentIndex: index) }
                     }
                     if model.canLoadMore || model.isLoadingMore {
