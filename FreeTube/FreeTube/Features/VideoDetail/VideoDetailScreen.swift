@@ -23,9 +23,11 @@ struct VideoDetailScreen: View {
                 } else if model.isLoading {
                     LoadingView()
                 } else {
-                    EmptyStateView(systemImage: "play.rectangle",
-                                   title: "Couldn't load video",
-                                   message: "Pull to retry.")
+                    ContentUnavailableView(
+                        "Couldn't load video",
+                        systemImage: "play.rectangle",
+                        description: Text("Pull to retry.")
+                    )
                 }
             }
             .padding(.vertical)

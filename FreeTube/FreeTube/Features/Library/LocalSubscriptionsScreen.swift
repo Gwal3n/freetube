@@ -12,10 +12,12 @@ struct LocalSubscriptionsScreen: View {
     var body: some View {
         Group {
             if store.subscriptions.isEmpty {
-                EmptyStateView(
+                ContentUnavailableView(
+                    "No local subscriptions",
                     systemImage: "person.2.slash",
-                    title: "No local subscriptions",
-                    message: "Subscribe from a channel page or import a YouTube subscriptions CSV in Settings."
+                    description: Text(
+                        "Subscribe from a channel page or import a YouTube subscriptions CSV in Settings."
+                    )
                 )
             } else {
                 List {
