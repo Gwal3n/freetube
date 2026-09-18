@@ -22,10 +22,7 @@ struct PlayerDescription: View {
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                 } else if isLoading {
-                    HStack {
-                        ProgressView().controlSize(.small)
-                        Text("Loading details…").font(.caption).foregroundStyle(.secondary)
-                    }
+                    PlayerDescriptionPlaceholder()
                 } else if loadFailed {
                     HStack(spacing: 8) {
                         Text("Description unavailable").font(.subheadline).foregroundStyle(.secondary)
@@ -53,6 +50,27 @@ struct PlayerDescription: View {
             }
         }
         .padding(.horizontal)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isExpanded)
+        .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
+    }
+}
+
+/// Reserves text-like geometry while metadata arrives, avoiding a spinner-to-paragraph jump.
+private struct PlayerDescriptionPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.quaternary)
+                .frame(height: 11)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.quaternary)
+                .frame(maxWidth: 290)
+                .frame(height: 11)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.quaternary)
+                .frame(width: 150, height: 9)
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading video details")
     }
 }

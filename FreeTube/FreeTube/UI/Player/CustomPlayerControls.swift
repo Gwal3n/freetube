@@ -79,6 +79,11 @@ struct CustomPlayerControls: View {
                             .frame(width: 68, height: 68)
                             .contentShape(Circle())
                             .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
+                            .contentTransition(.symbolEffect(.replace))
+                            .animation(
+                                reduceMotion ? nil : InterfaceMotion.quick,
+                                value: playbackSymbolState
+                            )
                     }
                     .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
                     Button(action: onNext) {
@@ -111,6 +116,11 @@ struct CustomPlayerControls: View {
         .accessibilityHidden(!isVisible && !isSeekPreviewActive)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
+    }
+
+    private var playbackSymbolState: Int {
+        if hasEnded { return 2 }
+        return isPlaying ? 1 : 0
     }
 
 }

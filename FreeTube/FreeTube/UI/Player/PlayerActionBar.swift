@@ -37,6 +37,7 @@ struct PlayerActionBar: View {
             .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
             .accessibilityLabel("Save to playlist")
+            .accessibilityValue(isSavedToPlaylist ? "Saved" : "Not saved")
 
             Menu {
                 if let watchURL {

@@ -23,7 +23,7 @@ struct SwiftUIMiniPlayer: View {
                         .foregroundStyle(secondaryForeground)
                         .frame(width: MediaStyle.actionSize, height: 50)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel("Close player")
 
                 Button(action: onExpand) {
@@ -65,7 +65,7 @@ struct SwiftUIMiniPlayer: View {
                             value: player.isPlaying
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             }
             .padding(.horizontal, 4)

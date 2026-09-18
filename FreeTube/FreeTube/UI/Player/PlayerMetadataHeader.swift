@@ -43,10 +43,10 @@ struct PlayerMetadataHeader<Actions: View>: View {
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
-                    Image(systemName: isDetailsExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .contentTransition(.symbolEffect(.replace))
+                        .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
                 }
                 .contentShape(Rectangle())
             }
@@ -113,7 +113,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                 .clipShape(Circle())
 
             Text(video.channelName)
-                .font(.subheadline)
+                .font(.subheadline.weight(.medium))
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
         }
         .frame(minHeight: 44)
