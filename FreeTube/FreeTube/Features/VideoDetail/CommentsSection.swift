@@ -110,7 +110,6 @@ struct CommentsSection: View {
     private func commentThread(_ comment: Comment) -> some View {
         CommentRow(
             comment: comment,
-            onLike: { Task { await model.toggleLike(comment) } },
             repliesTitle: comment.replyCount > 0 && comment.replyContinuationToken != nil
                 ? (expandedReplyCommentIDs.contains(comment.id)
                     ? "Hide replies"
@@ -132,8 +131,7 @@ struct CommentsSection: View {
                     } else {
                         ForEach(model.repliesByCommentID[comment.id] ?? []) { reply in
                             CommentRow(
-                                comment: reply,
-                                onLike: { Task { await model.toggleLike(reply) } }
+                                comment: reply
                             )
                             .padding(.leading, 20)
                         }

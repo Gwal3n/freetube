@@ -3,7 +3,7 @@ import OSLog
 import YouTubeKit
 
 /// Holds the single `YouTubeModel` instance the rest of the app talks to. Services depend on this
-/// type for the model handle and for cookie application.
+/// type for the model handle. Both models are permanently anonymous.
 ///
 /// Per CLAUDE.md §6: `YouTubeKit` must not be imported anywhere outside `Core/Networking/`. Domain
 /// types (Video, Channel, …) are mapped from YouTubeKit response types inside the services that
@@ -25,6 +25,10 @@ nonisolated final class YouTubeKitClient: @unchecked Sendable {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "YouTubeKitClient")
 
     private init() {
+        model.cookies = ""
+        model.alwaysUseCookies = false
+        tvHtmlModel.cookies = ""
+        tvHtmlModel.alwaysUseCookies = false
         installTVHTML5Overrides()
     }
 
@@ -59,35 +63,12 @@ nonisolated final class YouTubeKitClient: @unchecked Sendable {
         tvHtmlModel.customHeaders[.videoInfos] = headers
     }
 
-    /// Current cookie header string as YouTubeKit holds it. Read-only mirror of
-    /// `model.cookies` so callers outside this file don't have to touch YouTubeKit types
-    /// directly (services without a YouTubeKit import — e.g. our raw-HTTP fallbacks — can
-    /// still inject the auth header).
-    var cookies: String { model.cookies }
-
-    /// Drops the cached visitor token so the next request fetches a fresh one. Called by
-    /// `SessionManager` after clearing cookies — the visitor token YouTube issued may have been
-    /// tied to the now-expired auth.
+    /// Drops the anonymous visitor token so the next request fetches a fresh one.
     func clearVisitorData() {
         model.visitorData = ""
         tvHtmlModel.visitorData = ""
     }
 
-    /// Pushes the latest cookie header string into `YouTubeModel`. Called by `SessionManager`.
-    func applyCookies(_ cookies: String) {
-        model.cookies = cookies
-        model.alwaysUseCookies = !cookies.isEmpty
-        tvHtmlModel.cookies = cookies
-        tvHtmlModel.alwaysUseCookies = !cookies.isEmpty
-
-        // Sanity-log the auth state. We never log cookie values themselves — only presence /
-        // length — and we ask the model to compute SAPISIDHASH (without keeping the value) to
-        // confirm YouTubeKit's auth-header generator agrees that the cookie set is usable.
-        let hashOK = !cookies.isEmpty && model.generateSAPISIDHASHForCookies(cookies) != nil
-        let containsSAPISID = cookies.range(of: "SAPISID=") != nil
-        let containsSID = cookies.range(of: "; SID=") != nil || cookies.hasPrefix("SID=")
-        log.info("[client] applyCookies length=\(cookies.count, privacy: .public) state=\(cookies.isEmpty ? "anon" : "auth", privacy: .public) alwaysUseCookies=\(self.model.alwaysUseCookies, privacy: .public) hasSAPISID=\(containsSAPISID, privacy: .public) hasSID=\(containsSID, privacy: .public) sapisidHashGenerable=\(hashOK, privacy: .public)")
-    }
 
     /// `VideoInfosResponse` requires a `visitorData` token. YouTubeKit doesn't fetch one for you;
     /// the canonical way to obtain it (per `YouTubeModel.visitorData` docs) is to run a `SearchResponse`

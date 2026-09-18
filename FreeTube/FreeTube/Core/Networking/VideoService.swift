@@ -75,7 +75,6 @@ final class VideoService: VideoServicing {
             return info
         } catch {
             log.error("fetchInfo[IOS] FAILED id=\(id, privacy: .public): \(String(describing: error), privacy: .public)")
-            await Self.clearSessionIfLoginRequired(error)
             throw YouTubeServiceError.network(error)
         }
     }
@@ -109,7 +108,6 @@ final class VideoService: VideoServicing {
             return VideoInfoWithFormats(info: info, formats: formats)
         } catch {
             log.error("VideoInfosWithDownloadFormatsResponse failed: \(String(describing: error), privacy: .public)")
-            await Self.clearSessionIfLoginRequired(error)
             throw YouTubeServiceError.streamExtractionFailed
         }
     }
@@ -175,18 +173,6 @@ final class VideoService: VideoServicing {
         } catch {
             throw YouTubeServiceError.network(error)
         }
-    }
-
-    // MARK: - Cookie hygiene
-
-    /// If the failure looks like YouTube rejecting a stale auth blob, wipe the cookies in Keychain
-    /// + `YouTubeModel`. The next user attempt will run anonymously and should succeed. We catch
-    /// `LOGIN_REQUIRED` and `UNPLAYABLE` strings emitted by `VideoInfosResponse.decodeJSON`'s guards.
-    private static func clearSessionIfLoginRequired(_ error: Error) async {
-        let description = String(describing: error)
-        let signals = ["LOGIN_REQUIRED", "Login is required", "UNPLAYABLE"]
-        guard signals.contains(where: { description.localizedCaseInsensitiveContains($0) }) else { return }
-        await SessionManager.shared.handleExpiredSession()
     }
 
     // MARK: - Mapping helpers

@@ -37,7 +37,7 @@ enum LocalSubscriptionImportError: LocalizedError {
 }
 
 /// Device-only source of truth for subscriptions. It deliberately does not depend on account
-/// cookies: signing out, an expired YouTube session, and server subscription state cannot alter it.
+/// account state: remote YouTube changes cannot alter the device-local list.
 @available(iOS 17.0, *)
 @Observable
 @MainActor

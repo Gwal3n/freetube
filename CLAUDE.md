@@ -6,13 +6,13 @@ This file gives Claude Code the context, constraints, and conventions it must fo
 
 ## 1. What this project is
 
-**FreeTube iOS** — a native SwiftUI YouTube client that replicates the YouTube mobile app: home feed, search, playback, login, subscriptions, library, history, playlists, comments, likes, downloads. Plus a "Link" tab for downloading from any of ~2,000 sites supported by yt-dlp.
+**FreeTube iOS** — an account-free native SwiftUI YouTube client: subscription feed, search, playback, local subscriptions, local history, local playlists, read-only comments, favorites, and downloads.
 
 **Distribution:** TestFlight internal, sideload, or personal use. **Not for public App Store submission.** Do not suggest changes that assume App Store distribution.
 
 **Platforms:** iOS 17.0+, Swift 5.9+, Xcode 15+.
 
-**Bundle identifier:** `com.leshko.freetube`. This is also the reverse-DNS namespace for the `os.Logger` subsystem, the Keychain cookie key (`com.leshko.freetube.cookies`), the `UserDefaults` keys (subscriptions / downloads / metadata), and internal `Notification.Name`s. Keep all of them on this same domain. Changing the identifier invalidates provisioning profiles and resets Keychain / `UserDefaults` state for any prior install.
+**Bundle identifier:** `com.leshko.freetube`. This is also the reverse-DNS namespace for the `os.Logger` subsystem, `UserDefaults` keys, and internal `Notification.Name`s. Keep them on this same domain. Changing the identifier invalidates provisioning profiles and resets local state for any prior install.
 
 ---
 
@@ -20,11 +20,11 @@ This file gives Claude Code the context, constraints, and conventions it must fo
 
 These come first. Violating them breaks the project.
 
-1. **No Google Cloud YouTube Data API.** Feeds, metadata, and account interaction go through `b5i/YouTubeKit`; native playback resolution goes through the vendored `alexeichhorn/YouTubeKit` snapshot exposed as `FreeTubeStreamKit`. Neither requires an API key. Never suggest `GoogleAPIClientForREST`, `YTPlayerView`, IFrame embeds, or `https://www.googleapis.com/youtube/v3/...`.
+1. **No Google Cloud YouTube Data API or YouTube account.** Anonymous feeds and metadata go through `b5i/YouTubeKit`; native playback resolution goes through the vendored `alexeichhorn/YouTubeKit` snapshot exposed as `FreeTubeStreamKit`. Never add login, authenticated account requests, `GoogleAPIClientForREST`, `YTPlayerView`, IFrame embeds, or `https://www.googleapis.com/youtube/v3/...`.
 2. **No `dimitris-c/AudioStreaming`.** It is for raw audio streams (Icecast/Shoutcast). YouTube serves HLS/DASH. Playback uses `AVPlayer` only.
-3. **No App Store assumptions.** Do not add capabilities, entitlements, or workarounds aimed at App Store review (e.g. avoiding `WKWebView` cookie reads, hiding download functionality). Sideload-honest behavior is expected.
+3. **No App Store assumptions.** Do not add capabilities, entitlements, or workarounds aimed at App Store review. Sideload-honest behavior is expected.
 4. **No telemetry, analytics, or remote logging by default.** Logs go to `os.Logger` only. Never add SDKs that beacon out.
-5. **Cookies are sensitive.** Always store in Keychain via `KeychainHelper`. Never write them to disk, `UserDefaults`, plist, or logs. Never print cookie values.
+5. **Anonymous operation is mandatory.** Never add login, capture or store account cookies, or synchronize local state with a YouTube account. `YouTubeKitClient` explicitly keeps both models cookie-free.
 6. **Signed stream URLs are sensitive and time-limited.** Never persist them. In-memory cache only (`StreamURLCache`), 30-minute TTL max.
 7. **MVVM with service layer is mandatory.** Views do not import `YouTubeKit` or `YoutubeDL`. ViewModels do not perform networking directly — they call services in `Core/Networking/`.
 8. **SwiftUI only for UI.** No UIKit `UIViewController` subclasses except where bridging is unavoidable (`AVPlayerViewController`, `WKWebView`, `AVPictureInPictureController`). Wrap those in `UIViewControllerRepresentable` / `UIViewRepresentable`.
@@ -47,9 +47,8 @@ These come first. Violating them breaks the project.
 | Playback | `AVFoundation` / `AVKit` (`AVQueuePlayer`, `AVPlayerViewController`, `AVPictureInPictureController`) |
 | Mini / expanded player | Native `SwiftUIPlayerContainer` (SwiftUI presentation and gestures) |
 | Now-playing indicator | `SwimplyPlayIndicator` |
-| Login web view | `WebKit` (`WKWebView`, `WKHTTPCookieStore` against ephemeral `.nonPersistent()` data store) |
 | Images | `Kingfisher` |
-| Secure storage | `Security` (raw Keychain via `KeychainHelper`) |
+| Legacy credential cleanup | `Security` (deletes credentials left by older builds) |
 | Persistence | `SwiftData` (`@Model`); `UserDefaults` for simple flags via `UserPreferences` |
 | Background work | `BackgroundTasks` framework + `URLSession` background config (`BackgroundDownloadCoordinator`) |
 | Logging | `os.Logger` with subsystem `com.leshko.freetube` |
@@ -73,8 +72,6 @@ FreeTube/
 ├── FreeTubeApp.swift
 ├── Core/
 │   ├── Networking/        # YouTubeKit wrappers, one Service per response family
-│   ├── Auth/              # CookieStore, KeychainHelper, LoginCoordinator,
-│   │                      # SessionManager, SubscriptionRegistry, AuthState
 │   ├── Player/            # PlayerStateManager, PlaybackResolver, QueueManager,
 │   │                      # AudioSessionConfigurator, NowPlayingCenter,
 │   │                      # RemoteCommandCenter, StreamURLCache, HLSResourceLoaderDelegate
@@ -96,8 +93,6 @@ FreeTube/
 │   ├── Channel/           # ChannelScreen, ChannelTabScreen, ViewModel
 │   ├── Playlist/          # PlaylistScreen + ViewModel
 │   ├── VideoDetail/       # VideoDetailScreen, CommentsSection, SaveToPlaylistSheet, ViewModels
-│   ├── Account/           # AccountScreen + ViewModel
-│   ├── Login/             # LoginScreen, LoginWebView
 │   ├── Downloads/         # DownloadsScreen + ViewModel
 │   └── Settings/          # SettingsScreen + ViewModel
 ├── UI/
@@ -120,7 +115,7 @@ When asked to "add a feature", create or extend a folder under `Features/`. Keep
 ## 5. File and naming conventions
 
 - One type per file. File name matches the type name.
-- Service classes end in `Service` (`SearchService`, `HistoryService`).
+- Service classes end in `Service` (`SearchService`, `VideoService`).
 - View models end in `ViewModel`, declared `@Observable` (iOS 17+).
 - SwiftUI views are nouns (`VideoCard`, `HomeScreen`). Use `Screen` suffix for top-level screens.
 - Async functions return concrete types or throw — no `Result` returns from public service APIs.
@@ -144,21 +139,6 @@ Every YouTubeKit response type gets exactly one service method. Do not call `You
 | `VideoInfosResponse` | `VideoService.fetchInfo(id:)` (iOS client) — **also `VideoService.fetchInfoViaTVHTML5(id:)`** (TVHTML5_SIMPLY_EMBEDDED_PLAYER context for PoT-resistant URLs) |
 | `VideoInfosWithDownloadFormatsResponse` | `VideoService.fetchInfoWithFormats(id:)` |
 | `MoreVideoInfosResponse` (+RecommendedVideosContinuation) | `VideoService.fetchMoreInfo(id:)` / `fetchRecommendedVideos(continuation:)` |
-| `AccountInfosResponse` | `AccountService.fetchAccountInfo()` |
-| `AccountLibraryResponse` | `AccountService.fetchLibrary()` |
-| `AccountPlaylistsResponse` | `AccountService.fetchPlaylists()` |
-| `AccountSubscriptionsFeedResponse` | `SubscriptionService.fetchFeed()` |
-| `AccountSubscriptionsResponse` | `SubscriptionService.fetchSubscriptions()` |
-| `HistoryResponse` / `RemoveVideoFromHistroryResponse` | `HistoryService.fetch()` / `remove(videoID:)` |
-| `SubscribeChannelResponse` / `UnsubscribeChannelResponse` | `SubscriptionService.subscribe(channelID:)` / `unsubscribe(channelID:)` |
-| `AllPossibleHostPlaylistsResponse` | `PlaylistService.fetchHostablePlaylists(videoID:)` |
-| `AddVideoToPlaylistResponse` / `RemoveVideoByIdFromPlaylistResponse` / `RemoveVideoFromPlaylistResponse` | `PlaylistService.add/remove*` |
-| `CreatePlaylistResponse` / `DeletePlaylistResponse` / `MoveVideoInPlaylistResponse` | `PlaylistService.create/delete/move*` |
-| `LikeVideoResponse` / `DislikeVideoResponse` / `RemoveLikeFromVideoResponse` | `VideoActionsService.like/dislike/removeRating*` |
-| `CreateCommentResponse` / `EditCommentResponse` / `DeleteCommentResponse` | `CommentService.create/edit/delete*` |
-| `ReplyCommentResponse` / `EditReplyCommandResponse` | `CommentService.reply/editReply*` |
-| `LikeCommentResponse` / `DislikeCommentResponse` / `RemoveLikeCommentResponse` / `RemoveDislikeCommentResponse` | `CommentService.like/dislike/removeRating*` |
-| `CommentTranslationResponse` | `CommentService.translate(commentID:)` |
 
 If a feature seems to need data without a clear mapping above, stop and ask before improvising.
 
@@ -363,16 +343,14 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 ---
 
-## 9. Authentication flow
+## 9. Anonymous operation
 
-1. `LoginScreen` presents a `WKWebView` against an **ephemeral `.nonPersistent()` `WKWebsiteDataStore`**. The ephemeral store is critical — a persistent store reuses any prior session and we'd capture stale cookies.
-2. `LoginCoordinator` watches navigation; when the URL transitions to `youtube.com` after sign-in, it calls `WKWebsiteDataStore.default().httpCookieStore.getAllCookies` and filters for `.youtube.com` / `.google.com` domains.
-3. **Cookie de-duplication:** when both `.youtube.com` and `.google.com` versions of the same cookie are present, **prefer `.youtube.com`** (`CookieStore.dedupe`). Length-based tie-breaking failed in practice — both scopes were 12 chars. YouTube-scoped cookies are the ones YouTube actually accepts.
-4. Required cookies (all must be present): `SAPISID`, `__Secure-3PAPISID`, `LOGIN_INFO`, `SID`, `HSID`, `SSID`, `APISID`.
-5. Cookies are serialized as a single Cookie-header string and stored in Keychain under `com.leshko.freetube.cookies` via `KeychainHelper`.
-6. On every app launch, `SessionManager.bootstrap()` reads from Keychain and assigns to `YouTubeModel.shared.cookies` plus `YouTubeKitClient.shared.applyCookies(...)`.
-7. **`SubscriptionRegistry`** persists the user's subscribed channel IDs in `UserDefaults` (`com.leshko.freetube.subscriptions`). Subscribe/unsubscribe optimistically flips this **and** calls the YouTube endpoint. Needed because YouTubeKit's `subscribeStatus` parser doesn't follow `pageHeaderRenderer` entity-key indirection — channel screens were always showing "Subscribe" even on subscribed channels until this cache was added.
-8. **`AuthState`** (an `@Observable` singleton) drives root navigation: `.loggedIn` / `.loggedOut` / `.unknown`. On `cookieExpired` / 401-equivalent failures, `SessionManager.handleExpiredSession()` wipes Keychain + sets `AuthState.loggedOut` and the root re-routes to Login.
+- The app has no login, sign-out, account state, or authenticated YouTube endpoints.
+- `YouTubeKitClient` explicitly sets empty cookies and disables `alwaysUseCookies` for both models.
+- Foundation's shared cookie jar rejects response cookies and is purged at launch.
+- A one-way migration deletes the legacy Keychain credential created by older builds.
+- Subscriptions, history, playlists, and favorites are device-local. Import/export is their backup mechanism.
+- YouTube's anonymous `visitorData` token is request metadata, not an account credential; it remains memory-only.
 
 ---
 
@@ -435,10 +413,9 @@ Preferences live in `UserDefaults` via a `@AppStorage`-backed `UserPreferences` 
 
 ## 12. Error handling rules
 
-- Public service methods are `async throws`. Define `YouTubeServiceError`: `notAuthenticated`, `rateLimited`, `videoUnavailable`, `streamExtractionFailed`, `cookieExpired`, `network(Error)`, `decoding(Error)`, `unknown(Error)`.
+- Public service methods are `async throws`. Define `YouTubeServiceError`: `rateLimited`, `videoUnavailable`, `streamExtractionFailed`, `network(Error)`, `decoding(Error)`, `unknown(Error)`.
 - View models catch errors and translate to `@Published var errorState: ErrorState?` (or `var` on `@Observable`). Never let raw errors bubble to views.
 - Show errors via the single `ErrorToastModifier`. Don't pepper alerts across screens.
-- On `cookieExpired` / 401-equivalent: `SessionManager.handleExpiredSession()` wipes Keychain cookies + flips `AuthState`. Root view reacts and routes to Login.
 - Stream extraction failure must always fall through to the next tier (see §7) before surfacing to the user.
 
 ---
@@ -453,7 +430,7 @@ log.info("Resolving \(videoID, privacy: .public) at quality \(quality.rawValue, 
 log.error("Stream extraction failed: \(error.localizedDescription, privacy: .public)")
 ```
 
-- Cookie values, signed URLs, user emails: `privacy: .private` or omit entirely.
+- Signed URLs and other authorization-bearing URLs: `privacy: .private` or omit entirely.
 - Public IDs, response status, timing: `privacy: .public` is fine.
 - Do not reconstruct file logs through `OSLogStore`; deferred interpolation can produce `<compose failure […]>`. `AppLog` mirrors already-rendered, privacy-filtered messages directly.
 - **Do not log from SwiftUI body re-evaluation paths.** `DownloadManager.localFile(for:)` is called from `Menu` bodies that re-evaluate every player time tick; even a `log.debug` line floods the device log with hundreds of "miss" lines per second.
@@ -505,17 +482,11 @@ Don't use it. Use `removeAllItems()` + `insert(_:after:)` (see `loadItem`).
 
 Stale Xcode index. Real compiler links these fine; `xcodebuild` shows `BUILD SUCCEEDED`. Ignore. Clean Build Folder clears it.
 
-### 15.7 Login `WKWebsiteDataStore` must be ephemeral
+### 15.7 Account-free networking
 
-Using `.default()` reuses prior session cookies and captures stale ones. Use `.nonPersistent()`.
-
-### 15.8 Cookie domain de-dup picks `.youtube.com`
-
-When `.youtube.com` and `.google.com` versions of the same cookie are both present (post-login), YouTube only accepts the `.youtube.com` value. `CookieStore.dedupe` enforces this — don't simplify it to a length-based tiebreak.
-
-### 15.9 `SubscriptionRegistry` exists because YouTubeKit can't parse subscribe state reliably
-
-YouTubeKit's `subscribeStatus` doesn't follow `pageHeaderRenderer` entity-key indirection. We persist subscribe state in `UserDefaults` and reconcile on subscribe/unsubscribe.
+Never add a login WebView or authenticated InnerTube mutations. `SecurityHardening` rejects shared
+response cookies and deletes the legacy Keychain credential on upgrade. Device-local subscriptions,
+history, playlists, and favorites are the only writable user state.
 
 ### 15.10 Don't run heavy work from SwiftUI bodies
 
@@ -573,20 +544,16 @@ Current state of the implementation. Items marked ✓ are shipped.
   - Three-tier playback resolver (yt-dlp / YouTubeKit / streaming HLS)
   - `PlayerStateManager`, mini player + expanded SwiftUI player container
   - Background audio + Now Playing + Remote Command Center
-- **P1 — Account** ✓
-  - Login (`WKWebView` ephemeral data store + Keychain)
-  - `AccountService`, `SubscriptionService`, `HistoryService`
-  - Subscriptions tab, Library tab (History / Playlists / Your videos / Subscriptions / Liked / Watch later)
-  - Like / Dislike, Save-to-playlist sheet
-  - Channel screen, Playlist screen
+- **P1 — Local library** ✓
+  - Local subscriptions, history, playlists, and favorites
+  - Channel screen and read-only public playlist screen
 - **P2 — Engagement** ✓ (mostly)
-  - `CommentService` (read + write + reply + rate)
+  - `CommentService` (read-only comments and replies)
   - `DownloadManager` with priority queue + cache limit
   - Queue management UI
   - PiP, AirPlay
   - CarPlay audio mode — not yet
 - **P3 — Polish** (in flight)
-  - Comment translation ✓
   - Localization en / es / ru / fr / de ✓
   - JavaScriptCore-based n-decoder ✓ (see §15.11 — `PythonJSBridge` fakes deno via JSCore; ships `yt-dlp-ejs` JS in `Resources/`)
   - Custom video controls beyond AVPlayerViewController — not in scope for v1
@@ -600,7 +567,7 @@ Stop and ask when:
 - A request implies adding a dependency not on the locked stack.
 - A request implies App Store distribution accommodations.
 - A YouTubeKit response type doesn't map cleanly to the service layer in §6.
-- A request asks Claude to handle cookies, tokens, or stream URLs in any persistence layer other than Keychain (cookies) or in-memory (URLs).
+- A request asks for login, authenticated account interaction, or persistent stream URLs.
 - A request would require building custom video player controls from scratch before the AVPlayerViewController-based v1 is shipped.
 - A request asks to integrate with Chromecast, Google Cast, or any non-AirPlay casting (not in scope).
 - A request asks to drop the iOS deployment target below 17.0 — that's not a config change, it's a SwiftData → CoreData + `@Observable` → `ObservableObject` refactor across ~30 files.
@@ -631,7 +598,7 @@ Do not ask before:
 If asked to "make it more robust" or "production-ready", point to these realities first instead of inventing solutions:
 
 - YouTube can change its internal API at any time and silently break extraction. There is no SLA.
-- Cookies expire (typically 1-2 weeks of inactivity); the user will need to re-login.
+- Some age-restricted or account-gated content is unavailable by design because the app is anonymous.
 - N-cipher-locked content downloads in-process via the JSCore bridge (§15.11). PoT-locked content (Play Integrity attestation, not solvable by a JS runtime) still **cannot be downloaded** and falls through to tier 3 streaming. Kids/family content is the usual PoT offender.
 - yt-dlp's HLS downloader needs ffmpeg, which is blocked by §15.3 — yt-dlp picking an HLS-only format fails on iOS. Tier 2/3 take over.
 - IP-level rate limiting from YouTube can hit users on shared networks (CGNAT, VPN). No client-side fix.

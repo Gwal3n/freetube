@@ -130,10 +130,6 @@ final class ChannelVideosFallbackService: Sendable {
         request.setValue("https://www.youtube.com", forHTTPHeaderField: "Origin")
         request.setValue("https://www.youtube.com/", forHTTPHeaderField: "Referer")
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-        let cookies = client.cookies
-        if !cookies.isEmpty {
-            request.setValue(cookies, forHTTPHeaderField: "Cookie")
-        }
         request.httpBody = body
 
         log.info("[channel-fallback] POST browse kind=\(kind, privacy: .public) channelID=\(channelID, privacy: .public)")

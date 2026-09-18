@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Process-wide privacy defaults that must be established before logging or networking starts.
 nonisolated enum SecurityHardening {
@@ -8,23 +9,35 @@ nonisolated enum SecurityHardening {
 
     private static let configured: Bool = {
         lockDownSharedCookieJar()
+        removeLegacyAccountCredentials()
         migrateLegacyDiagnostics()
         return true
     }()
 
-    /// YouTube requests supply their Cookie header explicitly from Keychain. The shared jar has no
-    /// legitimate role and otherwise persists rotated response cookies outside that store.
+    /// FreeTube is account-free. Reject and erase any response cookies that Foundation might
+    /// otherwise retain implicitly, even though app requests never provide account credentials.
     private static func lockDownSharedCookieJar() {
         let jar = HTTPCookieStorage.shared
         jar.cookieAcceptPolicy = .never
         purgeSharedCookieJar()
     }
 
-    static func purgeSharedCookieJar() {
+    private static func purgeSharedCookieJar() {
         let jar = HTTPCookieStorage.shared
         for cookie in jar.cookies ?? [] {
             jar.deleteCookie(cookie)
         }
+    }
+
+    /// Account login is no longer part of FreeTube. Remove credentials left in the Keychain by
+    /// older builds so an upgrade cannot silently resume an authenticated YouTube session.
+    private static func removeLegacyAccountCredentials() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.leshko.freetube",
+            kSecAttrAccount as String: "com.leshko.freetube.cookies",
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     /// Diagnostic files stay private until the user explicitly shares them from Settings.

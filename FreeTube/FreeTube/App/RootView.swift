@@ -9,7 +9,7 @@ import UIKit
 /// - Search (search field, suggestions, results, and local recent searches)
 /// - Library (device-local history, subscriptions, and playlists)
 /// - Downloads (saved videos, transfer queue, and yt-dlp link downloads)
-/// - Settings (preferences, quality, reset-session)
+/// - Settings (preferences, quality, diagnostics)
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
@@ -68,9 +68,6 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
-        .task {
-            await SessionManager.shared.bootstrap()
-        }
         // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
         // mini-player can show the actual preview.
         .onChange(of: player.currentVideo?.id, initial: true) {

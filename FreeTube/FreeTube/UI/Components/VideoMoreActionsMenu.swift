@@ -1,18 +1,17 @@
 import SwiftUI
 import SwiftData
 import UIKit
-import OSLog
 
 /// Reusable trailing ellipsis Menu for `Video` items. Used by search results, history,
 /// the playback queue, and anywhere else a video appears in a list. Owns its own favorites
 /// `@Query`, share-file sheet, and add-to-playlist sheet so callers just drop it in next to
 /// the row's main tap target.
 ///
-/// Auth-gating rules (per product spec):
+/// Local-action rules:
 ///   - Open in browser, Copy URL: always shown
 ///   - Open in… : shown only when the video has a local downloaded file
-///   - Add to favorites / Remove from favorites: shown only when signed in
-///   - Add to playlist: shown only when signed in
+///   - Add to favorites / Remove from favorites: always local
+///   - Add to playlist: always local
 ///   - Remove downloaded file: shown only when the video has a local downloaded file
 @available(iOS 17.0, *)
 struct VideoMoreActionsMenu: View {
@@ -112,15 +111,13 @@ struct VideoMoreActionsMenu: View {
         } label: {
             Label("Save to local playlist", systemImage: "bookmark")
         }
-        if isSignedIn {
-            Button {
-                toggleFavorite()
-            } label: {
-                if isFavorite {
-                    Label("Remove from favorites", systemImage: "hand.thumbsup.fill")
-                } else {
-                    Label("Add to favorites", systemImage: "hand.thumbsup")
-                }
+        Button {
+            toggleFavorite()
+        } label: {
+            if isFavorite {
+                Label("Remove from favorites", systemImage: "hand.thumbsup.fill")
+            } else {
+                Label("Add to favorites", systemImage: "hand.thumbsup")
             }
         }
         if DownloadManager.shared.localFile(for: video.id) != nil {
@@ -145,18 +142,11 @@ struct VideoMoreActionsMenu: View {
         URL(string: "https://www.youtube.com/watch?v=\(video.id)")
     }
 
-    private var isSignedIn: Bool {
-        if case .loggedIn = AuthState.shared.status { return true }
-        return false
-    }
-
     private var isFavorite: Bool {
         favorites.contains { $0.videoID == video.id }
     }
 
-    /// Toggles the local favorite + (when signed in) fires the YouTube like/unlike sync.
-    /// Mirrors `FullScreenPlayer.toggleFavorite` so the behaviour is identical wherever the
-    /// menu appears.
+    /// Toggles the device-local favorite without contacting YouTube.
     private func toggleFavorite() {
         let wasFavorite = isFavorite
         if wasFavorite {
@@ -173,20 +163,5 @@ struct VideoMoreActionsMenu: View {
         }
         try? modelContext.save()
 
-        if isSignedIn {
-            let log = AppLog(subsystem: "com.leshko.freetube", category: "VideoMoreActionsMenu")
-            Task { [videoID = video.id] in
-                do {
-                    let actions: any VideoActionsServicing = VideoActionsService()
-                    if wasFavorite {
-                        try await actions.removeRating(videoID: videoID)
-                    } else {
-                        try await actions.like(videoID: videoID)
-                    }
-                } catch {
-                    log.error("[favorites] YouTube sync failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
-                }
-            }
-        }
     }
 }

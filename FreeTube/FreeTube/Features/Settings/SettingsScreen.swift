@@ -3,7 +3,6 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     @State private var model = SettingsViewModel()
-    @State private var showingResetConfirmation = false
 
     /// Drives the live cache-usage line under the download cache limit picker. The store is
     /// `@Observable`, so reading `entries` here re-renders the view when downloads land or
@@ -224,24 +223,11 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Diagnostics")
                 } footer: {
-                    Text("When enabled, every app launch creates a private diagnostic log that can be exported with Share. Each file starts with the app version, build, iOS version, and device model, followed by timestamped entries from FreeTube's subsystem. URL query strings and cookie values are excluded.")
+                    Text("When enabled, every app launch creates a private diagnostic log that can be exported with Share. Each file starts with the app version, build, iOS version, and device model, followed by timestamped entries from FreeTube's subsystem. Sensitive URL query strings are excluded.")
                 }
 
                 Section {
-                    Button {
-                        showingResetConfirmation = true
-                    } label: {
-                        Label("Reset session", systemImage: "arrow.counterclockwise")
-                            .foregroundStyle(.white)
-                    }
-                } header: {
-                    Text("Troubleshooting")
-                } footer: {
-                    Text("Wipes stored cookies and the visitor token. The next playback attempt will run anonymously. Use this if playback or sign-in is stuck.")
-                }
-
-                Section {
-                    Text("FreeTube is a personal/sideload-only YouTube client. It uses YouTubeKit (cookie-based, no Google API key) plus yt-dlp for downloads. YouTube can change its internal API at any time — please be patient when things break.")
+                    Text("FreeTube is a personal, account-free YouTube client. It uses anonymous YouTubeKit requests without a Google API key, plus yt-dlp for downloads. YouTube can change its internal API at any time — please be patient when things break.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } header: {
@@ -253,14 +239,6 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
-            .confirmationDialog("Reset session?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
-                Button("Reset", role: .destructive) {
-                    Task { await SessionManager.shared.handleExpiredSession() }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This signs you out and clears cached cookies.")
-            }
             // System Share sheet for the log file. `ShareLink` would be cleaner, but
             // file:// URLs inside SwiftUI's `ShareLink` sometimes serialize as plain text
             // — UIActivityViewController via the existing `ActivityShareSheet` is the

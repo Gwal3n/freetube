@@ -3,7 +3,6 @@ import SwiftUI
 struct CommentRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let comment: Comment
-    var onLike: () -> Void = {}
     var repliesTitle: String? = nil
     var repliesExpanded = false
     var onToggleReplies: (() -> Void)? = nil
@@ -35,11 +34,9 @@ struct CommentRow: View {
             }
 
             HStack(spacing: 16) {
-                Button(action: onLike) {
-                    Label("\(comment.likeCount)", systemImage: comment.isLikedByUser ? "hand.thumbsup.fill" : "hand.thumbsup")
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption)
-                }
+                Label("\(comment.likeCount)", systemImage: "hand.thumbsup")
+                    .labelStyle(.titleAndIcon)
+                    .font(.caption)
                 if let repliesTitle, let onToggleReplies {
                     Button(action: onToggleReplies) {
                         HStack(spacing: 4) {

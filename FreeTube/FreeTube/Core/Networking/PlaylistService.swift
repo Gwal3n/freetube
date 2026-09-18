@@ -2,30 +2,12 @@ import Foundation
 import OSLog
 import YouTubeKit
 
-struct PlaylistAvailability: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let containsVideo: Bool
-    let isPrivate: Bool
-}
-
 protocol PlaylistServicing: Sendable {
     func fetchPlaylist(id: String) async throws -> PlaylistDetails
     func fetchMore(continuation: String) async throws -> PlaylistDetails
-    func fetchHostablePlaylists(videoID: String) async throws -> [PlaylistAvailability]
-    func add(videoID: String, to playlistID: String) async throws
-    func removeVideo(playlistVideoID: String, from playlistID: String) async throws
-    func removeVideo(byID videoID: String, from playlistID: String) async throws
-    func create(title: String, isPrivate: Bool, seedVideoID: String?) async throws -> Playlist
-    func delete(playlistID: String) async throws
-    func move(playlistVideoID: String, in playlistID: String, toIndex: Int) async throws
 }
 
-/// Wraps:
-/// - `PlaylistInfosResponse` (+Continuation)
-/// - `AllPossibleHostPlaylistsResponse`
-/// - `AddVideoToPlaylistResponse` / `RemoveVideoByIdFromPlaylistResponse` / `RemoveVideoFromPlaylistResponse`
-/// - `CreatePlaylistResponse` / `DeletePlaylistResponse` / `MoveVideoInPlaylistResponse`
+/// Anonymous, read-only wrapper around `PlaylistInfosResponse` and its continuation.
 final class PlaylistService: PlaylistServicing {
     private let client: YouTubeKitClient
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlaylistService")
@@ -113,108 +95,4 @@ final class PlaylistService: PlaylistServicing {
         return Int(raw.filter(\.isNumber))
     }
 
-    /// Lists all the user's playlists that a given video can be added to, plus a flag indicating
-    /// whether the video is already in each playlist. Backs the "Add to playlist" sheet so we
-    /// can show checkmarks next to playlists that already contain the video.
-    func fetchHostablePlaylists(videoID: String) async throws -> [PlaylistAvailability] {
-        log.info("[playlists] fetchHostable videoID=\(videoID, privacy: .public)")
-        do {
-            let response = try await AllPossibleHostPlaylistsResponse.sendThrowingRequest(
-                youtubeModel: client.model,
-                data: [.browseId: videoID]
-            )
-            if response.isDisconnected {
-                log.notice("[playlists] fetchHostable: response isDisconnected=true")
-                throw YouTubeServiceError.notAuthenticated
-            }
-            return response.playlistsAndStatus.map { entry in
-                PlaylistAvailability(
-                    id: entry.playlist.playlistId,
-                    title: entry.playlist.title ?? "",
-                    containsVideo: entry.isVideoPresentInside,
-                    isPrivate: entry.playlist.privacy == .private
-                )
-            }
-        } catch let error as YouTubeServiceError {
-            throw error
-        } catch {
-            log.error("[playlists] fetchHostable failed: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.network(error)
-        }
-    }
-
-    /// Adds a video to the given playlist. Pass the **bare** playlist id (no `VL` prefix) —
-    /// YouTubeKit's validator (`playlistIdWithoutVLPrefixValidator`) requires it.
-    func add(videoID: String, to playlistID: String) async throws {
-        let bareID = playlistID.hasPrefix("VL") ? String(playlistID.dropFirst(2)) : playlistID
-        log.info("[playlists] add videoID=\(videoID, privacy: .public) → playlistID=\(bareID, privacy: .public)")
-        do {
-            let response = try await AddVideoToPlaylistResponse.sendThrowingRequest(
-                youtubeModel: client.model,
-                data: [.browseId: bareID, .movingVideoId: videoID]
-            )
-            if response.isDisconnected {
-                throw YouTubeServiceError.notAuthenticated
-            }
-        } catch let error as YouTubeServiceError {
-            throw error
-        } catch {
-            log.error("[playlists] add failed: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.network(error)
-        }
-    }
-
-    func removeVideo(playlistVideoID: String, from playlistID: String) async throws {
-        throw YouTubeServiceError.notAuthenticated
-    }
-
-    func removeVideo(byID videoID: String, from playlistID: String) async throws {
-        throw YouTubeServiceError.notAuthenticated
-    }
-
-    /// Creates a new playlist with `title`, optionally seeding it with one initial video.
-    /// `isPrivate` toggles between `PRIVATE` and `PUBLIC` — YouTube also supports `UNLISTED`
-    /// but the iOS-app convention is a binary public/private toggle, so we stick with that.
-    func create(title: String, isPrivate: Bool, seedVideoID: String?) async throws -> Playlist {
-        let privacy = isPrivate ? "PRIVATE" : "PUBLIC"
-        log.info("[playlists] create title=\(title, privacy: .public) privacy=\(privacy, privacy: .public) seed=\(seedVideoID ?? "-", privacy: .public)")
-        var data: [HeadersList.AddQueryInfo.ContentTypes: String] = [
-            .query: title,
-            .params: privacy
-        ]
-        if let seedVideoID { data[.movingVideoId] = seedVideoID }
-        do {
-            let response = try await CreatePlaylistResponse.sendThrowingRequest(
-                youtubeModel: client.model,
-                data: data
-            )
-            if response.isDisconnected {
-                throw YouTubeServiceError.notAuthenticated
-            }
-            let id = response.createdPlaylistId ?? ""
-            return Playlist(
-                id: id.hasPrefix("VL") ? id : "VL" + id,
-                title: title,
-                channelID: response.playlistCreatorId,
-                channelName: nil,
-                thumbnailURL: nil,
-                videoCount: seedVideoID != nil ? 1 : 0,
-                descriptionText: nil,
-                isOwnedByUser: true
-            )
-        } catch let error as YouTubeServiceError {
-            throw error
-        } catch {
-            log.error("[playlists] create failed: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.network(error)
-        }
-    }
-
-    func delete(playlistID: String) async throws {
-        throw YouTubeServiceError.notAuthenticated
-    }
-
-    func move(playlistVideoID: String, in playlistID: String, toIndex: Int) async throws {
-        throw YouTubeServiceError.notAuthenticated
-    }
 }
