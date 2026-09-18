@@ -4,7 +4,7 @@ import SwiftUI
 struct SubscriptionFeedScreen: View {
     let navigationRequest: AppNavigationRequest?
     @State private var model = SubscriptionFeedViewModel()
-    @State private var path = NavigationPath()
+    @State private var path: [AppNavigationRequest.Destination] = []
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
 

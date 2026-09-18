@@ -68,7 +68,7 @@ struct SearchContent: View {
                         if areChannelsExpanded {
                             ForEach(results.channels) { channel in
                                 Button {
-                                    dismissNativeSearch()
+                                    dismissKeyboard()
                                     onOpenDestination(.channel(channel.id))
                                 } label: {
                                     ChannelRow(channel: channel)
@@ -93,7 +93,7 @@ struct SearchContent: View {
                                 PlaylistRow(
                                     playlist: playlist,
                                     onTap: {
-                                        dismissNativeSearch()
+                                        dismissKeyboard()
                                         onOpenDestination(.playlist(playlist.id))
                                     },
                                     showsMoreMenu: true

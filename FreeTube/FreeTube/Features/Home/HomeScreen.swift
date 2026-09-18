@@ -12,7 +12,7 @@ struct HomeScreen: View {
     let searchActivation: Int
     let navigationRequest: AppNavigationRequest?
     @State private var searchModel = SearchViewModel()
-    @State private var path = NavigationPath()
+    @State private var path: [AppNavigationRequest.Destination] = []
     @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
@@ -77,7 +77,7 @@ struct HomeScreen: View {
                 // Re-selecting Search returns from a pushed destination and focuses the native
                 // field in one action. It must not discard the current term or result set.
                 if !path.isEmpty {
-                    path = NavigationPath()
+                    path.removeAll()
                 }
                 Task { @MainActor in
                     await Task.yield()

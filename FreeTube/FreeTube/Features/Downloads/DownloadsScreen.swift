@@ -12,7 +12,7 @@ struct DownloadsScreen: View {
     /// `DownloadsStore.didChange` notification (posted by the YouTube + URL writers).
     @State private var store = DownloadsStore.shared
     @Environment(PlayerStateManager.self) private var player
-    @State private var path = NavigationPath()
+    @State private var path: [AppNavigationRequest.Destination] = []
 
     // MARK: - Selection + sort state
 
