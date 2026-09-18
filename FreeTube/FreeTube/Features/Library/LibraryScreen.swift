@@ -19,9 +19,9 @@ struct LibraryScreen: View {
     }
 
     let navigationRequest: AppNavigationRequest?
-    @State private var localHistoryCount = 0
+    @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
-    @State private var localPlaylistCount = 0
+    @State private var localPlaylistCount: Int?
     @State private var path: [Destination] = []
     @State private var didLoadRootData = false
 

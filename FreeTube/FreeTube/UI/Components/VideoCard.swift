@@ -8,6 +8,8 @@ import Kingfisher
 /// the card's main tap target so its taps don't trigger `onTap`.
 @available(iOS 17.0, *)
 struct VideoCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let video: Video
     var onTap: () -> Void = {}
     var showsMoreMenu: Bool = false
@@ -65,11 +67,11 @@ struct VideoCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(video.title)
                             .font(MediaStyle.title)
-                            .lineLimit(2)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                         Text(metadataLine)
                             .font(MediaStyle.metadata)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     }
 
                     Spacer(minLength: 0)

@@ -3,6 +3,7 @@ import Kingfisher
 
 struct ChannelRow: View {
     let channel: Channel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Optional tap handler. **Leave nil when wrapping this row inside a `NavigationLink`** —
     /// the inner `Button` was swallowing the link's tap, which made channel rows in search
     /// results feel "hard to hit": you had to land precisely on the disclosure indicator area
@@ -48,7 +49,10 @@ struct ChannelRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(channel.name).font(.subheadline.weight(.semibold))
                 if !detailLine.isEmpty {
-                    Text(detailLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(detailLine)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                 }
             }
             Spacer()
