@@ -11,7 +11,10 @@ enum PlayerViewportLayout {
         availableSize: CGSize,
         isLandscape: Bool
     ) -> CGFloat {
-        if isLandscape { return 16 }
+        // The timeline's labels and touch target extend below the visible track. Twenty-eight
+        // points keeps that complete control clear of the home indicator without making it feel
+        // detached from the lower edge of the video.
+        if isLandscape { return 28 }
         let aspectHeight = availableSize.width * 9 / 16
         return max(8, aspectHeight - availableSize.height + 16)
     }

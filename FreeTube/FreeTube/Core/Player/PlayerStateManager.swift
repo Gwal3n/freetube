@@ -205,6 +205,10 @@ final class PlayerStateManager {
         // end observer, so pause on the final frame and retain the item until that decision is
         // made. This is also what keeps the video surface from turning black at natural end.
         player.actionAtItemEnd = .pause
+        // The app is intentionally read-only and currently has no caption picker. AVPlayer can
+        // otherwise auto-select a matching HLS legible track from the device language settings,
+        // making captions appear with no corresponding UI state or way to dismiss them.
+        player.appliesMediaSelectionCriteriaAutomatically = false
         // Keep the audio track running when the player view goes off-screen (popup minimize, app
         // backgrounded). Without this, AVPlayer pauses video tracks as soon as their pixel buffer
         // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
@@ -993,8 +997,27 @@ final class PlayerStateManager {
         log.info("loadItem: removeAllItems + insert (assetKind=\(assetKind, privacy: .public))")
         player.removeAllItems()
         player.insert(item, after: nil)
+        disableLegibleMediaSelection(on: item)
         log.debug("loadItem: queue size after insert=\(self.player.items().count, privacy: .public)")
         observe(item: item)
+    }
+
+    /// Keep every newly installed asset caption-free. The player-level automatic-selection flag
+    /// handles normal HLS manifests; the explicit nil selection also clears a default/forced
+    /// legible option embedded by a particular stream variant once its media groups are available.
+    private func disableLegibleMediaSelection(on item: AVPlayerItem) {
+        Task { @MainActor [weak item] in
+            guard let item else { return }
+            do {
+                let group = try await item.asset.loadMediaSelectionGroup(
+                    for: .legible
+                )
+                guard let group else { return }
+                item.select(nil, in: group)
+            } catch {
+                // Most progressive assets have no legible group. Absence is the expected case.
+            }
+        }
     }
 
     private func observe(item: AVPlayerItem) {

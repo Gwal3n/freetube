@@ -43,7 +43,7 @@ struct CustomPlayerControls: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(videoTitle)
                                 .font(usesLandscapeLayout
-                                    ? .title3.weight(.semibold)
+                                    ? .headline.weight(.semibold)
                                     : .subheadline.weight(.semibold))
                                 .lineLimit(1)
                             if !channelName.isEmpty {
