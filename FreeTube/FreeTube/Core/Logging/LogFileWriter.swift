@@ -70,8 +70,7 @@ final class LogFileWriter {
     }
 
     nonisolated static func logsDirectory() -> URL {
-        let docs = AppDirectories.documents
-        return docs.appendingPathComponent("Logs", isDirectory: true)
+        SecurityHardening.diagnosticsDirectory
     }
 
     func clearAllLogs() {

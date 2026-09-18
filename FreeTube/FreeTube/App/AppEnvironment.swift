@@ -9,6 +9,7 @@ final class AppEnvironment {
     let playerStateManager = PlayerStateManager()
 
     init() {
+        SecurityHardening.configureAtLaunch()
         // Touch `LogFileWriter.shared` first so the file-logging writer (if enabled)
         // captures every subsequent line in this init — audio session setup, remote
         // commands, BG task registration, and yt-dlp TTL refresh.

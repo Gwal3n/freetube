@@ -40,6 +40,7 @@ final class SessionManager {
     func signOut() async {
         log.info("[session] signOut called")
         store.clear()
+        SecurityHardening.purgeSharedCookieJar()
         client.applyCookies("")
         // Drop the visitor token too — if cookies were stale, the token they were paired with may
         // also be invalid. `ensureVisitorData` below seeds a fresh one for the anonymous session.

@@ -224,7 +224,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Diagnostics")
                 } footer: {
-                    Text("When enabled, every app launch creates a new log file under Documents/Logs/ (visible in the Files app). Each file starts with the app version, build, iOS version, and device model, followed by timestamped entries from FreeTube's subsystem. Useful for sharing diagnostics with the developer when something breaks in TestFlight or sideload installs.")
+                    Text("When enabled, every app launch creates a private diagnostic log that can be exported with Share. Each file starts with the app version, build, iOS version, and device model, followed by timestamped entries from FreeTube's subsystem. URL query strings and cookie values are excluded.")
                 }
 
                 Section {
@@ -283,7 +283,7 @@ struct SettingsScreen: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This removes every file under Documents/Logs/. If \"Save logs to file\" is on, a fresh log file will be opened for new entries.")
+                Text("This removes every saved diagnostic log. If \"Save logs to file\" is on, a fresh log file will be opened for new entries.")
             }
             .confirmationDialog(
                 "Clear local watch history?",
