@@ -119,7 +119,7 @@ extension Image {
     func playerTopControl() -> some View {
         font(.body.weight(.bold))
             .foregroundStyle(.white)
-            .frame(width: 44, height: 44)
+            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
             .contentShape(Circle())
             .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
     }

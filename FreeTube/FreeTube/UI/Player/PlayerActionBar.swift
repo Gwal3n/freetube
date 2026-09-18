@@ -30,7 +30,7 @@ struct PlayerActionBar: View {
             Button(action: onSaveToPlaylist) {
                 Image(systemName: isSavedToPlaylist ? "bookmark.fill" : "bookmark")
                     .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
                     .contentTransition(.symbolEffect(.replace))
             }
@@ -61,7 +61,7 @@ struct PlayerActionBar: View {
             } label: {
                 Image(systemName: "square.and.arrow.up")
                     .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())
@@ -70,7 +70,7 @@ struct PlayerActionBar: View {
 
             Button(action: onDownload) {
                 downloadLabel
-                    .frame(width: 44, height: 44)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())

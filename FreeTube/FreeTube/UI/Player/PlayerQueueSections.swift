@@ -239,7 +239,7 @@ struct PlayerQueueSections: View {
                 Button(action: onOpen) {
                     Image(systemName: "arrow.up.right")
                         .font(.footnote.weight(.semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(ResponsiveButtonStyle())

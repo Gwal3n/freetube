@@ -21,7 +21,7 @@ struct SwiftUIMiniPlayer: View {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(secondaryForeground)
-                        .frame(width: 44, height: 50)
+                        .frame(width: MediaStyle.actionSize, height: 50)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close player")
@@ -58,7 +58,7 @@ struct SwiftUIMiniPlayer: View {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(primaryForeground)
-                        .frame(width: 44, height: 50)
+                        .frame(width: MediaStyle.actionSize, height: 50)
                         .contentTransition(.symbolEffect(.replace))
                         .animation(
                             reduceMotion ? nil : InterfaceMotion.quick,

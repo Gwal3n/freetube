@@ -20,7 +20,7 @@ struct ErrorToastModifier: ViewModifier {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.footnote)
-                                .frame(width: 44, height: 44)
+                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Dismiss error")
