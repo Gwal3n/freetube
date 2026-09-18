@@ -5,6 +5,21 @@ import UniformTypeIdentifiers
 struct ImportDataScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private enum ImportKind: Equatable {
+        case backup
+        case subscriptions
+        case playlists
+
+        var contentTypes: [UTType] {
+            switch self {
+            case .backup: [.json]
+            case .subscriptions, .playlists: [.commaSeparatedText, .plainText]
+            }
+        }
+
+        var allowsMultipleSelection: Bool { self == .playlists }
+    }
+
     private enum DataOperation {
         case exporting
         case restoring
@@ -41,9 +56,8 @@ struct ImportDataScreen: View {
         }
     }
 
-    @State private var showingSubscriptionImporter = false
-    @State private var showingPlaylistImporter = false
-    @State private var showingBackupImporter = false
+    @State private var importKind: ImportKind = .backup
+    @State private var showingImporter = false
     @State private var showingBackupExporter = false
     @State private var confirmsBackupRestore = false
     @State private var pendingBackup: AppBackup?
@@ -65,7 +79,7 @@ struct ImportDataScreen: View {
                 }
                 .disabled(isWorking)
                 Button {
-                    showingBackupImporter = true
+                    presentImporter(.backup)
                 } label: {
                     Label("Restore Full Backup", systemImage: "arrow.clockwise.icloud")
                 }
@@ -78,13 +92,13 @@ struct ImportDataScreen: View {
 
             Section {
                 Button {
-                    showingSubscriptionImporter = true
+                    presentImporter(.subscriptions)
                 } label: {
                     Label("Import Subscriptions CSV", systemImage: "person.2.badge.plus")
                 }
                 .disabled(isWorking)
                 Button {
-                    showingPlaylistImporter = true
+                    presentImporter(.playlists)
                 } label: {
                     Label("Import Playlist CSV Files", systemImage: "music.note.list")
                 }
@@ -114,11 +128,11 @@ struct ImportDataScreen: View {
         .navigationTitle("Import Data")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
-            isPresented: $showingBackupImporter,
-            allowedContentTypes: [.json],
-            allowsMultipleSelection: false
+            isPresented: $showingImporter,
+            allowedContentTypes: importKind.contentTypes,
+            allowsMultipleSelection: importKind.allowsMultipleSelection
         ) { result in
-            prepareBackupImport(result)
+            handleImport(result, kind: importKind)
         }
         .fileExporter(
             isPresented: $showingBackupExporter,
@@ -127,20 +141,6 @@ struct ImportDataScreen: View {
             defaultFilename: "FreeTube Backup"
         ) { result in
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileImporter(
-            isPresented: $showingSubscriptionImporter,
-            allowedContentTypes: [.commaSeparatedText, .plainText],
-            allowsMultipleSelection: false
-        ) { result in
-            importSubscriptions(result)
-        }
-        .fileImporter(
-            isPresented: $showingPlaylistImporter,
-            allowedContentTypes: [.commaSeparatedText, .plainText],
-            allowsMultipleSelection: true
-        ) { result in
-            Task { await importPlaylists(result) }
         }
         .alert("Import Complete", isPresented: Binding(
             get: { resultMessage != nil }, set: { if !$0 { resultMessage = nil } }
@@ -162,6 +162,23 @@ struct ImportDataScreen: View {
         }
     }
 
+    private func presentImporter(_ kind: ImportKind) {
+        guard !isWorking, !showingImporter else { return }
+        importKind = kind
+        showingImporter = true
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>, kind: ImportKind) {
+        switch kind {
+        case .backup:
+            prepareBackupImport(result)
+        case .subscriptions:
+            importSubscriptions(result)
+        case .playlists:
+            Task { await importPlaylists(result) }
+        }
+    }
+
     private func exportAllData() async {
         guard !isWorking else { return }
         activeOperation = .exporting
@@ -180,8 +197,15 @@ struct ImportDataScreen: View {
             guard let url = try result.get().first else { return }
             let accessed = url.startAccessingSecurityScopedResource()
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-            pendingBackup = try AppBackupService.shared.decode(Data(contentsOf: url))
-            confirmsBackupRestore = true
+            let backup = try AppBackupService.shared.decode(Data(contentsOf: url))
+            pendingBackup = backup
+            // The document picker is still completing its dismissal during this callback.
+            // Presenting a confirmation dialog in the same update can be dropped by SwiftUI.
+            Task { @MainActor in
+                await Task.yield()
+                guard pendingBackup != nil else { return }
+                confirmsBackupRestore = true
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
