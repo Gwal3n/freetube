@@ -22,8 +22,7 @@ struct CommentsSection: View {
             if isExpanded {
                 Group {
                     if model.isLoading && model.comments.isEmpty {
-                        LoadingView()
-                            .padding(.vertical, 12)
+                        CommentListPlaceholder()
                     } else if model.commentsDisabled {
                         ContentUnavailableView(
                             "Comments disabled",
@@ -37,7 +36,10 @@ struct CommentsSection: View {
                             commentThread(comment)
                         }
                         if model.isLoading {
-                            LoadingView()
+                            ProgressView("Loading more…")
+                                .font(.footnote)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
                         } else if model.continuationToken != nil {
                             Button {
                                 Task { await model.loadMore() }
@@ -152,5 +154,36 @@ struct CommentsSection: View {
                 Task { await model.loadReplies(for: comment) }
             }
         }
+    }
+}
+
+/// Static geometry keeps the expanded section stable while its first page arrives. Deliberately
+/// avoids shimmer so loading does not add continuous animation beneath a playing video.
+private struct CommentListPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(0..<3, id: \.self) { index in
+                VStack(alignment: .leading, spacing: 8) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.quaternary)
+                        .frame(width: index == 1 ? 112 : 148, height: 10)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.quaternary)
+                        .frame(height: 12)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.quaternary)
+                        .frame(maxWidth: index == 2 ? 210 : 280)
+                        .frame(height: 12)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.quaternary)
+                        .frame(width: 72, height: 10)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading comments")
     }
 }
