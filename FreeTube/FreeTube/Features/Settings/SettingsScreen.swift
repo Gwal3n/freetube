@@ -2,6 +2,12 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
+    private enum Destination: Hashable {
+        case sponsorBlock
+        case playerControls
+        case importData
+    }
+
     @State private var model = SettingsViewModel()
 
     /// Drives the live cache-usage line under the download cache limit picker. The store is
@@ -84,9 +90,7 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    NavigationLink {
-                        SponsorBlockSettingsScreen(model: model)
-                    } label: {
+                    NavigationLink(value: Destination.sponsorBlock) {
                         LabeledContent("Categories and behavior") {
                             Text(model.sponsorBlockEnabled ? "On" : "Off")
                                 .foregroundStyle(.secondary)
@@ -99,17 +103,13 @@ struct SettingsScreen: View {
                 }
 
                 Section("Player controls") {
-                    NavigationLink {
-                        PlayerControlsSettingsScreen(model: model)
-                    } label: {
+                    NavigationLink(value: Destination.playerControls) {
                         Label("Customize controls", systemImage: "slider.horizontal.3")
                     }
                 }
 
                 Section("Data") {
-                    NavigationLink {
-                        ImportDataScreen()
-                    } label: {
+                    NavigationLink(value: Destination.importData) {
                         Label("Import Data", systemImage: "square.and.arrow.down")
                     }
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
@@ -239,6 +239,16 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(for: Destination.self) { destination in
+                switch destination {
+                case .sponsorBlock:
+                    SponsorBlockSettingsScreen(model: model)
+                case .playerControls:
+                    PlayerControlsSettingsScreen(model: model)
+                case .importData:
+                    ImportDataScreen()
+                }
+            }
             // System Share sheet for the log file. `ShareLink` would be cleaner, but
             // file:// URLs inside SwiftUI's `ShareLink` sometimes serialize as plain text
             // — UIActivityViewController via the existing `ActivityShareSheet` is the

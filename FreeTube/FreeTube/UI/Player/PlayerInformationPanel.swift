@@ -95,6 +95,10 @@ struct PlayerInformationPanel<Actions: View>: View {
             )
 
             VStack(alignment: .leading, spacing: 0) {
+                if showsUpNext || showsComments {
+                    Divider()
+                        .padding(.horizontal)
+                }
                 PlayerQueueSections(
                     showsUpNext: showsUpNext,
                     upNextInitialCount: upNextInitialCount,
@@ -102,6 +106,10 @@ struct PlayerInformationPanel<Actions: View>: View {
                 )
 
                 if showsComments {
+                    if showsUpNext {
+                        Divider()
+                            .padding(.horizontal)
+                    }
                     CommentsSection(videoID: video.id, countText: commentsCountText)
                         .id(video.id)
                 }

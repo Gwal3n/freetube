@@ -5,7 +5,6 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// One strongly typed route set for both local rows and cross-feature requests. Avoiding a
     /// heterogeneous `NavigationPath` lets SwiftUI resolve the first push up front, preserving the
     /// same native transition on a destination's cold and warm openings.
@@ -100,35 +99,29 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            LibraryDestinationRow(
-                title: "Local history",
-                subtitle: countSubtitle(localHistoryCount, noun: "video"),
-                systemImage: "clock.arrow.circlepath"
-            ) {
-                openLocalDestination(.history)
+            NavigationLink(value: Destination.history) {
+                LibraryDestinationRow(
+                    title: "Local history",
+                    subtitle: countSubtitle(localHistoryCount, noun: "video"),
+                    systemImage: "clock.arrow.circlepath"
+                )
             }
 
-            LibraryDestinationRow(
-                title: "Local subscriptions",
-                subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
-                systemImage: "person.2.fill"
-            ) {
-                openLocalDestination(.subscriptions)
+            NavigationLink(value: Destination.subscriptions) {
+                LibraryDestinationRow(
+                    title: "Local subscriptions",
+                    subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
+                    systemImage: "person.2.fill"
+                )
             }
 
-            LibraryDestinationRow(
-                title: "Local playlists",
-                subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
-                systemImage: "music.note.list"
-            ) {
-                openLocalDestination(.playlists)
+            NavigationLink(value: Destination.playlists) {
+                LibraryDestinationRow(
+                    title: "Local playlists",
+                    subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
+                    systemImage: "music.note.list"
+                )
             }
-        }
-    }
-
-    private func openLocalDestination(_ destination: Destination) {
-        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-            path.append(destination)
         }
     }
 

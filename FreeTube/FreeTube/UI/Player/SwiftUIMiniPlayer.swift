@@ -56,7 +56,7 @@ struct SwiftUIMiniPlayer: View {
                     player.togglePlayPause()
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.body.weight(.semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(primaryForeground)
                         .frame(width: MediaStyle.actionSize, height: 50)
                         .contentTransition(.symbolEffect(.replace))

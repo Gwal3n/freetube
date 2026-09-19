@@ -326,6 +326,8 @@ struct PlayerQueueSections: View {
                         NowPlayingIndicator(videoID: video.id)
                     }
                 }
+                .frame(maxWidth: .infinity, minHeight: Self.queueRowHeight, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())
 

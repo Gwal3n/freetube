@@ -81,7 +81,7 @@ struct ImportDataScreen: View {
                 Button {
                     presentImporter(.backup)
                 } label: {
-                    Label("Restore Full Backup", systemImage: "arrow.clockwise.icloud")
+                    Label("Import Full Backup", systemImage: "square.and.arrow.down")
                 }
                 .disabled(isWorking)
             } header: {
