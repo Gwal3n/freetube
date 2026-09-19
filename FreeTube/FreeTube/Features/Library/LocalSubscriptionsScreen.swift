@@ -2,7 +2,6 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct LocalSubscriptionsScreen: View {
-    let onOpenChannel: (String) -> Void
     @State private var store = LocalSubscriptionStore.shared
     @State private var showingClearConfirmation = false
     @State private var refreshError: String?
@@ -22,13 +21,11 @@ struct LocalSubscriptionsScreen: View {
             } else {
                 List {
                     ForEach(store.subscriptions) { subscription in
-                        Button {
-                            onOpenChannel(subscription.id)
+                        NavigationLink {
+                            ChannelScreen(channelID: subscription.id)
                         } label: {
                             ChannelRow(channel: subscription.channel)
                         }
-                        .buttonStyle(ResponsiveButtonStyle())
-                        .accessibilityAddTraits(.isLink)
                         .mediaListRow()
                     }
                     .onDelete(perform: store.remove)
