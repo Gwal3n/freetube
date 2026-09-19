@@ -54,26 +54,4 @@ final class PlaylistViewModel {
         }
     }
 
-    func move(from source: IndexSet, to destination: Int) async {
-        guard
-            let details,
-            let sourceIndex = source.first
-        else { return }
-        let item = details.videos[sourceIndex]
-        do {
-            try await service.move(playlistVideoID: item.id, in: playlistID, toIndex: destination)
-            await load()
-        } catch {
-            errorState = ErrorState(from: error)
-        }
-    }
-
-    func delete(_ video: Video) async {
-        do {
-            try await service.removeVideo(byID: video.id, from: playlistID)
-            await load()
-        } catch {
-            errorState = ErrorState(from: error)
-        }
-    }
 }

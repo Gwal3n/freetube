@@ -62,7 +62,9 @@ final class PlaylistService: PlaylistServicing {
             videoCount: parseInteger(response.videoCount),
             viewCount: Mappers.parseAbbreviatedCount(response.viewCount),
             descriptionText: response.playlistDescription,
-            isOwnedByUser: response.userInteractions.isEditable ?? false
+            // Account-free builds never expose remote ownership or editing, even if an
+            // anonymous response happens to contain an interaction renderer.
+            isOwnedByUser: false
         )
         // Backfill the owning channel's name onto videos that lack one (lockup-decoded items
         // skip the channel field entirely).

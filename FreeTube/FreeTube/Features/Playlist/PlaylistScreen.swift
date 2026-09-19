@@ -7,9 +7,8 @@ import Kingfisher
 ///   3. Glass-pill action toolbar — Play all / Shuffle all / Download all + More menu
 ///   4. List of videos
 ///
-/// Edit mode + the swipe-to-delete / drag-to-reorder handlers were removed: most playlists
-/// shown here belong to other YouTube users, so the buttons would always fail. We'll wire them
-/// back behind a `playlist.isOwnedByUser` check when authenticated playlists ship.
+/// Public YouTube playlists are read-only. Editing and reordering live exclusively in the local
+/// playlist screens, keeping this view independent from account-only mutation endpoints.
 @available(iOS 17.0, *)
 struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel
