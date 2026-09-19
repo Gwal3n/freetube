@@ -66,12 +66,17 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .transition(.opacity)
                         // Keep the container's simultaneous drag (which preserves panel scrolling),
                         // but prevent controls beneath an accepted vertical drag from firing too.
-                        .environment(\.isEnabled, !playerActionsSuppressed)
+                        // A clear interaction shield avoids `.disabled`'s automatic gray styling.
                         // The UIKit-backed player stays mounted for a seamless mini/expanded
                         // transition. Once settled in mini mode it is fully off-screen, but must
                         // also leave hit testing explicitly so it cannot intercept Library rows
                         // through its original hosting-controller bounds.
                         .allowsHitTesting(player.fullScreenPresented)
+                        .overlay {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .allowsHitTesting(playerActionsSuppressed)
+                        }
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
 
                     SwiftUIMiniPlayer(
@@ -89,7 +94,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .opacity(miniOpacity(for: transition) * miniDismissOpacity)
                         .allowsHitTesting(!player.fullScreenPresented)
                         .zIndex(3)
-                        .environment(\.isEnabled, !playerActionsSuppressed)
+                        .overlay {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .allowsHitTesting(playerActionsSuppressed)
+                        }
                         .simultaneousGesture(miniPlayerGesture(in: proxy.size))
                 }
             }
