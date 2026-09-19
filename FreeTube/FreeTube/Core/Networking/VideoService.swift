@@ -20,6 +20,9 @@ struct VideoInfo: Sendable {
     let commentsContinuationToken: String?
     let commentsCountText: String?
     let commentsAvailability: CommentThread.Availability
+    /// YouTube's own comments-entry teaser. This is an excerpt only: the response does not expose
+    /// its comment ID or author name, so consumers must not model it as a complete `Comment`.
+    let teaserCommentText: String?
     /// The HLS playlist URL (if available). Per `VideoInfosResponse` docs, this URL is consumable by
     /// `AVPlayer` directly. Prefer it over per-format URLs unless a specific quality is required.
     let streamingURL: URL?
@@ -154,6 +157,7 @@ final class VideoService: VideoServicing {
                 commentsAvailability: response.commentsContinuationToken != nil || response.commentsCount != nil
                     ? .available
                     : .disabled,
+                teaserCommentText: response.teaserComment.teaserText,
                 streamingURL: nil,
                 formats: []
             )
@@ -209,6 +213,7 @@ final class VideoService: VideoServicing {
             commentsContinuationToken: nil,
             commentsCountText: nil,
             commentsAvailability: .available,
+            teaserCommentText: nil,
             streamingURL: response.streamingURL,
             formats: formats
         )

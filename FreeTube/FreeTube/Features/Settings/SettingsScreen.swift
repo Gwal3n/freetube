@@ -62,7 +62,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("The featured preview loads and shows the first available comment while Comments is collapsed. Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
+                    Text("The featured preview shows YouTube’s own comment excerpt while Comments is collapsed. Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
                 }
 
                 Section("Search") {

@@ -22,20 +22,16 @@ struct CommentsSection: View {
 
             if showsFeaturedCommentPreview,
                !isExpanded,
-               let featuredComment = model.comments.first {
+               let teaserText = model.teaserText,
+               !teaserText.isEmpty {
                 Button {
                     expandComments()
                 } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(featuredComment.authorName)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text(featuredComment.bodyText)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
+                    Text(teaserText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
                     .padding(.bottom, 4)
@@ -59,7 +55,7 @@ struct CommentsSection: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                     } else {
-                        ForEach(model.comments) { comment in
+                        ForEach(model.commentsForDisplay) { comment in
                             commentThread(comment)
                         }
                         if model.isLoading {
@@ -88,14 +84,14 @@ struct CommentsSection: View {
         }
         .clipped()
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
-        .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.comments.first?.id)
+        .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.teaserText)
         .errorToast(Bindable(model).errorState)
         // Covers state restoration where the section mounts expanded. Collapsed sections remain
         // unloaded unless the user explicitly enables the featured-comment preview.
         .task(id: showsFeaturedCommentPreview) {
-            if (isExpanded || showsFeaturedCommentPreview),
-               model.comments.isEmpty,
-               !model.isLoading {
+            if showsFeaturedCommentPreview {
+                await model.loadTeaser()
+            } else if isExpanded, model.comments.isEmpty, !model.isLoading {
                 await model.load()
             }
         }
@@ -203,6 +199,9 @@ struct CommentsSection: View {
         guard !isExpanded else { return }
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             isExpanded = true
+        }
+        if model.comments.isEmpty && !model.isLoading {
+            Task { await model.load() }
         }
     }
 }

@@ -10,6 +10,7 @@ final class CommentsViewModel {
     private(set) var continuationToken: String?
     private(set) var isLoading: Bool = false
     private(set) var commentsDisabled = false
+    private(set) var teaserText: String?
     private(set) var repliesByCommentID: [String: [Comment]] = [:]
     private(set) var replyContinuationTokens: [String: String] = [:]
     private(set) var loadingReplyCommentIDs: Set<String> = []
@@ -34,6 +35,42 @@ final class CommentsViewModel {
         } catch {
             errorState = ErrorState(from: error)
         }
+    }
+
+    /// Loads only the shared watch-page metadata. Unlike `load()`, this does not fetch the comments
+    /// continuation, so a collapsed teaser does not make an otherwise unnecessary comments call.
+    func loadTeaser() async {
+        guard teaserText == nil else { return }
+        do {
+            let details = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
+            teaserText = details.teaserCommentText?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            // The teaser is optional polish. Full comments retain their ordinary error handling.
+        }
+    }
+
+    /// YouTube's teaser has no comment ID. If its excerpt occurs in a loaded full comment, place
+    /// that comment first so expanding the preview reveals the complete text immediately.
+    var commentsForDisplay: [Comment] {
+        guard let teaser = teaserText, !teaser.isEmpty,
+              let matchIndex = comments.firstIndex(where: { comment in
+                  Self.matchesTeaser(teaser, commentBody: comment.bodyText)
+              }), matchIndex != comments.startIndex else { return comments }
+        var ordered = comments
+        let match = ordered.remove(at: matchIndex)
+        ordered.insert(match, at: 0)
+        return ordered
+    }
+
+    private static func matchesTeaser(_ teaser: String, commentBody: String) -> Bool {
+        let excerpt = teaser
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".…"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !excerpt.isEmpty, !commentBody.isEmpty else { return false }
+        return commentBody.localizedCaseInsensitiveContains(excerpt)
+            || excerpt.localizedCaseInsensitiveContains(commentBody)
     }
 
     func loadMore() async {
