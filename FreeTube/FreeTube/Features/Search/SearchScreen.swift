@@ -67,14 +67,12 @@ struct SearchContent: View {
                     Section {
                         if areChannelsExpanded {
                             ForEach(results.channels) { channel in
-                                Button {
-                                    dismissKeyboard()
-                                    onOpenDestination(.channel(channel.id))
-                                } label: {
+                                NavigationLink(value: AppNavigationRequest.Destination.channel(channel.id)) {
                                     ChannelRow(channel: channel)
                                 }
-                                .buttonStyle(ResponsiveButtonStyle())
-                                .accessibilityAddTraits(.isLink)
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    dismissKeyboard()
+                                })
                                 .mediaListRow()
                             }
                         }

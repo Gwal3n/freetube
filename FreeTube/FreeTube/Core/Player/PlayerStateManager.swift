@@ -1056,6 +1056,7 @@ final class PlayerStateManager {
         player.removeAllItems()
         player.insert(item, after: nil)
         disableLegibleMediaSelection(on: item)
+        selectOriginalAudio(on: item)
         log.debug("loadItem: queue size after insert=\(self.player.items().count, privacy: .public)")
         observe(item: item)
     }
@@ -1074,6 +1075,35 @@ final class PlayerStateManager {
                 item.select(nil, in: group)
             } catch {
                 // Most progressive assets have no legible group. Absence is the expected case.
+            }
+        }
+    }
+
+    /// YouTube HLS manifests can expose the source soundtrack alongside localized dubs.
+    /// AVPlayer's automatic language matching may choose a dub based on the device locale even
+    /// when YouTube marks the original track as the default. Prefer the explicitly labelled
+    /// original option, then the manifest default. Progressive assets have no audible group.
+    private func selectOriginalAudio(on item: AVPlayerItem) {
+        Task { @MainActor [weak self, weak item] in
+            guard let self, let item else { return }
+            do {
+                guard let group = try await item.asset.loadMediaSelectionGroup(for: .audible),
+                      self.player.currentItem === item else { return }
+
+                let original = group.options.first {
+                    $0.displayName.localizedCaseInsensitiveContains("original")
+                }
+                guard let selection = original ?? group.defaultOption else {
+                    self.log.notice("HLS audio group has no original or default option")
+                    return
+                }
+
+                item.select(selection, in: group)
+                self.log.info(
+                    "Selected HLS audio option=\(selection.displayName, privacy: .public) originalLabel=\(original != nil, privacy: .public)"
+                )
+            } catch {
+                // Absence is expected for progressive assets.
             }
         }
     }
