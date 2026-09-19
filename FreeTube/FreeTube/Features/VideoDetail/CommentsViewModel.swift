@@ -38,12 +38,25 @@ final class CommentsViewModel {
     }
 
     /// Loads only the shared watch-page metadata. Unlike `load()`, this does not fetch the comments
-    /// continuation, so a collapsed teaser does not make an otherwise unnecessary comments call.
+    /// continuation when YouTubeKit decoded its native teaser. YouTube currently emits more than
+    /// one teaser JSON shape, while b5i only decodes the older `simpleText` form; when that field is
+    /// absent, fall back to the first top-level comment and retain the page for instant expansion.
     func loadTeaser() async {
         guard teaserText == nil else { return }
         do {
             let details = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
-            teaserText = details.teaserCommentText?
+            let nativeTeaser = details.teaserCommentText?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let nativeTeaser, !nativeTeaser.isEmpty {
+                teaserText = nativeTeaser
+                return
+            }
+
+            let thread = try await VideoContentPrefetchStore.shared.fetchComments(videoID: videoID)
+            comments = thread.comments
+            continuationToken = thread.continuationToken
+            commentsDisabled = thread.availability == .disabled
+            teaserText = thread.comments.first?.bodyText
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
             // The teaser is optional polish. Full comments retain their ordinary error handling.

@@ -27,8 +27,8 @@ struct UserPreferences {
     /// Uses edge-to-edge 16:9 cards in the local subscription feed instead of compact rows.
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     @AppStorage("showComments") var showComments: Bool = true
-    /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. Off by
-    /// default; it reuses the ordinary expanded-details metadata request, not the comments page.
+    /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit
+    /// cannot decode the current teaser shape, the first top-level comment is used as a fallback.
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
