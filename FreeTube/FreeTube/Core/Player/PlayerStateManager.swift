@@ -16,6 +16,7 @@ import UIKit
 final class PlayerStateManager {
     struct QueueNotice: Identifiable, Equatable {
         let id = UUID()
+        let message: String
         let title: String
     }
     enum LoadState: Equatable {
@@ -65,6 +66,8 @@ final class PlayerStateManager {
     private(set) var activePlaylist: Playlist?
     private(set) var isLoadingMorePlaylistVideos = false
     private(set) var playlistRecommendations: [Video] = []
+    /// Explicit user choices are independent from disposable recommendations and playlists.
+    private(set) var manualQueue: [Video]
     private(set) var queueNotice: QueueNotice?
     /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
     private(set) var videoPresentationSize: CGSize = .zero
@@ -147,7 +150,9 @@ final class PlayerStateManager {
 
     var canPlayPrevious: Bool { playbackHistoryIndex > 0 }
     var canPlayNext: Bool {
-        playbackHistoryIndex + 1 < playbackHistory.count || queue.availableUpcomingCount(limit: 1) > 0
+        playbackHistoryIndex + 1 < playbackHistory.count
+            || !manualQueue.isEmpty
+            || queue.availableUpcomingCount(limit: 1) > 0
     }
 
     private var timeObserver: Any?
@@ -198,6 +203,7 @@ final class PlayerStateManager {
         self.videoService = videoService
         self.playlistService = playlistService
         self.preferences = preferences
+        self.manualQueue = Self.restoreManualQueue()
         self.playbackRate = preferences.playbackRate
         self.playbackQuality = preferences.preferredQuality
         // AVQueuePlayer defaults to `.advance`, which removes the finished item before our
@@ -360,6 +366,10 @@ final class PlayerStateManager {
         recordInPlaybackHistory: Bool = true
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
+        if manualQueue.contains(where: { $0.id == video.id }) {
+            manualQueue.removeAll { $0.id == video.id }
+            persistManualQueue()
+        }
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         recommendationTask?.cancel()
@@ -574,8 +584,29 @@ final class PlayerStateManager {
     /// interrupting playback. The queue remains local and recommendation loading stays unchanged.
     func enqueueNext(_ video: Video) {
         guard let currentVideo, video.id != currentVideo.id else { return }
-        queue.insertNext(video)
-        let notice = QueueNotice(title: video.title)
+        manualQueue.removeAll { $0.id == video.id }
+        manualQueue.insert(video, at: 0)
+        persistManualQueue()
+        showQueueNotice(message: "Playing next", video: video)
+        log.info("Queued \(video.id, privacy: .public) to play next")
+    }
+
+    func enqueue(_ video: Video) {
+        guard video.id != currentVideo?.id,
+              !manualQueue.contains(where: { $0.id == video.id }) else { return }
+        manualQueue.append(video)
+        persistManualQueue()
+        showQueueNotice(message: "Added to queue", video: video)
+        log.info("Added \(video.id, privacy: .public) to manual queue")
+    }
+
+    func removeFromManualQueue(videoID: String) {
+        manualQueue.removeAll { $0.id == videoID }
+        persistManualQueue()
+    }
+
+    private func showQueueNotice(message: String, video: Video) {
+        let notice = QueueNotice(message: message, title: video.title)
         queueNotice = notice
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         queueNoticeDismissTask?.cancel()
@@ -584,7 +615,6 @@ final class PlayerStateManager {
             guard !Task.isCancelled, self?.queueNotice?.id == notice.id else { return }
             self?.queueNotice = nil
         }
-        log.info("Queued \(video.id, privacy: .public) to play next")
     }
 
     func setPlaybackRate(_ rate: Double) {
@@ -685,6 +715,12 @@ final class PlayerStateManager {
                 expandPlayer: false,
                 recordInPlaybackHistory: false
             )
+            return
+        }
+        if let next = manualQueue.first {
+            manualQueue.removeFirst()
+            persistManualQueue()
+            load(next, expandPlayer: false)
             return
         }
         if let next = queue.advance() {
@@ -1688,6 +1724,21 @@ final class PlayerStateManager {
         AudioSessionConfigurator.configure(allowMixing: true, activate: true)
         log.info("Publishing Now Playing for FreeTube as the only active audio source")
         updateNowPlaying()
+    }
+
+    private static let manualQueueDefaultsKey = "manualQueue"
+
+    private static func restoreManualQueue() -> [Video] {
+        guard let encoded = UserDefaults.standard.string(forKey: manualQueueDefaultsKey),
+              let data = encoded.data(using: .utf8),
+              let videos = try? JSONDecoder().decode([Video].self, from: data) else { return [] }
+        return videos
+    }
+
+    private func persistManualQueue() {
+        guard let data = try? JSONEncoder().encode(manualQueue),
+              let encoded = String(data: data, encoding: .utf8) else { return }
+        UserDefaults.standard.set(encoded, forKey: Self.manualQueueDefaultsKey)
     }
 
     /// Resolves an artwork image for the given video and stores it in `currentArtwork`. Tries three

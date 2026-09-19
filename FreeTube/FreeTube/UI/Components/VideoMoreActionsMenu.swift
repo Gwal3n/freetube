@@ -71,6 +71,16 @@ struct VideoMoreActionsMenu: View {
                 Label("Play next", systemImage: "text.insert")
             }
             .disabled(player.currentVideo == nil || player.currentVideo?.id == video.id)
+            Button {
+                player.enqueue(video)
+            } label: {
+                Label("Add to queue", systemImage: "text.badge.plus")
+            }
+            .disabled(
+                player.currentVideo == nil
+                    || player.currentVideo?.id == video.id
+                    || player.manualQueue.contains(where: { $0.id == video.id })
+            )
             Divider()
         }
         if !video.channelID.isEmpty {

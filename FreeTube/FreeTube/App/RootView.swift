@@ -50,7 +50,7 @@ struct RootView: View {
         .overlay(alignment: .top) {
             if let notice = player.queueNotice {
                 Label {
-                    Text("Playing next: \(notice.title)")
+                    Text("\(notice.message): \(notice.title)")
                         .lineLimit(1)
                 } icon: {
                     Image(systemName: "text.insert")

@@ -15,6 +15,7 @@ struct PlayerQueueSections: View {
     let onOpenPlaylist: (String) -> Void
 
     @State private var isQueueExpanded = false
+    @State private var isManualQueueExpanded = true
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
@@ -25,11 +26,54 @@ struct PlayerQueueSections: View {
 
     @ViewBuilder
     var body: some View {
-        if player.activePlaylist != nil || showsUpNext {
+        if player.activePlaylist != nil || !player.manualQueue.isEmpty || showsUpNext {
             VStack(alignment: .leading, spacing: 16) {
                 playlistPanel
+                manualQueuePanel
                 if showsUpNext {
                     queuePanel
+                }
+            }
+        }
+    }
+
+    // MARK: - Manual queue
+
+    @ViewBuilder
+    private var manualQueuePanel: some View {
+        if !player.manualQueue.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                        isManualQueueExpanded.toggle()
+                    }
+                } label: {
+                    PlayerSectionHeading(
+                        title: "Queue",
+                        detail: "\(player.manualQueue.count)",
+                        isExpanded: isManualQueueExpanded
+                    )
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .padding(.horizontal)
+
+                if isManualQueueExpanded {
+                    LazyVStack(spacing: 8) {
+                        ForEach(player.manualQueue) { video in
+                            queueRow(
+                                video,
+                                preservesPlaylistContext: false,
+                                onPlay: {
+                                    player.removeFromManualQueue(videoID: video.id)
+                                    player.load(video)
+                                },
+                                onRemove: { player.removeFromManualQueue(videoID: video.id) }
+                            )
+                            .frame(height: Self.queueRowHeight)
+                            .padding(.horizontal)
+                        }
+                    }
+                    .transition(.opacity)
                 }
             }
         }
@@ -275,10 +319,27 @@ struct PlayerQueueSections: View {
         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
     }
 
-    private func queueRow(_ video: Video, preservesPlaylistContext: Bool) -> some View {
+    private func queueRow(
+        _ video: Video,
+        preservesPlaylistContext: Bool,
+        onPlay: (() -> Void)? = nil,
+        onRemove: (() -> Void)? = nil
+    ) -> some View {
+        let removalAction: (() -> Void)? = if let onRemove {
+            onRemove
+        } else if !preservesPlaylistContext {
+            { player.removeFromUpNext(videoID: video.id) }
+        } else {
+            nil
+        }
+
         HStack(spacing: 0) {
             Button {
-                player.load(video, skipRecommendations: preservesPlaylistContext)
+                if let onPlay {
+                    onPlay()
+                } else {
+                    player.load(video, skipRecommendations: preservesPlaylistContext)
+                }
             } label: {
                 HStack(spacing: 12) {
                     ZStack(alignment: .bottomTrailing) {
@@ -334,9 +395,7 @@ struct PlayerQueueSections: View {
             VideoMoreActionsMenu(
                 video: video,
                 offersPlayNext: !preservesPlaylistContext,
-                onRemoveFromUpNext: preservesPlaylistContext ? nil : {
-                    player.removeFromUpNext(videoID: video.id)
-                }
+                onRemoveFromUpNext: removalAction
             )
         }
         .background {

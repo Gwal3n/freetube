@@ -130,7 +130,7 @@ final class AppBackupService {
         "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback",
         "appearanceMode", "autoplayNext", "concurrentFragments", "downloadCacheLimit",
         "hiddenPlayerTopControls", "historyRetentionPolicy", "largeSubscriptionFeedThumbnails",
-        "logToFile", "oledMiniPlayer",
+        "logToFile", "manualQueue", "oledMiniPlayer",
         "oledPlayerBackground",
         "playbackRate", "playerTopControlOrder", "preferredQuality", "prefetchVideoDetails",
         "recentFetchURLs", "restrictedSearchMode", "showComments", "showFeaturedCommentPreview",
