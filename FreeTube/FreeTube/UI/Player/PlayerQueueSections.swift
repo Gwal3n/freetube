@@ -16,6 +16,7 @@ struct PlayerQueueSections: View {
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
+    @State private var manualQueueEditMode: EditMode = .inactive
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
@@ -43,22 +44,39 @@ struct PlayerQueueSections: View {
     private var manualQueuePanel: some View {
         if !player.manualQueue.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                        isManualQueueExpanded.toggle()
+                HStack(spacing: 8) {
+                    Button {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                            isManualQueueExpanded.toggle()
+                            if !isManualQueueExpanded {
+                                manualQueueEditMode = .inactive
+                            }
+                        }
+                    } label: {
+                        PlayerSectionHeading(
+                            title: "Queue",
+                            detail: "\(player.manualQueue.count)",
+                            isExpanded: isManualQueueExpanded
+                        )
                     }
-                } label: {
-                    PlayerSectionHeading(
-                        title: "Queue",
-                        detail: "\(player.manualQueue.count)",
-                        isExpanded: isManualQueueExpanded
-                    )
+                    .buttonStyle(ResponsiveButtonStyle())
+
+                    Button(manualQueueEditMode.isEditing ? "Done" : "Edit") {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                            manualQueueEditMode = manualQueueEditMode.isEditing ? .inactive : .active
+                            isManualQueueExpanded = true
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityHint("Reorder or remove queued videos")
                 }
-                .buttonStyle(ResponsiveButtonStyle())
                 .padding(.horizontal)
 
                 if isManualQueueExpanded {
-                    LazyVStack(spacing: 8) {
+                    List {
                         ForEach(player.manualQueue) { video in
                             queueRow(
                                 video,
@@ -69,10 +87,19 @@ struct PlayerQueueSections: View {
                                 },
                                 onRemove: { player.removeFromManualQueue(videoID: video.id) }
                             )
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
-                            .padding(.horizontal)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
+                        .onDelete(perform: player.removeFromManualQueue(atOffsets:))
+                        .onMove(perform: player.moveManualQueue(fromOffsets:toOffset:))
                     }
+                    .environment(\.editMode, $manualQueueEditMode)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollDisabled(true)
+                    .frame(height: manualQueueListHeight)
                     .transition(.opacity)
                 }
             }
@@ -80,6 +107,10 @@ struct PlayerQueueSections: View {
     }
 
     // MARK: - Sizing
+
+    private var manualQueueListHeight: CGFloat {
+        CGFloat(max(1, player.manualQueue.count)) * Self.queueRowFootprint + 32
+    }
 
     private var queueListHeight: CGFloat {
         let loadMoreRows = canRevealMoreUpNext ? 1 : 0

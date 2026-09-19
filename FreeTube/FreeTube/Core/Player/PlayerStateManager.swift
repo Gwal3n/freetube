@@ -605,6 +605,28 @@ final class PlayerStateManager {
         persistManualQueue()
     }
 
+    func removeFromManualQueue(atOffsets offsets: IndexSet) {
+        for index in offsets.sorted(by: >) where manualQueue.indices.contains(index) {
+            manualQueue.remove(at: index)
+        }
+        persistManualQueue()
+    }
+
+    func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        let sourceIndices = offsets.filter { manualQueue.indices.contains($0) }.sorted()
+        guard !sourceIndices.isEmpty else { return }
+
+        let movingVideos = sourceIndices.map { manualQueue[$0] }
+        for index in sourceIndices.reversed() {
+            manualQueue.remove(at: index)
+        }
+
+        let removedBeforeDestination = sourceIndices.filter { $0 < destination }.count
+        let insertionIndex = min(max(0, destination - removedBeforeDestination), manualQueue.endIndex)
+        manualQueue.insert(contentsOf: movingVideos, at: insertionIndex)
+        persistManualQueue()
+    }
+
     private func showQueueNotice(message: String, video: Video) {
         let notice = QueueNotice(message: message, title: video.title)
         queueNotice = notice

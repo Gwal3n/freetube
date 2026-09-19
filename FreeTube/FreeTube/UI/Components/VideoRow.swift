@@ -65,9 +65,9 @@ struct VideoRow: View {
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             if offersPlayNext {
                 Button {
-                    player.enqueueNext(video)
+                    player.enqueue(video)
                 } label: {
-                    Label("Play next", systemImage: "text.insert")
+                    Label("Add to queue", systemImage: "text.badge.plus")
                 }
                 .tint(.accentColor)
             }

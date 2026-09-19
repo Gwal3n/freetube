@@ -125,9 +125,9 @@ struct SubscriptionFeedScreen: View {
             .listRowSeparator(.hidden)
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 Button {
-                    player.enqueueNext(video)
+                    player.enqueue(video)
                 } label: {
-                    Label("Play next", systemImage: "text.insert")
+                    Label("Add to queue", systemImage: "text.badge.plus")
                 }
                 .tint(.accentColor)
             }
