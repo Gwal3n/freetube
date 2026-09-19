@@ -83,13 +83,11 @@ final class PlayerStateManager {
     /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
     /// panel owns vertical gestures.
     var chapterListPresented: Bool = false
-    /// Prevents the presentation container from taking over a scroll that began while the details
-    /// panel was away from its top edge. The user can scroll back to the top and see the native
-    /// rubber band; a fresh downward gesture then collapses the player.
+    /// Current bottom edge of the video surface in the expanded player's local coordinates.
+    /// The presentation container uses this to distinguish a deliberate drag on the video from
+    /// ordinary scrolling in the metadata panel below it.
+    var expandedPlayerSurfaceHeight: CGFloat = 0
     var playerPanelAtTop: Bool = true
-    /// Latched for the lifetime of a touch that began while the panel was scrolled. This prevents
-    /// reaching the top during one long gesture from handing that same touch to the container.
-    var playerPanelGestureStartedAwayFromTop: Bool = false
     /// Disabled while the in-place portrait fullscreen mode owns the entire viewport.
     var playerPresentationGestureEnabled: Bool = true
     /// True only after the outer SwiftUI container has accepted a downward collapse drag. The
@@ -853,8 +851,8 @@ final class PlayerStateManager {
         miniPlayerVisible = false
         fullScreenPresented = false
         chapterListPresented = false
+        expandedPlayerSurfaceHeight = 0
         playerPanelAtTop = true
-        playerPanelGestureStartedAwayFromTop = false
         playerPresentationGestureEnabled = true
         playerPresentationGestureActive = false
         currentVideo = nil

@@ -17,6 +17,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var miniDismissTranslation: CGFloat = 0
     @State private var dragIsVertical: Bool?
     @State private var expandedDragStartedDown = false
+    @State private var expandedDragCanCollapse = false
     @State private var suppressMiniPlayerTap = false
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
@@ -141,16 +142,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard player.fullScreenPresented,
                       verticalSizeClass != .compact,
                       player.playerPresentationGestureEnabled,
-                      !player.chapterListPresented,
-                      player.playerPanelAtTop,
-                      !player.playerPanelGestureStartedAwayFromTop else { return }
+                      !player.chapterListPresented else { return }
                 let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
                 if directionWasUndetermined {
                     expandedDragStartedDown = value.translation.height > 0
+                    let expandedTopInset = verticalSizeClass == .compact ? 0 : PlayerLayoutMetrics.safeAreaInsets.top
+                    let startedOnVideo = value.startLocation.y
+                        <= expandedTopInset + player.expandedPlayerSurfaceHeight
+                    expandedDragCanCollapse = startedOnVideo || player.playerPanelAtTop
                 }
-                guard expandedDragStartedDown else { return }
+                guard expandedDragStartedDown, expandedDragCanCollapse else { return }
                 player.playerPresentationGestureActive = true
                 // A small amount of initial resistance preserves the pleasant top-edge rubber
                 // band before the whole player begins following the finger.
@@ -160,11 +163,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 defer {
                     dragIsVertical = nil
                     expandedDragStartedDown = false
+                    expandedDragCanCollapse = false
                     player.playerPresentationGestureActive = false
                 }
                 guard player.fullScreenPresented,
                       dragIsVertical == true,
-                      expandedDragStartedDown else {
+                      expandedDragStartedDown,
+                      expandedDragCanCollapse else {
                     presentationTranslation = 0
                     return
                 }

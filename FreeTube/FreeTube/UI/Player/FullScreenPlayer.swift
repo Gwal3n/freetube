@@ -18,7 +18,6 @@ struct FullScreenPlayer: View {
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
-    @State private var panelScrollGestureActive = false
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
@@ -239,6 +238,9 @@ struct FullScreenPlayer: View {
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
                 .onAppear { showPlayerControls() }
+                .onChange(of: surfaceHeight, initial: true) { _, height in
+                    player.expandedPlayerSurfaceHeight = height
+                }
                 .onDisappear { controlsVisibility.cancelAutoHide() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
@@ -247,7 +249,6 @@ struct FullScreenPlayer: View {
                     portraitVideoFullscreen = false
                     panelScrollOffset = 0
                     player.playerPanelAtTop = true
-                    player.playerPanelGestureStartedAwayFromTop = false
                     if let videoID = player.currentVideo?.id {
                         detailsModel.reset(for: videoID)
                     }
@@ -493,18 +494,6 @@ struct FullScreenPlayer: View {
             // comments and Up Next are both collapsed and the natural feed is very short.
             .frame(minHeight: minimumContentHeight, alignment: .top)
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 1)
-                .onChanged { _ in
-                    guard !panelScrollGestureActive else { return }
-                    panelScrollGestureActive = true
-                    player.playerPanelGestureStartedAwayFromTop = panelScrollOffset > 0.5
-                }
-                .onEnded { _ in
-                    panelScrollGestureActive = false
-                    player.playerPanelGestureStartedAwayFromTop = false
-                }
-        )
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
     }
