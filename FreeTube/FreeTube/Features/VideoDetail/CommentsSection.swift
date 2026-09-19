@@ -36,12 +36,21 @@ struct CommentsSection: View {
                             commentThread(comment)
                         }
                         if model.isLoading {
-                            ProgressView("Loading more…")
-                                .font(.footnote)
+                            ProgressView()
+                                .controlSize(.small)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 14)
+                                .accessibilityLabel("Loading more comments")
                         } else if model.continuationToken != nil {
-                            loadMoreCommentsButton
+                            // A quiet pagination sentinel keeps comments moving as the user
+                            // reaches the end without introducing a non-native action row.
+                            Color.clear
+                                .frame(height: 24)
+                                .contentShape(Rectangle())
+                                .onAppear {
+                                    Task { await model.loadMore() }
+                                }
+                                .accessibilityHidden(true)
                         }
                     }
                 }
@@ -60,27 +69,6 @@ struct CommentsSection: View {
                 await model.load()
             }
         }
-    }
-
-    @ViewBuilder
-    private var loadMoreCommentsButton: some View {
-        let button = Button {
-            Task { await model.loadMore() }
-        } label: {
-            Label("Load more", systemImage: "chevron.down")
-        }
-        .controlSize(.small)
-
-        Group {
-            if #available(iOS 26.0, *) {
-                button.buttonStyle(.glass)
-            } else {
-                button.buttonStyle(.bordered)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal)
-        .padding(.bottom, 12)
     }
 
     @ViewBuilder
@@ -155,6 +143,10 @@ struct CommentsSection: View {
                     }
                 }
                 .transition(.opacity)
+                .animation(
+                    reduceMotion ? nil : InterfaceMotion.content,
+                    value: model.repliesByCommentID[comment.id]?.count ?? 0
+                )
             }
         }
     }
