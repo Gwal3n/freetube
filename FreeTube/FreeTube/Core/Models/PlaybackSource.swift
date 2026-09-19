@@ -30,11 +30,18 @@ struct PlaybackCandidate: Sendable {
     let source: PlaybackSource
     let strategy: PlaybackStrategy
     let storyboard: VideoStoryboard?
+    let originalAudioLanguageCode: String?
 
-    init(source: PlaybackSource, strategy: PlaybackStrategy, storyboard: VideoStoryboard? = nil) {
+    init(
+        source: PlaybackSource,
+        strategy: PlaybackStrategy,
+        storyboard: VideoStoryboard? = nil,
+        originalAudioLanguageCode: String? = nil
+    ) {
         self.source = source
         self.strategy = strategy
         self.storyboard = storyboard
+        self.originalAudioLanguageCode = originalAudioLanguageCode
     }
 }
 

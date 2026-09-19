@@ -1048,7 +1048,7 @@ final class PlayerStateManager {
     /// queue down to nothing first and then insert. Also wires KVO so we hear about decode/auth
     /// failures the moment they happen (CoreMedia's `CFByteFlume err=-12939` style messages don't
     /// surface a structured `NSError` otherwise).
-    private func loadItem(_ item: AVPlayerItem) {
+    private func loadItem(_ item: AVPlayerItem, originalAudioLanguageCode: String? = nil) {
         // Do not log the asset URL or path. Direct YouTube assets contain signed credentials in
         // both components; the candidate strategy is logged immediately before this method.
         let assetKind = item.asset is AVURLAsset ? "URL" : "composition"
@@ -1056,7 +1056,7 @@ final class PlayerStateManager {
         player.removeAllItems()
         player.insert(item, after: nil)
         disableLegibleMediaSelection(on: item)
-        selectOriginalAudio(on: item)
+        selectOriginalAudio(on: item, languageCode: originalAudioLanguageCode)
         log.debug("loadItem: queue size after insert=\(self.player.items().count, privacy: .public)")
         observe(item: item)
     }
@@ -1083,29 +1083,52 @@ final class PlayerStateManager {
     /// AVPlayer's automatic language matching may choose a dub based on the device locale even
     /// when YouTube marks the original track as the default. Prefer the explicitly labelled
     /// original option, then the manifest default. Progressive assets have no audible group.
-    private func selectOriginalAudio(on item: AVPlayerItem) {
+    private func selectOriginalAudio(on item: AVPlayerItem, languageCode: String?) {
         Task { @MainActor [weak self, weak item] in
             guard let self, let item else { return }
             do {
                 guard let group = try await item.asset.loadMediaSelectionGroup(for: .audible),
                       self.player.currentItem === item else { return }
 
-                let original = group.options.first {
+                let languageMatch = languageCode.flatMap { code in
+                    group.options.first { Self.audioOption($0, matches: code) }
+                }
+                let originalLabel = group.options.first {
                     $0.displayName.localizedCaseInsensitiveContains("original")
                 }
-                guard let selection = original ?? group.defaultOption else {
-                    self.log.notice("HLS audio group has no original or default option")
-                    return
-                }
+                guard let selection = languageMatch
+                    ?? originalLabel
+                    ?? group.defaultOption
+                    ?? group.options.first else { return }
 
                 item.select(selection, in: group)
                 self.log.info(
-                    "Selected HLS audio option=\(selection.displayName, privacy: .public) originalLabel=\(original != nil, privacy: .public)"
+                    "Selected HLS audio option=\(selection.displayName, privacy: .public) sourceLanguage=\(languageCode ?? "unknown", privacy: .public) metadataMatch=\(languageMatch != nil, privacy: .public) options=\(group.options.count, privacy: .public)"
                 )
             } catch {
                 // Absence is expected for progressive assets.
             }
         }
+    }
+
+    private nonisolated static func audioOption(
+        _ option: AVMediaSelectionOption,
+        matches languageCode: String
+    ) -> Bool {
+        let requested = normalizedLanguageIdentifier(languageCode)
+        guard !requested.isEmpty else { return false }
+        return [option.extendedLanguageTag, option.locale?.identifier]
+            .compactMap { $0 }
+            .map(normalizedLanguageIdentifier)
+            .contains {
+                $0 == requested
+                    || $0.hasPrefix(requested + "-")
+                    || requested.hasPrefix($0 + "-")
+            }
+    }
+
+    private nonisolated static func normalizedLanguageIdentifier(_ value: String) -> String {
+        value.replacingOccurrences(of: "_", with: "-").lowercased()
     }
 
     private func observe(item: AVPlayerItem) {
@@ -1254,7 +1277,7 @@ final class PlayerStateManager {
             let item = AVPlayerItem(url: candidate.source.url)
             applyQualityCap(to: item)
             itemLoadStartedAt = Date()
-            loadItem(item)
+            loadItem(item, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
             // Optimistic start. AVPlayer has no "first frame rendered" signal — only
             // `.readyToPlay`, which on a warm resolve accounted for ~80% of the tap-to-video
             // wait. So we stop gating the transport on it: the candidate is still validated

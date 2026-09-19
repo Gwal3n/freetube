@@ -4,4 +4,11 @@ import Foundation
 struct NativeStreamResult: Sendable {
     let url: URL
     let storyboard: VideoStoryboard?
+    let originalAudioLanguageCode: String?
+
+    init(url: URL, storyboard: VideoStoryboard?, originalAudioLanguageCode: String? = nil) {
+        self.url = url
+        self.storyboard = storyboard
+        self.originalAudioLanguageCode = originalAudioLanguageCode
+    }
 }

@@ -339,6 +339,26 @@ public class YouTube {
         }
     }
 
+    /// Language identifier for the source/default soundtrack advertised by InnerTube.
+    /// Multi-audio HLS manifests do not consistently mark a default rendition, so callers need
+    /// this metadata to prevent the player from selecting a localized dub by device language.
+    public var originalAudioLanguageCode: String? {
+        get async throws {
+            let formats = try await streamingData.flatMap {
+                ($0.formats ?? []) + ($0.adaptiveFormats ?? [])
+            }
+            let tracks = formats.compactMap(\.audioTrack)
+            let sourceTrack = tracks.first {
+                $0.audioIsDefault && $0.displayName.lowercased().hasSuffix("original")
+            } ?? tracks.first {
+                $0.displayName.lowercased().hasSuffix("original")
+            } ?? tracks.first(where: \.audioIsDefault)
+
+            guard let rawID = sourceTrack?.id, !rawID.isEmpty else { return nil }
+            return String(rawID.split(separator: ".", maxSplits: 1).first ?? Substring(rawID))
+        }
+    }
+
     /// streaming data from video info
     var streamingData: [InnerTube.StreamingData] {
         get async throws {

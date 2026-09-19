@@ -24,7 +24,11 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         let cacheKey = "native-\(quality.rawValue)"
         if let cached = await cache.getEntry(videoID: videoID, formatID: cacheKey) {
             log.debug("Native stream cache hit for \(videoID, privacy: .public)")
-            return NativeStreamResult(url: cached.url, storyboard: cached.storyboard)
+            return NativeStreamResult(
+                url: cached.url,
+                storyboard: cached.storyboard,
+                originalAudioLanguageCode: cached.originalAudioLanguageCode
+            )
         }
 
         let startedAt = Date()
@@ -44,9 +48,20 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             if quality != .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
-                await cache.set(videoID: videoID, formatID: cacheKey, url: hls, storyboard: storyboard)
+                let originalAudioLanguageCode = try? await youtube.originalAudioLanguageCode
+                await cache.set(
+                    videoID: videoID,
+                    formatID: cacheKey,
+                    url: hls,
+                    storyboard: storyboard,
+                    originalAudioLanguageCode: originalAudioLanguageCode
+                )
                 log.info("Resolved native HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
-                return NativeStreamResult(url: hls, storyboard: storyboard)
+                return NativeStreamResult(
+                    url: hls,
+                    storyboard: storyboard,
+                    originalAudioLanguageCode: originalAudioLanguageCode
+                )
             }
 
             let streams = try await youtube.streams
