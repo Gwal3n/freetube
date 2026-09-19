@@ -56,14 +56,11 @@ struct SwiftUIMiniPlayer: View {
                     player.togglePlayPause()
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title3.weight(.semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(primaryForeground)
                         .frame(width: MediaStyle.actionSize, height: 50)
                         .contentTransition(.symbolEffect(.replace))
-                        .animation(
-                            reduceMotion ? nil : InterfaceMotion.quick,
-                            value: player.isPlaying
-                        )
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: player.isPlaying)
                 }
                 .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
