@@ -45,9 +45,12 @@ struct CommentsSection: View {
                         }
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                // Let the section reveal by changing its own height. A top-edge move starts the
+                // rows behind the heading and briefly paints them through the label on first open.
+                .transition(.opacity)
             }
         }
+        .clipped()
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .errorToast(Bindable(model).errorState)
         // Covers state restoration where the section mounts expanded. The normal collapsed state

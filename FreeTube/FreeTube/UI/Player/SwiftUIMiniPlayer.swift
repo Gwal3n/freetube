@@ -107,6 +107,8 @@ struct SwiftUIMiniPlayer: View {
             Image(uiImage: thumbnail)
                 .resizable()
                 .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .clipped()
         } else {
             Image(systemName: "play.rectangle.fill")
                 .resizable()
