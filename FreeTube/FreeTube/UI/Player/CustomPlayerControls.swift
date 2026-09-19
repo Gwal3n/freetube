@@ -81,7 +81,7 @@ struct CustomPlayerControls: View {
                             .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
                             .contentTransition(.symbolEffect(.replace))
                             .animation(
-                                reduceMotion ? nil : .easeOut(duration: 0.12),
+                                reduceMotion ? nil : .linear(duration: 0.07),
                                 value: playbackSymbolState
                             )
                     }

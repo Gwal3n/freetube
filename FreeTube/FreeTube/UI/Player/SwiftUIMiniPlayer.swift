@@ -60,7 +60,7 @@ struct SwiftUIMiniPlayer: View {
                         .foregroundStyle(primaryForeground)
                         .frame(width: MediaStyle.actionSize, height: 50)
                         .contentTransition(.symbolEffect(.replace))
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: player.isPlaying)
+                        .animation(reduceMotion ? nil : .linear(duration: 0.07), value: player.isPlaying)
                 }
                 .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")

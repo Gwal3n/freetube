@@ -34,6 +34,10 @@ enum PlayerViewportLayout {
         // detached from the lower edge of the video.
         if isLandscape { return 28 }
         let aspectHeight = availableSize.width * 9 / 16
+        // Cinematic videos already shrink the surface itself to their native aspect ratio. The
+        // old 16:9 compensation was therefore applied a second time, lifting both the timeline
+        // and the centre transport row away from the visual middle of the picture.
+        if availableSize.height < aspectHeight - 1 { return 8 }
         return max(8, aspectHeight - availableSize.height + 16)
     }
 
@@ -67,11 +71,12 @@ enum PlayerViewportLayout {
             ? presentationSize.width / presentationSize.height
             : 16 / 9
         let fittedWidth = min(safeWidth, surfaceSize.height * aspect)
+        let fittedHeight = min(surfaceSize.height, fittedWidth / aspect)
         return CGRect(
             x: safeMinX + (safeWidth - fittedWidth) / 2,
-            y: 0,
+            y: (surfaceSize.height - fittedHeight) / 2,
             width: fittedWidth,
-            height: surfaceSize.height
+            height: fittedHeight
         )
     }
 
