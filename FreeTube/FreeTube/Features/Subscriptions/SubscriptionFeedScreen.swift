@@ -119,7 +119,8 @@ struct SubscriptionFeedScreen: View {
                 offersPlayNext: true,
                 playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
             )
-            .padding(.vertical, 4)
+            .padding(.top, 4)
+            .padding(.bottom, 14)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .swipeActions(edge: .leading, allowsFullSwipe: true) {

@@ -27,6 +27,9 @@ struct UserPreferences {
     /// Uses edge-to-edge 16:9 cards in the local subscription feed instead of compact rows.
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     @AppStorage("showComments") var showComments: Bool = true
+    /// Shows the first available comment beneath the collapsed Comments heading. Off by default
+    /// because enabling it requires loading the first comments page before the section is opened.
+    @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
     /// Fetches expanded details and the first comments page only after playback is ready. Further

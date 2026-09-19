@@ -44,6 +44,9 @@ struct SettingsScreen: View {
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
                     Toggle("Show comments", isOn: Bindable(model).showComments)
+                    if model.showComments {
+                        Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
+                    }
                     Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
                     if model.showUpNext {
                         Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
@@ -59,7 +62,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
+                    Text("The featured preview loads and shows the first available comment while Comments is collapsed. Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
                 }
 
                 Section("Search") {

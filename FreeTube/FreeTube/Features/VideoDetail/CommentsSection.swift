@@ -9,6 +9,7 @@ struct CommentsSection: View {
     @State private var isExpanded = false
     @State private var expandedReplyCommentIDs: Set<String> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("showFeaturedCommentPreview") private var showsFeaturedCommentPreview = false
 
     init(videoID: String, countText: String? = nil) {
         self.countText = countText
@@ -18,6 +19,32 @@ struct CommentsSection: View {
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 8) {
             header
+
+            if showsFeaturedCommentPreview,
+               !isExpanded,
+               let featuredComment = model.comments.first {
+                Button {
+                    expandComments()
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(featuredComment.authorName)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(featuredComment.bodyText)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityHint("Opens comments")
+                .transition(.opacity)
+            }
 
             if isExpanded {
                 Group {
@@ -61,11 +88,14 @@ struct CommentsSection: View {
         }
         .clipped()
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
+        .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.comments.first?.id)
         .errorToast(Bindable(model).errorState)
-        // Covers state restoration where the section mounts expanded. The normal collapsed state
-        // performs no request; the header button lazily loads on first expansion.
-        .task {
-            if isExpanded && model.comments.isEmpty && !model.isLoading {
+        // Covers state restoration where the section mounts expanded. Collapsed sections remain
+        // unloaded unless the user explicitly enables the featured-comment preview.
+        .task(id: showsFeaturedCommentPreview) {
+            if (isExpanded || showsFeaturedCommentPreview),
+               model.comments.isEmpty,
+               !model.isLoading {
                 await model.load()
             }
         }
@@ -74,12 +104,7 @@ struct CommentsSection: View {
     @ViewBuilder
     private var header: some View {
         Button {
-            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                isExpanded.toggle()
-            }
-            if isExpanded && model.comments.isEmpty && !model.isLoading {
-                Task { await model.load() }
-            }
+            toggleComments()
         } label: {
             PlayerSectionHeading(
                 title: "Comments",
@@ -121,9 +146,12 @@ struct CommentsSection: View {
                             .padding(.leading, 32)
                     } else {
                         ForEach(model.repliesByCommentID[comment.id] ?? []) { reply in
-                            CommentRow(
-                                comment: reply
-                            )
+                            HStack(alignment: .top, spacing: 8) {
+                                Capsule()
+                                    .fill(Color.secondary.opacity(0.22))
+                                    .frame(width: 2)
+                                CommentRow(comment: reply)
+                            }
                             .padding(.leading, 20)
                         }
 
@@ -159,6 +187,22 @@ struct CommentsSection: View {
                 expandedReplyCommentIDs.insert(comment.id)
                 Task { await model.loadReplies(for: comment) }
             }
+        }
+    }
+
+    private func toggleComments() {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+            isExpanded.toggle()
+        }
+        if isExpanded && model.comments.isEmpty && !model.isLoading {
+            Task { await model.load() }
+        }
+    }
+
+    private func expandComments() {
+        guard !isExpanded else { return }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+            isExpanded = true
         }
     }
 }

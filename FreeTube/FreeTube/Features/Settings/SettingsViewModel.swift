@@ -82,6 +82,11 @@ final class SettingsViewModel {
         set { preferences.showComments = newValue }
     }
 
+    var showFeaturedCommentPreview: Bool {
+        get { preferences.showFeaturedCommentPreview }
+        set { preferences.showFeaturedCommentPreview = newValue }
+    }
+
     var prefetchVideoDetails: Bool {
         get { preferences.prefetchVideoDetails }
         set { preferences.prefetchVideoDetails = newValue }
