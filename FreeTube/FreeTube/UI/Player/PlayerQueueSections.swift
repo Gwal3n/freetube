@@ -333,7 +333,7 @@ struct PlayerQueueSections: View {
             nil
         }
 
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             Button {
                 if let onPlay {
                     onPlay()
