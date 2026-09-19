@@ -344,19 +344,42 @@ public class YouTube {
     /// this metadata to prevent the player from selecting a localized dub by device language.
     public var originalAudioLanguageCode: String? {
         get async throws {
-            let formats = try await streamingData.flatMap {
-                ($0.formats ?? []) + ($0.adaptiveFormats ?? [])
+            let initialData = try await streamingData
+            if let language = Self.originalAudioLanguageCode(in: initialData) {
+                return language
             }
-            let tracks = formats.compactMap(\.audioTrack)
-            let sourceTrack = tracks.first {
-                $0.audioIsDefault && $0.displayName.lowercased().hasSuffix("original")
-            } ?? tracks.first {
-                $0.displayName.lowercased().hasSuffix("original")
-            } ?? tracks.first(where: \.audioIsDefault)
 
-            guard let rawID = sourceTrack?.id, !rawID.isEmpty else { return nil }
-            return String(rawID.split(separator: ".", maxSplits: 1).first ?? Substring(rawID))
+            // visionOS/web are the fast HLS providers, but YouTube sometimes omits their
+            // `audioTrack` objects. Mobile player responses normally carry those objects even
+            // for the same video, so query iOS and then Android only until one identifies the
+            // source language.
+            for client in [InnerTube.ClientType.ios, .android] {
+                if let additionalInfo = try? await loadAdditionalVideoInfos(forClient: client),
+                   let additionalData = additionalInfo.streamingData,
+                   let language = Self.originalAudioLanguageCode(in: [additionalData]) {
+                    return language
+                }
+            }
+
+            return nil
         }
+    }
+
+    private static func originalAudioLanguageCode(
+        in streamingData: [InnerTube.StreamingData]
+    ) -> String? {
+        let formats = streamingData.flatMap {
+            ($0.formats ?? []) + ($0.adaptiveFormats ?? [])
+        }
+        let tracks = formats.compactMap(\.audioTrack)
+        let sourceTrack = tracks.first {
+            $0.audioIsDefault && $0.displayName.lowercased().hasSuffix("original")
+        } ?? tracks.first {
+            $0.displayName.lowercased().hasSuffix("original")
+        } ?? tracks.first(where: \.audioIsDefault)
+
+        guard let rawID = sourceTrack?.id, !rawID.isEmpty else { return nil }
+        return String(rawID.split(separator: ".", maxSplits: 1).first ?? Substring(rawID))
     }
 
     /// streaming data from video info

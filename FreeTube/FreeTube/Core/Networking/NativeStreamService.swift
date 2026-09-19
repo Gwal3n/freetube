@@ -56,6 +56,9 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                     storyboard: storyboard,
                     originalAudioLanguageCode: originalAudioLanguageCode
                 )
+                log.info(
+                    "Native HLS source audio language=\(originalAudioLanguageCode ?? "unknown", privacy: .public) for \(videoID, privacy: .public)"
+                )
                 log.info("Resolved native HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 return NativeStreamResult(
                     url: hls,

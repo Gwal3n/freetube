@@ -1098,8 +1098,12 @@ final class PlayerStateManager {
                 }
                 guard let selection = languageMatch
                     ?? originalLabel
-                    ?? group.defaultOption
-                    ?? group.options.first else { return }
+                    ?? group.defaultOption else {
+                    self.log.notice(
+                        "Did not force HLS audio selection: sourceLanguage=\(languageCode ?? "unknown", privacy: .public) options=\(group.options.count, privacy: .public)"
+                    )
+                    return
+                }
 
                 item.select(selection, in: group)
                 self.log.info(

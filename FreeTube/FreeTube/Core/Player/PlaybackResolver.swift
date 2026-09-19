@@ -45,7 +45,8 @@ final class PlaybackResolver: PlaybackResolving {
                 return PlaybackCandidate(
                     source: .direct(result.url),
                     strategy: .native,
-                    storyboard: result.storyboard
+                    storyboard: result.storyboard,
+                    originalAudioLanguageCode: result.originalAudioLanguageCode
                 )
             } catch is CancellationError {
                 throw CancellationError()
