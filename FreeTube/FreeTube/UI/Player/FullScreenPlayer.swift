@@ -37,8 +37,9 @@ struct FullScreenPlayer: View {
         // the popup read as one continuous translucent surface instead of three stacked tones.
         //
         // The outer GeometryReader provides a stable viewport for both the display-correct
-        // expanded ratio and the compact 16:9 ratio. Their difference becomes the first part of
-        // the lower panel's scroll range, allowing a tall player to behave as a collapsible header.
+        // expanded ratio and the compact baseline (16:9 for ordinary/tall media, native ratio for
+        // wide media). Their difference becomes the first part of the lower panel's scroll range,
+        // allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
@@ -51,7 +52,10 @@ struct FullScreenPlayer: View {
             // that region, preventing the timeline and bottom edge from being cropped.
             let compactSurfaceHeight = isLandscape
                 ? proxy.size.height
-                : surfaceWidth * 9 / 16
+                : PlayerViewportLayout.compactSurfaceHeight(
+                    width: surfaceWidth,
+                    presentationSize: player.videoPresentationSize
+                )
             let expandedSurfaceHeight = usesPortraitFullscreen || isLandscape
                 ? compactSurfaceHeight
                 : PlayerViewportLayout.expandedSurfaceHeight(

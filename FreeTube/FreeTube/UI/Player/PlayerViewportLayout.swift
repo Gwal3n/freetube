@@ -7,6 +7,24 @@ import UIKit
 /// second source of layout rules. The type has no state and deliberately does not own any player
 /// behavior; it only returns the same frames and offsets used by the existing presentation.
 enum PlayerViewportLayout {
+    /// Baseline portrait height. Standard and tall media retain the familiar 16:9 player, while
+    /// genuinely cinematic sources may use their wider native ratio instead of carrying a band
+    /// of empty black canvas. The lower bound avoids impractically thin chrome for malformed or
+    /// extreme presentation sizes.
+    static func compactSurfaceHeight(
+        width: CGFloat,
+        presentationSize: CGSize
+    ) -> CGFloat {
+        guard width > 0 else { return 0 }
+        let sixteenByNine = width * 9 / 16
+        guard presentationSize.width > 0, presentationSize.height > 0 else {
+            return sixteenByNine
+        }
+        let naturalHeight = width * presentationSize.height / presentationSize.width
+        guard naturalHeight < sixteenByNine else { return sixteenByNine }
+        return max(naturalHeight, width * 9 / 21)
+    }
+
     static func timelineBottomPadding(
         availableSize: CGSize,
         isLandscape: Bool
@@ -66,7 +84,10 @@ enum PlayerViewportLayout {
         presentationSize: CGSize
     ) -> CGFloat {
         guard width > 0 else { return 0 }
-        let compactHeight = width * 9 / 16
+        let compactHeight = compactSurfaceHeight(
+            width: width,
+            presentationSize: presentationSize
+        )
         guard !isLandscape,
               presentationSize.width > 0,
               presentationSize.height > 0 else { return compactHeight }
