@@ -24,6 +24,8 @@ struct UserPreferences {
     /// Removes the local-subscription Feed destination from the tab bar when disabled. Cached
     /// entries remain on device so restoring the tab is immediate and does not force a refresh.
     @AppStorage("showSubscriptionFeedTab") var showSubscriptionFeedTab: Bool = true
+    /// Uses edge-to-edge 16:9 cards in the local subscription feed instead of compact rows.
+    @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5

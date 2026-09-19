@@ -72,6 +72,11 @@ final class SettingsViewModel {
         set { preferences.showSubscriptionFeedTab = newValue }
     }
 
+    var largeSubscriptionFeedThumbnails: Bool {
+        get { preferences.largeSubscriptionFeedThumbnails }
+        set { preferences.largeSubscriptionFeedThumbnails = newValue }
+    }
+
     var showComments: Bool {
         get { preferences.showComments }
         set { preferences.showComments = newValue }

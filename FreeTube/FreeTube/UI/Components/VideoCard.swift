@@ -13,6 +13,8 @@ struct VideoCard: View {
     let video: Video
     var onTap: () -> Void = {}
     var showsMoreMenu: Bool = false
+    var offersPlayNext = false
+    var playbackProgress: Double? = nil
 
     /// Channel name plus the playback count and relative upload date. Joined by middle dots so
     /// the line reads naturally and any missing segment is dropped without leaving stray
@@ -45,7 +47,8 @@ struct VideoCard: View {
         GeometryReader { proxy in
             VideoThumbnail(
                 video: video,
-                size: CGSize(width: proxy.size.width, height: proxy.size.width * 9 / 16)
+                size: CGSize(width: proxy.size.width, height: proxy.size.width * 9 / 16),
+                progress: playbackProgress
             )
         }
         .aspectRatio(16 / 9, contentMode: .fit)
@@ -83,7 +86,7 @@ struct VideoCard: View {
             .accessibilityHint("Plays video")
 
             if showsMoreMenu {
-                VideoMoreActionsMenu(video: video)
+                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)

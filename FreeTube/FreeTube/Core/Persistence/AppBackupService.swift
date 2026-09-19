@@ -129,7 +129,8 @@ final class AppBackupService {
     private static let settingKeys: Set<String> = [
         "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback",
         "appearanceMode", "autoplayNext", "concurrentFragments", "downloadCacheLimit",
-        "hiddenPlayerTopControls", "historyRetentionPolicy", "logToFile", "oledMiniPlayer",
+        "hiddenPlayerTopControls", "historyRetentionPolicy", "largeSubscriptionFeedThumbnails",
+        "logToFile", "oledMiniPlayer",
         "oledPlayerBackground",
         "playbackRate", "playerTopControlOrder", "preferredQuality", "prefetchVideoDetails",
         "recentFetchURLs", "restrictedSearchMode", "showComments", "showHistoryProgressBars",

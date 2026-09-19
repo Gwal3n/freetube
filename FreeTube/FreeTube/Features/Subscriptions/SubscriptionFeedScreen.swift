@@ -7,6 +7,7 @@ struct SubscriptionFeedScreen: View {
     @State private var path: [AppNavigationRequest.Destination] = []
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -38,13 +39,7 @@ struct SubscriptionFeedScreen: View {
                 }
 
                 ForEach(model.videos) { video in
-                    VideoRow(
-                        video: video,
-                        accessory: .actions(offersPlayNext: true),
-                        playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
-                    ) {
-                        player.load(video)
-                    }
+                    feedRow(video)
                 }
 
                 if model.canLoadMore {
@@ -110,6 +105,38 @@ struct SubscriptionFeedScreen: View {
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
                 path.append(destination)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func feedRow(_ video: Video) -> some View {
+        if largeVideoThumbnails {
+            VideoCard(
+                video: video,
+                onTap: { player.load(video) },
+                showsMoreMenu: true,
+                offersPlayNext: true,
+                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
+            )
+            .padding(.vertical, 4)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button {
+                    player.enqueueNext(video)
+                } label: {
+                    Label("Play next", systemImage: "text.insert")
+                }
+                .tint(.accentColor)
+            }
+        } else {
+            VideoRow(
+                video: video,
+                accessory: .actions(offersPlayNext: true),
+                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
+            ) {
+                player.load(video)
             }
         }
     }

@@ -21,6 +21,7 @@ struct CommentRow: View {
             Text(comment.bodyText)
                 .font(.subheadline)
                 .lineLimit(isLongComment && !isBodyExpanded ? 3 : nil)
+                .textSelection(.enabled)
 
             if isLongComment {
                 Button(isBodyExpanded ? "Show less" : "Read more") {

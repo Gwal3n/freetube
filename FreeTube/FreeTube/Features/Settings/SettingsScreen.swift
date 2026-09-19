@@ -68,10 +68,11 @@ struct SettingsScreen: View {
 
                 Section {
                     Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
+                    Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
                 } header: {
                     Text("Feed")
                 } footer: {
-                    Text("Hiding the tab keeps your local subscriptions and cached feed on this device.")
+                    Text("Hiding the tab keeps your local subscriptions and cached feed on this device. Large thumbnails use spacious 16:9 cards while preserving the same playback and queue actions.")
                 }
 
                 Section {
