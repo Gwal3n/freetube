@@ -35,7 +35,7 @@ struct HomeScreen: View {
                     onRunSearch: { query in
                         Task { await runSearch(query: query) }
                     },
-                    onOpenDestination: { path.append($0) }
+                    onOpenDestination: openDestination
                 )
             }
             .contentShape(Rectangle())
@@ -70,7 +70,7 @@ struct HomeScreen: View {
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
-                path.append(destination)
+                openDestination(destination)
             }
             .onChange(of: searchActivation) { _, _ in
                 guard !MacIntegration.isRunningOnMac else { return }
@@ -84,6 +84,24 @@ struct HomeScreen: View {
                     await focusSearch()
                 }
             }
+        }
+    }
+
+    /// Native searchable owns a presentation layer above the navigation stack. Pushing while
+    /// that layer is active can make iOS 26 reopen/focus the field and discard the destination.
+    /// End search first, let that transaction settle, then perform the stack mutation.
+    private func openDestination(_ destination: AppNavigationRequest.Destination) {
+        isSearchPresented = false
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+        Task { @MainActor in
+            await Task.yield()
+            guard path.last != destination else { return }
+            path.append(destination)
         }
     }
 
