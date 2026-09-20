@@ -63,6 +63,7 @@ struct PlayerQueueSections: View {
                             queueRow(
                                 video,
                                 preservesPlaylistContext: false,
+                                showsReorderHandle: true,
                                 onPlay: {
                                     player.removeFromManualQueue(videoID: video.id)
                                     player.load(video)
@@ -76,7 +77,6 @@ struct PlayerQueueSections: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
-                            .draggable(video.id)
                             .dropDestination(for: String.self) { videoIDs, location in
                                 guard let sourceID = videoIDs.first,
                                       sourceID != video.id,
@@ -370,6 +370,7 @@ struct PlayerQueueSections: View {
     private func queueRow(
         _ video: Video,
         preservesPlaylistContext: Bool,
+        showsReorderHandle: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemove: (() -> Void)? = nil
     ) -> some View {
@@ -439,6 +440,17 @@ struct PlayerQueueSections: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())
+
+            if showsReorderHandle {
+                Image(systemName: "line.3.horizontal")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 36, height: Self.queueRowHeight)
+                    .contentShape(Rectangle())
+                    .draggable(video.id)
+                    .accessibilityLabel("Reorder \(video.title)")
+                    .accessibilityHint("Drag to change its position in the queue")
+            }
 
             VideoMoreActionsMenu(
                 video: video,
