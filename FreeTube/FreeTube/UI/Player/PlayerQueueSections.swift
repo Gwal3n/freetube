@@ -16,7 +16,6 @@ struct PlayerQueueSections: View {
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
-    @State private var manualQueueEditMode: EditMode = .inactive
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
@@ -44,35 +43,18 @@ struct PlayerQueueSections: View {
     private var manualQueuePanel: some View {
         if !player.manualQueue.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Button {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            isManualQueueExpanded.toggle()
-                            if !isManualQueueExpanded {
-                                manualQueueEditMode = .inactive
-                            }
-                        }
-                    } label: {
-                        PlayerSectionHeading(
-                            title: "Queue",
-                            detail: "\(player.manualQueue.count)",
-                            isExpanded: isManualQueueExpanded
-                        )
+                Button {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                        isManualQueueExpanded.toggle()
                     }
-                    .buttonStyle(ResponsiveButtonStyle())
-
-                    Button(manualQueueEditMode.isEditing ? "Done" : "Edit") {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            manualQueueEditMode = manualQueueEditMode.isEditing ? .inactive : .active
-                            isManualQueueExpanded = true
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityHint("Reorder or remove queued videos")
+                } label: {
+                    PlayerSectionHeading(
+                        title: "Queue",
+                        detail: "\(player.manualQueue.count)",
+                        isExpanded: isManualQueueExpanded
+                    )
                 }
+                .buttonStyle(ResponsiveButtonStyle())
                 .padding(.horizontal)
 
                 if isManualQueueExpanded {
@@ -87,15 +69,21 @@ struct PlayerQueueSections: View {
                                 },
                                 onRemove: { player.removeFromManualQueue(videoID: video.id) }
                             )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    player.removeFromManualQueue(videoID: video.id)
+                                } label: {
+                                    Label("Remove", systemImage: "trash")
+                                }
+                            }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
-                        .onDelete(perform: player.removeFromManualQueue(atOffsets:))
                         .onMove(perform: player.moveManualQueue(fromOffsets:toOffset:))
                     }
-                    .environment(\.editMode, $manualQueueEditMode)
+                    .environment(\.editMode, .constant(.active))
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(true)
@@ -231,6 +219,21 @@ struct PlayerQueueSections: View {
                 List {
                     ForEach(displayedUpNextVideos) { video in
                         queueRow(video, preservesPlaylistContext: false)
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    player.enqueue(video)
+                                } label: {
+                                    Label("Add to queue", systemImage: "text.badge.plus")
+                                }
+                                .tint(.purple)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    player.removeFromUpNext(videoID: video.id)
+                                } label: {
+                                    Label("Remove", systemImage: "trash")
+                                }
+                            }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)

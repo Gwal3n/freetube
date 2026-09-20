@@ -129,7 +129,7 @@ struct SubscriptionFeedScreen: View {
                 } label: {
                     Label("Add to queue", systemImage: "text.badge.plus")
                 }
-                .tint(.accentColor)
+                .tint(.purple)
             }
         } else {
             VideoRow(

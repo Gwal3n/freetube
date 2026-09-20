@@ -69,7 +69,7 @@ struct VideoRow: View {
                 } label: {
                     Label("Add to queue", systemImage: "text.badge.plus")
                 }
-                .tint(.accentColor)
+                .tint(.purple)
             }
         }
         .mediaListRow()

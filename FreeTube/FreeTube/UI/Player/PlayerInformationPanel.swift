@@ -94,7 +94,7 @@ struct PlayerInformationPanel<Actions: View>: View {
                 onExpand: onExpandDetails
             )
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
                 PlayerQueueSections(
                     showsUpNext: showsUpNext,
                     upNextInitialCount: upNextInitialCount,
