@@ -27,7 +27,7 @@ struct PlayerQueueSections: View {
     @ViewBuilder
     var body: some View {
         if player.activePlaylist != nil || !player.manualQueue.isEmpty || showsUpNext {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
                 playlistPanel
                 manualQueuePanel
                 if showsUpNext {
@@ -76,14 +76,28 @@ struct PlayerQueueSections: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
+                            .draggable(video.id)
+                            .dropDestination(for: String.self) { videoIDs, location in
+                                guard let sourceID = videoIDs.first,
+                                      sourceID != video.id,
+                                      player.manualQueue.contains(where: { $0.id == sourceID }) else {
+                                    return false
+                                }
+                                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                                    player.moveManualQueue(
+                                        videoID: sourceID,
+                                        relativeTo: video.id,
+                                        placeAfterTarget: location.y > Self.queueRowHeight / 2
+                                    )
+                                }
+                                return true
+                            }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
-                        .onMove(perform: player.moveManualQueue(fromOffsets:toOffset:))
                     }
-                    .environment(\.editMode, .constant(.active))
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(true)
@@ -225,7 +239,7 @@ struct PlayerQueueSections: View {
                                 } label: {
                                     Label("Add to queue", systemImage: "text.badge.plus")
                                 }
-                                .tint(.purple)
+                                .tint(.indigo)
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {

@@ -603,25 +603,21 @@ final class PlayerStateManager {
         persistManualQueue()
     }
 
-    func removeFromManualQueue(atOffsets offsets: IndexSet) {
-        for index in offsets.sorted(by: >) where manualQueue.indices.contains(index) {
-            manualQueue.remove(at: index)
+    func moveManualQueue(videoID: String, relativeTo targetID: String, placeAfterTarget: Bool) {
+        guard videoID != targetID,
+              let sourceIndex = manualQueue.firstIndex(where: { $0.id == videoID }),
+              manualQueue.contains(where: { $0.id == targetID }) else { return }
+
+        let video = manualQueue.remove(at: sourceIndex)
+        guard let targetIndex = manualQueue.firstIndex(where: { $0.id == targetID }) else {
+            manualQueue.insert(video, at: min(sourceIndex, manualQueue.endIndex))
+            return
         }
-        persistManualQueue()
-    }
-
-    func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
-        let sourceIndices = offsets.filter { manualQueue.indices.contains($0) }.sorted()
-        guard !sourceIndices.isEmpty else { return }
-
-        let movingVideos = sourceIndices.map { manualQueue[$0] }
-        for index in sourceIndices.reversed() {
-            manualQueue.remove(at: index)
-        }
-
-        let removedBeforeDestination = sourceIndices.filter { $0 < destination }.count
-        let insertionIndex = min(max(0, destination - removedBeforeDestination), manualQueue.endIndex)
-        manualQueue.insert(contentsOf: movingVideos, at: insertionIndex)
+        let insertionIndex = min(
+            targetIndex + (placeAfterTarget ? 1 : 0),
+            manualQueue.endIndex
+        )
+        manualQueue.insert(video, at: insertionIndex)
         persistManualQueue()
     }
 
