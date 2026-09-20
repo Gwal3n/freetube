@@ -73,17 +73,19 @@ struct CustomPlayerControls: View {
                     .disabled(!hasPrevious)
                     .accessibilityLabel("Previous video")
                     Button(action: onTogglePlayPause) {
-                        Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 68, height: 68)
-                            .contentShape(Circle())
-                            .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
-                            .contentTransition(.symbolEffect(.replace))
-                            .animation(
-                                reduceMotion ? nil : .linear(duration: 0.07),
-                                value: playbackSymbolState
-                            )
+                        Group {
+                            if hasEnded {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 34, weight: .semibold))
+                            } else {
+                                PlayPauseMorphIcon(isPlaying: isPlaying)
+                                    .frame(width: 40, height: 40)
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .frame(width: 68, height: 68)
+                        .contentShape(Circle())
+                        .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
                     }
                     .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
                     Button(action: onNext) {
@@ -118,11 +120,88 @@ struct CustomPlayerControls: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
     }
 
-    private var playbackSymbolState: Int {
-        if hasEnded { return 2 }
-        return isPlaying ? 1 : 0
+}
+
+/// A continuous play-to-pause morph. Both states use the same pair of four-point polygons, so
+/// SwiftUI interpolates their geometry instead of shrinking one SF Symbol before inserting the
+/// other. The two polygons meet as a triangle in the play state and separate into pause bars.
+struct PlayPauseMorphIcon: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isPlaying: Bool
+
+    var body: some View {
+        PlayPauseMorphShape(progress: isPlaying ? 1 : 0)
+            .fill(.primary)
+            .animation(
+                reduceMotion ? nil : .snappy(duration: 0.18, extraBounce: 0),
+                value: isPlaying
+            )
+    }
+}
+
+private struct PlayPauseMorphShape: Shape {
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
     }
 
+    func path(in rect: CGRect) -> Path {
+        let playUpper = [
+            CGPoint(x: 0.22, y: 0.14),
+            CGPoint(x: 0.22, y: 0.50),
+            CGPoint(x: 0.84, y: 0.50),
+            CGPoint(x: 0.84, y: 0.50)
+        ]
+        let playLower = [
+            CGPoint(x: 0.22, y: 0.50),
+            CGPoint(x: 0.22, y: 0.86),
+            CGPoint(x: 0.84, y: 0.50),
+            CGPoint(x: 0.84, y: 0.50)
+        ]
+        let pauseLeft = rectanglePoints(minX: 0.22, maxX: 0.42)
+        let pauseRight = rectanglePoints(minX: 0.60, maxX: 0.80)
+
+        var path = Path()
+        addPolygon(interpolate(playUpper, pauseLeft), in: rect, to: &path)
+        addPolygon(interpolate(playLower, pauseRight), in: rect, to: &path)
+        return path
+    }
+
+    private func rectanglePoints(minX: CGFloat, maxX: CGFloat) -> [CGPoint] {
+        [
+            CGPoint(x: minX, y: 0.14),
+            CGPoint(x: minX, y: 0.86),
+            CGPoint(x: maxX, y: 0.86),
+            CGPoint(x: maxX, y: 0.14)
+        ]
+    }
+
+    private func interpolate(_ from: [CGPoint], _ to: [CGPoint]) -> [CGPoint] {
+        zip(from, to).map { start, end in
+            CGPoint(
+                x: start.x + (end.x - start.x) * progress,
+                y: start.y + (end.y - start.y) * progress
+            )
+        }
+    }
+
+    private func addPolygon(_ points: [CGPoint], in rect: CGRect, to path: inout Path) {
+        guard let first = points.first else { return }
+        path.move(to: scaled(first, in: rect))
+        for point in points.dropFirst() {
+            path.addLine(to: scaled(point, in: rect))
+        }
+        path.closeSubpath()
+    }
+
+    private func scaled(_ point: CGPoint, in rect: CGRect) -> CGPoint {
+        CGPoint(
+            x: rect.minX + point.x * rect.width,
+            y: rect.minY + point.y * rect.height
+        )
+    }
 }
 
 extension Image {
