@@ -108,7 +108,8 @@ struct FullScreenPlayer: View {
                             player.miniPlayerVisible = true
                             player.fullScreenPresented = true
                             player.requestInlinePlaybackRestoration()
-                        }
+                        },
+                        isInteractionEnabled: player.fullScreenPresented
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     DownloadProgressOverlay(state: player.loadState)

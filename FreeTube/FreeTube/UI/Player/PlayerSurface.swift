@@ -15,6 +15,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var onRestoreFromPictureInPicture: () -> Void
     var showsControls: Bool = false
     var entersPiPAutomatically: Bool = true
+    var isInteractionEnabled: Bool = true
 
     func makeCoordinator() -> PlayerGestureCoordinator {
         PlayerGestureCoordinator(
@@ -36,6 +37,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsPictureInPicturePlayback = true
         controller.allowsVideoFrameAnalysis = false
+        controller.view.isUserInteractionEnabled = isInteractionEnabled
+        controller.view.accessibilityElementsHidden = !isInteractionEnabled
         // Force the hierarchy to load before asking for `contentOverlayView`.
         _ = controller.view
         context.coordinator.install(on: controller)
@@ -48,6 +51,11 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsVideoFrameAnalysis = false
+        // SwiftUI's `.allowsHitTesting(false)` does not always propagate through an offset
+        // UIViewControllerRepresentable. Disable the native root as well so the off-screen,
+        // still-mounted player cannot cancel NavigationLink/Menu taps beneath the miniplayer.
+        controller.view.isUserInteractionEnabled = isInteractionEnabled
+        controller.view.accessibilityElementsHidden = !isInteractionEnabled
         context.coordinator.dismissPiPIfRequested(
             on: controller,
             request: pipDismissalRequest
