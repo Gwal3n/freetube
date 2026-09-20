@@ -614,6 +614,12 @@ final class PlayerStateManager {
         persistManualQueue()
     }
 
+    func clearManualQueue() {
+        guard !manualQueue.isEmpty else { return }
+        manualQueue.removeAll()
+        persistManualQueue()
+    }
+
     func moveManualQueue(videoID: String, relativeTo targetID: String, placeAfterTarget: Bool) {
         guard videoID != targetID,
               let sourceIndex = manualQueue.firstIndex(where: { $0.id == videoID }),

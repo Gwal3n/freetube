@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import UniformTypeIdentifiers
 
 /// Playlist context and recommendation queue shown below the expanded player's metadata.
 ///
@@ -20,6 +21,8 @@ struct PlayerQueueSections: View {
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
+    @State private var draggedManualQueueVideoID: String?
+    @State private var confirmsClearingQueue = false
 
     private static let queueRowHeight: CGFloat = 56
     private static let queueRowFootprint: CGFloat = queueRowHeight + 8
@@ -43,18 +46,46 @@ struct PlayerQueueSections: View {
     private var manualQueuePanel: some View {
         if !player.manualQueue.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                        isManualQueueExpanded.toggle()
+                HStack(spacing: 4) {
+                    Button {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                            isManualQueueExpanded.toggle()
+                        }
+                    } label: {
+                        PlayerSectionHeading(
+                            title: "Queue",
+                            detail: "\(player.manualQueue.count)",
+                            isExpanded: isManualQueueExpanded
+                        )
                     }
-                } label: {
-                    PlayerSectionHeading(
-                        title: "Queue",
-                        detail: "\(player.manualQueue.count)",
-                        isExpanded: isManualQueueExpanded
-                    )
+                    .buttonStyle(ResponsiveButtonStyle())
+
+                    Button(role: .destructive) {
+                        confirmsClearingQueue = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel("Clear queue")
+                    .confirmationDialog(
+                        "Clear the queue?",
+                        isPresented: $confirmsClearingQueue,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Clear Queue", role: .destructive) {
+                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                                player.clearManualQueue()
+                            }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("This removes every queued video without stopping the current video.")
+                    }
                 }
-                .buttonStyle(ResponsiveButtonStyle())
                 .padding(.horizontal)
 
                 if isManualQueueExpanded {
@@ -77,21 +108,23 @@ struct PlayerQueueSections: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
-                            .dropDestination(for: String.self) { videoIDs, location in
-                                guard let sourceID = videoIDs.first,
-                                      sourceID != video.id,
-                                      player.manualQueue.contains(where: { $0.id == sourceID }) else {
-                                    return false
-                                }
-                                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                                    player.moveManualQueue(
-                                        videoID: sourceID,
-                                        relativeTo: video.id,
-                                        placeAfterTarget: location.y > Self.queueRowHeight / 2
-                                    )
-                                }
-                                return true
-                            }
+                            .onDrop(
+                                of: [UTType.text],
+                                delegate: ManualQueueDropDelegate(
+                                    targetVideoID: video.id,
+                                    draggedVideoID: $draggedManualQueueVideoID,
+                                    videoIDs: { player.manualQueue.map(\.id) },
+                                    move: { sourceID, targetID, placeAfter in
+                                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                                            player.moveManualQueue(
+                                                videoID: sourceID,
+                                                relativeTo: targetID,
+                                                placeAfterTarget: placeAfter
+                                            )
+                                        }
+                                    }
+                                )
+                            )
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
@@ -447,7 +480,16 @@ struct PlayerQueueSections: View {
                     .foregroundStyle(.tertiary)
                     .frame(width: 36, height: Self.queueRowHeight)
                     .contentShape(Rectangle())
-                    .draggable(video.id)
+                    .onDrag {
+                        draggedManualQueueVideoID = video.id
+                        return NSItemProvider(object: video.id as NSString)
+                    } preview: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(12)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
                     .accessibilityLabel("Reorder \(video.title)")
                     .accessibilityHint("Drag to change its position in the queue")
             }
@@ -470,5 +512,32 @@ struct PlayerQueueSections: View {
         [video.channelName, video.viewCountString]
             .filter { !$0.isEmpty }
             .joined(separator: " • ")
+    }
+}
+
+private struct ManualQueueDropDelegate: DropDelegate {
+    let targetVideoID: String
+    @Binding var draggedVideoID: String?
+    let videoIDs: () -> [String]
+    let move: (_ sourceID: String, _ targetID: String, _ placeAfter: Bool) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let sourceID = draggedVideoID,
+              sourceID != targetVideoID else { return }
+
+        let ids = videoIDs()
+        guard let sourceIndex = ids.firstIndex(of: sourceID),
+              let targetIndex = ids.firstIndex(of: targetVideoID) else { return }
+
+        move(sourceID, targetVideoID, sourceIndex < targetIndex)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedVideoID = nil
+        return true
     }
 }

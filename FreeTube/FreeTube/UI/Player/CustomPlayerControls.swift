@@ -130,8 +130,17 @@ struct PlayPauseMorphIcon: View {
     let isPlaying: Bool
 
     var body: some View {
-        PlayPauseMorphShape(progress: isPlaying ? 1 : 0)
-            .fill(.primary)
+        let shape = PlayPauseMorphShape(progress: isPlaying ? 1 : 0)
+        ZStack {
+            // A small rounded stroke softens the polygon corners and covers the shared edge of
+            // the two play halves while they morph. Keeping the fill above it preserves a crisp
+            // symbol without the lower-half seam visible in the old geometry.
+            shape.stroke(
+                .primary,
+                style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
+            )
+            shape.fill(.primary)
+        }
             .animation(
                 reduceMotion ? nil : .snappy(duration: 0.18, extraBounce: 0),
                 value: isPlaying
