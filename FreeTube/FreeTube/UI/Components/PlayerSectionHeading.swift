@@ -5,6 +5,7 @@ struct PlayerSectionHeading: View {
     let title: String
     var detail: String? = nil
     let isExpanded: Bool
+    var showsDisclosureIndicator = true
 
     var body: some View {
         HStack(spacing: 8) {
@@ -19,11 +20,13 @@ struct PlayerSectionHeading: View {
                     .layoutPriority(-1)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                .frame(width: 18, height: 18)
+            if showsDisclosureIndicator {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: 18, height: 18)
+            }
         }
         .frame(minHeight: 44)
         .foregroundStyle(.primary)

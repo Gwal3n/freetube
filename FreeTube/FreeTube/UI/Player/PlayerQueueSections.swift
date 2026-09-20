@@ -22,7 +22,6 @@ struct PlayerQueueSections: View {
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
     @State private var draggedManualQueueVideoID: String?
-    @State private var confirmsClearingQueue = false
 
     private static let queueRowHeight: CGFloat = 56
     private static let queueRowFootprint: CGFloat = queueRowHeight + 8
@@ -55,13 +54,16 @@ struct PlayerQueueSections: View {
                         PlayerSectionHeading(
                             title: "Queue",
                             detail: "\(player.manualQueue.count)",
-                            isExpanded: isManualQueueExpanded
+                            isExpanded: isManualQueueExpanded,
+                            showsDisclosureIndicator: false
                         )
                     }
                     .buttonStyle(ResponsiveButtonStyle())
 
                     Button(role: .destructive) {
-                        confirmsClearingQueue = true
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                            player.clearManualQueue()
+                        }
                     } label: {
                         Image(systemName: "trash")
                             .font(.subheadline.weight(.semibold))
@@ -71,20 +73,21 @@ struct PlayerQueueSections: View {
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel("Clear queue")
-                    .confirmationDialog(
-                        "Clear the queue?",
-                        isPresented: $confirmsClearingQueue,
-                        titleVisibility: .visible
-                    ) {
-                        Button("Clear Queue", role: .destructive) {
-                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                                player.clearManualQueue()
-                            }
+
+                    Button {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                            isManualQueueExpanded.toggle()
                         }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text("This removes every queued video without stopping the current video.")
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isManualQueueExpanded ? 90 : 0))
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Circle())
                     }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel(isManualQueueExpanded ? "Collapse queue" : "Expand queue")
                 }
                 .padding(.horizontal)
 

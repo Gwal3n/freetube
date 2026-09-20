@@ -5,6 +5,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct SwiftUIMiniPlayer: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("oledMiniPlayer") private var oledMiniPlayer = false
 
     let thumbnail: UIImage?
@@ -54,10 +55,12 @@ struct SwiftUIMiniPlayer: View {
                 Button {
                     player.togglePlayPause()
                 } label: {
-                    PlayPauseMorphIcon(isPlaying: player.isPlaying)
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(primaryForeground)
-                        .frame(width: 22, height: 22)
                         .frame(width: MediaStyle.actionSize, height: 50)
+                        .contentTransition(.symbolEffect(.replace))
+                        .animation(reduceMotion ? nil : .linear(duration: 0.07), value: player.isPlaying)
                 }
                 .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
