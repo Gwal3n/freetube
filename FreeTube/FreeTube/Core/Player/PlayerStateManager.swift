@@ -364,6 +364,17 @@ final class PlayerStateManager {
         recordInPlaybackHistory: Bool = true
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
+        if currentVideo?.id == video.id {
+            if case .failed = loadState {
+                // A deliberate second tap retries a failed resolution.
+            } else {
+                log.info("load: current video selected again; expanding without restarting playback")
+                if expandPlayer {
+                    presentPlayer(for: video.id, expanded: true)
+                }
+                return
+            }
+        }
         if manualQueue.contains(where: { $0.id == video.id }) {
             manualQueue.removeAll { $0.id == video.id }
             persistManualQueue()

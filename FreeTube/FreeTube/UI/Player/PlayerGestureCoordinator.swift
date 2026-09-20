@@ -300,28 +300,34 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                   let duration = horizontalSeekDuration,
                   view.bounds.width > 0 else { return }
             let translation = gesture.translation(in: view).x
-            let sensitivity: TimeInterval
+            let precisionRange: TimeInterval
             if duration >= 3_600 {
-                sensitivity = 120
+                precisionRange = 120
             } else if duration >= 1_800 {
-                sensitivity = 90
+                precisionRange = 90
             } else {
-                sensitivity = 60
+                precisionRange = 60
             }
             horizontalSeekPeakVelocity = max(
                 horizontalSeekPeakVelocity,
                 abs(gesture.velocity(in: view).x)
             )
-            // Slow drags retain the base scale for precise positioning. Faster swipes smoothly
-            // increase that range up to 3×, while peak velocity keeps the preview from snapping
-            // backwards merely because the finger decelerates before release.
-            let velocityBoost = min(
-                max((TimeInterval(horizontalSeekPeakVelocity) - 300) / 1_200, 0),
-                2
+            // Slow movement retains the familiar seconds-based precision. As velocity rises,
+            // blend toward a duration-relative range so the same decisive flick can traverse a
+            // useful portion of a long video. Peak velocity keeps that scale stable while the
+            // finger naturally decelerates before release.
+            let rawVelocityProgress = min(
+                max((TimeInterval(horizontalSeekPeakVelocity) - 450) / 1_550, 0),
+                1
             )
+            let velocityProgress = rawVelocityProgress * rawVelocityProgress
+                * (3 - 2 * rawVelocityProgress)
+            let durationRelativeRange = max(precisionRange, duration * 0.5)
+            let activeRange = precisionRange
+                + (durationRelativeRange - precisionRange) * velocityProgress
             let dragFraction = TimeInterval(translation / view.bounds.width)
             let target = min(
-                max(start + dragFraction * sensitivity * (1 + velocityBoost), 0),
+                max(start + dragFraction * activeRange, 0),
                 duration
             )
             horizontalSeekTarget = target
