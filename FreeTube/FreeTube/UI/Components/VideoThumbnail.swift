@@ -6,6 +6,7 @@ struct VideoThumbnail: View {
     let video: Video
     let size: CGSize
     var progress: Double? = nil
+    var cornerRadius: CGFloat = MediaStyle.thumbnailRadius
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -40,7 +41,7 @@ struct VideoThumbnail: View {
                     .frame(height: 3)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .accessibilityHidden(true)
     }
 }

@@ -238,6 +238,8 @@ private struct VideoContextMenuModifier: ViewModifier {
                     shareFileURL: $shareFileURL,
                     addToPlaylistVideo: $addToPlaylistVideo
                 )
+            } preview: {
+                VideoContextPreview(video: video)
             }
             .sheet(isPresented: Binding(
                 get: { shareFileURL != nil },
