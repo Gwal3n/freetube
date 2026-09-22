@@ -1,6 +1,5 @@
 import SwiftUI
 import Kingfisher
-import UniformTypeIdentifiers
 
 /// Playlist context and recommendation queue shown below the expanded player's metadata.
 ///
@@ -22,6 +21,8 @@ struct PlayerQueueSections: View {
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
     @State private var draggedManualQueueVideoID: String?
+    @State private var manualQueueDragOriginIDs: [String] = []
+    @State private var lastManualQueueDragTargetID: String?
 
     private static let queueRowHeight: CGFloat = 56
     private static let queueRowFootprint: CGFloat = queueRowHeight + 8
@@ -111,23 +112,6 @@ struct PlayerQueueSections: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
-                            .onDrop(
-                                of: [UTType.text],
-                                delegate: ManualQueueDropDelegate(
-                                    targetVideoID: video.id,
-                                    draggedVideoID: $draggedManualQueueVideoID,
-                                    videoIDs: { player.manualQueue.map(\.id) },
-                                    move: { sourceID, targetID, placeAfter in
-                                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                                            player.moveManualQueue(
-                                                videoID: sourceID,
-                                                relativeTo: targetID,
-                                                placeAfterTarget: placeAfter
-                                            )
-                                        }
-                                    }
-                                )
-                            )
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
@@ -483,16 +467,7 @@ struct PlayerQueueSections: View {
                     .foregroundStyle(.tertiary)
                     .frame(width: 36, height: Self.queueRowHeight)
                     .contentShape(Rectangle())
-                    .onDrag {
-                        draggedManualQueueVideoID = video.id
-                        return NSItemProvider(object: video.id as NSString)
-                    } preview: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(12)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    }
+                    .gesture(manualQueueReorderGesture(for: video.id))
                     .accessibilityLabel("Reorder \(video.title)")
                     .accessibilityHint("Drag to change its position in the queue")
             }
@@ -516,31 +491,43 @@ struct PlayerQueueSections: View {
             .filter { !$0.isEmpty }
             .joined(separator: " • ")
     }
-}
 
-private struct ManualQueueDropDelegate: DropDelegate {
-    let targetVideoID: String
-    @Binding var draggedVideoID: String?
-    let videoIDs: () -> [String]
-    let move: (_ sourceID: String, _ targetID: String, _ placeAfter: Bool) -> Void
+    private func manualQueueReorderGesture(for videoID: String) -> some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .local)
+            .onChanged { value in
+                if draggedManualQueueVideoID == nil {
+                    draggedManualQueueVideoID = videoID
+                    manualQueueDragOriginIDs = player.manualQueue.map(\.id)
+                    lastManualQueueDragTargetID = videoID
+                }
+                guard draggedManualQueueVideoID == videoID,
+                      let sourceIndex = manualQueueDragOriginIDs.firstIndex(of: videoID),
+                      !manualQueueDragOriginIDs.isEmpty else { return }
 
-    func dropEntered(info: DropInfo) {
-        guard let sourceID = draggedVideoID,
-              sourceID != targetVideoID else { return }
+                let rowDelta = Int(
+                    (value.translation.height / Self.queueRowFootprint).rounded()
+                )
+                let targetIndex = min(
+                    max(0, sourceIndex + rowDelta),
+                    manualQueueDragOriginIDs.count - 1
+                )
+                let targetID = manualQueueDragOriginIDs[targetIndex]
+                guard targetID != videoID,
+                      targetID != lastManualQueueDragTargetID else { return }
 
-        let ids = videoIDs()
-        guard let sourceIndex = ids.firstIndex(of: sourceID),
-              let targetIndex = ids.firstIndex(of: targetVideoID) else { return }
-
-        move(sourceID, targetVideoID, sourceIndex < targetIndex)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggedVideoID = nil
-        return true
+                lastManualQueueDragTargetID = targetID
+                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                    player.moveManualQueue(
+                        videoID: videoID,
+                        relativeTo: targetID,
+                        placeAfterTarget: targetIndex > sourceIndex
+                    )
+                }
+            }
+            .onEnded { _ in
+                draggedManualQueueVideoID = nil
+                manualQueueDragOriginIDs = []
+                lastManualQueueDragTargetID = nil
+            }
     }
 }

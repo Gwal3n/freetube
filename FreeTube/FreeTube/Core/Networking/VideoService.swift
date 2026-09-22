@@ -240,8 +240,9 @@ final class VideoService: VideoServicing {
     private static func descriptionParts(
         from parts: [MoreVideoInfosResponse.YouTubeDescriptionPart]
     ) -> [VideoDescriptionPart] {
-        parts.compactMap { part in
-            guard let text = part.text, !text.isEmpty else { return nil }
+        var mapped: [VideoDescriptionPart] = []
+        for part in parts {
+            guard let text = part.text, !text.isEmpty else { continue }
             let action: VideoDescriptionPart.Action?
             if let seconds = Self.timestampSeconds(from: text) {
                 action = .seek(seconds)
@@ -255,8 +256,47 @@ final class VideoService: VideoServicing {
                 default: action = nil
                 }
             }
-            return VideoDescriptionPart(text: text, action: action)
+            mapped.append(VideoDescriptionPart(text: text, action: action))
         }
+        return repairingSplitTimestamps(in: mapped)
+    }
+
+    /// YouTube occasionally splits the first digit of a timestamp into the preceding plain-text
+    /// run (for example `"1" + "0:42"`). Join that digit run back onto the linked timestamp so
+    /// both its blue range and its seek destination describe the complete `10:42` value.
+    private static func repairingSplitTimestamps(
+        in parts: [VideoDescriptionPart]
+    ) -> [VideoDescriptionPart] {
+        var repaired: [VideoDescriptionPart] = []
+        for part in parts {
+            guard case .seek = part.action,
+                  part.text.split(separator: ":").count == 2,
+                  let previous = repaired.last,
+                  previous.action == nil else {
+                repaired.append(part)
+                continue
+            }
+
+            let trailingDigits = previous.text.reversed().prefix(while: \.isNumber).reversed()
+            guard !trailingDigits.isEmpty else {
+                repaired.append(part)
+                continue
+            }
+
+            let combinedText = String(trailingDigits) + part.text
+            guard let seconds = timestampSeconds(from: combinedText) else {
+                repaired.append(part)
+                continue
+            }
+
+            repaired.removeLast()
+            let prefix = String(previous.text.dropLast(trailingDigits.count))
+            if !prefix.isEmpty {
+                repaired.append(VideoDescriptionPart(text: prefix, action: nil))
+            }
+            repaired.append(VideoDescriptionPart(text: combinedText, action: .seek(seconds)))
+        }
+        return repaired
     }
 
     /// YouTube sometimes describes a timestamp as a video link instead of a chapter action. Its

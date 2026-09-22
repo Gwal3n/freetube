@@ -73,17 +73,12 @@ struct CustomPlayerControls: View {
                     .disabled(!hasPrevious)
                     .accessibilityLabel("Previous video")
                     Button(action: onTogglePlayPause) {
-                        Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
-                            .font(.system(size: 34, weight: .semibold))
+                        Image(systemName: hasEnded ? "arrow.counterclockwise.circle.fill" : (isPlaying ? "pause.circle.fill" : "play.circle.fill"))
+                            .font(.system(size: 48, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 68, height: 68)
                             .contentShape(Circle())
                             .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
-                            .contentTransition(.symbolEffect(.replace))
-                            .animation(
-                                reduceMotion ? nil : .linear(duration: 0.07),
-                                value: playbackSymbolState
-                            )
                     }
                     .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
                     Button(action: onNext) {
@@ -116,11 +111,6 @@ struct CustomPlayerControls: View {
         .accessibilityHidden(!isVisible && !isSeekPreviewActive)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
-    }
-
-    private var playbackSymbolState: Int {
-        if hasEnded { return 2 }
-        return isPlaying ? 1 : 0
     }
 
 }
