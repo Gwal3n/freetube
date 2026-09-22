@@ -21,6 +21,8 @@ struct FullScreenPlayer: View {
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
+    @State private var portraitFullscreenExitTranslation: CGFloat = 0
+    @State private var portraitFullscreenExitIsVertical: Bool?
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
@@ -240,6 +242,23 @@ struct FullScreenPlayer: View {
                     }
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
+                .scaleEffect(
+                    usesPortraitFullscreen
+                        ? portraitFullscreenExitScale(viewportHeight: proxy.size.height)
+                        : 1
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: usesPortraitFullscreen
+                            ? portraitFullscreenExitCornerRadius(viewportHeight: proxy.size.height)
+                            : 0,
+                        style: .continuous
+                    )
+                )
+                .offset(y: usesPortraitFullscreen ? portraitFullscreenExitTranslation : 0)
+                .simultaneousGesture(
+                    portraitFullscreenExitGesture(isActive: usesPortraitFullscreen)
+                )
                 .onAppear { showPlayerControls() }
                 .onChange(of: surfaceHeight, initial: true) { _, height in
                     player.expandedPlayerSurfaceHeight = height
@@ -250,6 +269,8 @@ struct FullScreenPlayer: View {
                     scrubberSeekPreview = nil
                     player.chapterListPresented = false
                     portraitVideoFullscreen = false
+                    portraitFullscreenExitTranslation = 0
+                    portraitFullscreenExitIsVertical = nil
                     panelScrollOffset = 0
                     player.playerPanelAtTop = true
                     if let videoID = player.currentVideo?.id {
@@ -351,6 +372,10 @@ struct FullScreenPlayer: View {
         }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
             player.playerPresentationGestureEnabled = !isActive
+            if !isActive {
+                portraitFullscreenExitTranslation = 0
+                portraitFullscreenExitIsVertical = nil
+            }
         }
         .onDisappear {
             player.playerPresentationGestureEnabled = true
@@ -399,6 +424,53 @@ struct FullScreenPlayer: View {
         case .idle, .downloading, .readyToPlay, .failed:
             return false
         }
+    }
+
+    private func portraitFullscreenExitScale(viewportHeight: CGFloat) -> CGFloat {
+        let progress = min(1, portraitFullscreenExitTranslation / max(1, viewportHeight * 0.35))
+        return 1 - progress * 0.035
+    }
+
+    private func portraitFullscreenExitCornerRadius(viewportHeight: CGFloat) -> CGFloat {
+        let progress = min(1, portraitFullscreenExitTranslation / max(1, viewportHeight * 0.24))
+        return progress * 20
+    }
+
+    private func portraitFullscreenExitGesture(isActive: Bool) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { value in
+                guard isActive else { return }
+                if portraitFullscreenExitIsVertical == nil {
+                    portraitFullscreenExitIsVertical = abs(value.translation.height)
+                        > abs(value.translation.width) * 1.15
+                }
+                guard portraitFullscreenExitIsVertical == true,
+                      value.translation.height > 0 else { return }
+
+                // Follow the finger after a short top-edge resistance, matching the expanded
+                // player's existing pull-down language without collapsing the whole player.
+                portraitFullscreenExitTranslation = max(0, value.translation.height - 10)
+            }
+            .onEnded { value in
+                defer { portraitFullscreenExitIsVertical = nil }
+                guard isActive, portraitFullscreenExitIsVertical == true else {
+                    portraitFullscreenExitTranslation = 0
+                    return
+                }
+
+                let predictedDownwardTravel = value.predictedEndTranslation.height
+                let isFlickingBackUp = predictedDownwardTravel
+                    < value.translation.height - 24
+                let shouldExit = !isFlickingBackUp
+                    && (portraitFullscreenExitTranslation > 92
+                        || predictedDownwardTravel > 190)
+                withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.88)) {
+                    portraitFullscreenExitTranslation = 0
+                    if shouldExit {
+                        portraitVideoFullscreen = false
+                    }
+                }
+            }
     }
 
     private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {
