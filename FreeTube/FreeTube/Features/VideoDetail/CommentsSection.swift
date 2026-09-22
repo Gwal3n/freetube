@@ -141,11 +141,17 @@ struct CommentsSection: View {
                             .controlSize(.small)
                             .padding(.leading, 32)
                     } else {
-                        ForEach(model.repliesByCommentID[comment.id] ?? []) { reply in
+                        let replies = model.repliesByCommentID[comment.id] ?? []
+                        let replyDepths = inferredReplyDepths(parent: comment, replies: replies)
+                        ForEach(replies) { reply in
                             HStack(alignment: .top, spacing: 8) {
-                                Capsule()
-                                    .fill(Color.secondary.opacity(0.22))
-                                    .frame(width: 2)
+                                HStack(spacing: 5) {
+                                    ForEach(0..<replyDepths[reply.id, default: 1], id: \.self) { _ in
+                                        Capsule()
+                                            .fill(Color.secondary.opacity(0.20))
+                                            .frame(width: 2)
+                                    }
+                                }
                                 CommentRow(comment: reply)
                             }
                             .padding(.leading, 20)
@@ -184,6 +190,44 @@ struct CommentsSection: View {
                 Task { await model.loadReplies(for: comment) }
             }
         }
+    }
+
+    /// YouTube's replies endpoint is flat and does not expose a parent-comment identifier. A
+    /// leading @mention is the only relationship retained in the text, so use it to reconstruct a
+    /// conservative visual tree. Unknown mentions receive one extra level, while known authors
+    /// inherit their most recent depth. Capping at three keeps narrow screens readable.
+    private func inferredReplyDepths(parent: Comment, replies: [Comment]) -> [String: Int] {
+        var authorDepths: [String: Int] = [normalizedAuthor(parent.authorName): 0]
+        var depths: [String: Int] = [:]
+
+        for reply in replies {
+            let depth: Int
+            if let mention = leadingMention(in: reply.bodyText) {
+                let mentionedDepth = authorDepths[normalizedAuthor(mention)] ?? 1
+                depth = min(3, max(1, mentionedDepth + 1))
+            } else {
+                depth = 1
+            }
+            depths[reply.id] = depth
+            authorDepths[normalizedAuthor(reply.authorName)] = depth
+        }
+        return depths
+    }
+
+    private func leadingMention(in text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.first == "@" else { return nil }
+        let mention = trimmed.dropFirst().prefix { character in
+            !character.isWhitespace && character != ":" && character != ","
+        }
+        return mention.isEmpty ? nil : String(mention)
+    }
+
+    private func normalizedAuthor(_ author: String) -> String {
+        author
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+            .lowercased()
     }
 
     private func toggleComments() {
