@@ -103,6 +103,9 @@ final class PlayerDetailsModel {
         } else if let views = video.viewCount, views > 0 {
             parts.append("\(Self.formatCount(views)) views")
         }
+        if let count = details?.likeCount, count > 0 {
+            parts.append("\(Self.formatCount(count)) likes")
+        }
         if let uploadDate = details?.uploadDateText?.trimmingCharacters(in: .whitespacesAndNewlines),
            !uploadDate.isEmpty {
             parts.append("Uploaded \(uploadDate)")
@@ -110,9 +113,6 @@ final class PlayerDetailsModel {
             parts.append("Uploaded \(published.formatted(date: .abbreviated, time: .omitted))")
         } else if let relative = video.publishedRelative, !relative.isEmpty {
             parts.append("Uploaded \(relative)")
-        }
-        if let count = details?.likeCount, count > 0 {
-            parts.append("\(Self.formatCount(count)) likes")
         }
         return parts.joined(separator: " • ")
     }

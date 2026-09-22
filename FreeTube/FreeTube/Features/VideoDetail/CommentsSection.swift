@@ -273,7 +273,7 @@ struct CommentsSection: View {
         var ordered: [PresentedReply] = []
         func appendChildren(of parentID: String, depth: Int) {
             for reply in children[parentID] ?? [] {
-                ordered.append(PresentedReply(comment: reply, depth: min(3, depth)))
+                ordered.append(PresentedReply(comment: reply, depth: min(5, depth)))
                 appendChildren(of: reply.id, depth: depth + 1)
             }
         }

@@ -94,24 +94,43 @@ struct SwiftUIMiniPlayer: View {
 
     @ViewBuilder
     private var artwork: some View {
-        if case .downloading = player.loadState {
-            Image(systemName: "arrow.down.circle.fill")
-                .resizable()
-                .scaledToFit()
-                .padding(10)
-                .background(.quaternary)
-        } else if let thumbnail {
-            Image(uiImage: thumbnail)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .clipped()
-        } else {
-            Image(systemName: "play.rectangle.fill")
-                .resizable()
-                .scaledToFit()
-                .padding(10)
-                .background(.quaternary)
+        ZStack {
+            if case .downloading = player.loadState {
+                Image(systemName: "arrow.down.circle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(10)
+                    .background(.quaternary)
+            } else if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .clipped()
+            } else {
+                Image(systemName: "play.rectangle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(10)
+                    .background(.quaternary)
+            }
+
+            if isPreparingPlayback {
+                PlaybackActivityIndicator(size: 17, lineWidth: 2.5)
+                    .padding(6)
+                    .background(.black.opacity(0.42), in: Circle())
+                    .transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isPreparingPlayback)
+    }
+
+    private var isPreparingPlayback: Bool {
+        switch player.loadState {
+        case .resolving, .buffering:
+            return true
+        case .idle, .downloading, .readyToPlay, .failed:
+            return false
         }
     }
 

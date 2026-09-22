@@ -72,17 +72,21 @@ struct PlayerQueueSections: View {
                             if isClearQueueArmed {
                                 Text("Clear")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.red)
-                                    .padding(.horizontal, 10)
-                                    .background(.red.opacity(0.12), in: Capsule())
+                                    .foregroundStyle(.white)
+                                    .transition(.blurReplace)
                             } else {
                                 Image(systemName: "trash")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.secondary)
+                                    .transition(.blurReplace)
                             }
                         }
-                        .frame(minWidth: MediaStyle.actionSize, minHeight: MediaStyle.actionSize)
+                        .frame(minWidth: 56, minHeight: MediaStyle.actionSize)
                         .contentShape(Capsule())
+                        .animation(
+                            reduceMotion ? nil : InterfaceMotion.quick,
+                            value: isClearQueueArmed
+                        )
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel(isClearQueueArmed ? "Confirm clear queue" : "Clear queue")

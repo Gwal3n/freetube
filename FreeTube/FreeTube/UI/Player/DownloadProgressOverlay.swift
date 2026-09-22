@@ -34,10 +34,7 @@ struct DownloadProgressOverlay: View {
     /// `AVPlayerViewController`'s controls.
     @ViewBuilder
     private var startupIndicator: some View {
-        ProgressView()
-            .progressViewStyle(.circular)
-            .tint(.white)
-            .scaleEffect(1.25)
+        PlaybackActivityIndicator(size: 30, lineWidth: 3.5)
             .padding(12)
             .background(.black.opacity(0.58), in: Circle())
             .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
@@ -88,5 +85,31 @@ struct DownloadProgressOverlay: View {
             return "Downloading \(phase) \(percent)%"
         }
         return "Downloading \(percent)%"
+    }
+}
+
+/// A crisp indeterminate ring shared by the expanded and mini players. Timeline-driven rotation
+/// avoids lifecycle-sensitive repeat-forever animation state and pauses cleanly for Reduce Motion.
+struct PlaybackActivityIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let size: CGFloat
+    let lineWidth: CGFloat
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion)) { context in
+            let rotation = reduceMotion
+                ? 0
+                : context.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: 0.85) / 0.85 * 360
+            Circle()
+                .trim(from: 0.08, to: 0.82)
+                .stroke(
+                    Color.white,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(rotation))
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel("Preparing video")
     }
 }
