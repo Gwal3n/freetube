@@ -95,12 +95,18 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    NavigationLink(value: Destination.sponsorBlock) {
-                        LabeledContent("Categories and behavior") {
+                    Button {
+                        path.append(.sponsorBlock)
+                    } label: {
+                        HStack {
+                            Text("Categories and behavior")
+                            Spacer()
                             Text(model.sponsorBlockEnabled ? "On" : "Off")
                                 .foregroundStyle(.secondary)
+                            navigationChevron
                         }
                     }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("SponsorBlock")
                 } footer: {
@@ -108,15 +114,21 @@ struct SettingsScreen: View {
                 }
 
                 Section("Player controls") {
-                    NavigationLink(value: Destination.playerControls) {
-                        Label("Customize controls", systemImage: "slider.horizontal.3")
+                    Button {
+                        path.append(.playerControls)
+                    } label: {
+                        navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
+                    .buttonStyle(.plain)
                 }
 
                 Section("Data") {
-                    NavigationLink(value: Destination.importData) {
-                        Label("Import Data", systemImage: "square.and.arrow.down")
+                    Button {
+                        path.append(.importData)
+                    } label: {
+                        navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
+                    .buttonStyle(.plain)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
@@ -291,5 +303,21 @@ struct SettingsScreen: View {
                 Text("This removes watch history stored by FreeTube on this device.")
             }
         }
+    }
+
+    private var navigationChevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.tertiary)
+    }
+
+    private func navigationLabel(_ title: String, systemImage: String) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            navigationChevron
+        }
+        .foregroundStyle(.primary)
+        .contentShape(Rectangle())
     }
 }

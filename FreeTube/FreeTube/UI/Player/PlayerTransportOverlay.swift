@@ -10,6 +10,7 @@ struct PlayerTransportOverlay: View {
     @Environment(PlayerStateManager.self) private var player
 
     let isVisible: Bool
+    let isPreparing: Bool
     let isSeekPreviewActive: Bool
     let previewElapsed: TimeInterval?
     let hasPrevious: Bool
@@ -31,6 +32,7 @@ struct PlayerTransportOverlay: View {
     var body: some View {
         CustomPlayerControls(
             isVisible: isVisible,
+            isPreparing: isPreparing,
             isSeekPreviewActive: isSeekPreviewActive,
             isPlaying: player.isPlaying,
             hasEnded: player.hasEnded,

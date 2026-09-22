@@ -99,7 +99,7 @@ struct CommentsSection: View {
 
     @ViewBuilder
     private var header: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             Button {
                 toggleComments()
             } label: {
@@ -112,8 +112,8 @@ struct CommentsSection: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
 
-            if model.sortingModes.count > 1 {
-                Menu {
+            Menu {
+                if model.sortingModes.count > 1 {
                     ForEach(model.sortingModes) { mode in
                         Button {
                             if !isExpanded {
@@ -131,18 +131,20 @@ struct CommentsSection: View {
                             }
                         }
                     }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                        .contentShape(Circle())
+                } else {
+                    Text("Sort options load with comments")
                 }
-                .buttonStyle(ResponsiveButtonStyle())
-                .disabled(model.isLoading)
-                .accessibilityLabel("Sort comments")
-                .accessibilityValue(selectedSortingModeLabel)
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Circle())
             }
+            .buttonStyle(ResponsiveButtonStyle())
+            .disabled(model.isLoading)
+            .accessibilityLabel("Sort comments")
+            .accessibilityValue(selectedSortingModeLabel)
 
             Button {
                 toggleComments()
@@ -157,6 +159,7 @@ struct CommentsSection: View {
             .buttonStyle(ResponsiveButtonStyle())
             .accessibilityLabel(isExpanded ? "Collapse comments" : "Expand comments")
         }
+        .frame(minHeight: 44)
         .padding(.horizontal)
     }
 

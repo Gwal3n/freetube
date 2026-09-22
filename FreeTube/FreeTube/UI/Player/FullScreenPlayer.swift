@@ -123,7 +123,8 @@ struct FullScreenPlayer: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
                     PlayerTransportOverlay(
-                        isVisible: controlsVisibility.isVisible && !isPreparingPlayback,
+                        isVisible: controlsVisibility.isVisible,
+                        isPreparing: isPreparingPlayback,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
                         previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
                         hasPrevious: hasPrevious,
@@ -197,9 +198,12 @@ struct FullScreenPlayer: View {
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
                     .position(x: controlFrame.midX, y: controlFrame.midY)
-                    // Loading feedback must remain above transport chrome. During startup the
-                    // transport controls are hidden so the centre play glyph cannot obscure it.
-                    DownloadProgressOverlay(state: player.loadState)
+                    // Long-running fallback downloads and failures retain their explanatory
+                    // overlay. Brief startup waits replace the centre transport glyph instead,
+                    // keeping the surrounding player chrome stable and avoiding a dark badge.
+                    if !isPreparingPlayback {
+                        DownloadProgressOverlay(state: player.loadState)
+                    }
                     if let previewTime = scrubberSeekPreview,
                        let tile = player.storyboard?.tile(
                            at: previewTime,

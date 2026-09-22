@@ -4,6 +4,7 @@ import SwiftUI
 struct CustomPlayerControls: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isVisible: Bool
+    let isPreparing: Bool
     let isSeekPreviewActive: Bool
     let isPlaying: Bool
     let hasEnded: Bool
@@ -72,20 +73,30 @@ struct CustomPlayerControls: View {
                     }
                     .disabled(!hasPrevious)
                     .accessibilityLabel("Previous video")
-                    Button(action: onTogglePlayPause) {
-                        Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 68, height: 68)
-                            .contentShape(Circle())
-                            .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
-                            .contentTransition(.symbolEffect(.replace))
-                            .animation(
-                                reduceMotion ? nil : .linear(duration: 0.07),
-                                value: playbackSymbolState
-                            )
+                    Group {
+                        if isPreparing {
+                            PlaybackActivityIndicator(size: 34, lineWidth: 3.5)
+                                .frame(width: 68, height: 68)
+                                .allowsHitTesting(false)
+                                .accessibilityLabel("Preparing video")
+                        } else {
+                            Button(action: onTogglePlayPause) {
+                                Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
+                                    .font(.system(size: 34, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 68, height: 68)
+                                    .contentShape(Circle())
+                                    .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
+                                    .contentTransition(.symbolEffect(.replace))
+                                    .animation(
+                                        reduceMotion ? nil : .linear(duration: 0.07),
+                                        value: playbackSymbolState
+                                    )
+                            }
+                            .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
+                        }
                     }
-                    .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
+                    .frame(width: 68, height: 68)
                     Button(action: onNext) {
                         Image(systemName: "forward.end.fill").playerCenterControl()
                     }
@@ -112,7 +123,7 @@ struct CustomPlayerControls: View {
                 .opacity(isVisible || isSeekPreviewActive ? 1 : 0)
             }
         }
-        .allowsHitTesting(isVisible)
+        .allowsHitTesting(isVisible && !isPreparing)
         .accessibilityHidden(!isVisible && !isSeekPreviewActive)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
