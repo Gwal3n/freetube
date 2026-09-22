@@ -448,7 +448,6 @@ struct FullScreenPlayer: View {
                     statsText: detailsModel.statsText(for: video),
                     descriptionText: detailsModel.description(for: video),
                     descriptionParts: detailsModel.details?.descriptionParts ?? [],
-                    likesText: detailsModel.likesText,
                     commentsCountText: detailsModel.commentsCountText(
                         fallback: player.commentsCountText
                     ),

@@ -11,7 +11,6 @@ struct PlayerInformationPanel<Actions: View>: View {
     let statsText: String
     let descriptionText: String?
     let descriptionParts: [VideoDescriptionPart]
-    let likesText: String?
     let commentsCountText: String?
     let isDetailsExpanded: Bool
     let isLoadingDetails: Bool
@@ -32,7 +31,6 @@ struct PlayerInformationPanel<Actions: View>: View {
         statsText: String,
         descriptionText: String?,
         descriptionParts: [VideoDescriptionPart],
-        likesText: String?,
         commentsCountText: String?,
         isDetailsExpanded: Bool,
         isLoadingDetails: Bool,
@@ -52,7 +50,6 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.statsText = statsText
         self.descriptionText = descriptionText
         self.descriptionParts = descriptionParts
-        self.likesText = likesText
         self.commentsCountText = commentsCountText
         self.isDetailsExpanded = isDetailsExpanded
         self.isLoadingDetails = isLoadingDetails
@@ -85,7 +82,6 @@ struct PlayerInformationPanel<Actions: View>: View {
             PlayerDescription(
                 text: descriptionText,
                 parts: descriptionParts,
-                likesText: likesText,
                 isExpanded: isDetailsExpanded,
                 isLoading: isLoadingDetails,
                 loadFailed: detailsLoadFailed,

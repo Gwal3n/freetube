@@ -111,12 +111,10 @@ final class PlayerDetailsModel {
         } else if let relative = video.publishedRelative, !relative.isEmpty {
             parts.append("Uploaded \(relative)")
         }
+        if let count = details?.likeCount, count > 0 {
+            parts.append("\(Self.formatCount(count)) likes")
+        }
         return parts.joined(separator: " • ")
-    }
-
-    var likesText: String? {
-        guard let count = details?.likeCount, count > 0 else { return nil }
-        return Self.formatCount(count)
     }
 
     func commentsCountText(fallback: String?) -> String? {

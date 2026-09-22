@@ -5,7 +5,6 @@ import SwiftUI
 struct PlayerDescription: View {
     let text: String?
     let parts: [VideoDescriptionPart]
-    let likesText: String?
     let isExpanded: Bool
     let isLoading: Bool
     let loadFailed: Bool
@@ -30,9 +29,6 @@ struct PlayerDescription: View {
                             .font(.caption.weight(.semibold))
                             .buttonStyle(.bordered)
                     }
-                }
-                if let likesText {
-                    Text("\(likesText) likes").font(.caption).foregroundStyle(.secondary)
                 }
             } else if let text {
                 Button(action: onExpand) {
