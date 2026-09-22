@@ -143,7 +143,9 @@ final class VideoService: VideoServicing {
                 video: video,
                 descriptionText: descriptionText,
                 descriptionParts: descriptionParts,
-                likeCount: response.likesCount.defaultState.flatMap { Int($0) },
+                likeCount: Self.count(
+                    from: response.likesCount.defaultState ?? response.likesCount.clickedState
+                ),
                 isLikedByUser: response.authenticatedInfos?.likeStatus == .liked,
                 isDislikedByUser: response.authenticatedInfos?.likeStatus == .disliked,
                 recommended: recommended,
@@ -313,6 +315,30 @@ final class VideoService: VideoServicing {
         guard let hours = Int(components[0]),
               let minutes = Int(components[1]), minutes < 60 else { return nil }
         return TimeInterval(hours * 3600 + minutes * 60 + seconds)
+    }
+
+    /// YouTube commonly returns compact counts (`48K`, `1.2M`) rather than integer strings.
+    private static func count(from text: String?) -> Int? {
+        guard var value = text?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(), !value.isEmpty else { return nil }
+        value = value.replacingOccurrences(of: ",", with: "")
+        let numberText = value.prefix { $0.isNumber || $0 == "." }
+        guard !numberText.isEmpty else { return nil }
+        let suffix = value.dropFirst(numberText.count)
+            .first(where: { !$0.isWhitespace })
+        let multiplier: Double
+        if suffix == "k" {
+            multiplier = 1_000
+        } else if suffix == "m" {
+            multiplier = 1_000_000
+        } else if suffix == "b" {
+            multiplier = 1_000_000_000
+        } else {
+            multiplier = 1
+        }
+        guard let number = Double(numberText), number >= 0 else { return nil }
+        return Int((number * multiplier).rounded())
     }
 
     /// MoreVideoInfos uses YouTube's tracking redirect for many ordinary links. Opening its `q`

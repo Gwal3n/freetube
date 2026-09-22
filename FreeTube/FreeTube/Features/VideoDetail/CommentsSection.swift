@@ -106,7 +106,8 @@ struct CommentsSection: View {
                 PlayerSectionHeading(
                     title: "Comments",
                     detail: normalizedCountText,
-                    isExpanded: isExpanded
+                    isExpanded: isExpanded,
+                    showsDisclosureIndicator: false
                 )
             }
             .buttonStyle(ResponsiveButtonStyle())
@@ -142,6 +143,19 @@ struct CommentsSection: View {
                 .accessibilityLabel("Sort comments")
                 .accessibilityValue(selectedSortingModeLabel)
             }
+
+            Button {
+                toggleComments()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel(isExpanded ? "Collapse comments" : "Expand comments")
         }
         .padding(.horizontal)
     }
@@ -180,17 +194,16 @@ struct CommentsSection: View {
                             .padding(.leading, 32)
                     } else {
                         let replies = model.repliesByCommentID[comment.id] ?? []
-                        let replyDepths = inferredReplyDepths(parent: comment, replies: replies)
-                        ForEach(replies) { reply in
+                        ForEach(orderedReplies(parent: comment, replies: replies)) { item in
                             HStack(alignment: .top, spacing: 8) {
                                 HStack(spacing: 5) {
-                                    ForEach(0..<replyDepths[reply.id, default: 1], id: \.self) { _ in
+                                    ForEach(0..<item.depth, id: \.self) { _ in
                                         Capsule()
                                             .fill(Color.secondary.opacity(0.20))
                                             .frame(width: 2)
                                     }
                                 }
-                                CommentRow(comment: reply)
+                                CommentRow(comment: item.comment)
                             }
                             .padding(.leading, 20)
                         }
@@ -200,12 +213,17 @@ struct CommentsSection: View {
                                 .controlSize(.small)
                                 .padding(.leading, 32)
                         } else if model.replyContinuationTokens[comment.id] != nil {
-                            Button("Load more replies") {
+                            Button {
                                 Task { await model.loadMoreReplies(for: comment) }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.down")
+                                    Text("Load more replies")
+                                }
+                                .font(.caption)
                             }
-                            .font(.caption.weight(.semibold))
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.primary)
                             .padding(.leading, 32)
                         }
                     }
@@ -230,35 +248,54 @@ struct CommentsSection: View {
         }
     }
 
-    /// YouTube's replies endpoint is flat and does not expose a parent-comment identifier. A
-    /// leading @mention is the only relationship retained in the text, so use it to reconstruct a
-    /// conservative visual tree. Unknown mentions receive one extra level, while known authors
-    /// inherit their most recent depth. Capping at three keeps narrow screens readable.
-    private func inferredReplyDepths(parent: Comment, replies: [Comment]) -> [String: Int] {
-        var authorDepths: [String: Int] = [normalizedAuthor(parent.authorName): 0]
-        var depths: [String: Int] = [:]
-
-        for reply in replies {
-            let depth: Int
-            if let mention = leadingMention(in: reply.bodyText) {
-                let mentionedDepth = authorDepths[normalizedAuthor(mention)] ?? 1
-                depth = min(3, max(1, mentionedDepth + 1))
-            } else {
-                depth = 1
-            }
-            depths[reply.id] = depth
-            authorDepths[normalizedAuthor(reply.authorName)] = depth
-        }
-        return depths
+    private struct PresentedReply: Identifiable {
+        let comment: Comment
+        let depth: Int
+        var id: String { comment.id }
     }
 
-    private func leadingMention(in text: String) -> String? {
+    /// Reconstruct a conservative tree from leading mentions, then emit every child directly
+    /// beneath its parent. The endpoint itself supplies only a flat reply array.
+    private func orderedReplies(parent: Comment, replies: [Comment]) -> [PresentedReply] {
+        let rootID = parent.id
+        var latestCommentIDByAuthor = [normalizedAuthor(parent.authorName): rootID]
+        var children: [String: [Comment]] = [:]
+
+        for reply in replies {
+            let mentionedParentID = mentionedAuthor(
+                in: reply.bodyText,
+                candidates: latestCommentIDByAuthor.keys
+            ).flatMap { latestCommentIDByAuthor[$0] }
+            children[mentionedParentID ?? rootID, default: []].append(reply)
+            latestCommentIDByAuthor[normalizedAuthor(reply.authorName)] = reply.id
+        }
+
+        var ordered: [PresentedReply] = []
+        func appendChildren(of parentID: String, depth: Int) {
+            for reply in children[parentID] ?? [] {
+                ordered.append(PresentedReply(comment: reply, depth: min(3, depth)))
+                appendChildren(of: reply.id, depth: depth + 1)
+            }
+        }
+        appendChildren(of: rootID, depth: 1)
+        return ordered
+    }
+
+    private func mentionedAuthor(
+        in text: String,
+        candidates: Dictionary<String, String>.Keys
+    ) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.first == "@" else { return nil }
-        let mention = trimmed.dropFirst().prefix { character in
-            !character.isWhitespace && character != ":" && character != ","
+        let mentionText = trimmed.dropFirst().lowercased()
+        return candidates.sorted { $0.count > $1.count }.first { candidate in
+            guard mentionText.hasPrefix(candidate) else { return false }
+            let boundary = mentionText.dropFirst(candidate.count).first
+            return boundary == nil
+                || boundary?.isWhitespace == true
+                || boundary == ":"
+                || boundary == ","
         }
-        return mention.isEmpty ? nil : String(mention)
     }
 
     private func normalizedAuthor(_ author: String) -> String {

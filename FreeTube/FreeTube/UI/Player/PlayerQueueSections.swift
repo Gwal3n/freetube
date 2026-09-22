@@ -20,9 +20,7 @@ struct PlayerQueueSections: View {
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
-    @State private var draggedManualQueueVideoID: String?
-    @State private var manualQueueDragOriginIDs: [String] = []
-    @State private var lastManualQueueDragTargetID: String?
+    @State private var isClearQueueArmed = false
 
     private static let queueRowHeight: CGFloat = 56
     private static let queueRowFootprint: CGFloat = queueRowHeight + 8
@@ -61,19 +59,33 @@ struct PlayerQueueSections: View {
                     }
                     .buttonStyle(ResponsiveButtonStyle())
 
-                    Button(role: .destructive) {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                    Button {
+                        if isClearQueueArmed {
                             player.clearManualQueue()
+                        } else {
+                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                                isClearQueueArmed = true
+                            }
                         }
                     } label: {
-                        Image(systemName: "trash")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                            .contentShape(Circle())
+                        Group {
+                            if isClearQueueArmed {
+                                Text("Clear")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 10)
+                                    .background(.red.opacity(0.12), in: Capsule())
+                            } else {
+                                Image(systemName: "trash")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(minWidth: MediaStyle.actionSize, minHeight: MediaStyle.actionSize)
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel("Clear queue")
+                    .accessibilityLabel(isClearQueueArmed ? "Confirm clear queue" : "Clear queue")
 
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
@@ -98,7 +110,6 @@ struct PlayerQueueSections: View {
                             queueRow(
                                 video,
                                 preservesPlaylistContext: false,
-                                showsReorderHandle: true,
                                 onPlay: {
                                     player.removeFromManualQueue(videoID: video.id)
                                     player.load(video)
@@ -117,10 +128,14 @@ struct PlayerQueueSections: View {
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
+                        .onMove { offsets, destination in
+                            player.moveManualQueue(fromOffsets: offsets, toOffset: destination)
+                        }
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(true)
+                    .environment(\.editMode, .constant(.active))
                     .frame(height: manualQueueListHeight)
                     .transition(.opacity)
                 }
@@ -390,7 +405,6 @@ struct PlayerQueueSections: View {
     private func queueRow(
         _ video: Video,
         preservesPlaylistContext: Bool,
-        showsReorderHandle: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemove: (() -> Void)? = nil
     ) -> some View {
@@ -461,17 +475,6 @@ struct PlayerQueueSections: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
 
-            if showsReorderHandle {
-                Image(systemName: "line.3.horizontal")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 36, height: Self.queueRowHeight)
-                    .contentShape(Rectangle())
-                    .gesture(manualQueueReorderGesture(for: video.id))
-                    .accessibilityLabel("Reorder \(video.title)")
-                    .accessibilityHint("Drag to change its position in the queue")
-            }
-
             VideoMoreActionsMenu(
                 video: video,
                 offersPlayNext: !preservesPlaylistContext,
@@ -492,42 +495,4 @@ struct PlayerQueueSections: View {
             .joined(separator: " • ")
     }
 
-    private func manualQueueReorderGesture(for videoID: String) -> some Gesture {
-        DragGesture(minimumDistance: 2, coordinateSpace: .local)
-            .onChanged { value in
-                if draggedManualQueueVideoID == nil {
-                    draggedManualQueueVideoID = videoID
-                    manualQueueDragOriginIDs = player.manualQueue.map(\.id)
-                    lastManualQueueDragTargetID = videoID
-                }
-                guard draggedManualQueueVideoID == videoID,
-                      let sourceIndex = manualQueueDragOriginIDs.firstIndex(of: videoID),
-                      !manualQueueDragOriginIDs.isEmpty else { return }
-
-                let rowDelta = Int(
-                    (value.translation.height / Self.queueRowFootprint).rounded()
-                )
-                let targetIndex = min(
-                    max(0, sourceIndex + rowDelta),
-                    manualQueueDragOriginIDs.count - 1
-                )
-                let targetID = manualQueueDragOriginIDs[targetIndex]
-                guard targetID != videoID,
-                      targetID != lastManualQueueDragTargetID else { return }
-
-                lastManualQueueDragTargetID = targetID
-                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                    player.moveManualQueue(
-                        videoID: videoID,
-                        relativeTo: targetID,
-                        placeAfterTarget: targetIndex > sourceIndex
-                    )
-                }
-            }
-            .onEnded { _ in
-                draggedManualQueueVideoID = nil
-                manualQueueDragOriginIDs = []
-                lastManualQueueDragTargetID = nil
-            }
-    }
 }

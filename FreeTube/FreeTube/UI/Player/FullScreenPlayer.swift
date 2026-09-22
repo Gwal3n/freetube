@@ -112,7 +112,6 @@ struct FullScreenPlayer: View {
                         isInteractionEnabled: player.fullScreenPresented
                     )
                     PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
-                    DownloadProgressOverlay(state: player.loadState)
                     Color.black
                         .opacity(controlsVisibility.isVisible ? 0.28 : 0)
                         // Dim the stable player surface rather than AVPlayer's presentation rect.
@@ -122,7 +121,7 @@ struct FullScreenPlayer: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
                     PlayerTransportOverlay(
-                        isVisible: controlsVisibility.isVisible,
+                        isVisible: controlsVisibility.isVisible && !isPreparingPlayback,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
                         previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
                         hasPrevious: hasPrevious,
@@ -196,6 +195,9 @@ struct FullScreenPlayer: View {
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
                     .position(x: controlFrame.midX, y: controlFrame.midY)
+                    // Loading feedback must remain above transport chrome. During startup the
+                    // transport controls are hidden so the centre play glyph cannot obscure it.
+                    DownloadProgressOverlay(state: player.loadState)
                     if let previewTime = scrubberSeekPreview,
                        let tile = player.storyboard?.tile(
                            at: previewTime,
@@ -388,6 +390,15 @@ struct FullScreenPlayer: View {
         let size = player.videoPresentationSize
         if size.width > 0, size.height > 0 { return size.height > size.width }
         return player.currentVideo?.isShort == true
+    }
+
+    private var isPreparingPlayback: Bool {
+        switch player.loadState {
+        case .resolving, .buffering:
+            return true
+        case .idle, .downloading, .readyToPlay, .failed:
+            return false
+        }
     }
 
     private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {

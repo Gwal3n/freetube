@@ -55,10 +55,12 @@ struct SwiftUIMiniPlayer: View {
                 Button {
                     player.togglePlayPause()
                 } label: {
-                    Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 25, weight: .semibold))
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(primaryForeground)
                         .frame(width: MediaStyle.actionSize, height: 50)
+                        .contentTransition(.symbolEffect(.replace))
+                        .animation(reduceMotion ? nil : .linear(duration: 0.07), value: player.isPlaying)
                 }
                 .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
@@ -92,46 +94,24 @@ struct SwiftUIMiniPlayer: View {
 
     @ViewBuilder
     private var artwork: some View {
-        ZStack {
-            if case .downloading = player.loadState {
-                Image(systemName: "arrow.down.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(10)
-                    .background(.quaternary)
-            } else if let thumbnail {
-                Image(uiImage: thumbnail)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .clipped()
-            } else {
-                Image(systemName: "play.rectangle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(10)
-                    .background(.quaternary)
-            }
-
-            if isPreparingPlayback {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(.white)
-                    .padding(7)
-                    .background(.black.opacity(0.48), in: Circle())
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    .accessibilityLabel("Preparing video")
-            }
-        }
-        .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isPreparingPlayback)
-    }
-
-    private var isPreparingPlayback: Bool {
-        switch player.loadState {
-        case .resolving, .buffering:
-            return true
-        case .idle, .downloading, .readyToPlay, .failed:
-            return false
+        if case .downloading = player.loadState {
+            Image(systemName: "arrow.down.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .padding(10)
+                .background(.quaternary)
+        } else if let thumbnail {
+            Image(uiImage: thumbnail)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .clipped()
+        } else {
+            Image(systemName: "play.rectangle.fill")
+                .resizable()
+                .scaledToFit()
+                .padding(10)
+                .background(.quaternary)
         }
     }
 

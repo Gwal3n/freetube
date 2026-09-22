@@ -620,21 +620,18 @@ final class PlayerStateManager {
         persistManualQueue()
     }
 
-    func moveManualQueue(videoID: String, relativeTo targetID: String, placeAfterTarget: Bool) {
-        guard videoID != targetID,
-              let sourceIndex = manualQueue.firstIndex(where: { $0.id == videoID }),
-              manualQueue.contains(where: { $0.id == targetID }) else { return }
-
-        let video = manualQueue.remove(at: sourceIndex)
-        guard let targetIndex = manualQueue.firstIndex(where: { $0.id == targetID }) else {
-            manualQueue.insert(video, at: min(sourceIndex, manualQueue.endIndex))
-            return
+    func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        guard !offsets.isEmpty else { return }
+        let videos = offsets.sorted().map { manualQueue[$0] }
+        for index in offsets.sorted(by: >) {
+            manualQueue.remove(at: index)
         }
+        let removedBeforeDestination = offsets.filter { $0 < destination }.count
         let insertionIndex = min(
-            targetIndex + (placeAfterTarget ? 1 : 0),
+            max(0, destination - removedBeforeDestination),
             manualQueue.endIndex
         )
-        manualQueue.insert(video, at: insertionIndex)
+        manualQueue.insert(contentsOf: videos, at: insertionIndex)
         persistManualQueue()
     }
 
