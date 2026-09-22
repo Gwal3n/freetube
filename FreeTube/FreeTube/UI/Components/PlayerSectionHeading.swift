@@ -25,7 +25,8 @@ struct PlayerSectionHeading: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .frame(width: 18, height: 18)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Circle())
             }
         }
         .frame(minHeight: 44)

@@ -57,9 +57,11 @@ struct FullScreenPlayer: View {
                     width: surfaceWidth,
                     presentationSize: player.videoPresentationSize
                 )
-            let expandedSurfaceHeight = usesPortraitFullscreen || isLandscape
-                ? compactSurfaceHeight
-                : PlayerViewportLayout.expandedSurfaceHeight(
+            let expandedSurfaceHeight = usesPortraitFullscreen
+                ? proxy.size.height
+                : isLandscape
+                    ? compactSurfaceHeight
+                    : PlayerViewportLayout.expandedSurfaceHeight(
                     width: surfaceWidth,
                     viewportHeight: proxy.size.height,
                     isLandscape: isLandscape,

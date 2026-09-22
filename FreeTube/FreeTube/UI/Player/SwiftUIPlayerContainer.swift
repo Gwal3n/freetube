@@ -67,8 +67,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // transition. Once settled in mini mode it is fully off-screen, but must
                         // also leave hit testing explicitly so it cannot intercept Library rows
                         // through its original hosting-controller bounds.
-                        .allowsHitTesting(player.fullScreenPresented)
                         .simultaneousGesture(expandedPresentationGesture(in: proxy.size))
+                        // Keep this outermost. Gesture modifiers install their own hit-test
+                        // participation, so disabling the content before attaching the drag still
+                        // allowed the off-screen recognizer to cancel List and Form row taps.
+                        .allowsHitTesting(player.fullScreenPresented)
 
                     SwiftUIMiniPlayer(
                         thumbnail: thumbnail,
@@ -83,9 +86,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                                 + miniHandoffOffset(for: transition)
                         )
                         .opacity(miniOpacity(for: transition) * miniDismissOpacity)
-                        .allowsHitTesting(!player.fullScreenPresented)
                         .zIndex(3)
                         .simultaneousGesture(miniPlayerGesture(in: proxy.size))
+                        .allowsHitTesting(!player.fullScreenPresented)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)

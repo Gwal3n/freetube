@@ -15,7 +15,9 @@ struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var selectedTab: Tab = .feed
+    // A system picker temporarily deactivates and may reconstruct the tab hierarchy. Scene-backed
+    // selection prevents that lifecycle boundary from snapping the app back to Feed.
+    @SceneStorage("selectedRootTab") private var selectedTabRaw = Tab.feed.rawValue
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var feedNavigationRequest: AppNavigationRequest?
@@ -30,8 +32,12 @@ struct RootView: View {
     /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
     @State private var thumbnail: UIImage?
 
-    enum Tab: Hashable {
+    enum Tab: String, Hashable {
         case feed, search, library, downloads, settings
+    }
+
+    private var selectedTab: Tab {
+        Tab(rawValue: selectedTabRaw) ?? .feed
     }
 
     private var activeDownloadsCount: Int {
@@ -94,7 +100,7 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                selectedTab = tab
+                selectedTabRaw = tab.rawValue
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
@@ -110,10 +116,14 @@ struct RootView: View {
             routeInSelectedTab(.localPlaylist(playlistID))
         }
         .onAppear {
-            if !showSubscriptionFeedTab, selectedTab == .feed { selectedTab = .search }
+            if !showSubscriptionFeedTab, selectedTab == .feed {
+                selectedTabRaw = Tab.search.rawValue
+            }
         }
         .onChange(of: showSubscriptionFeedTab) { _, isVisible in
-            if !isVisible, selectedTab == .feed { selectedTab = .search }
+            if !isVisible, selectedTab == .feed {
+                selectedTabRaw = Tab.search.rawValue
+            }
         }
     }
 
@@ -186,13 +196,13 @@ struct RootView: View {
             get: { selectedTab },
             set: { newTab in
                 if newTab == .feed, !showSubscriptionFeedTab {
-                    selectedTab = .search
+                    selectedTabRaw = Tab.search.rawValue
                     return
                 }
                 if newTab == .search, selectedTab == .search {
                     searchActivation &+= 1
                 }
-                selectedTab = newTab
+                selectedTabRaw = newTab.rawValue
             }
         )
     }
