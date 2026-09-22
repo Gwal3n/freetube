@@ -3,9 +3,8 @@ import SwiftData
 import UIKit
 
 /// Reusable trailing ellipsis Menu for `Video` items. Used by search results, history,
-/// the playback queue, and anywhere else a video appears in a list. Owns its own favorites
-/// `@Query`, share-file sheet, and add-to-playlist sheet so callers just drop it in next to
-/// the row's main tap target.
+/// the playback queue, and anywhere else a video appears in a list. The action definitions are
+/// shared with the native long-press context menu so both entry points remain consistent.
 ///
 /// Local-action rules:
 ///   - Open in browser, Copy URL: always shown
@@ -19,10 +18,6 @@ struct VideoMoreActionsMenu: View {
     var offersPlayNext = false
     var onRemoveFromUpNext: (() -> Void)? = nil
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(PlayerStateManager.self) private var player
-    @Query private var favorites: [FavoriteVideo]
-
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
 
@@ -30,13 +25,18 @@ struct VideoMoreActionsMenu: View {
         self.video = video
         self.offersPlayNext = offersPlayNext
         self.onRemoveFromUpNext = onRemoveFromUpNext
-        let videoID = video.id
-        _favorites = Query(filter: #Predicate<FavoriteVideo> { $0.videoID == videoID })
     }
 
     var body: some View {
         Menu {
-            menuContent
+            VideoActionsContent(
+                video: video,
+                offersPlay: false,
+                offersPlayNext: offersPlayNext,
+                onRemoveFromUpNext: onRemoveFromUpNext,
+                shareFileURL: $shareFileURL,
+                addToPlaylistVideo: $addToPlaylistVideo
+            )
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body)
@@ -62,8 +62,49 @@ struct VideoMoreActionsMenu: View {
         }
     }
 
+}
+
+/// One action definition shared by the ellipsis menu and native long-press context menus.
+@available(iOS 17.0, *)
+private struct VideoActionsContent: View {
+    let video: Video
+    let offersPlay: Bool
+    let offersPlayNext: Bool
+    let onRemoveFromUpNext: (() -> Void)?
+    @Binding var shareFileURL: URL?
+    @Binding var addToPlaylistVideo: Video?
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(PlayerStateManager.self) private var player
+    @Query private var favorites: [FavoriteVideo]
+
+    init(
+        video: Video,
+        offersPlay: Bool,
+        offersPlayNext: Bool,
+        onRemoveFromUpNext: (() -> Void)?,
+        shareFileURL: Binding<URL?>,
+        addToPlaylistVideo: Binding<Video?>
+    ) {
+        self.video = video
+        self.offersPlay = offersPlay
+        self.offersPlayNext = offersPlayNext
+        self.onRemoveFromUpNext = onRemoveFromUpNext
+        _shareFileURL = shareFileURL
+        _addToPlaylistVideo = addToPlaylistVideo
+        let videoID = video.id
+        _favorites = Query(filter: #Predicate<FavoriteVideo> { $0.videoID == videoID })
+    }
+
     @ViewBuilder
-    private var menuContent: some View {
+    var body: some View {
+        if offersPlay {
+            Button {
+                player.load(video)
+            } label: {
+                Label("Play", systemImage: "play.fill")
+            }
+        }
         if offersPlayNext {
             Button {
                 player.enqueueNext(video)
@@ -172,6 +213,57 @@ struct VideoMoreActionsMenu: View {
             ))
         }
         try? modelContext.save()
+    }
+}
 
+/// Native iOS context-menu presentation. SwiftUI owns the long-press recognizer, lift preview,
+/// haptic, interactive cancellation, dismissal, Dynamic Type, and accessibility behavior.
+@available(iOS 17.0, *)
+private struct VideoContextMenuModifier: ViewModifier {
+    let video: Video
+    let offersPlayNext: Bool
+    let onRemoveFromUpNext: (() -> Void)?
+
+    @State private var shareFileURL: URL?
+    @State private var addToPlaylistVideo: Video?
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                VideoActionsContent(
+                    video: video,
+                    offersPlay: true,
+                    offersPlayNext: offersPlayNext,
+                    onRemoveFromUpNext: onRemoveFromUpNext,
+                    shareFileURL: $shareFileURL,
+                    addToPlaylistVideo: $addToPlaylistVideo
+                )
+            }
+            .sheet(isPresented: Binding(
+                get: { shareFileURL != nil },
+                set: { if !$0 { shareFileURL = nil } }
+            )) {
+                if let url = shareFileURL {
+                    ActivityShareSheet(activityItems: [url])
+                }
+            }
+            .sheet(item: $addToPlaylistVideo) { video in
+                AddToPlaylistSheet(video: video)
+            }
+    }
+}
+
+@available(iOS 17.0, *)
+extension View {
+    func videoContextMenu(
+        video: Video,
+        offersPlayNext: Bool = false,
+        onRemoveFromUpNext: (() -> Void)? = nil
+    ) -> some View {
+        modifier(VideoContextMenuModifier(
+            video: video,
+            offersPlayNext: offersPlayNext,
+            onRemoveFromUpNext: onRemoveFromUpNext
+        ))
     }
 }

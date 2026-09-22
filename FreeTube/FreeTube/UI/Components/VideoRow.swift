@@ -72,6 +72,7 @@ struct VideoRow: View {
                 .tint(.indigo)
             }
         }
+        .videoContextMenu(video: video, offersPlayNext: true)
         .mediaListRow()
     }
 
