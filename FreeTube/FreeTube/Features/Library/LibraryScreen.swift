@@ -5,9 +5,10 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    /// Programmatic routes are reserved for cross-feature requests. The three fixed local rows use
-    /// direct native links so their navigation does not depend on path mutation or type lookup.
     private enum Destination: Hashable {
+        case history
+        case subscriptions
+        case playlists
         case channel(String)
         case playlist(String)
         case localPlaylist(String)
@@ -28,6 +29,9 @@ struct LibraryScreen: View {
             .navigationTitle("Library")
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
+                case .history: LocalHistoryScreen()
+                case .subscriptions: LocalSubscriptionsScreen()
+                case .playlists: LocalPlaylistsScreen()
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
@@ -91,9 +95,7 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            NavigationLink {
-                LocalHistoryScreen()
-            } label: {
+            NavigationLink(value: Destination.history) {
                 LibraryDestinationRow(
                     title: "Local history",
                     subtitle: countSubtitle(localHistoryCount, noun: "video"),
@@ -101,9 +103,7 @@ struct LibraryScreen: View {
                 )
             }
 
-            NavigationLink {
-                LocalSubscriptionsScreen()
-            } label: {
+            NavigationLink(value: Destination.subscriptions) {
                 LibraryDestinationRow(
                     title: "Local subscriptions",
                     subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
@@ -111,9 +111,7 @@ struct LibraryScreen: View {
                 )
             }
 
-            NavigationLink {
-                LocalPlaylistsScreen()
-            } label: {
+            NavigationLink(value: Destination.playlists) {
                 LibraryDestinationRow(
                     title: "Local playlists",
                     subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
