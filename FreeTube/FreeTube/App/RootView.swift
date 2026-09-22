@@ -105,15 +105,15 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
-            routeInSelectedTab(.channel(channelID))
+            routeFromPlayer(.channel(channelID))
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenPlaylist)) { note in
             guard let playlistID = note.object as? String, !playlistID.isEmpty else { return }
-            routeInSelectedTab(.playlist(playlistID))
+            routeFromPlayer(.playlist(playlistID))
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenLocalPlaylist)) { note in
             guard let playlistID = note.object as? String, !playlistID.isEmpty else { return }
-            routeInSelectedTab(.localPlaylist(playlistID))
+            routeFromPlayer(.localPlaylist(playlistID))
         }
         .onAppear {
             if !showSubscriptionFeedTab, selectedTab == .feed {
@@ -207,14 +207,24 @@ struct RootView: View {
         )
     }
 
-    private func routeInSelectedTab(_ destination: AppNavigationRequest.Destination) {
+    /// Player metadata is global, so its links need one stable navigation owner rather than being
+    /// handed to whichever unrelated tab happens to be visible. Feed is the app's browsing root;
+    /// Search is the fallback when the user hides Feed. Deliver the request on the next main-actor
+    /// turn so a lazily created tab observes a change instead of mounting with an already-set value.
+    private func routeFromPlayer(_ destination: AppNavigationRequest.Destination) {
         let request = AppNavigationRequest(destination: destination)
-        switch selectedTab {
-        case .feed: feedNavigationRequest = request
-        case .search: searchNavigationRequest = request
-        case .library: libraryNavigationRequest = request
-        case .downloads: downloadsNavigationRequest = request
-        case .settings: break
+        let destinationTab: Tab = showSubscriptionFeedTab ? .feed : .search
+        selectedTabRaw = destinationTab.rawValue
+        Task { @MainActor in
+            await Task.yield()
+            switch destinationTab {
+            case .feed:
+                feedNavigationRequest = request
+            case .search:
+                searchNavigationRequest = request
+            case .library, .downloads, .settings:
+                break
+            }
         }
     }
 
