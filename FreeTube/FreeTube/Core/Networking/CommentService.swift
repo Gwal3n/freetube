@@ -57,7 +57,14 @@ final class CommentService: CommentServicing {
             return CommentThread(
                 comments: comments,
                 continuationToken: response.continuationToken,
-                availability: .available
+                availability: .available,
+                sortingModes: response.sortingModes.map {
+                    CommentSortingMode(
+                        label: $0.label,
+                        token: $0.token,
+                        isSelected: $0.isSelected
+                    )
+                }
             )
         } catch {
             throw YouTubeServiceError.network(error)

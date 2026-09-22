@@ -10,6 +10,7 @@ final class CommentsViewModel {
     private(set) var continuationToken: String?
     private(set) var isLoading: Bool = false
     private(set) var commentsDisabled = false
+    private(set) var sortingModes: [CommentSortingMode] = []
     private(set) var teaserText: String?
     private(set) var repliesByCommentID: [String: [Comment]] = [:]
     private(set) var replyContinuationTokens: [String: String] = [:]
@@ -32,6 +33,7 @@ final class CommentsViewModel {
             comments = thread.comments
             continuationToken = thread.continuationToken
             commentsDisabled = thread.availability == .disabled
+            sortingModes = thread.sortingModes
         } catch {
             errorState = ErrorState(from: error)
         }
@@ -56,6 +58,7 @@ final class CommentsViewModel {
             comments = thread.comments
             continuationToken = thread.continuationToken
             commentsDisabled = thread.availability == .disabled
+            sortingModes = thread.sortingModes
             teaserText = thread.comments.first?.bodyText
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
@@ -66,6 +69,12 @@ final class CommentsViewModel {
     /// YouTube's teaser has no comment ID. If its excerpt occurs in a loaded full comment, place
     /// that comment first so expanding the preview reveals the complete text immediately.
     var commentsForDisplay: [Comment] {
+        // The featured excerpt belongs to YouTube's default (normally Top) ordering. Never move it
+        // ahead of the server's results after the user explicitly chooses another sort mode.
+        let selectedSortID = sortingModes.first(where: \.isSelected)?.id
+        guard selectedSortID == nil || selectedSortID == sortingModes.first?.id else {
+            return comments
+        }
         guard let teaser = teaserText, !teaser.isEmpty,
               let matchIndex = comments.firstIndex(where: { comment in
                   Self.matchesTeaser(teaser, commentBody: comment.bodyText)
@@ -95,6 +104,41 @@ final class CommentsViewModel {
             comments.append(contentsOf: thread.comments)
             continuationToken = thread.continuationToken
         } catch {
+            errorState = ErrorState(from: error)
+        }
+    }
+
+    func selectSortingMode(_ mode: CommentSortingMode) async {
+        guard !mode.isSelected, !isLoading else { return }
+        let previousComments = comments
+        let previousContinuationToken = continuationToken
+        let previousSortingModes = sortingModes
+        let previousReplies = repliesByCommentID
+        let previousReplyTokens = replyContinuationTokens
+        isLoading = true
+        comments = []
+        continuationToken = nil
+        repliesByCommentID = [:]
+        replyContinuationTokens = [:]
+        sortingModes = sortingModes.map {
+            CommentSortingMode(label: $0.label, token: $0.token, isSelected: $0.id == mode.id)
+        }
+        defer { isLoading = false }
+
+        do {
+            let thread = try await service.fetchComments(videoID: videoID, continuation: mode.token)
+            comments = thread.comments
+            continuationToken = thread.continuationToken
+            commentsDisabled = thread.availability == .disabled
+            if !thread.sortingModes.isEmpty {
+                sortingModes = thread.sortingModes
+            }
+        } catch {
+            comments = previousComments
+            continuationToken = previousContinuationToken
+            sortingModes = previousSortingModes
+            repliesByCommentID = previousReplies
+            replyContinuationTokens = previousReplyTokens
             errorState = ErrorState(from: error)
         }
     }

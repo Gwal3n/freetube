@@ -24,4 +24,25 @@ struct CommentThread: Sendable {
     let comments: [Comment]
     let continuationToken: String?
     let availability: Availability
+    let sortingModes: [CommentSortingMode]
+
+    init(
+        comments: [Comment],
+        continuationToken: String?,
+        availability: Availability,
+        sortingModes: [CommentSortingMode] = []
+    ) {
+        self.comments = comments
+        self.continuationToken = continuationToken
+        self.availability = availability
+        self.sortingModes = sortingModes
+    }
+}
+
+struct CommentSortingMode: Identifiable, Hashable, Sendable {
+    let label: String
+    let token: String
+    let isSelected: Bool
+
+    var id: String { token }
 }

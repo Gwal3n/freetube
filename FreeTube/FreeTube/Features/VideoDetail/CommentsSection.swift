@@ -99,17 +99,55 @@ struct CommentsSection: View {
 
     @ViewBuilder
     private var header: some View {
-        Button {
-            toggleComments()
-        } label: {
-            PlayerSectionHeading(
-                title: "Comments",
-                detail: normalizedCountText,
-                isExpanded: isExpanded
-            )
+        HStack(spacing: 4) {
+            Button {
+                toggleComments()
+            } label: {
+                PlayerSectionHeading(
+                    title: "Comments",
+                    detail: normalizedCountText,
+                    isExpanded: isExpanded
+                )
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+
+            if model.sortingModes.count > 1 {
+                Menu {
+                    ForEach(model.sortingModes) { mode in
+                        Button {
+                            if !isExpanded {
+                                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                                    isExpanded = true
+                                }
+                            }
+                            expandedReplyCommentIDs.removeAll()
+                            Task { await model.selectSortingMode(mode) }
+                        } label: {
+                            if mode.isSelected {
+                                Label(mode.label, systemImage: "checkmark")
+                            } else {
+                                Text(mode.label)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .disabled(model.isLoading)
+                .accessibilityLabel("Sort comments")
+                .accessibilityValue(selectedSortingModeLabel)
+            }
         }
-        .buttonStyle(ResponsiveButtonStyle())
         .padding(.horizontal)
+    }
+
+    private var selectedSortingModeLabel: String {
+        model.sortingModes.first(where: \.isSelected)?.label ?? ""
     }
 
     private var normalizedCountText: String? {
