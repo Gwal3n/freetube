@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import OSLog
 
 /// Expanded player content hosted by the app's SwiftUI player container. This view renders the
 /// surface, transport controls, metadata, and independently collapsible sections below.
@@ -423,7 +422,7 @@ struct FullScreenPlayer: View {
                 requestPlayerOrientation(.portrait)
             }
         } else {
-            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscape)
+            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
         }
         showPlayerControls()
     }
@@ -524,7 +523,7 @@ struct FullScreenPlayer: View {
             portraitVideoFullscreen = true
             requestPlayerOrientation(.portrait)
         } else {
-            requestPlayerOrientation(.landscape)
+            requestPlayerOrientation(.landscapeRight)
         }
         showPlayerControls()
     }
@@ -542,20 +541,8 @@ struct FullScreenPlayer: View {
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive }) else { return }
-        let rootController = scene.windows.first(where: \.isKeyWindow)?.rootViewController
-            ?? scene.windows.first?.rootViewController
-        rootController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { error in
-            Logger(
-                subsystem: "com.leshko.freetube",
-                category: "PlayerOrientation"
-            ).error("Fullscreen orientation request failed: \(error.localizedDescription, privacy: .public)")
-        }
-        Task { @MainActor in
-            await Task.yield()
-            rootController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-            UIViewController.attemptRotationToDeviceOrientation()
-        }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations))
+        UIViewController.attemptRotationToDeviceOrientation()
     }
 
     /// Default panel mode. No NavigationStack wrapping — the outer popup's `.thinMaterial`
