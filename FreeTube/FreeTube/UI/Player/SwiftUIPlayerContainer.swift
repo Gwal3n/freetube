@@ -46,8 +46,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(1)
                         .transition(.opacity)
 
-                    FullScreenPlayer(topContentInset: expandedTopInset)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
+                    FullScreenPlayer()
+                        .frame(
+                            width: proxy.size.width,
+                            height: max(0, proxy.size.height - expandedTopInset)
+                        )
                         .background(Color.black)
                         .clipShape(
                             RoundedRectangle(

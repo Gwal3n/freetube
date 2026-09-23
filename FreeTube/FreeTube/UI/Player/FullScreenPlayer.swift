@@ -35,8 +35,6 @@ struct FullScreenPlayer: View {
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
 
-    let topContentInset: CGFloat
-
     var body: some View {
         // Single dark-blur material under EVERYTHING — status bar inset, video chrome, transport,
         // comments, queue. Removing per-section backgrounds and using one full-screen material lets
@@ -48,7 +46,6 @@ struct FullScreenPlayer: View {
         // allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
-            let viewportHeight = max(0, proxy.size.height - topContentInset)
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
             let chapterPanelWidth: CGFloat = isLandscape && player.chapterListPresented
                 ? min(360, proxy.size.width * 0.38)
@@ -58,18 +55,18 @@ struct FullScreenPlayer: View {
             // frame taller than a modern phone's safe height. AVPlayer aspect-fits the video in
             // that region, preventing the timeline and bottom edge from being cropped.
             let compactSurfaceHeight = isLandscape
-                ? viewportHeight
+                ? proxy.size.height
                 : PlayerViewportLayout.compactSurfaceHeight(
                     width: surfaceWidth,
                     presentationSize: player.videoPresentationSize
                 )
             let expandedSurfaceHeight = usesPortraitFullscreen
-                ? viewportHeight
+                ? proxy.size.height
                 : isLandscape
                     ? compactSurfaceHeight
                     : PlayerViewportLayout.expandedSurfaceHeight(
                     width: surfaceWidth,
-                    viewportHeight: viewportHeight,
+                    viewportHeight: proxy.size.height,
                     isLandscape: isLandscape,
                     presentationSize: player.videoPresentationSize
                 )
@@ -127,14 +124,14 @@ struct FullScreenPlayer: View {
                     // Entering fullscreen grows the media upward from a planted bottom edge,
                     // matching the direct-manipulation language used by YouTube. Exiting retains
                     // the subtle uniform shrink while travelling down.
-                    .scaleEffect(fullscreenExitScale(viewportHeight: viewportHeight))
+                    .scaleEffect(fullscreenExitScale(viewportHeight: proxy.size.height))
                     .scaleEffect(
                         fullscreenEntryScale(surfaceHeight: surfaceHeight),
                         anchor: .bottom
                     )
                     .clipShape(
                         RoundedRectangle(
-                            cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: viewportHeight),
+                            cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: proxy.size.height),
                             style: .continuous
                         )
                     )
@@ -274,7 +271,7 @@ struct FullScreenPlayer: View {
                 .simultaneousGesture(
                     fullscreenSwipeGesture(
                         isFullscreen: portraitFullscreenActive || isLandscape,
-                        viewportHeight: viewportHeight
+                        viewportHeight: proxy.size.height
                     )
                 )
                 .onAppear { showPlayerControls() }
@@ -314,7 +311,7 @@ struct FullScreenPlayer: View {
                     collapseRange: collapseRange,
                     minimumContentHeight: max(
                         0,
-                        viewportHeight - compactSurfaceHeight + collapseRange
+                        proxy.size.height - compactSurfaceHeight + collapseRange
                     )
                 )
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
@@ -322,8 +319,7 @@ struct FullScreenPlayer: View {
                 .frame(width: surfaceWidth, alignment: .leading)
             }
             }
-            .frame(width: proxy.size.width, height: viewportHeight, alignment: .topLeading)
-            .offset(y: topContentInset)
+            .frame(width: proxy.size.width, alignment: .leading)
 
             if player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
                 PlayerChapterOverlay(
@@ -333,9 +329,9 @@ struct FullScreenPlayer: View {
                 )
                 .frame(
                     width: isLandscape ? chapterPanelWidth : proxy.size.width,
-                    height: isLandscape ? viewportHeight : max(0, viewportHeight - surfaceHeight)
+                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - surfaceHeight)
                 )
-                .offset(y: topContentInset + (isLandscape ? 0 : surfaceHeight))
+                .offset(y: isLandscape ? 0 : surfaceHeight)
                 // Moving the landscape material sidebar while simultaneously widening the player
                 // leaves a stale strip at the trailing edge for one render pass. Remove it
                 // atomically and let the underlying column resize; portrait retains its sheet
@@ -468,9 +464,7 @@ struct FullScreenPlayer: View {
     /// the media without bound before the fullscreen threshold is crossed.
     private func fullscreenEntryScale(surfaceHeight: CGFloat) -> CGFloat {
         guard fullscreenSwipeTranslation < 0 else { return 1 }
-        // A compact 16:9 surface needs enough headroom to travel visibly beyond the status-area
-        // inset, not merely stop at its lower boundary.
-        let maximumGrowthTravel = min(140, surfaceHeight * 0.65)
+        let maximumGrowthTravel = min(110, surfaceHeight * 0.28)
         let growthTravel = min(abs(fullscreenSwipeTranslation), maximumGrowthTravel)
         return 1 + growthTravel / max(1, surfaceHeight)
     }
