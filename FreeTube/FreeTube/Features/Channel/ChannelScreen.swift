@@ -21,7 +21,12 @@ struct ChannelScreen: View {
     var body: some View {
         GeometryReader { viewport in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                // Keep the profile shell eagerly mounted. The tab pager uses moving,
+                // clipped overlays; placing that composition beside the identity
+                // header in a LazyVStack can retain the header's measured space while
+                // dropping its rendered subtree during lazy-view reconciliation.
+                // The media collections remain lazy in their individual sections.
+                VStack(spacing: 0) {
                     if let details = model.details {
                         channelHeader(details.channel)
                         channelTabBar(details, width: viewport.size.width)
