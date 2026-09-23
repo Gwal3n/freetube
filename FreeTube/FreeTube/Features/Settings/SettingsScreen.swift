@@ -245,15 +245,26 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    LabeledContent("Version") {
+                        Text(appVersion)
+                            .monospacedDigit()
+                    }
+                    LabeledContent("Build") {
+                        Text(appBuild)
+                            .monospacedDigit()
+                    }
+                    LabeledContent("Revision") {
+                        Text(appRevision)
+                            .font(.body.monospaced())
+                            .textSelection(.enabled)
+                    }
                     Text("FreeTube is a personal, account-free YouTube client. It uses anonymous YouTubeKit requests without a Google API key, plus yt-dlp for downloads. YouTube can change its internal API at any time — please be patient when things break.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("About")
                 } footer: {
-                    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-                    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-                    Text("v\(version) (\(build)) — [freetube.io](https://freetube.io)")
+                    Text("[freetube.io](https://freetube.io)")
                 }
             }
             .navigationTitle("Settings")
@@ -310,6 +321,20 @@ struct SettingsScreen: View {
         Image(systemName: "chevron.right")
             .font(.footnote.weight(.semibold))
             .foregroundStyle(.tertiary)
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    }
+
+    private var appBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+    }
+
+    private var appRevision: String {
+        guard let revision = Bundle.main.infoDictionary?["FreeTubeCommit"] as? String,
+              !revision.isEmpty else { return "local" }
+        return revision
     }
 
     private func navigationLabel(_ title: String, systemImage: String) -> some View {

@@ -140,11 +140,13 @@ final class LogFileWriter {
         let info = Bundle.main.infoDictionary ?? [:]
         let version = info["CFBundleShortVersionString"] as? String ?? "?"
         let build = info["CFBundleVersion"] as? String ?? "?"
+        let revision = info["FreeTubeCommit"] as? String ?? "local"
         let launch = Self.isoTimestampFormatter.string(from: Date())
         let header = """
         =============================================
          FreeTube log
          App version:   \(version) (build \(build))
+         Revision:      \(revision)
          iOS:           \(device.systemVersion)
          Device:        \(device.model)
          Launch:        \(launch)

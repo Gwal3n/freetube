@@ -10,12 +10,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Show Xcode version
         run: xcodebuild -version
 
       - name: Build for iPhone
         run: |
+          FREETUBE_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          FREETUBE_COMMIT_SHA="$(git rev-parse --short=8 HEAD)"
           xcodebuild \
             -project FreeTube/FreeTube.xcodeproj \
             -scheme FreeTube \
@@ -26,6 +30,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION="$FREETUBE_BUILD_NUMBER" \
+            FREETUBE_COMMIT="$FREETUBE_COMMIT_SHA" \
             build
 
       - name: Package unsigned IPA
