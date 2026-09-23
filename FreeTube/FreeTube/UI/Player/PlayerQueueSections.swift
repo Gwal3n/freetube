@@ -21,6 +21,7 @@ struct PlayerQueueSections: View {
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
     @State private var isClearQueueArmed = false
+    @State private var clearQueueButtonFrame: CGRect = .zero
 
     private static let queueRowHeight: CGFloat = 56
     private static let queueRowFootprint: CGFloat = queueRowHeight + 8
@@ -35,6 +36,17 @@ struct PlayerQueueSections: View {
                     queuePanel
                 }
             }
+            .coordinateSpace(name: "playerQueueSections")
+            .onPreferenceChange(ClearQueueButtonFrameKey.self) { frame in
+                clearQueueButtonFrame = frame
+            }
+            .simultaneousGesture(
+                SpatialTapGesture().onEnded { value in
+                    guard isClearQueueArmed,
+                          !clearQueueButtonFrame.contains(value.location) else { return }
+                    disarmClearQueue()
+                }
+            )
         }
     }
 
@@ -49,6 +61,7 @@ struct PlayerQueueSections: View {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             isManualQueueExpanded.toggle()
                         }
+                        disarmClearQueue()
                     } label: {
                         PlayerSectionHeading(
                             title: "Queue",
@@ -90,6 +103,14 @@ struct PlayerQueueSections: View {
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel(isClearQueueArmed ? "Confirm clear queue" : "Clear queue")
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: ClearQueueButtonFrameKey.self,
+                                value: proxy.frame(in: .named("playerQueueSections"))
+                            )
+                        }
+                    }
 
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
@@ -114,6 +135,7 @@ struct PlayerQueueSections: View {
                             queueRow(
                                 video,
                                 preservesPlaylistContext: false,
+                                showsReorderHandle: true,
                                 onPlay: {
                                     player.removeFromManualQueue(videoID: video.id)
                                     player.load(video)
@@ -127,23 +149,24 @@ struct PlayerQueueSections: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
+                            .dropDestination(for: String.self) { identifiers, _ in
+                                guard let sourceID = identifiers.first else { return false }
+                                return moveManualQueueItem(sourceID: sourceID, before: video.id)
+                            }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
-                        .onMove { offsets, destination in
-                            player.moveManualQueue(fromOffsets: offsets, toOffset: destination)
-                        }
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .scrollDisabled(true)
-                    .environment(\.editMode, .constant(.active))
+                    .scrollBounceBehavior(.basedOnSize)
                     .frame(height: manualQueueListHeight)
                     .transition(.opacity)
                 }
             }
+            .onDisappear { isClearQueueArmed = false }
         }
     }
 
@@ -409,6 +432,7 @@ struct PlayerQueueSections: View {
     private func queueRow(
         _ video: Video,
         preservesPlaylistContext: Bool,
+        showsReorderHandle: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemove: (() -> Void)? = nil
     ) -> some View {
@@ -484,6 +508,24 @@ struct PlayerQueueSections: View {
                 offersPlayNext: !preservesPlaylistContext,
                 onRemoveFromUpNext: removalAction
             )
+
+            if showsReorderHandle {
+                Image(systemName: "line.3.horizontal")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: MediaStyle.actionSize, height: Self.queueRowHeight)
+                    .contentShape(Rectangle())
+                    .draggable(video.id) {
+                        Text(video.title)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .frame(maxWidth: 220)
+                            .background(.regularMaterial, in: Capsule())
+                    }
+                    .accessibilityLabel("Reorder \(video.title)")
+            }
         }
         .background {
             if preservesPlaylistContext, video.id == player.currentVideo?.id {
@@ -493,10 +535,36 @@ struct PlayerQueueSections: View {
         }
     }
 
+    private func moveManualQueueItem(sourceID: String, before targetID: String) -> Bool {
+        guard sourceID != targetID,
+              let source = player.manualQueue.firstIndex(where: { $0.id == sourceID }),
+              let target = player.manualQueue.firstIndex(where: { $0.id == targetID }) else {
+            return false
+        }
+        let destination = target > source ? target + 1 : target
+        player.moveManualQueue(fromOffsets: IndexSet(integer: source), toOffset: destination)
+        return true
+    }
+
+    private func disarmClearQueue() {
+        guard isClearQueueArmed else { return }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+            isClearQueueArmed = false
+        }
+    }
+
     private func queueRowMetadata(for video: Video) -> String {
         [video.channelName, video.viewCountString]
             .filter { !$0.isEmpty }
             .joined(separator: " • ")
     }
 
+}
+
+private struct ClearQueueButtonFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
 }

@@ -49,6 +49,7 @@ struct SettingsScreen: View {
                         }
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
+                    Toggle("Swipe vertically for fullscreen", isOn: Bindable(model).verticalSwipeFullscreen)
                     Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
                     Toggle("Show comments", isOn: Bindable(model).showComments)
                     if model.showComments {

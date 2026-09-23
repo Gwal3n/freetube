@@ -48,6 +48,11 @@ final class SettingsViewModel {
         set { preferences.autoplayNext = newValue }
     }
 
+    var verticalSwipeFullscreen: Bool {
+        get { preferences.verticalSwipeFullscreen }
+        set { preferences.verticalSwipeFullscreen = newValue }
+    }
+
     var showHistoryProgressBars: Bool {
         get { preferences.showHistoryProgressBars }
         set { preferences.showHistoryProgressBars = newValue }

@@ -101,14 +101,15 @@ struct AddToPlaylistSheet: View {
                             Text(playlist.title)
                                 .foregroundStyle(.primary)
                             Spacer()
-                            if pendingPlaylistIDs.contains(playlist.id) {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Image(systemName: containingIDs.contains(playlist.id) ? "checkmark.circle.fill" : "plus.circle")
-                                    .font(.title3)
-                                    .foregroundStyle(.primary)
-                                    .contentTransition(.symbolEffect(.replace))
-                            }
+                            Image(systemName: containingIDs.contains(playlist.id) ? "checkmark.circle.fill" : "plus.circle")
+                                .font(.title3)
+                                .foregroundStyle(.primary)
+                                .contentTransition(.symbolEffect(.replace))
+                                .animation(
+                                    reduceMotion ? nil : InterfaceMotion.quick,
+                                    value: containingIDs.contains(playlist.id)
+                                )
+                                .opacity(pendingPlaylistIDs.contains(playlist.id) ? 0.65 : 1)
                         }
                         .contentShape(Rectangle())
                     }
@@ -144,13 +145,18 @@ struct AddToPlaylistSheet: View {
     private func toggle(_ playlistID: String) async {
         guard !pendingPlaylistIDs.contains(playlistID) else { return }
         pendingPlaylistIDs.insert(playlistID)
-        defer { pendingPlaylistIDs.remove(playlistID) }
         if containingIDs.contains(playlistID) {
             await service.remove(videoID: video.id, from: playlistID)
-            containingIDs.remove(playlistID)
+            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                containingIDs.remove(playlistID)
+                pendingPlaylistIDs.remove(playlistID)
+            }
         } else {
             await service.add(video: video, to: playlistID)
-            containingIDs.insert(playlistID)
+            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                containingIDs.insert(playlistID)
+                pendingPlaylistIDs.remove(playlistID)
+            }
         }
     }
 

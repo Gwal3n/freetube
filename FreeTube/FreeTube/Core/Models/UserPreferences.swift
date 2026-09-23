@@ -18,6 +18,9 @@ struct UserPreferences {
     /// cleanly for existing installs.
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
+    /// Enables vertical video-surface gestures: swipe up to enter fullscreen and swipe down to
+    /// leave it. Kept independent from the fullscreen button for users who prefer fixed gestures.
+    @AppStorage("verticalSwipeFullscreen") var verticalSwipeFullscreen: Bool = true
     /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
     @AppStorage("historyRetentionPolicy") var historyRetentionPolicyRaw: String = HistoryRetentionPolicy.forever.rawValue
