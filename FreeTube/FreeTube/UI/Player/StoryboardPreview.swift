@@ -6,12 +6,21 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct StoryboardPreview: View {
     let tile: VideoStoryboard.Tile
+    let videoPresentationSize: CGSize
 
-    private let previewWidth: CGFloat = 116
+    private let maximumPreviewWidth: CGFloat = 116
+    private let maximumPreviewHeight: CGFloat = 96
 
-    private var previewHeight: CGFloat {
-        guard tile.width > 0 else { return 66 }
-        return min(previewWidth * CGFloat(tile.height) / CGFloat(tile.width), 72)
+    private var previewSize: CGSize {
+        let sourceAspect = tile.width > 0 && tile.height > 0
+            ? CGFloat(tile.width) / CGFloat(tile.height)
+            : 16 / 9
+        let videoAspect = videoPresentationSize.width > 0 && videoPresentationSize.height > 0
+            ? videoPresentationSize.width / videoPresentationSize.height
+            : sourceAspect
+        let aspect = max(0.2, min(videoAspect, 5))
+        let width = min(maximumPreviewWidth, maximumPreviewHeight * aspect)
+        return CGSize(width: width, height: width / aspect)
     }
 
     var body: some View {
@@ -19,15 +28,15 @@ struct StoryboardPreview: View {
             KFImage(tile.url)
                 .resizable()
                 .frame(
-                    width: previewWidth * CGFloat(tile.columns),
-                    height: previewHeight * CGFloat(tile.rows)
+                    width: previewSize.width * CGFloat(tile.columns),
+                    height: previewSize.height * CGFloat(tile.rows)
                 )
                 .offset(
-                    x: -previewWidth * CGFloat(tile.column),
-                    y: -previewHeight * CGFloat(tile.row)
+                    x: -previewSize.width * CGFloat(tile.column),
+                    y: -previewSize.height * CGFloat(tile.row)
                 )
         }
-        .frame(width: previewWidth, height: previewHeight, alignment: .topLeading)
+        .frame(width: previewSize.width, height: previewSize.height, alignment: .topLeading)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay {

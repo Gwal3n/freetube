@@ -20,6 +20,7 @@ struct PlayerTransportOverlay: View {
     let usesLandscapeLayout: Bool
     let showsCollapseButton: Bool
     let additionalTopControls: AnyView
+    let topControlsSafeAreaPadding: CGFloat
     let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
@@ -48,6 +49,7 @@ struct PlayerTransportOverlay: View {
             usesLandscapeLayout: usesLandscapeLayout,
             showsCollapseButton: showsCollapseButton,
             additionalTopControls: additionalTopControls,
+            topControlsSafeAreaPadding: topControlsSafeAreaPadding,
             bottomTimelinePadding: bottomTimelinePadding,
             onTogglePlayPause: onTogglePlayPause,
             onSeek: onSeek,

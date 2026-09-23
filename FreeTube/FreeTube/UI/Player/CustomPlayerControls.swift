@@ -20,6 +20,7 @@ struct CustomPlayerControls: View {
     let usesLandscapeLayout: Bool
     let showsCollapseButton: Bool
     let additionalTopControls: AnyView
+    let topControlsSafeAreaPadding: CGFloat
     let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
@@ -62,7 +63,7 @@ struct CustomPlayerControls: View {
                     additionalTopControls
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
+                .padding(.top, 8 + topControlsSafeAreaPadding)
                 .opacity(isVisible ? 1 : 0)
 
                 Spacer()

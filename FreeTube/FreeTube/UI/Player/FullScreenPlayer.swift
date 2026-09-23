@@ -182,6 +182,9 @@ struct FullScreenPlayer: View {
                                 }
                             )
                         ),
+                        topControlsSafeAreaPadding: usesPortraitFullscreen
+                            ? PlayerLayoutMetrics.safeAreaInsets.top
+                            : 0,
                         bottomTimelinePadding: PlayerViewportLayout.timelineBottomPadding(
                             availableSize: controlFrame.size,
                             isLandscape: isLandscape
@@ -233,7 +236,10 @@ struct FullScreenPlayer: View {
                            maximumWidth: 320,
                            maximumHeight: 180
                        ) {
-                        StoryboardPreview(tile: tile)
+                        StoryboardPreview(
+                            tile: tile,
+                            videoPresentationSize: player.videoPresentationSize
+                        )
                             .position(
                                 x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
                                     time: previewTime,
@@ -360,7 +366,10 @@ struct FullScreenPlayer: View {
         .simultaneousGesture(
             DragGesture(minimumDistance: 0, coordinateSpace: .global)
                 .onChanged { value in
-                    guard !clearQueueButtonFrame.contains(value.startLocation) else { return }
+                    // Preference propagation can trail the Clear morph by a frame. A generous
+                    // protected region keeps that second, intentional tap owned by the button.
+                    guard !clearQueueButtonFrame.insetBy(dx: -18, dy: -14)
+                        .contains(value.startLocation) else { return }
                     disarmClearQueue()
                 },
             including: isClearQueueArmed ? .all : .none

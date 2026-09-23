@@ -17,6 +17,7 @@ struct PlayerQueueSections: View {
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
+    @State private var isReorderingManualQueue = false
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
@@ -76,13 +77,13 @@ struct PlayerQueueSections: View {
                                     .foregroundStyle(.white)
                                     .transition(.blurReplace)
                             } else {
-                                Image(systemName: "trash")
+                                Image(systemName: "xmark")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .transition(.blurReplace)
                             }
                         }
-                        .frame(minWidth: 56, minHeight: MediaStyle.actionSize)
+                        .frame(width: 72, height: MediaStyle.actionSize)
                         .contentShape(Capsule())
                         .animation(
                             reduceMotion ? nil : InterfaceMotion.quick,
@@ -99,6 +100,21 @@ struct PlayerQueueSections: View {
                             )
                         }
                     }
+
+                    Button {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                            isReorderingManualQueue.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isReorderingManualQueue ? "checkmark" : "arrow.up.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(isReorderingManualQueue ? Color.primary : Color.secondary)
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Circle())
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel(isReorderingManualQueue ? "Finish reordering queue" : "Reorder queue")
 
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
@@ -147,8 +163,14 @@ struct PlayerQueueSections: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .scrollDisabled(true)
-                    .environment(\.editMode, .constant(.active))
+                    // SwiftUI suppresses native row swipe actions while a List is in edit mode.
+                    // Keep normal playback as the swipe-to-remove state and enter edit mode only
+                    // while the user explicitly rearranges the queue.
+                    .scrollDisabled(isReorderingManualQueue)
+                    .environment(
+                        \.editMode,
+                        .constant(isReorderingManualQueue ? EditMode.active : EditMode.inactive)
+                    )
                     .frame(height: manualQueueListHeight)
                     .transition(.opacity)
                 }
