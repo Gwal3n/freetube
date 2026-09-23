@@ -669,7 +669,7 @@ final class PlayerStateManager {
         queueNoticeUndoAction = undoAction
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         queueNoticeDismissTask?.cancel()
-        let displayDuration: Duration = undoAction == nil ? .seconds(1.4) : .seconds(4)
+        let displayDuration: Duration = undoAction == nil ? .seconds(1.4) : .seconds(2)
         queueNoticeDismissTask = Task { [weak self] in
             try? await Task.sleep(for: displayDuration)
             guard !Task.isCancelled, self?.queueNotice?.id == notice.id else { return }
