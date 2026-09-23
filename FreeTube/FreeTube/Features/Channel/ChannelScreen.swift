@@ -1,11 +1,13 @@
 import SwiftUI
 import Kingfisher
+import UIKit
 
 @available(iOS 17.0, *)
 struct ChannelScreen: View {
     @State private var model: ChannelViewModel
     @State private var selectedTab: ChannelProfileTab = .videos
     @State private var videoSort: ChannelVideoSort = .newest
+    @GestureState private var tabDragOffset: CGFloat = 0
     @Namespace private var tabSelection
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,33 +19,58 @@ struct ChannelScreen: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                if let details = model.details {
-                    channelHeader(details.channel)
-                    Section {
-                        channelContent(details)
-                            .id(selectedTab)
-                            .transition(.opacity)
-                            .simultaneousGesture(tabSwipeGesture(availableTabs: availableTabs(for: details)))
-                    } header: {
+        GeometryReader { viewport in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if let details = model.details {
+                        channelHeader(details.channel)
                         channelTabBar(details)
+                        interactiveChannelContent(details, width: viewport.size.width)
+                    } else {
+                        channelHeaderPlaceholder
                     }
-                } else {
-                    channelHeaderPlaceholder
                 }
             }
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.black)
+        .preferredColorScheme(.dark)
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(model.details?.channel.name ?? "Channel")
+        .toolbar { channelActionsToolbar }
         .task { await model.load() }
         .task(id: videoSort) {
             guard model.details != nil, videoSort != .newest else { return }
             await model.loadVideos(sort: videoSort)
         }
         .errorToast(Bindable(model).errorState)
+    }
+
+    @ToolbarContentBuilder
+    private var channelActionsToolbar: some ToolbarContent {
+        if let channel = model.details?.channel,
+           let url = channelURL(channel) {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    ShareLink(item: url) {
+                        Label("Share channel", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        UIPasteboard.general.url = url
+                    } label: {
+                        Label("Copy channel link", systemImage: "link")
+                    }
+                    Link(destination: url) {
+                        Label("Open in browser", systemImage: "safari")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Circle())
+                }
+                .accessibilityLabel("Channel actions")
+            }
+        }
     }
 
     // MARK: - Header
@@ -80,18 +107,22 @@ struct ChannelScreen: View {
                     .scaledToFill()
                     .frame(width: 88, height: 88)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color(uiColor: .systemBackground), lineWidth: 4))
+                    .overlay(Circle().stroke(Color.black, lineWidth: 3))
                     .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
-                    .offset(y: -30)
-                    .padding(.bottom, -30)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(channel.name)
-                        .font(.title2.weight(.bold))
+                        .font(.title3.weight(.bold))
                         .lineLimit(2)
                     if let handle = channel.handle, !handle.isEmpty {
                         Text(handle)
                             .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if !channelStats(channel).isEmpty {
+                        Text(channelStats(channel))
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -101,15 +132,7 @@ struct ChannelScreen: View {
                 subscribeButton(channel)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 12)
-
-            if !channelStats(channel).isEmpty {
-                Text(channelStats(channel))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-            }
+            .padding(.top, 16)
 
             if let description = channel.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines),
                !description.isEmpty {
@@ -120,7 +143,9 @@ struct ChannelScreen: View {
                         Text(description)
                             .font(.subheadline)
                             .foregroundStyle(.primary)
-                            .lineLimit(2)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .layoutPriority(1)
                             .multilineTextAlignment(.leading)
                         Image(systemName: "chevron.right")
                             .font(.caption2.weight(.semibold))
@@ -130,8 +155,8 @@ struct ChannelScreen: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(ResponsiveButtonStyle())
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
                 .accessibilityHint("Opens the About tab")
             }
         }
@@ -142,7 +167,7 @@ struct ChannelScreen: View {
     private func banner(_ channel: Channel) -> some View {
         ZStack {
             LinearGradient(
-                colors: [Color.accentColor.opacity(0.42), Color.accentColor.opacity(0.12)],
+                colors: [Color.white.opacity(0.18), Color.white.opacity(0.04)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -167,23 +192,24 @@ struct ChannelScreen: View {
 
     @ViewBuilder
     private func subscribeButton(_ channel: Channel) -> some View {
-        if channel.isSubscribed {
-            Button {
-                Task { await model.toggleSubscribe() }
-            } label: {
-                Label("Subscribed", systemImage: "checkmark")
+        Button {
+            Task { await model.toggleSubscribe() }
+        } label: {
+            Group {
+                if channel.isSubscribed {
+                    Label("Subscribed", systemImage: "checkmark")
+                } else {
+                    Text("Subscribe")
+                }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        } else {
-            Button {
-                Task { await model.toggleSubscribe() }
-            } label: {
-                Text("Subscribe")
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(.white.opacity(channel.isSubscribed ? 0.10 : 0.16), in: Capsule())
+            .contentShape(Capsule())
         }
+        .buttonStyle(ResponsiveButtonStyle())
     }
 
     // MARK: - Tabs
@@ -191,31 +217,32 @@ struct ChannelScreen: View {
     private func channelTabBar(_ details: ChannelDetails) -> some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
-                HStack(spacing: 6) {
+                HStack(spacing: 22) {
                     ForEach(availableTabs(for: details)) { tab in
                         Button {
                             selectTab(tab)
                         } label: {
-                            Text(tab.title)
-                                .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
-                                .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
-                                .padding(.horizontal, 13)
-                                .frame(height: 34)
-                                .background {
+                            VStack(spacing: 7) {
+                                Text(tab.title)
+                                    .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
+                                    .foregroundStyle(selectedTab == tab ? Color.white : Color.white.opacity(0.55))
+                                ZStack {
+                                    Color.clear.frame(height: 2)
                                     if selectedTab == tab {
-                                        Capsule()
-                                            .fill(Color.primary.opacity(0.09))
+                                        Capsule().fill(.white)
+                                            .frame(height: 2)
                                             .matchedGeometryEffect(id: "channel-tab", in: tabSelection)
                                     }
                                 }
-                                .contentShape(Capsule())
+                            }
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .id(tab)
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.top, 10)
             }
             .scrollIndicators(.hidden)
             .onChange(of: selectedTab) { _, tab in
@@ -224,8 +251,7 @@ struct ChannelScreen: View {
                 }
             }
         }
-        .background(.regularMaterial)
-        .overlay(alignment: .bottom) { Divider() }
+        .background(Color.black)
     }
 
     private func availableTabs(for details: ChannelDetails) -> [ChannelProfileTab] {
@@ -243,6 +269,10 @@ struct ChannelScreen: View {
 
     private func tabSwipeGesture(availableTabs: [ChannelProfileTab]) -> some Gesture {
         DragGesture(minimumDistance: 32)
+            .updating($tabDragOffset) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.15 else { return }
+                state = value.translation.width
+            }
             .onEnded { value in
                 guard abs(value.translation.width) > abs(value.translation.height) * 1.35,
                       abs(value.predictedEndTranslation.width) > 80,
@@ -254,11 +284,39 @@ struct ChannelScreen: View {
             }
     }
 
+    @ViewBuilder
+    private func interactiveChannelContent(_ details: ChannelDetails, width: CGFloat) -> some View {
+        let tabs = availableTabs(for: details)
+        let currentIndex = tabs.firstIndex(of: selectedTab) ?? 0
+        let destinationIndex = tabDragOffset < 0 ? currentIndex + 1 : currentIndex - 1
+        let hasDestination = tabDragOffset != 0 && tabs.indices.contains(destinationIndex)
+
+        channelContent(details, tab: selectedTab)
+            .frame(width: width)
+            .offset(x: hasDestination ? tabDragOffset : resistedTabOffset(tabDragOffset))
+            .overlay(alignment: .topLeading) {
+                if hasDestination {
+                    channelContent(details, tab: tabs[destinationIndex])
+                        .frame(width: width)
+                        .offset(x: (tabDragOffset < 0 ? width : -width) + tabDragOffset)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .clipped()
+            .contentShape(Rectangle())
+            .simultaneousGesture(tabSwipeGesture(availableTabs: tabs))
+    }
+
+    private func resistedTabOffset(_ offset: CGFloat) -> CGFloat {
+        guard offset != 0 else { return 0 }
+        return offset * 0.18
+    }
+
     // MARK: - Tab content
 
     @ViewBuilder
-    private func channelContent(_ details: ChannelDetails) -> some View {
-        switch selectedTab {
+    private func channelContent(_ details: ChannelDetails, tab: ChannelProfileTab) -> some View {
+        switch tab {
         case .videos:
             videoSection(model.videos(for: videoSort))
         case .shorts:
@@ -286,6 +344,7 @@ struct ChannelScreen: View {
                 } label: {
                     Label(videoSort.title, systemImage: "arrow.up.arrow.down")
                         .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white)
                 }
             }
             .padding(.horizontal, 16)
@@ -313,14 +372,15 @@ struct ChannelScreen: View {
         } else {
             LazyVStack(spacing: 0) {
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
-                    VideoRow(video: video, accessory: .actions(offersPlayNext: true)) {
-                        player.load(video)
-                    }
-                    .padding(.horizontal, 16)
+                    VideoCard(
+                        video: video,
+                        onTap: { player.load(video) },
+                        showsMoreMenu: true,
+                        offersPlayNext: true
+                    )
+                    .padding(.top, 4)
+                    .padding(.bottom, 14)
                     .onAppear { prefetchIfNeeded(index: index, total: videos.count, kind: kind) }
-                    if index < videos.count - 1 {
-                        Divider().padding(.leading, 176)
-                    }
                 }
                 if canLoadMore(kind: kind) { loadingFooter(kind: kind) }
             }
@@ -336,17 +396,10 @@ struct ChannelScreen: View {
         } else {
             LazyVStack(spacing: 0) {
                 ForEach(Array(playlists.enumerated()), id: \.element.id) { index, playlist in
-                    NavigationLink {
-                        PlaylistScreen(playlistID: playlist.id)
-                    } label: {
-                        PlaylistRow(playlist: playlist)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
+                    playlistCard(playlist)
+                        .padding(.top, 4)
+                        .padding(.bottom, 14)
                     .onAppear { prefetchIfNeeded(index: index, total: playlists.count, kind: .playlists) }
-                    if index < playlists.count - 1 {
-                        Divider().padding(.leading, 176)
-                    }
                 }
                 if model.canLoadMore(for: .playlists) { loadingFooter(kind: .playlists) }
             }
@@ -372,12 +425,6 @@ struct ChannelScreen: View {
                 if let videos = channel.videoCount {
                     aboutRow(title: "Videos", value: formattedCount(videos), systemImage: "play.rectangle")
                 }
-                if let url = URL(string: "https://www.youtube.com/channel/\(channel.id)") {
-                    Link(destination: url) {
-                        Label("Open channel in browser", systemImage: "safari")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
             }
         }
         .padding(20)
@@ -395,6 +442,55 @@ struct ChannelScreen: View {
     private func aboutDescription(for channel: Channel) -> String {
         let description = channel.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return description.isEmpty ? "This channel has not provided a description." : description
+    }
+
+    private func playlistCard(_ playlist: Playlist) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            NavigationLink {
+                PlaylistScreen(playlistID: playlist.id)
+            } label: {
+                KFImage(playlist.thumbnailURL)
+                    .thumbnail(size: CGSize(width: 720, height: 405)) {
+                        MediaStyle.placeholderFill
+                    }
+                    .resizable()
+                    .scaledToFill()
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+
+            HStack(alignment: .top, spacing: 10) {
+                NavigationLink {
+                    PlaylistScreen(playlistID: playlist.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(playlist.title)
+                            .font(MediaStyle.title)
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                        Text(playlistMetadata(playlist))
+                            .font(MediaStyle.metadata)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+
+                PlaylistMoreActionsMenu(playlist: playlist)
+            }
+            .padding(.horizontal, MediaStyle.cardHorizontalPadding)
+        }
+    }
+
+    private func playlistMetadata(_ playlist: Playlist) -> String {
+        var parts: [String] = []
+        if let channelName = playlist.channelName, !channelName.isEmpty { parts.append(channelName) }
+        if let videoCount = playlist.videoCount { parts.append("\(videoCount) videos") }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Pagination
@@ -443,6 +539,10 @@ struct ChannelScreen: View {
             values.append("\(formattedCount(videos)) videos")
         }
         return values.joined(separator: " · ")
+    }
+
+    private func channelURL(_ channel: Channel) -> URL? {
+        URL(string: "https://www.youtube.com/channel/\(channel.id)")
     }
 
     private func formattedCount(_ value: Int) -> String {
