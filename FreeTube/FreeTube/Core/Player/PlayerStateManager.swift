@@ -17,7 +17,7 @@ final class PlayerStateManager {
     struct QueueNotice: Identifiable, Equatable {
         let id = UUID()
         let message: String
-        let title: String
+        let offersUndo: Bool
     }
     enum LoadState: Equatable {
         case idle
@@ -516,6 +516,7 @@ final class PlayerStateManager {
     private var recommendationTask: Task<Void, Never>?
     private var contentPrefetchTask: Task<Void, Never>?
     private var queueNoticeDismissTask: Task<Void, Never>?
+    private var queueNoticeUndoAction: (() -> Void)?
     private var playerPresentationTask: Task<Void, Never>?
 
     /// Mounts the complete player in its settled mini position before expanding it for a first
@@ -596,7 +597,7 @@ final class PlayerStateManager {
         manualQueue.removeAll { $0.id == video.id }
         manualQueue.insert(video, at: 0)
         persistManualQueue()
-        showQueueNotice(message: "Playing next", video: video)
+        showQueueNotice(message: "Playing next")
         log.info("Queued \(video.id, privacy: .public) to play next")
     }
 
@@ -605,7 +606,7 @@ final class PlayerStateManager {
               !manualQueue.contains(where: { $0.id == video.id }) else { return }
         manualQueue.append(video)
         persistManualQueue()
-        showQueueNotice(message: "Added to queue", video: video)
+        showQueueNotice(message: "Added to queue")
         log.info("Added \(video.id, privacy: .public) to manual queue")
     }
 
@@ -614,10 +615,37 @@ final class PlayerStateManager {
         persistManualQueue()
     }
 
+    func removeFromManualQueueWithUndo(videoID: String) {
+        guard let index = manualQueue.firstIndex(where: { $0.id == videoID }) else { return }
+        let removedVideo = manualQueue.remove(at: index)
+        persistManualQueue()
+        showQueueNotice(message: "Removed from queue") { [weak self] in
+            guard let self, !self.manualQueue.contains(where: { $0.id == removedVideo.id }) else { return }
+            self.manualQueue.insert(removedVideo, at: min(index, self.manualQueue.endIndex))
+            self.persistManualQueue()
+        }
+    }
+
     func clearManualQueue() {
         guard !manualQueue.isEmpty else { return }
         manualQueue.removeAll()
         persistManualQueue()
+    }
+
+    func clearManualQueueWithUndo() {
+        guard !manualQueue.isEmpty else { return }
+        let removedVideos = manualQueue
+        manualQueue.removeAll()
+        persistManualQueue()
+        showQueueNotice(message: "Queue cleared") { [weak self] in
+            guard let self else { return }
+            let existingIDs = Set(self.manualQueue.map(\.id))
+            self.manualQueue.insert(
+                contentsOf: removedVideos.filter { !existingIDs.contains($0.id) },
+                at: 0
+            )
+            self.persistManualQueue()
+        }
     }
 
     func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
@@ -635,16 +663,27 @@ final class PlayerStateManager {
         persistManualQueue()
     }
 
-    private func showQueueNotice(message: String, video: Video) {
-        let notice = QueueNotice(message: message, title: video.title)
+    private func showQueueNotice(message: String, undoAction: (() -> Void)? = nil) {
+        let notice = QueueNotice(message: message, offersUndo: undoAction != nil)
         queueNotice = notice
+        queueNoticeUndoAction = undoAction
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         queueNoticeDismissTask?.cancel()
+        let displayDuration: Duration = undoAction == nil ? .seconds(1.4) : .seconds(4)
         queueNoticeDismissTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1.4))
+            try? await Task.sleep(for: displayDuration)
             guard !Task.isCancelled, self?.queueNotice?.id == notice.id else { return }
             self?.queueNotice = nil
+            self?.queueNoticeUndoAction = nil
         }
+    }
+
+    func undoQueueNotice() {
+        guard let action = queueNoticeUndoAction else { return }
+        queueNoticeDismissTask?.cancel()
+        queueNoticeUndoAction = nil
+        queueNotice = nil
+        action()
     }
 
     func setPlaybackRate(_ rate: Double) {

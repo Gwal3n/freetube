@@ -17,7 +17,6 @@ struct PlayerQueueSections: View {
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
-    @State private var isReorderingManualQueue = false
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
@@ -63,7 +62,7 @@ struct PlayerQueueSections: View {
 
                     Button {
                         if isClearQueueArmed {
-                            player.clearManualQueue()
+                            player.clearManualQueueWithUndo()
                         } else {
                             withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                                 isClearQueueArmed = true
@@ -102,21 +101,6 @@ struct PlayerQueueSections: View {
                     }
 
                     Button {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                            isReorderingManualQueue.toggle()
-                        }
-                    } label: {
-                        Image(systemName: isReorderingManualQueue ? "checkmark" : "arrow.up.arrow.down")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(isReorderingManualQueue ? Color.primary : Color.secondary)
-                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                            .contentShape(Circle())
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel(isReorderingManualQueue ? "Finish reordering queue" : "Reorder queue")
-
-                    Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             isManualQueueExpanded.toggle()
                         }
@@ -143,15 +127,9 @@ struct PlayerQueueSections: View {
                                     player.removeFromManualQueue(videoID: video.id)
                                     player.load(video)
                                 },
-                                onRemove: { player.removeFromManualQueue(videoID: video.id) }
+                                onRemove: { player.removeFromManualQueueWithUndo(videoID: video.id) },
+                                showsRemoveButton: true
                             )
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    player.removeFromManualQueue(videoID: video.id)
-                                } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
-                            }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
@@ -163,14 +141,8 @@ struct PlayerQueueSections: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    // SwiftUI suppresses native row swipe actions while a List is in edit mode.
-                    // Keep normal playback as the swipe-to-remove state and enter edit mode only
-                    // while the user explicitly rearranges the queue.
-                    .scrollDisabled(isReorderingManualQueue)
-                    .environment(
-                        \.editMode,
-                        .constant(isReorderingManualQueue ? EditMode.active : EditMode.inactive)
-                    )
+                    .scrollDisabled(true)
+                    .environment(\.editMode, .constant(.active))
                     .frame(height: manualQueueListHeight)
                     .transition(.opacity)
                 }
@@ -442,7 +414,8 @@ struct PlayerQueueSections: View {
         _ video: Video,
         preservesPlaylistContext: Bool,
         onPlay: (() -> Void)? = nil,
-        onRemove: (() -> Void)? = nil
+        onRemove: (() -> Void)? = nil,
+        showsRemoveButton: Bool = false
     ) -> some View {
         let removalAction: (() -> Void)? = if let onRemove {
             onRemove
@@ -511,10 +484,22 @@ struct PlayerQueueSections: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
 
+            if showsRemoveButton, let removalAction {
+                Button(action: removalAction) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel("Remove from queue")
+            }
+
             VideoMoreActionsMenu(
                 video: video,
                 offersPlayNext: !preservesPlaylistContext,
-                onRemoveFromUpNext: removalAction
+                onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
             )
         }
         .background {

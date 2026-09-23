@@ -55,12 +55,23 @@ struct RootView: View {
         }
         .overlay(alignment: .top) {
             if let notice = player.queueNotice {
-                Label {
-                    Text("\(notice.message): \(notice.title)")
-                        .lineLimit(1)
-                } icon: {
-                    Image(systemName: "text.insert")
+                HStack(spacing: 10) {
+                    Label {
+                        Text(notice.message)
+                    } icon: {
+                        Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "text.insert")
+                    }
+                    if notice.offersUndo {
+                        Divider()
+                            .frame(height: 18)
+                        Button("Undo") {
+                            player.undoQueueNotice()
+                        }
+                        .fontWeight(.semibold)
+                        .buttonStyle(.plain)
+                    }
                 }
+                .lineLimit(1)
                 .font(.footnote.weight(.semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -69,7 +80,7 @@ struct RootView: View {
                 .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
                 .padding(.top, 8)
-                .allowsHitTesting(false)
+                .allowsHitTesting(notice.offersUndo)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
