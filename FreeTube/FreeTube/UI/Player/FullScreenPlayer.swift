@@ -124,8 +124,7 @@ struct FullScreenPlayer: View {
                     // the subtle uniform shrink while travelling down.
                     .scaleEffect(fullscreenExitScale(viewportHeight: proxy.size.height))
                     .scaleEffect(
-                        x: 1,
-                        y: fullscreenEntryStretch(surfaceHeight: surfaceHeight),
+                        fullscreenEntryScale(surfaceHeight: surfaceHeight),
                         anchor: .bottom
                     )
                     .clipShape(
@@ -446,11 +445,14 @@ struct FullScreenPlayer: View {
         return 1 - progress * 0.035
     }
 
-    /// With `.bottom` as the transform anchor, increasing the layer by `travel / height` moves
-    /// its top edge by exactly the finger's travel while leaving the bottom edge unchanged.
-    private func fullscreenEntryStretch(surfaceHeight: CGFloat) -> CGFloat {
+    /// Grow uniformly from the bottom centre so the picture expands upward and outward without
+    /// changing its aspect ratio. The capped travel prevents an exploratory swipe from scaling
+    /// the media without bound before the fullscreen threshold is crossed.
+    private func fullscreenEntryScale(surfaceHeight: CGFloat) -> CGFloat {
         guard fullscreenSwipeTranslation < 0 else { return 1 }
-        return 1 + abs(fullscreenSwipeTranslation) / max(1, surfaceHeight)
+        let maximumGrowthTravel = min(110, surfaceHeight * 0.28)
+        let growthTravel = min(abs(fullscreenSwipeTranslation), maximumGrowthTravel)
+        return 1 + growthTravel / max(1, surfaceHeight)
     }
 
     private func fullscreenSwipeCornerRadius(viewportHeight: CGFloat) -> CGFloat {
