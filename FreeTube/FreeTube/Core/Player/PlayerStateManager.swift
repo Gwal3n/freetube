@@ -619,7 +619,7 @@ final class PlayerStateManager {
         guard let index = manualQueue.firstIndex(where: { $0.id == videoID }) else { return }
         let removedVideo = manualQueue.remove(at: index)
         persistManualQueue()
-        showQueueNotice(message: "Removed from queue") { [weak self] in
+        showQueueNotice(message: "Removed") { [weak self] in
             guard let self, !self.manualQueue.contains(where: { $0.id == removedVideo.id }) else { return }
             self.manualQueue.insert(removedVideo, at: min(index, self.manualQueue.endIndex))
             self.persistManualQueue()

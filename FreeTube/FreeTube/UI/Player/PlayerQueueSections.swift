@@ -44,7 +44,7 @@ struct PlayerQueueSections: View {
     private var manualQueuePanel: some View {
         if !player.manualQueue.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 4) {
+                HStack(spacing: 0) {
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             isManualQueueExpanded.toggle()
@@ -62,6 +62,7 @@ struct PlayerQueueSections: View {
 
                     Button {
                         if isClearQueueArmed {
+                            isClearQueueArmed = false
                             player.clearManualQueueWithUndo()
                         } else {
                             withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
@@ -82,8 +83,8 @@ struct PlayerQueueSections: View {
                                     .transition(.blurReplace)
                             }
                         }
-                        .frame(width: 72, height: MediaStyle.actionSize)
-                        .contentShape(Capsule())
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Rectangle())
                         .animation(
                             reduceMotion ? nil : InterfaceMotion.quick,
                             value: isClearQueueArmed
@@ -91,14 +92,6 @@ struct PlayerQueueSections: View {
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel(isClearQueueArmed ? "Confirm clear queue" : "Clear queue")
-                    .background {
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: ClearQueueButtonFrameKey.self,
-                                value: proxy.frame(in: .global)
-                            )
-                        }
-                    }
 
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
@@ -523,12 +516,4 @@ struct PlayerQueueSections: View {
             .joined(separator: " • ")
     }
 
-}
-
-struct ClearQueueButtonFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
 }

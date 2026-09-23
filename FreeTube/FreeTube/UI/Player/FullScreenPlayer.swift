@@ -24,7 +24,6 @@ struct FullScreenPlayer: View {
     @State private var fullscreenSwipeTranslation: CGFloat = 0
     @State private var fullscreenSwipeIsVertical: Bool?
     @State private var isClearQueueArmed = false
-    @State private var clearQueueButtonFrame: CGRect = .zero
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -81,6 +80,15 @@ struct FullScreenPlayer: View {
                 hasChapterSidebar: chapterPanelWidth > 0,
                 presentationSize: player.videoPresentationSize,
                 safeAreaInsets: PlayerLayoutMetrics.safeAreaInsets
+            )
+            let timelineBottomPadding = max(
+                PlayerViewportLayout.timelineBottomPadding(
+                    availableSize: controlFrame.size,
+                    isLandscape: isLandscape
+                ),
+                isLandscape || usesPortraitFullscreen
+                    ? PlayerLayoutMetrics.safeAreaInsets.bottom + 14
+                    : 0
             )
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
@@ -185,10 +193,7 @@ struct FullScreenPlayer: View {
                         topControlsSafeAreaPadding: usesPortraitFullscreen
                             ? PlayerLayoutMetrics.safeAreaInsets.top
                             : 0,
-                        bottomTimelinePadding: PlayerViewportLayout.timelineBottomPadding(
-                            availableSize: controlFrame.size,
-                            isLandscape: isLandscape
-                        ),
+                        bottomTimelinePadding: timelineBottomPadding,
                         onTogglePlayPause: {
                             player.togglePlayPause()
                             showPlayerControls()
@@ -223,6 +228,7 @@ struct FullScreenPlayer: View {
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
                     .position(x: controlFrame.midX, y: controlFrame.midY)
+                    .zIndex(3)
                     // Long-running fallback downloads and failures retain their explanatory
                     // overlay. Brief startup waits replace the centre transport glyph instead,
                     // keeping the surrounding player chrome stable and avoiding a dark badge.
@@ -249,10 +255,7 @@ struct FullScreenPlayer: View {
                                 y: max(
                                     58,
                                     controlFrame.maxY
-                                        - PlayerViewportLayout.timelineBottomPadding(
-                                            availableSize: controlFrame.size,
-                                            isLandscape: isLandscape
-                                        )
+                                        - timelineBottomPadding
                                         - 68
                                 )
                             )
@@ -264,10 +267,7 @@ struct FullScreenPlayer: View {
                             onUndo: { player.undoSponsorBlockSkip() },
                             onSkip: { player.confirmSponsorBlockSkip() },
                             onDismiss: { player.dismissSponsorBlockNotice() },
-                            bottomPadding: PlayerViewportLayout.timelineBottomPadding(
-                                availableSize: controlFrame.size,
-                                isLandscape: isLandscape
-                            ) + 46
+                            bottomPadding: timelineBottomPadding + 46
                         )
                         .frame(width: controlFrame.width, height: controlFrame.height)
                         .position(x: controlFrame.midX, y: controlFrame.midY)
@@ -360,20 +360,6 @@ struct FullScreenPlayer: View {
         // Ensure the system status bar stays visible with light glyphs against the dark material.
         .preferredColorScheme(.dark)
         .statusBarHidden(portraitFullscreenActive)
-        .onPreferenceChange(ClearQueueButtonFrameKey.self) { frame in
-            clearQueueButtonFrame = frame
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                .onChanged { value in
-                    // Preference propagation can trail the Clear morph by a frame. A generous
-                    // protected region keeps that second, intentional tap owned by the button.
-                    guard !clearQueueButtonFrame.insetBy(dx: -18, dy: -14)
-                        .contains(value.startLocation) else { return }
-                    disarmClearQueue()
-                },
-            including: isClearQueueArmed ? .all : .none
-        )
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL
         // in a `Binding<Bool>` that flips when the URL is set/cleared so the sheet lifecycle
         // matches the user's intent.

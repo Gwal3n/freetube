@@ -49,17 +49,25 @@ struct RootView: View {
         }.count
     }
 
+    private var queueNoticeBottomPadding: CGFloat {
+        if player.fullScreenPresented {
+            return PlayerLayoutMetrics.safeAreaInsets.bottom + 12
+        }
+        let miniPlayerClearance: CGFloat = player.miniPlayerVisible ? 68 : 8
+        return PlayerLayoutMetrics.bottomTabBarClearance + miniPlayerClearance
+    }
+
     var body: some View {
         SwiftUIPlayerContainer(thumbnail: thumbnail) {
             tabShell
         }
-        .overlay(alignment: .top) {
+        .overlay(alignment: .bottom) {
             if let notice = player.queueNotice {
                 HStack(spacing: 10) {
                     Label {
                         Text(notice.message)
                     } icon: {
-                        Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "text.insert")
+                        Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "checkmark")
                     }
                     if notice.offersUndo {
                         Divider()
@@ -72,16 +80,16 @@ struct RootView: View {
                     }
                 }
                 .lineLimit(1)
-                .font(.footnote.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: 300)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .fixedSize(horizontal: true, vertical: false)
                 .background(.regularMaterial, in: Capsule())
                 .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
-                .padding(.top, 8)
+                .padding(.bottom, queueNoticeBottomPadding)
                 .allowsHitTesting(notice.offersUndo)
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
