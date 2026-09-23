@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import OSLog
 
 /// Expanded player content hosted by the app's SwiftUI player container. This view renders the
 /// surface, transport controls, metadata, and independently collapsible sections below.
@@ -23,7 +24,6 @@ struct FullScreenPlayer: View {
     @State private var portraitVideoFullscreen = false
     @State private var fullscreenSwipeTranslation: CGFloat = 0
     @State private var fullscreenSwipeIsVertical: Bool?
-    @State private var isClearQueueArmed = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -389,7 +389,6 @@ struct FullScreenPlayer: View {
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
                 portraitVideoFullscreen = false
-                isClearQueueArmed = false
             }
         }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
@@ -424,7 +423,7 @@ struct FullScreenPlayer: View {
                 requestPlayerOrientation(.portrait)
             }
         } else {
-            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscapeRight)
+            requestPlayerOrientation(verticalSizeClass == .compact ? .portrait : .landscape)
         }
         showPlayerControls()
     }
@@ -525,7 +524,7 @@ struct FullScreenPlayer: View {
             portraitVideoFullscreen = true
             requestPlayerOrientation(.portrait)
         } else {
-            requestPlayerOrientation(.landscapeRight)
+            requestPlayerOrientation(.landscape)
         }
         showPlayerControls()
     }
@@ -539,19 +538,24 @@ struct FullScreenPlayer: View {
         showPlayerControls()
     }
 
-    private func disarmClearQueue() {
-        guard isClearQueueArmed else { return }
-        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-            isClearQueueArmed = false
-        }
-    }
-
     private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive }) else { return }
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations))
-        UIViewController.attemptRotationToDeviceOrientation()
+        let rootController = scene.windows.first(where: \.isKeyWindow)?.rootViewController
+            ?? scene.windows.first?.rootViewController
+        rootController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { error in
+            Logger(
+                subsystem: "com.leshko.freetube",
+                category: "PlayerOrientation"
+            ).error("Fullscreen orientation request failed: \(error.localizedDescription, privacy: .public)")
+        }
+        Task { @MainActor in
+            await Task.yield()
+            rootController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            UIViewController.attemptRotationToDeviceOrientation()
+        }
     }
 
     /// Default panel mode. No NavigationStack wrapping — the outer popup's `.thinMaterial`
@@ -613,7 +617,6 @@ struct FullScreenPlayer: View {
                     showsUpNext: showUpNext,
                     upNextInitialCount: upNextInitialCount,
                     showsComments: showComments,
-                    isClearQueueArmed: $isClearQueueArmed,
                     onToggleDetails: {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             detailsModel.isExpanded.toggle()

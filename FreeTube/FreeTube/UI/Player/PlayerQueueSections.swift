@@ -13,7 +13,6 @@ struct PlayerQueueSections: View {
     let showsUpNext: Bool
     let upNextInitialCount: Int
     let onOpenPlaylist: (String) -> Void
-    @Binding var isClearQueueArmed: Bool
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
@@ -49,7 +48,6 @@ struct PlayerQueueSections: View {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             isManualQueueExpanded.toggle()
                         }
-                        disarmClearQueue()
                     } label: {
                         PlayerSectionHeading(
                             title: "Queue",
@@ -61,37 +59,16 @@ struct PlayerQueueSections: View {
                     .buttonStyle(ResponsiveButtonStyle())
 
                     Button {
-                        if isClearQueueArmed {
-                            isClearQueueArmed = false
-                            player.clearManualQueueWithUndo()
-                        } else {
-                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                                isClearQueueArmed = true
-                            }
-                        }
+                        player.clearManualQueueWithUndo()
                     } label: {
-                        Group {
-                            if isClearQueueArmed {
-                                Text("Clear")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .transition(.blurReplace)
-                            } else {
-                                Image(systemName: "xmark")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .transition(.blurReplace)
-                            }
-                        }
-                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                        .contentShape(Rectangle())
-                        .animation(
-                            reduceMotion ? nil : InterfaceMotion.quick,
-                            value: isClearQueueArmed
-                        )
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel(isClearQueueArmed ? "Confirm clear queue" : "Clear queue")
+                    .accessibilityLabel("Clear queue")
 
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
@@ -140,7 +117,6 @@ struct PlayerQueueSections: View {
                     .transition(.opacity)
                 }
             }
-            .onDisappear { isClearQueueArmed = false }
         }
     }
 
@@ -500,13 +476,6 @@ struct PlayerQueueSections: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.accentColor.opacity(0.10))
             }
-        }
-    }
-
-    private func disarmClearQueue() {
-        guard isClearQueueArmed else { return }
-        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-            isClearQueueArmed = false
         }
     }
 
