@@ -47,6 +47,12 @@ struct PlayerQueueSections: View {
                     disarmClearQueue()
                 }
             )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1).onChanged { _ in
+                    disarmClearQueue()
+                },
+                including: isClearQueueArmed ? .all : .none
+            )
         }
     }
 
@@ -135,7 +141,6 @@ struct PlayerQueueSections: View {
                             queueRow(
                                 video,
                                 preservesPlaylistContext: false,
-                                showsReorderHandle: true,
                                 onPlay: {
                                     player.removeFromManualQueue(videoID: video.id)
                                     player.load(video)
@@ -149,19 +154,19 @@ struct PlayerQueueSections: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
-                            .dropDestination(for: String.self) { identifiers, _ in
-                                guard let sourceID = identifiers.first else { return false }
-                                return moveManualQueueItem(sourceID: sourceID, before: video.id)
-                            }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .frame(height: Self.queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
+                        .onMove { offsets, destination in
+                            player.moveManualQueue(fromOffsets: offsets, toOffset: destination)
+                        }
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollDisabled(true)
+                    .environment(\.editMode, .constant(.active))
                     .frame(height: manualQueueListHeight)
                     .transition(.opacity)
                 }
@@ -432,7 +437,6 @@ struct PlayerQueueSections: View {
     private func queueRow(
         _ video: Video,
         preservesPlaylistContext: Bool,
-        showsReorderHandle: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemove: (() -> Void)? = nil
     ) -> some View {
@@ -508,24 +512,6 @@ struct PlayerQueueSections: View {
                 offersPlayNext: !preservesPlaylistContext,
                 onRemoveFromUpNext: removalAction
             )
-
-            if showsReorderHandle {
-                Image(systemName: "line.3.horizontal")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: MediaStyle.actionSize, height: Self.queueRowHeight)
-                    .contentShape(Rectangle())
-                    .draggable(video.id) {
-                        Text(video.title)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .frame(maxWidth: 220)
-                            .background(.regularMaterial, in: Capsule())
-                    }
-                    .accessibilityLabel("Reorder \(video.title)")
-            }
         }
         .background {
             if preservesPlaylistContext, video.id == player.currentVideo?.id {
@@ -533,17 +519,6 @@ struct PlayerQueueSections: View {
                     .fill(Color.accentColor.opacity(0.10))
             }
         }
-    }
-
-    private func moveManualQueueItem(sourceID: String, before targetID: String) -> Bool {
-        guard sourceID != targetID,
-              let source = player.manualQueue.firstIndex(where: { $0.id == sourceID }),
-              let target = player.manualQueue.firstIndex(where: { $0.id == targetID }) else {
-            return false
-        }
-        let destination = target > source ? target + 1 : target
-        player.moveManualQueue(fromOffsets: IndexSet(integer: source), toOffset: destination)
-        return true
     }
 
     private func disarmClearQueue() {
