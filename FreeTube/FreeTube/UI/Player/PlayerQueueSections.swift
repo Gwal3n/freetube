@@ -13,6 +13,7 @@ struct PlayerQueueSections: View {
     let showsUpNext: Bool
     let upNextInitialCount: Int
     let onOpenPlaylist: (String) -> Void
+    @Binding var isClearQueueArmed: Bool
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
@@ -20,8 +21,6 @@ struct PlayerQueueSections: View {
     @State private var isPlaylistExpanded = true
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
-    @State private var isClearQueueArmed = false
-    @State private var clearQueueButtonFrame: CGRect = .zero
 
     private static let queueRowHeight: CGFloat = 56
     private static let queueRowFootprint: CGFloat = queueRowHeight + 8
@@ -36,18 +35,6 @@ struct PlayerQueueSections: View {
                     queuePanel
                 }
             }
-            .coordinateSpace(name: "playerQueueSections")
-            .onPreferenceChange(ClearQueueButtonFrameKey.self) { frame in
-                clearQueueButtonFrame = frame
-            }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .named("playerQueueSections"))
-                    .onChanged { value in
-                    guard !clearQueueButtonFrame.contains(value.startLocation) else { return }
-                    disarmClearQueue()
-                },
-                including: isClearQueueArmed ? .all : .none
-            )
         }
     }
 
@@ -108,7 +95,7 @@ struct PlayerQueueSections: View {
                         GeometryReader { proxy in
                             Color.clear.preference(
                                 key: ClearQueueButtonFrameKey.self,
-                                value: proxy.frame(in: .named("playerQueueSections"))
+                                value: proxy.frame(in: .global)
                             )
                         }
                     }
@@ -531,7 +518,7 @@ struct PlayerQueueSections: View {
 
 }
 
-private struct ClearQueueButtonFrameKey: PreferenceKey {
+struct ClearQueueButtonFrameKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
 
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {

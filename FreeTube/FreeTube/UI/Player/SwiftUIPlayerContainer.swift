@@ -46,12 +46,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(1)
                         .transition(.opacity)
 
-                    FullScreenPlayer()
-                        // Keep the host itself edge-to-edge and inset its normal content instead
-                        // of shortening the host frame. This preserves the settled status-area
-                        // clearance while giving an interactive fullscreen stretch room to draw
-                        // temporarily behind the notch up to the physical screen edge.
-                        .padding(.top, expandedTopInset)
+                    FullScreenPlayer(topContentInset: expandedTopInset)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .background(Color.black)
                         .clipShape(

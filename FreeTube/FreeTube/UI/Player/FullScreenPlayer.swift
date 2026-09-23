@@ -23,6 +23,8 @@ struct FullScreenPlayer: View {
     @State private var portraitVideoFullscreen = false
     @State private var fullscreenSwipeTranslation: CGFloat = 0
     @State private var fullscreenSwipeIsVertical: Bool?
+    @State private var isClearQueueArmed = false
+    @State private var clearQueueButtonFrame: CGRect = .zero
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -32,6 +34,8 @@ struct FullScreenPlayer: View {
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
+
+    let topContentInset: CGFloat
 
     var body: some View {
         // Single dark-blur material under EVERYTHING — status bar inset, video chrome, transport,
@@ -44,6 +48,7 @@ struct FullScreenPlayer: View {
         // allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
+            let viewportHeight = max(0, proxy.size.height - topContentInset)
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
             let chapterPanelWidth: CGFloat = isLandscape && player.chapterListPresented
                 ? min(360, proxy.size.width * 0.38)
@@ -53,18 +58,18 @@ struct FullScreenPlayer: View {
             // frame taller than a modern phone's safe height. AVPlayer aspect-fits the video in
             // that region, preventing the timeline and bottom edge from being cropped.
             let compactSurfaceHeight = isLandscape
-                ? proxy.size.height
+                ? viewportHeight
                 : PlayerViewportLayout.compactSurfaceHeight(
                     width: surfaceWidth,
                     presentationSize: player.videoPresentationSize
                 )
             let expandedSurfaceHeight = usesPortraitFullscreen
-                ? proxy.size.height
+                ? viewportHeight
                 : isLandscape
                     ? compactSurfaceHeight
                     : PlayerViewportLayout.expandedSurfaceHeight(
                     width: surfaceWidth,
-                    viewportHeight: proxy.size.height,
+                    viewportHeight: viewportHeight,
                     isLandscape: isLandscape,
                     presentationSize: player.videoPresentationSize
                 )
@@ -122,14 +127,14 @@ struct FullScreenPlayer: View {
                     // Entering fullscreen grows the media upward from a planted bottom edge,
                     // matching the direct-manipulation language used by YouTube. Exiting retains
                     // the subtle uniform shrink while travelling down.
-                    .scaleEffect(fullscreenExitScale(viewportHeight: proxy.size.height))
+                    .scaleEffect(fullscreenExitScale(viewportHeight: viewportHeight))
                     .scaleEffect(
                         fullscreenEntryScale(surfaceHeight: surfaceHeight),
                         anchor: .bottom
                     )
                     .clipShape(
                         RoundedRectangle(
-                            cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: proxy.size.height),
+                            cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: viewportHeight),
                             style: .continuous
                         )
                     )
@@ -269,7 +274,7 @@ struct FullScreenPlayer: View {
                 .simultaneousGesture(
                     fullscreenSwipeGesture(
                         isFullscreen: portraitFullscreenActive || isLandscape,
-                        viewportHeight: proxy.size.height
+                        viewportHeight: viewportHeight
                     )
                 )
                 .onAppear { showPlayerControls() }
@@ -309,7 +314,7 @@ struct FullScreenPlayer: View {
                     collapseRange: collapseRange,
                     minimumContentHeight: max(
                         0,
-                        proxy.size.height - compactSurfaceHeight + collapseRange
+                        viewportHeight - compactSurfaceHeight + collapseRange
                     )
                 )
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
@@ -317,7 +322,8 @@ struct FullScreenPlayer: View {
                 .frame(width: surfaceWidth, alignment: .leading)
             }
             }
-            .frame(width: proxy.size.width, alignment: .leading)
+            .frame(width: proxy.size.width, height: viewportHeight, alignment: .topLeading)
+            .offset(y: topContentInset)
 
             if player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
                 PlayerChapterOverlay(
@@ -327,9 +333,9 @@ struct FullScreenPlayer: View {
                 )
                 .frame(
                     width: isLandscape ? chapterPanelWidth : proxy.size.width,
-                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - surfaceHeight)
+                    height: isLandscape ? viewportHeight : max(0, viewportHeight - surfaceHeight)
                 )
-                .offset(y: isLandscape ? 0 : surfaceHeight)
+                .offset(y: topContentInset + (isLandscape ? 0 : surfaceHeight))
                 // Moving the landscape material sidebar while simultaneously widening the player
                 // leaves a stale strip at the trailing edge for one render pass. Remove it
                 // atomically and let the underlying column resize; portrait retains its sheet
@@ -352,6 +358,17 @@ struct FullScreenPlayer: View {
         // Ensure the system status bar stays visible with light glyphs against the dark material.
         .preferredColorScheme(.dark)
         .statusBarHidden(portraitFullscreenActive)
+        .onPreferenceChange(ClearQueueButtonFrameKey.self) { frame in
+            clearQueueButtonFrame = frame
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                .onChanged { value in
+                    guard !clearQueueButtonFrame.contains(value.startLocation) else { return }
+                    disarmClearQueue()
+                },
+            including: isClearQueueArmed ? .all : .none
+        )
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL
         // in a `Binding<Bool>` that flips when the URL is set/cleared so the sheet lifecycle
         // matches the user's intent.
@@ -381,6 +398,7 @@ struct FullScreenPlayer: View {
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
                 portraitVideoFullscreen = false
+                isClearQueueArmed = false
             }
         }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
@@ -532,6 +550,13 @@ struct FullScreenPlayer: View {
         showPlayerControls()
     }
 
+    private func disarmClearQueue() {
+        guard isClearQueueArmed else { return }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+            isClearQueueArmed = false
+        }
+    }
+
     private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
@@ -599,6 +624,7 @@ struct FullScreenPlayer: View {
                     showsUpNext: showUpNext,
                     upNextInitialCount: upNextInitialCount,
                     showsComments: showComments,
+                    isClearQueueArmed: $isClearQueueArmed,
                     onToggleDetails: {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                             detailsModel.isExpanded.toggle()

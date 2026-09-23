@@ -18,6 +18,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     let showsUpNext: Bool
     let upNextInitialCount: Int
     let showsComments: Bool
+    @Binding var isClearQueueArmed: Bool
     let onToggleDetails: () -> Void
     let onExpandDetails: () -> Void
     let onRetryDetails: () -> Void
@@ -38,6 +39,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         showsUpNext: Bool,
         upNextInitialCount: Int,
         showsComments: Bool,
+        isClearQueueArmed: Binding<Bool>,
         onToggleDetails: @escaping () -> Void,
         onExpandDetails: @escaping () -> Void,
         onRetryDetails: @escaping () -> Void,
@@ -57,6 +59,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.showsUpNext = showsUpNext
         self.upNextInitialCount = upNextInitialCount
         self.showsComments = showsComments
+        _isClearQueueArmed = isClearQueueArmed
         self.onToggleDetails = onToggleDetails
         self.onExpandDetails = onExpandDetails
         self.onRetryDetails = onRetryDetails
@@ -94,7 +97,8 @@ struct PlayerInformationPanel<Actions: View>: View {
                 PlayerQueueSections(
                     showsUpNext: showsUpNext,
                     upNextInitialCount: upNextInitialCount,
-                    onOpenPlaylist: onOpenPlaylist
+                    onOpenPlaylist: onOpenPlaylist,
+                    isClearQueueArmed: $isClearQueueArmed
                 )
 
                 if showsComments {
