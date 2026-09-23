@@ -119,27 +119,32 @@ struct ChannelScreen: View {
 
                     Text(channel.name)
                         .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
                         .lineLimit(2)
                     if let handle = channel.handle, !handle.isEmpty {
                         Text(handle)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.72))
                             .lineLimit(1)
                     }
                     if !channelStats(channel).isEmpty {
                         Text(channelStats(channel))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.62))
                             .lineLimit(1)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
+                Spacer(minLength: 12)
                 subscribeButton(channel)
+                    .fixedSize(horizontal: true, vertical: false)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.top, 16)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, 18)
     }
 
@@ -165,6 +170,7 @@ struct ChannelScreen: View {
                 endPoint: .bottom
             )
         }
+        .frame(maxWidth: .infinity)
         .frame(height: 178)
         .clipped()
         .accessibilityHidden(true)
