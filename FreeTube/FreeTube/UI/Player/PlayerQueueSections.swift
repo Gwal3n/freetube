@@ -41,14 +41,9 @@ struct PlayerQueueSections: View {
                 clearQueueButtonFrame = frame
             }
             .simultaneousGesture(
-                SpatialTapGesture().onEnded { value in
-                    guard isClearQueueArmed,
-                          !clearQueueButtonFrame.contains(value.location) else { return }
-                    disarmClearQueue()
-                }
-            )
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 1).onChanged { _ in
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("playerQueueSections"))
+                    .onChanged { value in
+                    guard !clearQueueButtonFrame.contains(value.startLocation) else { return }
                     disarmClearQueue()
                 },
                 including: isClearQueueArmed ? .all : .none

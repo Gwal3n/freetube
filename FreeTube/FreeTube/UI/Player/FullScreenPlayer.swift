@@ -450,7 +450,9 @@ struct FullScreenPlayer: View {
     /// the media without bound before the fullscreen threshold is crossed.
     private func fullscreenEntryScale(surfaceHeight: CGFloat) -> CGFloat {
         guard fullscreenSwipeTranslation < 0 else { return 1 }
-        let maximumGrowthTravel = min(110, surfaceHeight * 0.28)
+        // A compact 16:9 surface needs enough headroom to travel visibly beyond the status-area
+        // inset, not merely stop at its lower boundary.
+        let maximumGrowthTravel = min(140, surfaceHeight * 0.65)
         let growthTravel = min(abs(fullscreenSwipeTranslation), maximumGrowthTravel)
         return 1 + growthTravel / max(1, surfaceHeight)
     }
