@@ -119,14 +119,22 @@ struct FullScreenPlayer: View {
                         )
                         PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     }
-                    .scaleEffect(fullscreenSwipeScale(viewportHeight: proxy.size.height))
+                    // Entering fullscreen grows the media upward from a planted bottom edge,
+                    // matching the direct-manipulation language used by YouTube. Exiting retains
+                    // the subtle uniform shrink while travelling down.
+                    .scaleEffect(fullscreenExitScale(viewportHeight: proxy.size.height))
+                    .scaleEffect(
+                        x: 1,
+                        y: fullscreenEntryStretch(surfaceHeight: surfaceHeight),
+                        anchor: .bottom
+                    )
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: proxy.size.height),
                             style: .continuous
                         )
                     )
-                    .offset(y: fullscreenSwipeTranslation)
+                    .offset(y: max(0, fullscreenSwipeTranslation))
                     Color.black
                         .opacity(controlsVisibility.isVisible ? 0.28 : 0)
                         // Dim the stable player surface rather than AVPlayer's presentation rect.
@@ -432,13 +440,22 @@ struct FullScreenPlayer: View {
         }
     }
 
-    private func fullscreenSwipeScale(viewportHeight: CGFloat) -> CGFloat {
-        let progress = min(1, abs(fullscreenSwipeTranslation) / max(1, viewportHeight * 0.35))
+    private func fullscreenExitScale(viewportHeight: CGFloat) -> CGFloat {
+        guard fullscreenSwipeTranslation > 0 else { return 1 }
+        let progress = min(1, fullscreenSwipeTranslation / max(1, viewportHeight * 0.35))
         return 1 - progress * 0.035
     }
 
+    /// With `.bottom` as the transform anchor, increasing the layer by `travel / height` moves
+    /// its top edge by exactly the finger's travel while leaving the bottom edge unchanged.
+    private func fullscreenEntryStretch(surfaceHeight: CGFloat) -> CGFloat {
+        guard fullscreenSwipeTranslation < 0 else { return 1 }
+        return 1 + abs(fullscreenSwipeTranslation) / max(1, surfaceHeight)
+    }
+
     private func fullscreenSwipeCornerRadius(viewportHeight: CGFloat) -> CGFloat {
-        let progress = min(1, abs(fullscreenSwipeTranslation) / max(1, viewportHeight * 0.24))
+        guard fullscreenSwipeTranslation > 0 else { return 0 }
+        let progress = min(1, fullscreenSwipeTranslation / max(1, viewportHeight * 0.24))
         return progress * 20
     }
 
