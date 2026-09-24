@@ -9,7 +9,15 @@ struct ChannelScreen: View {
     @State private var videoSort: ChannelVideoSort = .newest
     @State private var suppressContentTap = false
     @GestureState private var tabDragOffset: CGFloat = 0
-    @Namespace private var tabIndicatorNamespace
+    /// Laid-out frame of each tab label, keyed by `ChannelProfileTab.id`, in the tab row's own
+    /// coordinate space. The underline is positioned by interpolating between two of these rather
+    /// than by recomputing segment arithmetic, so it tracks a drag continuously.
+    @State private var tabFrames: [String: CGRect] = [:]
+    @State private var contentWidth: CGFloat = 0
+    @State private var showsNavigationTitle = false
+
+    private static let tabRowSpace = "channelTabRow"
+    private static let scrollSpace = "channelScroll"
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -20,6 +28,53 @@ struct ChannelScreen: View {
     }
 
     var body: some View {
+        offsetTrackingScrollView
+            .scrollIndicators(.hidden)
+            .background(Color.black)
+            .preferredColorScheme(.dark)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // A principal item rather than `navigationTitle`, because the title has to fade
+                // rather than appear: it stays hidden while the channel's own name is on screen in
+                // the header, and takes over only once that name has scrolled under the bar.
+                ToolbarItem(placement: .principal) {
+                    Text(model.details?.channel.name ?? "")
+                        .font(.headline)
+                        .lineLimit(1)
+                        .opacity(showsNavigationTitle ? 1 : 0)
+                        .offset(y: showsNavigationTitle ? 0 : 8)
+                }
+                channelActionsToolbar
+            }
+            .task { await model.load() }
+            .task(id: videoSort) {
+                guard model.details != nil, videoSort != .newest else { return }
+                await model.loadVideos(sort: videoSort)
+            }
+            .errorToast(Bindable(model).errorState)
+    }
+
+    /// iOS 18 reads the scroll geometry natively; iOS 17 falls back to a preference probe in a
+    /// named coordinate space. Same split the player panel uses.
+    @ViewBuilder
+    private var offsetTrackingScrollView: some View {
+        if #available(iOS 18.0, *) {
+            channelScrollView
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    max(0, geometry.contentOffset.y + geometry.contentInsets.top)
+                } action: { _, offset in
+                    updateNavigationTitle(scrollOffset: offset)
+                }
+        } else {
+            channelScrollView
+                .coordinateSpace(name: Self.scrollSpace)
+                .onPreferenceChange(ChannelScrollOffsetKey.self) { offset in
+                    updateNavigationTitle(scrollOffset: offset)
+                }
+        }
+    }
+
+    private var channelScrollView: some View {
         ScrollView {
             // Keep the profile shell eagerly mounted. The media collections remain
             // lazy in their individual sections.
@@ -40,19 +95,32 @@ struct ChannelScreen: View {
             // misbehaving child overflows and gets clipped instead of relaying its width to the
             // header and the tab bar.
             .containerRelativeFrame(.horizontal)
+            // Probes sit outside the clamp so the width they report is the clamped page width,
+            // which is what a tab swipe is measured against.
+            .background {
+                GeometryReader { geometry in
+                    Color.clear
+                        .preference(
+                            key: ChannelScrollOffsetKey.self,
+                            value: -geometry.frame(in: .named(Self.scrollSpace)).minY
+                        )
+                        .preference(key: ChannelContentWidthKey.self, value: geometry.size.width)
+                }
+            }
+            .onPreferenceChange(ChannelContentWidthKey.self) { width in
+                contentWidth = width
+            }
         }
-        .scrollIndicators(.hidden)
-        .background(Color.black)
-        .preferredColorScheme(.dark)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle(model.details?.channel.name ?? "Channel")
-        .toolbar { channelActionsToolbar }
-        .task { await model.load() }
-        .task(id: videoSort) {
-            guard model.details != nil, videoSort != .newest else { return }
-            await model.loadVideos(sort: videoSort)
+    }
+
+    /// The header's own channel name sits just under the avatar. Once it has travelled under the
+    /// navigation bar the bar takes the name over, so the name is always present exactly once.
+    private func updateNavigationTitle(scrollOffset: CGFloat) {
+        let shouldShow = scrollOffset > Metrics.navigationTitleReveal
+        guard shouldShow != showsNavigationTitle else { return }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+            showsNavigationTitle = shouldShow
         }
-        .errorToast(Bindable(model).errorState)
     }
 
     @ToolbarContentBuilder
@@ -95,6 +163,11 @@ struct ChannelScreen: View {
         /// How far the avatar hangs below the banner — half its height, so it sits centred on the
         /// banner's bottom edge.
         static var avatarOverhang: CGFloat { avatarSize / 2 }
+        /// Scroll distance at which the header's channel name has cleared the navigation bar.
+        /// Derived from the geometry above so it stays correct if the banner or avatar changes.
+        static var navigationTitleReveal: CGFloat { bannerHeight + avatarOverhang + 30 }
+        /// Leading strip reserved for the navigation controller's interactive pop gesture.
+        static let interactivePopEdge: CGFloat = 32
     }
 
     /// Mirrors the loaded header's geometry so the screen doesn't jump when content arrives.
@@ -286,52 +359,95 @@ struct ChannelScreen: View {
     /// widths inside a scroller can do neither: the labels keep their natural spacing at any size,
     /// and when they genuinely exceed the width the row scrolls instead of truncating.
     ///
-    /// The indicator rides on `matchedGeometryEffect`, so its travel is derived from the laid-out
-    /// labels rather than recomputed from segment arithmetic.
+    /// The underline is a single view positioned from the measured label frames, interpolated by
+    /// the live drag offset. That is what makes it follow a swipe continuously instead of jumping
+    /// once the gesture ends, and it costs one interpolation rather than a second layout pass.
     private func channelTabBar(_ details: ChannelDetails) -> some View {
         let tabs = availableTabs(for: details)
 
-        return ScrollView(.horizontal) {
-            HStack(spacing: 26) {
-                ForEach(tabs) { tab in
-                    let isSelected = selectedTab == tab
-                    Button {
-                        selectTab(tab)
-                    } label: {
-                        VStack(spacing: 7) {
-                            Text(tab.title)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.5))
-                                .fixedSize()
-                            // Only the selected tab carries the geometry id, so it is
-                            // unambiguously the source and SwiftUI animates the single indicator
-                            // between positions. Giving every tab the id and toggling `isSource`
-                            // would snap the inactive ones onto the active frame instead.
-                            if isSelected {
-                                Capsule()
-                                    .fill(Color.white)
-                                    .frame(height: 2.5)
-                                    .matchedGeometryEffect(id: "channelTabIndicator", in: tabIndicatorNamespace)
-                            } else {
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 26) {
+                    ForEach(tabs) { tab in
+                        let isSelected = selectedTab == tab
+                        Button {
+                            selectTab(tab)
+                        } label: {
+                            VStack(spacing: 7) {
+                                Text(tab.title)
+                                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                    .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.5))
+                                    .fixedSize()
+                                // Reserves the underline's row so the labels don't shift when it
+                                // moves; the underline itself is drawn once, in the overlay below.
                                 Color.clear.frame(height: 2.5)
                             }
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .id(tab.id)
+                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key: ChannelTabFrameKey.self,
+                                    value: [tab.id: geometry.frame(in: .named(Self.tabRowSpace))]
+                                )
+                            }
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                }
+                .coordinateSpace(name: Self.tabRowSpace)
+                .overlay(alignment: .bottomLeading) {
+                    if let indicator = indicatorFrame(tabs: tabs) {
+                        Capsule()
+                            .fill(Color.white)
+                            .frame(width: indicator.width, height: 2.5)
+                            .offset(x: indicator.minX)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+            }
+            .scrollIndicators(.hidden)
+            .onPreferenceChange(ChannelTabFrameKey.self) { frames in
+                tabFrames = frames
+            }
+            // Keep the active tab reachable when the row is wider than the screen.
+            .onChange(of: selectedTab) { _, tab in
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(tab.id, anchor: .center)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
         }
-        .scrollIndicators(.hidden)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(.white.opacity(0.08))
                 .frame(height: 1)
         }
+    }
+
+    /// Where the underline sits right now: the selected tab's label frame, blended toward the
+    /// neighbour the current drag is heading for. `tabDragOffset` is normalised against the page
+    /// width, so the underline is exactly as far along as the content is.
+    private func indicatorFrame(tabs: [ChannelProfileTab]) -> CGRect? {
+        guard let current = tabFrames[selectedTab.id] else { return nil }
+        guard contentWidth > 0, tabDragOffset != 0,
+              let currentIndex = tabs.firstIndex(of: selectedTab) else { return current }
+
+        let progress = min(max(-tabDragOffset / contentWidth, -1), 1)
+        let destinationIndex = progress > 0 ? currentIndex + 1 : currentIndex - 1
+        guard tabs.indices.contains(destinationIndex),
+              let destination = tabFrames[tabs[destinationIndex].id] else { return current }
+
+        let blend = min(abs(progress), 1)
+        return CGRect(
+            x: current.minX + (destination.minX - current.minX) * blend,
+            y: current.minY,
+            width: current.width + (destination.width - current.width) * blend,
+            height: current.height
+        )
     }
 
     private func availableTabs(for details: ChannelDetails) -> [ChannelProfileTab] {
@@ -347,18 +463,27 @@ struct ChannelScreen: View {
         }
     }
 
+    /// Horizontal swipe between tabs.
+    ///
+    /// Two rules earn their place here. Drags that begin within `interactivePopEdge` of the leading
+    /// edge are ignored outright, because that strip belongs to the navigation controller's
+    /// interactive pop — competing with it is what made a tab swipe sometimes pop the screen
+    /// instead. And the activation distance is short (12pt, previously 32) so the gesture claims a
+    /// real swipe before the row underneath can read it as a tap; a swipe that travelled 20pt used
+    /// to leave this gesture unrecognised and the button still saw a tap, which is how a sideways
+    /// flick opened a video.
     private func tabSwipeGesture(availableTabs: [ChannelProfileTab]) -> some Gesture {
-        DragGesture(minimumDistance: 32)
+        DragGesture(minimumDistance: 12)
             .updating($tabDragOffset) { value, state, _ in
-                guard abs(value.translation.width) > abs(value.translation.height) * 1.15 else { return }
+                guard isHorizontalTabSwipe(value) else { return }
                 state = value.translation.width
             }
             .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) * 1.15 else { return }
+                guard isHorizontalTabSwipe(value) else { return }
                 suppressContentTap = true
             }
             .onEnded { value in
-                if abs(value.translation.width) > abs(value.translation.height) * 1.35,
+                if isHorizontalTabSwipe(value),
                    abs(value.predictedEndTranslation.width) > 80,
                    let currentIndex = availableTabs.firstIndex(of: selectedTab) {
                     let direction = value.predictedEndTranslation.width < 0 ? 1 : -1
@@ -372,6 +497,11 @@ struct ChannelScreen: View {
                     suppressContentTap = false
                 }
             }
+    }
+
+    private func isHorizontalTabSwipe(_ value: DragGesture.Value) -> Bool {
+        guard value.startLocation.x > Metrics.interactivePopEdge else { return false }
+        return abs(value.translation.width) > abs(value.translation.height) * 1.15
     }
 
     @ViewBuilder
@@ -606,5 +736,31 @@ struct ChannelScreen: View {
         if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
         if value >= 1_000 { return String(format: "%.1fK", Double(value) / 1_000) }
         return "\(value)"
+    }
+}
+
+// MARK: - Layout probes
+
+/// Vertical scroll distance, used to hand the channel name from the header to the navigation bar.
+struct ChannelScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// Page width, used to normalise a tab swipe into 0...1 progress for the underline.
+struct ChannelContentWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// Measured frame of each tab label, keyed by `ChannelProfileTab.id`.
+struct ChannelTabFrameKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }
