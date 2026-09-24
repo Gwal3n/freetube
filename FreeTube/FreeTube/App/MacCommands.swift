@@ -34,7 +34,7 @@ struct MacCommands: Commands {
         // in-window Settings tab instead of opening a separate Settings scene.
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") {
-                postTab(.settings)
+                NotificationCenter.default.post(name: .freetubeOpenSettings, object: nil)
             }
             .keyboardShortcut(",", modifiers: .command)
         }
@@ -53,8 +53,12 @@ struct MacCommands: Commands {
                 .keyboardShortcut("3", modifiers: .command)
             Button("Downloads") { postTab(.downloads) }
                 .keyboardShortcut("4", modifiers: .command)
-            Button("Settings") { postTab(.settings) }
-                .keyboardShortcut("5", modifiers: .command)
+            // Settings is no longer a tab — it is presented from Library's toolbar — so this
+            // posts the same request the ⌘, item does rather than selecting anything.
+            Button("Settings") {
+                NotificationCenter.default.post(name: .freetubeOpenSettings, object: nil)
+            }
+            .keyboardShortcut("5", modifiers: .command)
         }
 
         // 3. Playback menu — same controls as the lock-screen remote on iOS. Disabled
@@ -105,6 +109,8 @@ extension Notification.Name {
     /// Posted by `MacCommands` when the user picks a tab via menu / shortcut. `RootView`
     /// listens and updates its `@State selectedTab`. The `object` is a `RootView.Tab`.
     static let freetubeSelectTab = Notification.Name("com.leshko.freetube.selectTab")
+    /// Requests the Settings sheet, which Library owns now that Settings has no tab of its own.
+    static let freetubeOpenSettings = Notification.Name("com.leshko.freetube.openSettings")
     /// Requests app-level channel presentation after the expanded player has collapsed.
     /// The object is a channel ID string.
     static let freetubeOpenChannel = Notification.Name("com.leshko.freetube.openChannel")

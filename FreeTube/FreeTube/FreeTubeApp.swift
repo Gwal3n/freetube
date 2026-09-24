@@ -4,15 +4,16 @@
 //
 //  Created by leshko on 17/5/26.
 //
-//  CLAUDE.md says iOS 16.0+, but SwiftData and `@Observable` require iOS 17.0+. The deployment
-//  target should be bumped to 17.0 in the Xcode project; this file requires iOS 17.
+//  The deployment target is iOS 26.0. The tab shell is built on `tabViewBottomAccessory` and
+//  `Tab(role: .search)`, which have no backward-compatible equivalent, so this entry point and
+//  everything on the path down to them is deliberately unannotated rather than carrying a stale
+//  `@available(iOS 17.0, *)` floor.
 //
 
 import SwiftUI
 import SwiftData
 
 @main
-@available(iOS 17.0, *)
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
 

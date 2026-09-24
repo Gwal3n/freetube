@@ -63,11 +63,19 @@ extension Video {
     /// refresh time. Render that date against the current clock so cached ages keep advancing.
     func publishedText(relativeTo now: Date) -> String? {
         guard let publishedAt else { return publishedRelative }
+        return Self.relativeDateFormatter.localizedString(for: min(publishedAt, now), relativeTo: now)
+    }
+
+    /// Shared because this is called from row bodies. `RelativeDateTimeFormatter` is expensive to
+    /// construct, and the subscription feed ticks a clock every minute that invalidates every
+    /// visible row — so a per-call formatter meant allocating one per row, per minute, plus one
+    /// per row scrolled into view.
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.dateTimeStyle = .numeric
         formatter.unitsStyle = .full
-        return formatter.localizedString(for: min(publishedAt, now), relativeTo: now)
-    }
+        return formatter
+    }()
 
     var durationString: String {
         if isLive { return "LIVE" }

@@ -875,6 +875,16 @@ final class PlayerStateManager {
         isLoadingMorePlaylistVideos || isLoadingMoreRecommendations
     }
 
+    /// Asks the presentation container to open the expanded player.
+    ///
+    /// Callers request rather than setting `fullScreenPresented` themselves so that one place owns
+    /// the animation. The mini player, playback commands, and Now Playing all arrive here, and the
+    /// container decides how the transition runs.
+    func requestExpansion() {
+        guard miniPlayerVisible, !fullScreenPresented else { return }
+        playerExpansionRequest &+= 1
+    }
+
     func dismiss() {
         log.info("dismiss()")
         persistCurrentPlaybackProgress(force: true)

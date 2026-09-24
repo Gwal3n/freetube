@@ -171,16 +171,23 @@ actor PersistenceWriter {
         return (existing.lastPosition, existing.duration)
     }
 
+    /// Resume progress for a batch of videos, in one query.
+    ///
+    /// This used to issue a separate `FetchDescriptor` per video inside a loop. Callers pass whole
+    /// pages — up to a hundred for the subscription feed, every row of a search result, a full
+    /// playlist — and re-run on each pagination and on every watch-history write, so the loop was
+    /// a hundred round trips to SQLite for one screen's worth of progress bars.
     func watchProgress(videoIDs: [String]) -> [String: Double] {
-        var result: [String: Double] = [:]
-        for videoID in Set(videoIDs) {
-            let target = videoID
-            let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
-            guard let entry = try? modelContext.fetch(descriptor).first,
-                  let progress = entry.resumableProgress else { continue }
-            result[videoID] = progress
+        let targets = Set(videoIDs)
+        guard !targets.isEmpty else { return [:] }
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(
+            predicate: #Predicate { targets.contains($0.videoID) }
+        )
+        guard let entries = try? modelContext.fetch(descriptor) else { return [:] }
+        return entries.reduce(into: [:]) { result, entry in
+            guard let progress = entry.resumableProgress else { return }
+            result[entry.videoID] = progress
         }
-        return result
     }
 
     func fetchWatchHistory(offset: Int, limit: Int) -> [WatchHistorySnapshot] {

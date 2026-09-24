@@ -310,7 +310,11 @@ struct FullScreenPlayer: View {
                           let video = player.currentVideo else { return }
                     detailsModel.loadIfNeeded(for: video, player: player)
             }
-            if let video = player.currentVideo, !usesPortraitFullscreen {
+            // Gated on the sheet actually being open. The video surface deliberately stays mounted
+            // while collapsed so returning to it doesn't flash, but the metadata panel underneath
+            // has no such requirement — and leaving it mounted meant every browse session carried
+            // the description, action bar, Up Next and comments laid out off-screen.
+            if let video = player.currentVideo, player.fullScreenPresented, !usesPortraitFullscreen {
                 panel(
                     video,
                     collapseRange: collapseRange,

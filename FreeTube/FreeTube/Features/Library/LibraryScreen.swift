@@ -15,11 +15,15 @@ struct LibraryScreen: View {
     }
 
     let navigationRequest: AppNavigationRequest?
+    /// Bumped by the ⌘, menu item, which has no tab to select now that Settings is presented
+    /// from this screen's toolbar.
+    var settingsRequest: Int = 0
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
     @State private var path: [Destination] = []
     @State private var didLoadRootData = false
+    @State private var showsSettings = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -27,6 +31,28 @@ struct LibraryScreen: View {
                 localHistorySection
             }
             .navigationTitle("Library")
+            // Settings lost its tab to the search button. A trailing toolbar control on the
+            // "your stuff" root is where Music and Podcasts put the same thing, and preferences
+            // are somewhere you visit occasionally rather than a peer browsing destination.
+            // Presented rather than pushed because `SettingsScreen` owns its own `NavigationStack`
+            // for its sub-pages, and nesting one stack inside another breaks both.
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showsSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .accessibilityLabel("Settings")
+                }
+            }
+            .sheet(isPresented: $showsSettings) {
+                SettingsScreen()
+            }
+            .onChange(of: settingsRequest) { _, _ in
+                guard settingsRequest > 0 else { return }
+                showsSettings = true
+            }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .history: LocalHistoryScreen()

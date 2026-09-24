@@ -2,15 +2,14 @@ import SwiftUI
 import Kingfisher
 import UIKit
 
-/// Top-level tabbed shell. CLAUDE.md §8: mini-player sits above the tab bar and persists across tabs.
+/// Top-level tabbed shell.
 ///
-/// Tab layout (5):
-/// - Feed (latest cached videos from local subscriptions)
-/// - Search (search field, suggestions, results, and local recent searches)
-/// - Library (device-local history, subscriptions, and playlists)
-/// - Downloads (saved videos, transfer queue, and yt-dlp link downloads)
-/// - Settings (preferences, quality, diagnostics)
-@available(iOS 17.0, *)
+/// Three peer tabs — Feed, Library, Downloads — plus Search in the dedicated search role, which
+/// the system detaches into its own button beside the bar. The mini player is the tab view's
+/// bottom accessory, so the system owns its glass treatment, its inset above the bar, and the way
+/// it settles inline between the active tab and the search button once the bar minimises on
+/// scroll. Settings moved into Library's toolbar; five tabs left no room for the search button and
+/// preferences are not a browsing destination.
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
@@ -24,6 +23,9 @@ struct RootView: View {
     @State private var searchNavigationRequest: AppNavigationRequest?
     @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
+    /// Monotonic counter rather than a Bool: the Settings sheet lives in Library, and a repeated
+    /// ⌘, must reopen it even if the flag was never reset.
+    @State private var settingsRequest = 0
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
     /// (for the list) read the same source of truth.
@@ -33,7 +35,7 @@ struct RootView: View {
     @State private var thumbnail: UIImage?
 
     enum Tab: String, Hashable {
-        case feed, search, library, downloads, settings
+        case feed, search, library, downloads
     }
 
     private var selectedTab: Tab {
@@ -49,16 +51,25 @@ struct RootView: View {
         }.count
     }
 
+    /// Lifts the transient queue toast clear of the system chrome below it.
+    ///
+    /// The container ignores the safe area so the expanded player can go edge to edge, which means
+    /// a bottom-anchored overlay lands on the display edge and this has to put it back. The tab
+    /// bar and accessory heights are estimates — SwiftUI exposes the accessory's placement but not
+    /// its measured height — and an estimate is acceptable here in a way it was not for the mini
+    /// player itself, because this is a toast that appears for a few seconds rather than a
+    /// permanent surface that has to sit flush against the bar.
     private var queueNoticeBottomPadding: CGFloat {
         if player.fullScreenPresented {
             return PlayerLayoutMetrics.safeAreaInsets.bottom + 12
         }
-        let miniPlayerClearance: CGFloat = player.miniPlayerVisible ? 68 : 8
-        return PlayerLayoutMetrics.bottomTabBarClearance + miniPlayerClearance
+        let tabBar: CGFloat = 56
+        let accessory: CGFloat = player.miniPlayerVisible ? 68 : 0
+        return PlayerLayoutMetrics.safeAreaInsets.bottom + tabBar + accessory + 8
     }
 
     var body: some View {
-        SwiftUIPlayerContainer(thumbnail: thumbnail) {
+        SwiftUIPlayerContainer {
             tabShell
         }
         .overlay(alignment: .bottom) {
@@ -98,10 +109,7 @@ struct RootView: View {
         .onChange(of: player.currentVideo?.id, initial: true) {
             loadThumbnailForCurrentVideo()
         }
-        // Force light status-bar glyphs while the dark expanded player is visible, then restore
-        // the app's normal appearance when it returns to the mini-player.
         .onChange(of: player.fullScreenPresented) { _, presented in
-            updateStatusBarOverride(forFullScreenOpen: presented)
             if presented {
                 player.requestInlinePlaybackRestoration()
             }
@@ -121,6 +129,10 @@ struct RootView: View {
             if let tab = note.object as? Tab {
                 selectedTabRaw = tab.rawValue
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
+            selectedTabRaw = Tab.library.rawValue
+            settingsRequest &+= 1
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
@@ -146,70 +158,40 @@ struct RootView: View {
         }
     }
 
-    @ViewBuilder
     private var tabShell: some View {
-        if #available(iOS 26.0, *) {
-            TabView(selection: tabSelection) {
-                if showSubscriptionFeedTab {
-                    SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
-                        SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
-                    }
-                }
-
-                SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search) {
-                    HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
-                }
-
-                SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
-                    LibraryScreen(navigationRequest: libraryNavigationRequest)
-                }
-
-                SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
-                    DownloadsScreen(navigationRequest: downloadsNavigationRequest)
-                }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-
-                SwiftUI.Tab("Settings", systemImage: "gearshape.fill", value: Tab.settings) {
-                    SettingsScreen()
-                }
-            }
-        } else {
-            legacyTabShell
-        }
-    }
-
-    /// iOS 17–25 compatibility. iOS 26 uses the modern `Tab` declarations above for its
-    /// native Liquid Glass tab bar, while Search remains an ordinary peer tab on every OS.
-    private var legacyTabShell: some View {
         TabView(selection: tabSelection) {
             if showSubscriptionFeedTab {
-                SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
-                    .tabItem { Label("Feed", systemImage: "rectangle.stack") }
-                    .tag(Tab.feed)
+                SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
+                    SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
+                }
             }
 
-            HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(Tab.search)
+            SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
+                LibraryScreen(
+                    navigationRequest: libraryNavigationRequest,
+                    settingsRequest: settingsRequest
+                )
+            }
 
-            LibraryScreen(navigationRequest: libraryNavigationRequest)
-                .tabItem { Label("Library", systemImage: "play.square.stack") }
-                .tag(Tab.library)
+            SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
+                DownloadsScreen(navigationRequest: downloadsNavigationRequest)
+            }
+            .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
 
-            DownloadsScreen(navigationRequest: downloadsNavigationRequest)
-                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-                .tag(Tab.downloads)
-
-            SettingsScreen()
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                .tag(Tab.settings)
+            // The search role is what detaches this into its own button beside the bar, and it is
+            // also what gives the minimised bar something for the accessory to settle between.
+            SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
+                HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
+            }
+        }
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabViewBottomAccessory(isEnabled: player.miniPlayerVisible) {
+            MiniPlayerAccessory(thumbnail: thumbnail)
         }
     }
 
-    /// Keep Search as an ordinary peer tab. SwiftUI writes the selection binding even when an
-    /// already-selected tab item is tapped, which lets us request search activation without the
-    /// detached iOS 26 `.search` tab role or a gesture recognizer on the native tab bar.
+    /// SwiftUI writes the selection binding even when an already-selected tab is tapped, which is
+    /// how re-selecting Search re-focuses the field without a gesture recognizer on the tab bar.
     private var tabSelection: Binding<Tab> {
         Binding(
             get: { selectedTab },
@@ -241,19 +223,10 @@ struct RootView: View {
                 feedNavigationRequest = request
             case .search:
                 searchNavigationRequest = request
-            case .library, .downloads, .settings:
+            case .library, .downloads:
                 break
             }
         }
-    }
-
-    private func updateStatusBarOverride(forFullScreenOpen open: Bool) {
-        let scene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first(where: { $0.activationState == .foregroundActive })
-            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first
-        window?.overrideUserInterfaceStyle = open ? .dark : .unspecified
     }
 
     /// Refreshes `thumbnail` whenever the current video changes. Tries three sources in order:

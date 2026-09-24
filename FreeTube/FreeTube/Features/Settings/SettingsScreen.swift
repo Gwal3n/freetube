@@ -8,6 +8,7 @@ struct SettingsScreen: View {
         case importData
     }
 
+    @Environment(\.dismiss) private var dismiss
     @State private var model = SettingsViewModel()
     @State private var path: [Destination] = []
 
@@ -268,6 +269,14 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
+            // Presented from Library's toolbar rather than owning a tab, so it needs its own way
+            // out. Confirmation-style placement because every control here applies immediately;
+            // there is nothing to cancel.
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .sponsorBlock:
