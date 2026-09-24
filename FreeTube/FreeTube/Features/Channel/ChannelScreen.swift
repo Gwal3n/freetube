@@ -31,7 +31,7 @@ struct ChannelScreen: View {
                     channelHeaderPlaceholder
                 }
             }
-            .containerRelativeFrame(.horizontal)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
         .background(Color.black)
@@ -287,7 +287,7 @@ struct ChannelScreen: View {
         let hasDestination = tabDragOffset != 0 && tabs.indices.contains(destinationIndex)
 
         channelContent(details, tab: selectedTab)
-            .containerRelativeFrame(.horizontal)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .allowsHitTesting(!suppressContentTap)
             .offset(x: hasDestination ? tabDragOffset : resistedTabOffset(tabDragOffset))
             .overlay(alignment: .topLeading) {
@@ -303,7 +303,6 @@ struct ChannelScreen: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
             .clipped()
             .contentShape(Rectangle())
             .simultaneousGesture(tabSwipeGesture(availableTabs: tabs))
