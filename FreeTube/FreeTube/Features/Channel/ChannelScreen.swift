@@ -19,29 +19,21 @@ struct ChannelScreen: View {
     }
 
     var body: some View {
-        GeometryReader { viewport in
-            ScrollView {
-                // Keep the profile shell eagerly mounted. The tab pager uses moving,
-                // clipped overlays; placing that composition beside the identity
-                // header in a LazyVStack can retain the header's measured space while
-                // dropping its rendered subtree during lazy-view reconciliation.
-                // The media collections remain lazy in their individual sections.
-                VStack(spacing: 0) {
-                    if let details = model.details {
-                        channelHeader(details.channel)
-                        channelTabBar(details, width: viewport.size.width)
-                        interactiveChannelContent(details, width: viewport.size.width)
-                    } else {
-                        channelHeaderPlaceholder
-                    }
+        ScrollView {
+            // Keep the profile shell eagerly mounted. The media collections remain
+            // lazy in their individual sections.
+            VStack(spacing: 0) {
+                if let details = model.details {
+                    channelHeader(details.channel)
+                    channelTabBar(details)
+                    interactiveChannelContent(details)
+                } else {
+                    channelHeaderPlaceholder
                 }
-                // A vertical ScrollView does not always propose a finite horizontal
-                // size to eager children. Keep remote banner imagery from expanding
-                // the complete profile (including its tabs) beyond the viewport.
-                .frame(width: viewport.size.width, alignment: .leading)
             }
-            .scrollIndicators(.hidden)
+            .containerRelativeFrame(.horizontal)
         }
+        .scrollIndicators(.hidden)
         .background(Color.black)
         .preferredColorScheme(.dark)
         .navigationBarTitleDisplayMode(.inline)
@@ -179,7 +171,6 @@ struct ChannelScreen: View {
                 endPoint: .bottom
             )
         }
-        .frame(maxWidth: .infinity)
         .frame(height: 178)
         .clipped()
         .accessibilityHidden(true)
@@ -209,37 +200,40 @@ struct ChannelScreen: View {
 
     // MARK: - Tabs
 
-    private func channelTabBar(_ details: ChannelDetails, width: CGFloat) -> some View {
-        let tabs = availableTabs(for: details)
-        let segmentWidth = width / CGFloat(max(1, tabs.count))
-        let selectedIndex = CGFloat(tabs.firstIndex(of: selectedTab) ?? 0)
-        let dragProgress = min(max(-tabDragOffset / max(1, width), -1), 1)
-        let indicatorIndex = min(max(selectedIndex + dragProgress, 0), CGFloat(max(0, tabs.count - 1)))
+    private func channelTabBar(_ details: ChannelDetails) -> some View {
+        GeometryReader { geometry in
+            let tabs = availableTabs(for: details)
+            let width = geometry.size.width
+            let segmentWidth = width / CGFloat(max(1, tabs.count))
+            let selectedIndex = CGFloat(tabs.firstIndex(of: selectedTab) ?? 0)
+            let dragProgress = min(max(-tabDragOffset / max(1, width), -1), 1)
+            let indicatorIndex = min(max(selectedIndex + dragProgress, 0), CGFloat(max(0, tabs.count - 1)))
 
-        return ZStack(alignment: .bottomLeading) {
-            HStack(spacing: 0) {
-                ForEach(tabs) { tab in
-                    Button {
-                        selectTab(tab)
-                    } label: {
-                        Text(tab.title)
-                            .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
-                            .foregroundStyle(selectedTab == tab ? Color.white : Color.white.opacity(0.55))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
+            ZStack(alignment: .bottomLeading) {
+                HStack(spacing: 0) {
+                    ForEach(tabs) { tab in
+                        Button {
+                            selectTab(tab)
+                        } label: {
+                            Text(tab.title)
+                                .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
+                                .foregroundStyle(selectedTab == tab ? Color.white : Color.white.opacity(0.55))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: segmentWidth)
                     }
-                    .buttonStyle(.plain)
-                    .frame(width: segmentWidth)
                 }
-            }
 
-            Capsule()
-                .fill(.white)
-                .frame(width: min(34, max(20, segmentWidth - 20)), height: 2.5)
-                .offset(
-                    x: segmentWidth * indicatorIndex
-                        + (segmentWidth - min(34, max(20, segmentWidth - 20))) / 2
-                )
+                Capsule()
+                    .fill(.white)
+                    .frame(width: min(34, max(20, segmentWidth - 20)), height: 2.5)
+                    .offset(
+                        x: segmentWidth * indicatorIndex
+                            + (segmentWidth - min(34, max(20, segmentWidth - 20))) / 2
+                    )
+            }
         }
         .frame(height: 46)
         .background(Color.black)
@@ -286,22 +280,27 @@ struct ChannelScreen: View {
     }
 
     @ViewBuilder
-    private func interactiveChannelContent(_ details: ChannelDetails, width: CGFloat) -> some View {
+    private func interactiveChannelContent(_ details: ChannelDetails) -> some View {
         let tabs = availableTabs(for: details)
         let currentIndex = tabs.firstIndex(of: selectedTab) ?? 0
         let destinationIndex = tabDragOffset < 0 ? currentIndex + 1 : currentIndex - 1
         let hasDestination = tabDragOffset != 0 && tabs.indices.contains(destinationIndex)
 
         channelContent(details, tab: selectedTab)
-            .frame(width: width)
+            .containerRelativeFrame(.horizontal)
             .allowsHitTesting(!suppressContentTap)
             .offset(x: hasDestination ? tabDragOffset : resistedTabOffset(tabDragOffset))
             .overlay(alignment: .topLeading) {
                 if hasDestination {
-                    channelContent(details, tab: tabs[destinationIndex])
-                        .frame(width: width)
-                        .allowsHitTesting(false)
-                        .offset(x: (tabDragOffset < 0 ? width : -width) + tabDragOffset)
+                    GeometryReader { geometry in
+                        channelContent(details, tab: tabs[destinationIndex])
+                            .frame(width: geometry.size.width, alignment: .topLeading)
+                            .allowsHitTesting(false)
+                            .offset(
+                                x: (tabDragOffset < 0 ? geometry.size.width : -geometry.size.width)
+                                    + tabDragOffset
+                            )
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
