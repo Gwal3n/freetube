@@ -18,6 +18,13 @@ struct ChannelScreen: View {
     @State private var pageViewportHeight: CGFloat = 0
     /// Pending "scroll yourself down to here" requests, keyed by tab id. See `alignPages`.
     @State private var pageScrollTargets: [String: PageScrollTarget] = [:]
+    /// Shared header position, 0 (open) to `headerContentHeight` (closed). The whole screen agrees
+    /// on this one value; pages are moved to suit it rather than the other way round.
+    @State private var headerCollapse: CGFloat = 0
+    /// Per tab, which point in that tab's own content is sitting directly under the tab bar.
+    /// This is the thing a tab switch has to preserve — it is what "the video that was at the top
+    /// is still at the top" means — and it is deliberately independent of the header position.
+    @State private var pageContentPositions: [String: CGFloat] = [:]
     /// Vertical scroll offset of each page, keyed by tab id. Only the active page's value is used,
     /// but they are kept per tab so switching tabs restores that tab's own header state.
     @State private var pageOffsets: [String: CGFloat] = [:]
@@ -100,30 +107,19 @@ struct ChannelScreen: View {
         model.details.map(availableTabs(for:)) ?? []
     }
 
-    /// Vertical scroll offset driving the header, blended across the two pages a swipe sits
-    /// between.
-    ///
-    /// This is the backstop, not the main mechanism. `alignPages` keeps the pages in agreement so
-    /// there is normally nothing to blend; the interpolation only matters in the one case it
-    /// cannot fix — arriving at a tab that is scrolled *deeper* than the current header position,
-    /// where the header has to collapse to meet it. Moving that across the swipe instead of in a
-    /// single frame is the difference between a slide and a jump.
-    private var activePageOffset: CGFloat {
-        let tabs = currentTabs
-        guard !tabs.isEmpty else { return 0 }
-        let position = min(max(pagePosition, 0), CGFloat(tabs.count - 1))
-        let lowerIndex = Int(position.rounded(.down))
-        let upperIndex = min(lowerIndex + 1, tabs.count - 1)
-        let blend = position - CGFloat(lowerIndex)
-        let lower = max(0, pageOffsets[tabs[lowerIndex].id] ?? 0)
-        let upper = max(0, pageOffsets[tabs[upperIndex].id] ?? 0)
-        return lower + (upper - lower) * blend
-    }
+    /// `ScrollPosition` — the only way to put a scroll view at a chosen offset — is iOS 18. Where
+    /// it is missing, pages cannot be moved to suit the header, so the header has to go back to
+    /// following the active page instead.
+    private static let supportsPageAlignment: Bool = {
+        if #available(iOS 18.0, *) { return true }
+        return false
+    }()
 
-    /// How far the header is currently translated up. Stops at the header's own height so the tab
-    /// bar comes to rest against the navigation bar and stays there.
-    private var headerCollapse: CGFloat {
-        min(activePageOffset, headerContentHeight)
+    /// How far the header is currently translated up, clamped to its own height so the tab bar
+    /// comes to rest against the navigation bar and stays there.
+    private var headerOffset: CGFloat {
+        let raw = Self.supportsPageAlignment ? headerCollapse : (pageOffsets[selectedTab.id] ?? 0)
+        return min(max(0, raw), headerContentHeight)
     }
 
     /// Total space each page reserves at the top so its first row starts below the header.
@@ -137,7 +133,7 @@ struct ChannelScreen: View {
     /// visible below it, which read as two competing titles.
     private var showsNavigationTitle: Bool {
         guard headerContentHeight > 0 else { return false }
-        return activePageOffset > headerContentHeight - Metrics.navigationTitleLead
+        return headerOffset > headerContentHeight - Metrics.navigationTitleLead
     }
 
     /// Fractional page position: 1.4 means 40% of the way from the second tab to the third.
@@ -154,25 +150,61 @@ struct ChannelScreen: View {
         return abs(pagePosition - pagePosition.rounded()) > 0.01
     }
 
-    /// Moves every page that is *not* driving the header down to where the header already is.
+    /// Splits a page's scroll movement between the header and that page's own content, the way a
+    /// collapsing header behaves natively: scrolling down closes the header first and only then
+    /// moves content; scrolling up returns the content first and only then reopens the header.
     ///
-    /// This is the piece that removes the jump rather than smoothing it. The header can only sit
-    /// at one height, but each tab owns its own scroll position, and a page's content is laid out
-    /// assuming the header is wherever that page is scrolled to. So the two have to be reconciled,
-    /// and the choice is which one moves: previously the header moved to meet the incoming page,
-    /// which is the several-hundred-point lurch. Here the incoming page moves instead, silently,
-    /// before it is on screen — so the header simply stays put across the swipe.
+    /// The reason to track the two separately, rather than deriving the header from the raw scroll
+    /// offset, is that a single offset cannot express both at once. A tab that is deep into its
+    /// content and a header that is wide open is a perfectly reasonable state to be in — it is
+    /// exactly what you get by swiping from the top of one tab to a tab you had already read into
+    /// — but there is no single scroll offset that means it. Keeping the header position and the
+    /// content position as separate numbers is what lets a tab switch preserve both.
+    private func handlePageScroll(tab: ChannelProfileTab, offset: CGFloat) {
+        let previous = pageOffsets[tab.id] ?? offset
+        pageOffsets[tab.id] = offset
+        // Only the page the user is actually looking at moves the header. Everything else that
+        // changes a page's offset is us, in `alignPages`.
+        guard tab.id == selectedTab.id else { return }
+
+        let delta = offset - previous
+        guard delta != 0 else { return }
+
+        let limit = headerContentHeight
+        var collapse = min(max(0, headerCollapse), limit)
+        var content = max(0, pageContentPositions[tab.id] ?? 0)
+        if delta > 0 {
+            let toHeader = min(delta, limit - collapse)
+            collapse += toHeader
+            content += delta - toHeader
+        } else {
+            let toContent = min(-delta, content)
+            content -= toContent
+            collapse = max(0, collapse - (-delta - toContent))
+        }
+        headerCollapse = collapse
+        pageContentPositions[tab.id] = content
+    }
+
+    /// Re-seats every page that is not driving the header so that the shared header position and
+    /// that page's own reading position are both true of it.
     ///
-    /// Deliberately forward-only. Scrolling a page *backwards* to meet a more expanded header
-    /// would throw away however far the user had read into that tab, which is a worse trade than
-    /// the header moving. That case is left to the interpolation in `activePageOffset`.
+    /// This is the piece that removes the jump rather than smoothing it. A page's content is laid
+    /// out relative to where the header is, so the two have to be reconciled on a tab switch, and
+    /// the only question is which one moves. Moving the header is the several-hundred-point lurch.
+    /// Moving the page costs nothing, because it happens while the page is off screen or a sliver
+    /// wide — and because the target is built from the page's own stored content position, it
+    /// re-seats the page without losing its place. Whichever way the header has to travel.
     private func alignPages(excluding driver: ChannelProfileTab) {
-        let collapse = headerCollapse
-        guard collapse > 1 else { return }
+        guard Self.supportsPageAlignment else { return }
         for tab in currentTabs where tab.id != driver.id {
-            guard (pageOffsets[tab.id] ?? 0) < collapse - 1 else { continue }
+            let target = headerOffset + max(0, pageContentPositions[tab.id] ?? 0)
+            guard abs((pageOffsets[tab.id] ?? 0) - target) > 1 else { continue }
+            // Record the destination up front so the scroll this provokes reports no movement and
+            // cannot be mistaken for the user scrolling once this page becomes the driver.
+            pageOffsets[tab.id] = target
             let token = (pageScrollTargets[tab.id]?.token ?? 0) + 1
-            pageScrollTargets[tab.id] = PageScrollTarget(y: collapse, token: token)
+            pageScrollTargets[tab.id] = PageScrollTarget(y: target, token: token)
         }
     }
 
@@ -265,7 +297,7 @@ struct ChannelScreen: View {
         .onPreferenceChange(ChannelPageOffsetKey.self) { offsets in
             if #unavailable(iOS 18.0) { pageOffsets.merge(offsets) { _, new in new } }
         }
-        .modifier(PageScrollGeometry(tab: tab.id, offsets: $pageOffsets))
+        .modifier(PageScrollGeometry { handlePageScroll(tab: tab, offset: $0) })
         .modifier(PageScrollAlignment(request: pageScrollTargets[tab.id]))
     }
 
@@ -298,7 +330,7 @@ struct ChannelScreen: View {
         }
         // Opaque, because the pages scroll underneath it rather than below it.
         .background(Color.black)
-        .offset(y: -headerCollapse)
+        .offset(y: -headerOffset)
         .onPreferenceChange(ChannelHeaderHeightKey.self) { headerContentHeight = $0 }
         .onPreferenceChange(ChannelTabBarHeightKey.self) { tabBarHeight = $0 }
     }
@@ -339,99 +371,103 @@ struct ChannelScreen: View {
     /// protocol, which a nested type of that name would shadow throughout this file.
     private enum Metrics {
         static let bannerHeight: CGFloat = 190
-        static let avatarSize: CGFloat = 92
-        /// How far the avatar hangs below the banner — half its height, so it sits centred on the
-        /// banner's bottom edge.
-        static var avatarOverhang: CGFloat { avatarSize / 2 }
-        /// Scroll distance at which the header's channel name has cleared the navigation bar.
-        /// Derived from the geometry above so it stays correct if the banner or avatar changes.
+        /// Smaller than the straddling version needed to be: in a row the avatar sits beside the
+        /// text rather than carrying the composition on its own.
+        static let avatarSize: CGFloat = 72
+        static let headerRowSpacing: CGFloat = 14
+        static let headerRowInset: CGFloat = 20
         /// How far before the header is fully collapsed the navigation title starts to appear.
         static let navigationTitleLead: CGFloat = 20
         /// Breathing room between the tab bar and the first row of content.
         static let contentTopInset: CGFloat = 12
         /// First-frame approximations only — both are corrected by measurement immediately.
-        /// Banner, avatar overhang, the name/handle/stats block, the subscribe capsule, spacing.
-        static var estimatedHeaderHeight: CGFloat { bannerHeight + avatarOverhang + 162 }
+        /// Banner plus the identity row and its padding.
+        static var estimatedHeaderHeight: CGFloat { bannerHeight + avatarSize + 34 }
         static let estimatedTabBarHeight: CGFloat = 44
     }
 
     /// Mirrors the loaded header's geometry so the screen doesn't jump when content arrives.
     private var channelHeaderPlaceholder: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             Rectangle()
                 .fill(Color(white: 0.14))
                 .frame(height: Metrics.bannerHeight)
-                .overlay(alignment: .bottom) {
-                    Circle()
-                        .fill(Color(white: 0.2))
-                        .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
-                        .overlay(Circle().strokeBorder(Color.black, lineWidth: 4))
-                        .offset(y: Metrics.avatarOverhang)
-                }
-                .padding(.bottom, Metrics.avatarOverhang)
 
-            VStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 4).fill(Color(white: 0.2)).frame(width: 180, height: 20)
-                RoundedRectangle(cornerRadius: 3).fill(Color(white: 0.16)).frame(width: 120, height: 12)
+            HStack(alignment: .center, spacing: Metrics.headerRowSpacing) {
+                Circle()
+                    .fill(Color(white: 0.2))
+                    .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    RoundedRectangle(cornerRadius: 4).fill(Color(white: 0.2)).frame(width: 160, height: 18)
+                    RoundedRectangle(cornerRadius: 3).fill(Color(white: 0.16)).frame(width: 110, height: 12)
+                }
+
+                Spacer(minLength: 12)
             }
-            Capsule().fill(Color(white: 0.16)).frame(width: 140, height: 38)
+            .padding(.horizontal, Metrics.headerRowInset)
+            .padding(.top, 16)
+            .padding(.bottom, 18)
         }
-        .padding(.bottom, 22)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading channel")
         .allowsHitTesting(false)
     }
 
-    /// Centred profile block with the avatar straddling the bottom edge of the banner.
+    /// Leading identity row under the banner: avatar, then name and stats, then the subscribe
+    /// button pinned trailing. The App Store product page is the closest Apple precedent, and it
+    /// matches the leading alignment `PlaylistScreen` already uses.
     ///
-    /// Centred rather than the leading row this replaced, for two reasons. It reads as a profile
-    /// rather than as a list row, which is the Apple-style shape this screen wants; and it has no
-    /// `Spacer` throwing the subscribe button at the trailing edge, so the block stays composed at
-    /// any width instead of stretching the avatar and the button apart as the container grows.
+    /// The avatar no longer straddles the banner's bottom edge. A straddle reads well above a
+    /// centred column, where the overhang has empty space either side of it to sit in, but in a
+    /// horizontal row it has to pull the adjacent text up with it or sit visually detached from
+    /// the line it belongs to. Dropping it keeps the row on one baseline.
     private func channelHeader(_ channel: Channel) -> some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             banner(channel)
-                // The avatar hangs half outside the banner. An overlay never contributes to its
-                // host's size, so the overhang is reclaimed explicitly with the matching padding
-                // below rather than by letting the avatar stretch the banner's frame.
-                .overlay(alignment: .bottom) {
-                    avatar(channel).offset(y: Metrics.avatarOverhang)
-                }
-                .padding(.bottom, Metrics.avatarOverhang)
 
-            VStack(spacing: 5) {
-                Text(channel.name)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
+            HStack(alignment: .center, spacing: Metrics.headerRowSpacing) {
+                avatar(channel)
 
-                if let handle = channel.handle, !handle.isEmpty {
-                    Text(handle)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(1)
-                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(channel.name)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
 
-                if !channelStats(channel).isEmpty {
-                    Text(channelStats(channel))
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .lineLimit(1)
+                    if let handle = channel.handle, !handle.isEmpty {
+                        Text(handle)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.7))
+                            .lineLimit(1)
+                    }
+
+                    if !channelStats(channel).isEmpty {
+                        Text(channelStats(channel))
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
                 }
+                // The button keeps its intrinsic width, so a long name wraps rather than squeezing
+                // it. `minLength` keeps a gap between the two even when the name uses every point
+                // it can.
+                Spacer(minLength: 12)
+
+                subscribeButton(channel)
             }
-            .padding(.horizontal, 24)
-
-            subscribeButton(channel)
+            .padding(.horizontal, Metrics.headerRowInset)
+            .padding(.top, 16)
+            .padding(.bottom, 18)
         }
-        .padding(.bottom, 22)
     }
 
     private func avatar(_ channel: Channel) -> some View {
         ZStack {
             Circle().fill(Color(white: 0.16))
             Text(channel.name.prefix(1).uppercased())
-                .font(.largeTitle.weight(.semibold))
+                .font(.title.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.7))
             KFImage(channel.thumbnailURL)
                 .thumbnail(size: CGSize(width: Metrics.avatarSize, height: Metrics.avatarSize)) {
@@ -446,8 +482,10 @@ struct ChannelScreen: View {
         }
         .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(Color.black, lineWidth: 4))
-        .shadow(color: .black.opacity(0.5), radius: 10, y: 3)
+        // A hairline rather than the thick black ring the straddling version used. That ring was
+        // cutting the avatar out of the banner behind it; here there is nothing behind it but the
+        // page, so the edge only needs defining against a dark image.
+        .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
     }
 
     /// Full-bleed banner whose size is defined by an empty spacer, not by the image.
@@ -521,8 +559,11 @@ struct ChannelScreen: View {
             // `fixedSize` so the capsule hugs its label. Without it the button inherits the
             // header's width and spans the screen.
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 26)
-            .frame(height: 38)
+            // Tighter than the centred layout's capsule. There it had a row to itself and could
+            // afford to be generous; here every point it takes comes out of the channel name
+            // beside it.
+            .padding(.horizontal, 18)
+            .frame(height: 34)
             .background(
                 channel.isSubscribed ? AnyShapeStyle(Color.white.opacity(0.14)) : AnyShapeStyle(Color.white),
                 in: Capsule()
@@ -953,8 +994,7 @@ private struct PageScrollAlignmentBody<Content: View>: View {
 /// Same idea for a single page's vertical offset, which drives the header collapse.
 @available(iOS 17.0, *)
 private struct PageScrollGeometry: ViewModifier {
-    let tab: String
-    @Binding var offsets: [String: CGFloat]
+    let onScroll: (CGFloat) -> Void
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -962,7 +1002,7 @@ private struct PageScrollGeometry: ViewModifier {
             content.onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.y + geometry.contentInsets.top
             } action: { _, new in
-                offsets[tab] = new
+                onScroll(new)
             }
         } else {
             content
