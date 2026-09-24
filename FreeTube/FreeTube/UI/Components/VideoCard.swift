@@ -15,12 +15,15 @@ struct VideoCard: View {
     var showsMoreMenu: Bool = false
     var offersPlayNext = false
     var playbackProgress: Double? = nil
+    var relativeDateReference: Date? = nil
 
     /// Channel name plus the playback count and relative upload date. Joined by middle dots so
     /// the line reads naturally and any missing segment is dropped without leaving stray
     /// separators ("Channel" / "Channel • 1.2M views" / "Channel • 1.2M views • 3 days ago").
     private var metadataLine: String {
-        let parts = [video.channelName, video.viewCountString, video.publishedRelative ?? ""]
+        let publishedText = relativeDateReference.flatMap { video.publishedText(relativeTo: $0) }
+            ?? video.publishedRelative ?? ""
+        let parts = [video.channelName, video.viewCountString, publishedText]
             .filter { !$0.isEmpty }
         return parts.joined(separator: " • ")
     }

@@ -18,6 +18,7 @@ struct VideoRow: View {
     let video: Video
     var accessory: Accessory
     var playbackProgress: Double?
+    var relativeDateReference: Date?
     var onTap: () -> Void
 
     /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
@@ -26,18 +27,21 @@ struct VideoRow: View {
         video: Video,
         accessory: Accessory = .none,
         playbackProgress: Double? = nil,
+        relativeDateReference: Date? = nil,
         onTap: @escaping () -> Void = {}
     ) {
         self.video = video
         self.accessory = accessory
         self.playbackProgress = playbackProgress
+        self.relativeDateReference = relativeDateReference
         self.onTap = onTap
     }
 
     /// Playback count + relative upload date joined by a middle dot. Either half can be empty
     /// (older listings sometimes omit one), so we filter before joining to avoid stray separators.
     private var statsLine: String {
-        [video.viewCountString, video.publishedRelative ?? ""]
+        [video.viewCountString,
+         relativeDateReference.flatMap { video.publishedText(relativeTo: $0) } ?? video.publishedRelative ?? ""]
             .filter { !$0.isEmpty }
             .joined(separator: " • ")
     }

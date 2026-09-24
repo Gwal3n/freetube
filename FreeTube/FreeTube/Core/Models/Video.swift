@@ -12,9 +12,9 @@ struct Video: Identifiable, Hashable, Sendable, Codable {
     let viewCount: Int?
     let publishedAt: Date?
     /// Human-readable "N days ago" string from YouTube's `timePosted` field. We keep this as a
-    /// separate display-ready string instead of parsing into a Date because YouTube only returns
-    /// relative phrasing here ("3 days ago" / "2 months ago" / "1 year ago") and trying to round-
-    /// trip that through a Date would lose precision and re-localize awkwardly.
+    /// separate display-ready string because YouTube only returns relative phrasing here
+    /// ("3 days ago" / "2 months ago" / "1 year ago"). The subscription feed additionally
+    /// derives an approximate date at refresh time so cached ages can advance on screen.
     let publishedRelative: String?
     let descriptionSnippet: String?
     let isLive: Bool
@@ -59,6 +59,16 @@ extension Video {
 }
 
 extension Video {
+    /// Feed entries reconstruct an approximate upload date from the relative text received at
+    /// refresh time. Render that date against the current clock so cached ages keep advancing.
+    func publishedText(relativeTo now: Date) -> String? {
+        guard let publishedAt else { return publishedRelative }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.dateTimeStyle = .numeric
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: min(publishedAt, now), relativeTo: now)
+    }
+
     var durationString: String {
         if isLive { return "LIVE" }
         guard let duration else { return "" }

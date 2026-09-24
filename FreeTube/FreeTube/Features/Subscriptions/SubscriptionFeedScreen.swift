@@ -6,8 +6,10 @@ struct SubscriptionFeedScreen: View {
     @State private var model = SubscriptionFeedViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
+    @State private var currentDate = Date.now
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -99,6 +101,17 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .task { await model.load() }
+            .task {
+                while !Task.isCancelled {
+                    // A single clock for the feed keeps cached upload ages current while it is open.
+                    try? await Task.sleep(for: .seconds(60))
+                    guard !Task.isCancelled else { break }
+                    currentDate = .now
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { currentDate = .now }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await model.refreshProgress() }
             }
@@ -117,7 +130,8 @@ struct SubscriptionFeedScreen: View {
                 onTap: { player.load(video) },
                 showsMoreMenu: true,
                 offersPlayNext: true,
-                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
+                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil,
+                relativeDateReference: currentDate
             )
             .padding(.top, 4)
             .padding(.bottom, 14)
@@ -135,7 +149,8 @@ struct SubscriptionFeedScreen: View {
             VideoRow(
                 video: video,
                 accessory: .actions(offersPlayNext: true),
-                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil
+                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil,
+                relativeDateReference: currentDate
             ) {
                 player.load(video)
             }

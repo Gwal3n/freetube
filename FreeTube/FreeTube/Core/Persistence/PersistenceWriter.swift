@@ -38,7 +38,7 @@ actor PersistenceWriter {
                     thumbnailURL: entry.thumbnailURL,
                     duration: entry.duration,
                     viewCount: entry.viewCount,
-                    publishedAt: nil,
+                    publishedAt: Self.estimatedPublishDate(entry.publishedRelative, relativeTo: entry.refreshedAt),
                     publishedRelative: entry.publishedRelative,
                     descriptionSnippet: nil,
                     isLive: entry.isLive,
@@ -62,7 +62,8 @@ actor PersistenceWriter {
         for (index, video) in videos.enumerated() {
             modelContext.insert(SubscriptionFeedEntry(
                 video: video,
-                sortDate: Self.estimatedPublishDate(video.publishedRelative, fallback: refreshedAt.addingTimeInterval(-Double(index))),
+                sortDate: Self.estimatedPublishDate(video.publishedRelative, relativeTo: refreshedAt)
+                    ?? refreshedAt.addingTimeInterval(-Double(index)),
                 refreshedAt: refreshedAt
             ))
         }
@@ -77,18 +78,20 @@ actor PersistenceWriter {
         try? modelContext.save()
     }
 
-    private static func estimatedPublishDate(_ text: String?, fallback: Date) -> Date {
-        guard let text = text?.lowercased() else { return fallback }
-        let value = Int(text.split(separator: " ").first ?? "") ?? 0
+    private static func estimatedPublishDate(_ text: String?, relativeTo refreshedAt: Date) -> Date? {
+        guard let text = text?.lowercased(),
+              let numberRange = text.range(of: #"\d+"#, options: .regularExpression),
+              let value = Double(text[numberRange]) else { return nil }
         let interval: TimeInterval
-        if text.contains("minute") { interval = Double(value) * 60 }
-        else if text.contains("hour") { interval = Double(value) * 3_600 }
-        else if text.contains("day") { interval = Double(value) * 86_400 }
-        else if text.contains("week") { interval = Double(value) * 604_800 }
-        else if text.contains("month") { interval = Double(value) * 2_629_746 }
-        else if text.contains("year") { interval = Double(value) * 31_556_952 }
-        else { return fallback }
-        return fallback.addingTimeInterval(-interval)
+        if text.contains("second") { interval = value }
+        else if text.contains("minute") { interval = value * 60 }
+        else if text.contains("hour") { interval = value * 3_600 }
+        else if text.contains("day") { interval = value * 86_400 }
+        else if text.contains("week") { interval = value * 604_800 }
+        else if text.contains("month") { interval = value * 2_629_746 }
+        else if text.contains("year") { interval = value * 31_556_952 }
+        else { return nil }
+        return refreshedAt.addingTimeInterval(-interval)
     }
 
     // MARK: - WatchHistoryEntry

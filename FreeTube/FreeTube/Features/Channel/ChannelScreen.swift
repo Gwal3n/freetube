@@ -356,9 +356,6 @@ struct ChannelScreen: View {
                     Image(systemName: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.12), in: Circle())
-                        .contentShape(Circle())
                 }
                 .accessibilityLabel("Channel actions")
             }
@@ -447,7 +444,8 @@ struct ChannelScreen: View {
                         Text(channelStats(channel))
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 // The button keeps its intrinsic width, so a long name wraps rather than squeezing
@@ -549,7 +547,7 @@ struct ChannelScreen: View {
         } label: {
             Group {
                 if channel.isSubscribed {
-                    Label("Subscribed", systemImage: "checkmark")
+                    Text("Subscribed")
                 } else {
                     Text("Subscribe")
                 }
@@ -562,7 +560,7 @@ struct ChannelScreen: View {
             // Tighter than the centred layout's capsule. There it had a row to itself and could
             // afford to be generous; here every point it takes comes out of the channel name
             // beside it.
-            .padding(.horizontal, 18)
+            .padding(.horizontal, channel.isSubscribed ? 12 : 18)
             .frame(height: 34)
             .background(
                 channel.isSubscribed ? AnyShapeStyle(Color.white.opacity(0.14)) : AnyShapeStyle(Color.white),
