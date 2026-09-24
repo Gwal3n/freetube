@@ -20,18 +20,14 @@ struct ChannelScreen: View {
 
     var body: some View {
         ScrollView {
-            // Keep the profile shell eagerly mounted. The media collections remain
-            // lazy in their individual sections.
-            VStack(spacing: 0) {
-                if let details = model.details {
-                    channelHeader(details.channel)
-                    channelTabBar(details)
-                    interactiveChannelContent(details)
-                } else {
-                    channelHeaderPlaceholder
-                }
+            if let details = model.details {
+                banner(details.channel)
+                channelIdentity(details.channel)
+                channelTabBar(details)
+                interactiveChannelContent(details)
+            } else {
+                channelHeaderPlaceholder
             }
-            .containerRelativeFrame(.horizontal)
         }
         .scrollIndicators(.hidden)
         .background(Color.black)
@@ -98,55 +94,49 @@ struct ChannelScreen: View {
         .allowsHitTesting(false)
     }
 
-    private func channelHeader(_ channel: Channel) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            banner(channel)
-
-            HStack(alignment: .center, spacing: 13) {
-                ZStack {
-                    Circle().fill(.white.opacity(0.12))
-                    Text(channel.name.prefix(1).uppercased())
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.75))
-                    KFImage(channel.thumbnailURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-                .frame(width: 76, height: 76)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.black, lineWidth: 3))
-                .shadow(color: .black.opacity(0.18), radius: 8, y: 2)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(channel.name)
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    if let handle = channel.handle, !handle.isEmpty {
-                        Text(handle)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.72))
-                            .lineLimit(1)
-                    }
-                    if !channelStats(channel).isEmpty {
-                        Text(channelStats(channel))
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.62))
-                            .lineLimit(1)
-                    }
-                }
-                .layoutPriority(1)
-
-                Spacer(minLength: 4)
-                subscribeButton(channel)
-                    .fixedSize(horizontal: true, vertical: false)
+    private func channelIdentity(_ channel: Channel) -> some View {
+        HStack(alignment: .center, spacing: 13) {
+            ZStack {
+                Circle().fill(.white.opacity(0.12))
+                Text(channel.name.prefix(1).uppercased())
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+                KFImage(channel.thumbnailURL)
+                    .resizable()
+                    .scaledToFill()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
+            .frame(width: 76, height: 76)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.black, lineWidth: 3))
+            .shadow(color: .black.opacity(0.18), radius: 8, y: 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(channel.name)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                if let handle = channel.handle, !handle.isEmpty {
+                    Text(handle)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(1)
+                }
+                if !channelStats(channel).isEmpty {
+                    Text(channelStats(channel))
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.62))
+                        .lineLimit(1)
+                }
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 4)
+            subscribeButton(channel)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 18)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
     }
 
     @ViewBuilder
@@ -287,7 +277,7 @@ struct ChannelScreen: View {
         let hasDestination = tabDragOffset != 0 && tabs.indices.contains(destinationIndex)
 
         channelContent(details, tab: selectedTab)
-            .containerRelativeFrame(.horizontal)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .allowsHitTesting(!suppressContentTap)
             .offset(x: hasDestination ? tabDragOffset : resistedTabOffset(tabDragOffset))
             .overlay(alignment: .topLeading) {
