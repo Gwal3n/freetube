@@ -7,17 +7,25 @@ struct ChannelScreen: View {
     @State private var model: ChannelViewModel
     @State private var selectedTab: ChannelProfileTab = .videos
     @State private var videoSort: ChannelVideoSort = .newest
-    @State private var suppressContentTap = false
-    @GestureState private var tabDragOffset: CGFloat = 0
     /// Laid-out frame of each tab label, keyed by `ChannelProfileTab.id`, in the tab row's own
-    /// coordinate space. The underline is positioned by interpolating between two of these rather
-    /// than by recomputing segment arithmetic, so it tracks a drag continuously.
+    /// coordinate space. The underline is positioned by interpolating between two of these, so it
+    /// tracks the pager continuously rather than jumping when a swipe settles.
     @State private var tabFrames: [String: CGRect] = [:]
-    @State private var contentWidth: CGFloat = 0
-    @State private var showsNavigationTitle = false
+    /// Live horizontal offset of the pager, in points. Divided by the page width this gives a
+    /// fractional page position — 1.4 means "40% of the way from tab 1 to tab 2".
+    @State private var pagerOffset: CGFloat = 0
+    @State private var pageWidth: CGFloat = 0
+    /// Vertical scroll offset of each page, keyed by tab id. Only the active page's value is used,
+    /// but they are kept per tab so switching tabs restores that tab's own header state.
+    @State private var pageOffsets: [String: CGFloat] = [:]
+    /// Seeded with estimates rather than zero. These are replaced by the measured values on the
+    /// first layout pass, but starting at zero would put every page's first row under the header
+    /// for one frame and then shove it down, which reads as a flinch each time a channel opens.
+    @State private var headerContentHeight: CGFloat = Metrics.estimatedHeaderHeight
+    @State private var tabBarHeight: CGFloat = Metrics.estimatedTabBarHeight
 
     private static let tabRowSpace = "channelTabRow"
-    private static let scrollSpace = "channelScroll"
+    private static let pagerSpace = "channelPager"
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -27,100 +35,191 @@ struct ChannelScreen: View {
         _model = State(wrappedValue: ChannelViewModel(channelID: channelID))
     }
 
+    /// Collapsing header over a horizontal pager — the shape YouTube and X use for profiles.
+    ///
+    /// Each tab owns a real vertical `ScrollView`, and those pages sit in a horizontal
+    /// `ScrollView` with paging scroll-target behaviour. Every gesture on this screen is therefore
+    /// a system scroll gesture, which is the substantive change: the previous custom `DragGesture`
+    /// had to run alongside the rows' own controls, so a sideways swipe could still land as a tap
+    /// on a `NavigationLink` and a slow vertical drag could be read as a long press. A `UIScrollView`
+    /// cancels touches in its subviews once it starts scrolling, so both resolve themselves, and
+    /// the interactive pop gesture at the leading edge keeps working without being fenced off.
+    ///
+    /// The header is not inside any scroll view. It is drawn above the pager and translated up by
+    /// the active page's scroll offset, which is why each page reserves an equal amount of empty
+    /// space at the top: the content and the header move together at exactly 1:1, instead of the
+    /// double movement you get from putting a collapsing header inside the thing that scrolls it.
     var body: some View {
-        offsetTrackingScrollView
-            .scrollIndicators(.hidden)
-            .background(Color.black)
-            .preferredColorScheme(.dark)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // A principal item rather than `navigationTitle`, because the title has to fade
-                // rather than appear: it stays hidden while the channel's own name is on screen in
-                // the header, and takes over only once that name has scrolled under the bar.
-                ToolbarItem(placement: .principal) {
-                    Text(model.details?.channel.name ?? "")
-                        .font(.headline)
-                        .lineLimit(1)
-                        .opacity(showsNavigationTitle ? 1 : 0)
-                        .offset(y: showsNavigationTitle ? 0 : 8)
-                }
-                channelActionsToolbar
-            }
-            .task { await model.load() }
-            .task(id: videoSort) {
-                guard model.details != nil, videoSort != .newest else { return }
-                await model.loadVideos(sort: videoSort)
-            }
-            .errorToast(Bindable(model).errorState)
-    }
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
 
-    /// iOS 18 reads the scroll geometry natively; iOS 17 falls back to a preference probe in a
-    /// named coordinate space. Same split the player panel uses.
-    @ViewBuilder
-    private var offsetTrackingScrollView: some View {
-        if #available(iOS 18.0, *) {
-            channelScrollView
-                .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                    max(0, geometry.contentOffset.y + geometry.contentInsets.top)
-                } action: { _, offset in
-                    updateNavigationTitle(scrollOffset: offset)
-                }
-        } else {
-            channelScrollView
-                .coordinateSpace(name: Self.scrollSpace)
-                .onPreferenceChange(ChannelScrollOffsetKey.self) { offset in
-                    updateNavigationTitle(scrollOffset: offset)
-                }
+            if let details = model.details {
+                pager(details)
+                header(details)
+            } else {
+                channelHeaderPlaceholder
+            }
         }
+        .preferredColorScheme(.dark)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // A principal item rather than `navigationTitle`, because the title has to fade rather
+            // than appear: it stays hidden while the channel's own name is on screen in the header,
+            // and takes over only once that name has scrolled under the bar.
+            ToolbarItem(placement: .principal) {
+                Text(model.details?.channel.name ?? "")
+                    .font(.headline)
+                    .lineLimit(1)
+                    .opacity(showsNavigationTitle ? 1 : 0)
+                    .offset(y: showsNavigationTitle ? 0 : 8)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsNavigationTitle)
+            }
+            channelActionsToolbar
+        }
+        .task { await model.load() }
+        .task(id: videoSort) {
+            guard model.details != nil, videoSort != .newest else { return }
+            await model.loadVideos(sort: videoSort)
+        }
+        .errorToast(Bindable(model).errorState)
     }
 
-    private var channelScrollView: some View {
-        ScrollView {
-            // Keep the profile shell eagerly mounted. The media collections remain
-            // lazy in their individual sections.
-            VStack(spacing: 0) {
-                if let details = model.details {
-                    channelHeader(details.channel)
-                    channelTabBar(details)
-                    interactiveChannelContent(details)
-                } else {
-                    channelHeaderPlaceholder
+    // MARK: - Derived scroll state
+
+    /// Vertical scroll offset of the page currently on screen.
+    private var activePageOffset: CGFloat {
+        max(0, pageOffsets[selectedTab.id] ?? 0)
+    }
+
+    /// How far the header is currently translated up. Stops at the header's own height so the tab
+    /// bar comes to rest against the navigation bar and stays there.
+    private var headerCollapse: CGFloat {
+        min(activePageOffset, headerContentHeight)
+    }
+
+    /// Total space each page reserves at the top so its first row starts below the header.
+    private var headerTotalHeight: CGFloat {
+        headerContentHeight + tabBarHeight
+    }
+
+    private var showsNavigationTitle: Bool {
+        activePageOffset > Metrics.navigationTitleReveal
+    }
+
+    /// Fractional page position: 1.4 means 40% of the way from the second tab to the third.
+    private var pagePosition: CGFloat {
+        guard pageWidth > 0 else { return 0 }
+        return max(0, pagerOffset / pageWidth)
+    }
+
+    /// Two-way bridge between `selectedTab` and the pager's scroll position. Tapping a tab writes
+    /// `selectedTab`, which moves the pager; swiping moves the pager, which writes `selectedTab`.
+    private var pagerSelection: Binding<String?> {
+        Binding(
+            get: { selectedTab.id },
+            set: { newValue in
+                guard let newValue,
+                      let tab = ChannelProfileTab(rawValue: newValue),
+                      tab != selectedTab else { return }
+                selectedTab = tab
+            }
+        )
+    }
+
+    // MARK: - Pager
+
+    private func pager(_ details: ChannelDetails) -> some View {
+        let tabs = availableTabs(for: details)
+
+        return ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(tabs) { tab in
+                    page(details, tab: tab)
+                        // Exactly one page wide, so paging lands cleanly and the fractional
+                        // position derived from the offset is meaningful.
+                        .containerRelativeFrame(.horizontal)
+                        .id(tab.id)
                 }
             }
-            // Hard clamp, and the reason the screen can't be widened from the inside again.
-            // `maxWidth: .infinity` only *offers* to fill the proposal — a child that reports a
-            // larger size (an image scaled to fill, a fixed-width row) still drags the stack out
-            // with it, and `.clipped()` hides the overflow without correcting the reported size.
-            // `containerRelativeFrame` pins this to the scroll view's width outright, so a
-            // misbehaving child overflows and gets clipped instead of relaying its width to the
-            // header and the tab bar.
-            .containerRelativeFrame(.horizontal)
-            // Probes sit outside the clamp so the width they report is the clamped page width,
-            // which is what a tab swipe is measured against.
+            .scrollTargetLayout()
             .background {
                 GeometryReader { geometry in
-                    Color.clear
-                        .preference(
-                            key: ChannelScrollOffsetKey.self,
-                            value: -geometry.frame(in: .named(Self.scrollSpace)).minY
-                        )
-                        .preference(key: ChannelContentWidthKey.self, value: geometry.size.width)
+                    Color.clear.preference(
+                        key: ChannelPagerOffsetKey.self,
+                        value: -geometry.frame(in: .named(Self.pagerSpace)).minX
+                    )
                 }
             }
-            .onPreferenceChange(ChannelContentWidthKey.self) { width in
-                contentWidth = width
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: pagerSelection)
+        .scrollIndicators(.hidden)
+        .coordinateSpace(name: Self.pagerSpace)
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(key: ChannelPageWidthKey.self, value: geometry.size.width)
             }
+        }
+        .onPreferenceChange(ChannelPagerOffsetKey.self) { pagerOffset = $0 }
+        .onPreferenceChange(ChannelPageWidthKey.self) { pageWidth = $0 }
+    }
+
+    private func page(_ details: ChannelDetails, tab: ChannelProfileTab) -> some View {
+        ScrollView(.vertical) {
+            VStack(spacing: 0) {
+                // Reserves the header's footprint. The header itself is drawn over the top of it.
+                Color.clear.frame(height: headerTotalHeight)
+                channelContent(details, tab: tab)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ChannelPageOffsetKey.self,
+                        value: [tab.id: -geometry.frame(in: .named(Self.pageSpace(tab))).minY]
+                    )
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .coordinateSpace(name: Self.pageSpace(tab))
+        .onPreferenceChange(ChannelPageOffsetKey.self) { offsets in
+            pageOffsets.merge(offsets) { _, new in new }
         }
     }
 
-    /// The header's own channel name sits just under the avatar. Once it has travelled under the
-    /// navigation bar the bar takes the name over, so the name is always present exactly once.
-    private func updateNavigationTitle(scrollOffset: CGFloat) {
-        let shouldShow = scrollOffset > Metrics.navigationTitleReveal
-        guard shouldShow != showsNavigationTitle else { return }
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-            showsNavigationTitle = shouldShow
+    private static func pageSpace(_ tab: ChannelProfileTab) -> String {
+        "channelPage-\(tab.id)"
+    }
+
+    // MARK: - Header
+
+    private func header(_ details: ChannelDetails) -> some View {
+        VStack(spacing: 0) {
+            channelHeader(details.channel)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: ChannelHeaderHeightKey.self,
+                            value: geometry.size.height
+                        )
+                    }
+                }
+            channelTabBar(details)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: ChannelTabBarHeightKey.self,
+                            value: geometry.size.height
+                        )
+                    }
+                }
         }
+        // Opaque, because the pages scroll underneath it rather than below it.
+        .background(Color.black)
+        .offset(y: -headerCollapse)
+        .onPreferenceChange(ChannelHeaderHeightKey.self) { headerContentHeight = $0 }
+        .onPreferenceChange(ChannelTabBarHeightKey.self) { tabBarHeight = $0 }
     }
 
     @ToolbarContentBuilder
@@ -166,8 +265,10 @@ struct ChannelScreen: View {
         /// Scroll distance at which the header's channel name has cleared the navigation bar.
         /// Derived from the geometry above so it stays correct if the banner or avatar changes.
         static var navigationTitleReveal: CGFloat { bannerHeight + avatarOverhang + 30 }
-        /// Leading strip reserved for the navigation controller's interactive pop gesture.
-        static let interactivePopEdge: CGFloat = 32
+        /// First-frame approximations only — both are corrected by measurement immediately.
+        /// Banner, avatar overhang, the name/handle/stats block, the subscribe capsule, spacing.
+        static var estimatedHeaderHeight: CGFloat { bannerHeight + avatarOverhang + 162 }
+        static let estimatedTabBarHeight: CGFloat = 44
     }
 
     /// Mirrors the loaded header's geometry so the screen doesn't jump when content arrives.
@@ -359,9 +460,9 @@ struct ChannelScreen: View {
     /// widths inside a scroller can do neither: the labels keep their natural spacing at any size,
     /// and when they genuinely exceed the width the row scrolls instead of truncating.
     ///
-    /// The underline is a single view positioned from the measured label frames, interpolated by
-    /// the live drag offset. That is what makes it follow a swipe continuously instead of jumping
-    /// once the gesture ends, and it costs one interpolation rather than a second layout pass.
+    /// The underline is a single view positioned from the measured label frames and interpolated
+    /// by the pager's live scroll offset, so it is wherever the content is at every instant of a
+    /// swipe — including a swipe that gets abandoned and springs back.
     private func channelTabBar(_ details: ChannelDetails) -> some View {
         let tabs = availableTabs(for: details)
 
@@ -428,25 +529,28 @@ struct ChannelScreen: View {
         }
     }
 
-    /// Where the underline sits right now: the selected tab's label frame, blended toward the
-    /// neighbour the current drag is heading for. `tabDragOffset` is normalised against the page
-    /// width, so the underline is exactly as far along as the content is.
+    /// Where the underline sits right now, read straight off the pager's live scroll offset.
+    ///
+    /// Because `pagePosition` is continuous, the underline is wherever the content is: halfway
+    /// through a swipe it sits halfway between the two labels, at the width between theirs, and it
+    /// reverses with the finger if the swipe is abandoned. Nothing here is animated — it doesn't
+    /// need to be, since the value it reads is already following the gesture.
     private func indicatorFrame(tabs: [ChannelProfileTab]) -> CGRect? {
-        guard let current = tabFrames[selectedTab.id] else { return nil }
-        guard contentWidth > 0, tabDragOffset != 0,
-              let currentIndex = tabs.firstIndex(of: selectedTab) else { return current }
+        guard !tabs.isEmpty else { return nil }
 
-        let progress = min(max(-tabDragOffset / contentWidth, -1), 1)
-        let destinationIndex = progress > 0 ? currentIndex + 1 : currentIndex - 1
-        guard tabs.indices.contains(destinationIndex),
-              let destination = tabFrames[tabs[destinationIndex].id] else { return current }
+        let position = min(max(pagePosition, 0), CGFloat(tabs.count - 1))
+        let lowerIndex = Int(position.rounded(.down))
+        let upperIndex = min(lowerIndex + 1, tabs.count - 1)
+        let blend = position - CGFloat(lowerIndex)
 
-        let blend = min(abs(progress), 1)
+        guard let lower = tabFrames[tabs[lowerIndex].id] else { return nil }
+        guard let upper = tabFrames[tabs[upperIndex].id] else { return lower }
+
         return CGRect(
-            x: current.minX + (destination.minX - current.minX) * blend,
-            y: current.minY,
-            width: current.width + (destination.width - current.width) * blend,
-            height: current.height
+            x: lower.minX + (upper.minX - lower.minX) * blend,
+            y: lower.minY,
+            width: lower.width + (upper.width - lower.width) * blend,
+            height: lower.height
         )
     }
 
@@ -461,81 +565,6 @@ struct ChannelScreen: View {
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
             selectedTab = tab
         }
-    }
-
-    /// Horizontal swipe between tabs.
-    ///
-    /// Two rules earn their place here. Drags that begin within `interactivePopEdge` of the leading
-    /// edge are ignored outright, because that strip belongs to the navigation controller's
-    /// interactive pop — competing with it is what made a tab swipe sometimes pop the screen
-    /// instead. And the activation distance is short (12pt, previously 32) so the gesture claims a
-    /// real swipe before the row underneath can read it as a tap; a swipe that travelled 20pt used
-    /// to leave this gesture unrecognised and the button still saw a tap, which is how a sideways
-    /// flick opened a video.
-    private func tabSwipeGesture(availableTabs: [ChannelProfileTab]) -> some Gesture {
-        DragGesture(minimumDistance: 12)
-            .updating($tabDragOffset) { value, state, _ in
-                guard isHorizontalTabSwipe(value) else { return }
-                state = value.translation.width
-            }
-            .onChanged { value in
-                guard isHorizontalTabSwipe(value) else { return }
-                suppressContentTap = true
-            }
-            .onEnded { value in
-                if isHorizontalTabSwipe(value),
-                   abs(value.predictedEndTranslation.width) > 80,
-                   let currentIndex = availableTabs.firstIndex(of: selectedTab) {
-                    let direction = value.predictedEndTranslation.width < 0 ? 1 : -1
-                    let destination = currentIndex + direction
-                    if availableTabs.indices.contains(destination) {
-                        selectTab(availableTabs[destination])
-                    }
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(120))
-                    suppressContentTap = false
-                }
-            }
-    }
-
-    private func isHorizontalTabSwipe(_ value: DragGesture.Value) -> Bool {
-        guard value.startLocation.x > Metrics.interactivePopEdge else { return false }
-        return abs(value.translation.width) > abs(value.translation.height) * 1.15
-    }
-
-    @ViewBuilder
-    private func interactiveChannelContent(_ details: ChannelDetails) -> some View {
-        let tabs = availableTabs(for: details)
-        let currentIndex = tabs.firstIndex(of: selectedTab) ?? 0
-        let destinationIndex = tabDragOffset < 0 ? currentIndex + 1 : currentIndex - 1
-        let hasDestination = tabDragOffset != 0 && tabs.indices.contains(destinationIndex)
-
-        channelContent(details, tab: selectedTab)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .allowsHitTesting(!suppressContentTap)
-            .offset(x: hasDestination ? tabDragOffset : resistedTabOffset(tabDragOffset))
-            .overlay(alignment: .topLeading) {
-                if hasDestination {
-                    GeometryReader { geometry in
-                        channelContent(details, tab: tabs[destinationIndex])
-                            .frame(width: geometry.size.width, alignment: .topLeading)
-                            .allowsHitTesting(false)
-                            .offset(
-                                x: (tabDragOffset < 0 ? geometry.size.width : -geometry.size.width)
-                                    + tabDragOffset
-                            )
-                    }
-                }
-            }
-            .clipped()
-            .contentShape(Rectangle())
-            .simultaneousGesture(tabSwipeGesture(availableTabs: tabs))
-    }
-
-    private func resistedTabOffset(_ offset: CGFloat) -> CGFloat {
-        guard offset != 0 else { return 0 }
-        return offset * 0.18
     }
 
     // MARK: - Tab content
@@ -604,8 +633,10 @@ struct ChannelScreen: View {
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
+                    // No tap suppression needed any more: the enclosing scroll views cancel
+                    // touches in their subviews once a scroll begins, so a swipe can no longer
+                    // arrive here as a tap.
                     VideoRow(video: video, accessory: .actions(offersPlayNext: true)) {
-                        guard !suppressContentTap else { return }
                         player.load(video)
                     }
                     .padding(.horizontal, 12)
@@ -741,19 +772,42 @@ struct ChannelScreen: View {
 
 // MARK: - Layout probes
 
-/// Vertical scroll distance, used to hand the channel name from the header to the navigation bar.
-struct ChannelScrollOffsetKey: PreferenceKey {
+/// Live horizontal offset of the pager, which drives the underline.
+struct ChannelPagerOffsetKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
 }
 
-/// Page width, used to normalise a tab swipe into 0...1 progress for the underline.
-struct ChannelContentWidthKey: PreferenceKey {
+/// Width of a single page, used to turn the pager offset into a fractional page position.
+struct ChannelPageWidthKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+/// Vertical scroll offset of each page, keyed by tab id. Drives the header collapse and the
+/// navigation-bar title hand-off.
+struct ChannelPageOffsetKey: PreferenceKey {
+    static var defaultValue: [String: CGFloat] = [:]
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+struct ChannelHeaderHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+struct ChannelTabBarHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
