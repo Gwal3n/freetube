@@ -35,6 +35,10 @@ struct ChannelScreen: View {
                         channelHeaderPlaceholder
                     }
                 }
+                // A vertical ScrollView does not always propose a finite horizontal
+                // size to eager children. Keep remote banner imagery from expanding
+                // the complete profile (including its tabs) beyond the viewport.
+                .frame(width: viewport.size.width, alignment: .leading)
             }
             .scrollIndicators(.hidden)
         }
@@ -106,22 +110,22 @@ struct ChannelScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             banner(channel)
 
-            HStack(alignment: .bottom, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    ZStack {
-                        Circle().fill(.white.opacity(0.12))
-                        Text(channel.name.prefix(1).uppercased())
-                            .font(.largeTitle.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.75))
-                        KFImage(channel.thumbnailURL)
-                            .resizable()
-                            .scaledToFill()
-                    }
-                    .frame(width: 96, height: 96)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.black, lineWidth: 3))
-                    .shadow(color: .black.opacity(0.18), radius: 9, y: 3)
+            HStack(alignment: .center, spacing: 13) {
+                ZStack {
+                    Circle().fill(.white.opacity(0.12))
+                    Text(channel.name.prefix(1).uppercased())
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.75))
+                    KFImage(channel.thumbnailURL)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .frame(width: 76, height: 76)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.black, lineWidth: 3))
+                .shadow(color: .black.opacity(0.18), radius: 8, y: 2)
 
+                VStack(alignment: .leading, spacing: 4) {
                     Text(channel.name)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
@@ -141,7 +145,7 @@ struct ChannelScreen: View {
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: 12)
+                Spacer(minLength: 4)
                 subscribeButton(channel)
                     .fixedSize(horizontal: true, vertical: false)
             }
