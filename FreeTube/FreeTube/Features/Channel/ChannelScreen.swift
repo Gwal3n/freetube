@@ -15,6 +15,9 @@ struct ChannelScreen: View {
     /// fractional page position — 1.4 means "40% of the way from tab 1 to tab 2".
     @State private var pagerOffset: CGFloat = 0
     @State private var pageWidth: CGFloat = 0
+    @State private var pageViewportHeight: CGFloat = 0
+    /// Pending "scroll yourself down to here" requests, keyed by tab id. See `alignPages`.
+    @State private var pageScrollTargets: [String: PageScrollTarget] = [:]
     /// Vertical scroll offset of each page, keyed by tab id. Only the active page's value is used,
     /// but they are kept per tab so switching tabs restores that tab's own header state.
     @State private var pageOffsets: [String: CGFloat] = [:]
@@ -76,12 +79,12 @@ struct ChannelScreen: View {
             }
             channelActionsToolbar
         }
-        // The bar is transparent over the banner, which is what makes the top of the screen feel
-        // immersive, but a title floating directly on artwork has nothing to separate it from the
-        // header underneath. The background fades in on the same trigger as the title, so the bar
-        // only becomes a surface once it has something to hold.
+        // Transparent over the banner, which is what makes the top of the screen feel immersive,
+        // then solid black on the same trigger as the title. Black rather than a material because
+        // by the time the title appears the header behind the bar is also black, and a blur would
+        // draw a seam across a surface that should read as one continuous piece with the tab row.
         .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
-        .toolbarBackground(Material.bar, for: .navigationBar)
+        .toolbarBackground(Color.black, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
         .task(id: videoSort) {
@@ -100,12 +103,11 @@ struct ChannelScreen: View {
     /// Vertical scroll offset driving the header, blended across the two pages a swipe sits
     /// between.
     ///
-    /// Each tab keeps its own scroll position, so a tab you had scrolled down and a tab you have
-    /// never opened genuinely want the header in different places. Reading only `selectedTab`
-    /// meant the whole header changed position the instant the pager crossed the halfway point —
-    /// one frame, several hundred points, which is the jump. Interpolating on the same fractional
-    /// page position the underline uses spreads that same movement across the swipe, so the header
-    /// is always where the content under it is.
+    /// This is the backstop, not the main mechanism. `alignPages` keeps the pages in agreement so
+    /// there is normally nothing to blend; the interpolation only matters in the one case it
+    /// cannot fix — arriving at a tab that is scrolled *deeper* than the current header position,
+    /// where the header has to collapse to meet it. Moving that across the swipe instead of in a
+    /// single frame is the difference between a slide and a jump.
     private var activePageOffset: CGFloat {
         let tabs = currentTabs
         guard !tabs.isEmpty else { return 0 }
@@ -142,6 +144,36 @@ struct ChannelScreen: View {
     private var pagePosition: CGFloat {
         guard pageWidth > 0 else { return 0 }
         return max(0, pagerOffset / pageWidth)
+    }
+
+    /// True as soon as the pager leaves a whole page, i.e. the moment a sideways drag begins.
+    /// The threshold is about four points, so the neighbouring page is barely a sliver on screen
+    /// when this flips — early enough to align it before anyone can see it move.
+    private var isPagingActive: Bool {
+        guard pageWidth > 0 else { return false }
+        return abs(pagePosition - pagePosition.rounded()) > 0.01
+    }
+
+    /// Moves every page that is *not* driving the header down to where the header already is.
+    ///
+    /// This is the piece that removes the jump rather than smoothing it. The header can only sit
+    /// at one height, but each tab owns its own scroll position, and a page's content is laid out
+    /// assuming the header is wherever that page is scrolled to. So the two have to be reconciled,
+    /// and the choice is which one moves: previously the header moved to meet the incoming page,
+    /// which is the several-hundred-point lurch. Here the incoming page moves instead, silently,
+    /// before it is on screen — so the header simply stays put across the swipe.
+    ///
+    /// Deliberately forward-only. Scrolling a page *backwards* to meet a more expanded header
+    /// would throw away however far the user had read into that tab, which is a worse trade than
+    /// the header moving. That case is left to the interpolation in `activePageOffset`.
+    private func alignPages(excluding driver: ChannelProfileTab) {
+        let collapse = headerCollapse
+        guard collapse > 1 else { return }
+        for tab in currentTabs where tab.id != driver.id {
+            guard (pageOffsets[tab.id] ?? 0) < collapse - 1 else { continue }
+            let token = (pageScrollTargets[tab.id]?.token ?? 0) + 1
+            pageScrollTargets[tab.id] = PageScrollTarget(y: collapse, token: token)
+        }
     }
 
     /// Two-way bridge between `selectedTab` and the pager's scroll position. Tapping a tab writes
@@ -199,7 +231,10 @@ struct ChannelScreen: View {
         .onPreferenceChange(ChannelPageWidthKey.self) { value in
             if #unavailable(iOS 18.0) { pageWidth = value }
         }
-        .modifier(PagerScrollGeometry(offset: $pagerOffset, width: $pageWidth))
+        .modifier(PagerScrollGeometry(offset: $pagerOffset, width: $pageWidth, height: $pageViewportHeight))
+        .onChange(of: isPagingActive) { _, active in
+            if active { alignPages(excluding: selectedTab) }
+        }
     }
 
     private func page(_ details: ChannelDetails, tab: ChannelProfileTab) -> some View {
@@ -208,8 +243,13 @@ struct ChannelScreen: View {
                 // Reserves the header's footprint, plus a little air so the first row isn't
                 // crowded against the tab bar. The header is drawn over the top of this.
                 Color.clear.frame(height: headerTotalHeight + Metrics.contentTopInset)
+                // The minimum height is what lets a short tab — About, or a channel with three
+                // videos — still scroll far enough to hold the header collapsed. Without it that
+                // tab has no room to accept an alignment, so arriving at it would spring the
+                // header back open. The cost is that a short tab can be scrolled past its content
+                // into empty space, which is the same bargain every tabbed profile makes.
                 channelContent(details, tab: tab)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, minHeight: pageViewportHeight, alignment: .topLeading)
             }
             .background {
                 GeometryReader { geometry in
@@ -226,6 +266,7 @@ struct ChannelScreen: View {
             if #unavailable(iOS 18.0) { pageOffsets.merge(offsets) { _, new in new } }
         }
         .modifier(PageScrollGeometry(tab: tab.id, offsets: $pageOffsets))
+        .modifier(PageScrollAlignment(request: pageScrollTargets[tab.id]))
     }
 
     private static func pageSpace(_ tab: ChannelProfileTab) -> String {
@@ -609,6 +650,9 @@ struct ChannelScreen: View {
     }
 
     private func selectTab(_ tab: ChannelProfileTab) {
+        // Before the pager moves, not after — the destination has to already be at the header's
+        // height by the time it slides into view.
+        alignPages(excluding: selectedTab)
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
             selectedTab = tab
         }
@@ -832,6 +876,7 @@ struct ChannelScreen: View {
 private struct PagerScrollGeometry: ViewModifier {
     @Binding var offset: CGFloat
     @Binding var width: CGFloat
+    @Binding var height: CGFloat
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -842,14 +887,66 @@ private struct PagerScrollGeometry: ViewModifier {
                 } action: { _, new in
                     offset = new
                 }
-                .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                    geometry.containerSize.width
+                .onScrollGeometryChange(for: CGSize.self) { geometry in
+                    geometry.containerSize
                 } action: { _, new in
-                    width = new
+                    width = new.width
+                    height = new.height
                 }
         } else {
             content
         }
+    }
+}
+
+/// A request for one page to put itself at a given vertical offset.
+///
+/// The token is what makes a repeat of the same offset a new request, and it is also how a page
+/// that was created *after* the request was issued — the usual case, since the pager is lazy and
+/// the neighbour is built as it slides in — knows to apply it on appear without re-applying an
+/// old one later.
+private struct PageScrollTarget: Equatable {
+    var y: CGFloat
+    var token: Int
+}
+
+@available(iOS 17.0, *)
+private struct PageScrollAlignment: ViewModifier {
+    let request: PageScrollTarget?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            PageScrollAlignmentBody(request: request, content: content)
+        } else {
+            // iOS 17 has no way to set a scroll view's offset to an arbitrary value, so the header
+            // falls back to interpolating toward the incoming page instead of the page moving.
+            content
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct PageScrollAlignmentBody<Content: View>: View {
+    let request: PageScrollTarget?
+    let content: Content
+
+    @State private var position = ScrollPosition()
+    @State private var appliedToken = 0
+
+    var body: some View {
+        content
+            .scrollPosition($position)
+            .onAppear(perform: apply)
+            .onChange(of: request) { _, _ in apply() }
+    }
+
+    private func apply() {
+        guard let request, request.token > appliedToken else { return }
+        appliedToken = request.token
+        // Unanimated on purpose: this page is off screen or a sliver wide, and the whole point is
+        // that the move is never seen.
+        position.scrollTo(y: request.y)
     }
 }
 
