@@ -9,10 +9,9 @@ import UIKit
 /// surface nested in the real one. The only exception is the OLED preference, which deliberately
 /// replaces the glass with true black.
 ///
-/// The system also owns the two behaviours this view used to implement by hand. It insets the
-/// accessory above the tab bar, so there is no tab-bar frame to measure; and when the bar
-/// minimises on scroll it re-lays the accessory inline between the active tab and the search
-/// button, handing us `.inline` so the content can shed everything that no longer fits.
+/// Layout is the same in `.inline` and `.expanded`. The system already resizes the capsule when
+/// the tab bar minimises; changing our own hierarchy at that moment is what made the title jump.
+/// A second line of text and a different artwork size are therefore not worth the reflow.
 struct MiniPlayerAccessory: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
@@ -24,87 +23,60 @@ struct MiniPlayerAccessory: View {
     private var isInline: Bool { placement == .inline }
 
     var body: some View {
-        HStack(spacing: isInline ? 8 : 10) {
-            artwork
-                .frame(width: isInline ? 28 : 44, height: isInline ? 28 : 28)
-                .clipShape(RoundedRectangle(cornerRadius: isInline ? 6 : 7, style: .continuous))
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    artwork
+                        .frame(width: 32, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(player.currentVideo?.title ?? "")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(primaryForeground)
-                    .lineLimit(1)
-
-                // Inline placement is a sliver between two tab-bar controls. A second line of
-                // text there is unreadable before it is uninformative.
-                if !isInline {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(secondaryForeground)
-                        .lineLimit(1)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button {
-                player.togglePlayPause()
-            } label: {
-                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(primaryForeground)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Rectangle())
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
-
-            if !isInline {
-                Button {
-                    player.playNext()
-                } label: {
-                    Image(systemName: "forward.fill")
-                        .font(.body.weight(.semibold))
+                    Text(player.currentVideo?.title ?? "")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(primaryForeground)
-                        .frame(width: 40, height: 40)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { player.requestExpansion() }
+                .highPriorityGesture(accessoryDrag)
+
+                Button {
+                    player.togglePlayPause()
+                } label: {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(primaryForeground)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+
+                Button {
+                    player.dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(primaryForeground)
+                        .frame(width: 36, height: 36)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Next")
+                .accessibilityLabel("Close player")
             }
-        }
-        .padding(.leading, isInline ? 8 : 12)
-        .padding(.trailing, 4)
-        // Music's accessory has no progress line because a song's position is not something you
-        // track at a glance. A video's is. It stays a child view so the half-second clock
-        // invalidates only this hairline and not the artwork or the controls, and it is dropped
-        // inline where there is no room for it.
-        .overlay(alignment: .bottom) {
+            .padding(.leading, 10)
+            .padding(.trailing, 2)
+            .padding(.vertical, 5)
+
+            // Flush with the bottom of the accessory, not overlaid on the title. Dropped when
+            // the system has collapsed the capsule to a sliver — there is no room for it there.
             if !isInline {
                 MiniPlayerProgress()
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 3)
             }
         }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isInline)
+        .opacity(max(0, 1 - player.presentationProgress))
         .animation(reduceMotion ? nil : .linear(duration: 0.08), value: player.isPlaying)
-        // The whole accessory expands the player, except where a control already claimed the tap.
-        .contentShape(Rectangle())
-        .onTapGesture { player.requestExpansion() }
-        // Downward flick dismisses, matching the gesture the old floating bar had. Upward flick
-        // expands, so both directions do the obvious thing rather than only one being live.
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 18)
-                .onEnded { value in
-                    let vertical = value.translation.height
-                    guard abs(vertical) > abs(value.translation.width) else { return }
-                    if vertical > 0 {
-                        player.dismiss()
-                    } else {
-                        player.requestExpansion()
-                    }
-                }
-        )
         .background {
             if oledMiniPlayer {
                 Rectangle().fill(Color.black)
@@ -116,6 +88,34 @@ struct MiniPlayerAccessory: View {
         .accessibilityAddTraits(.isButton)
     }
 
+    private var accessoryDrag: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard player.presentationProgress < 0.98 else { return }
+                let vertical = value.translation.height
+                guard abs(vertical) > abs(value.translation.width) else { return }
+                guard vertical < 0 else { return }
+                if !player.presentationIsInteractive {
+                    player.beginInteractivePresentation()
+                }
+                let travel = max(player.presentationTravel, 1)
+                player.updatePresentationProgress(-vertical / travel)
+            }
+            .onEnded { value in
+                if player.presentationIsInteractive {
+                    player.endInteractivePresentation(velocity: value.velocity.height)
+                    return
+                }
+                let vertical = value.translation.height
+                guard abs(vertical) > abs(value.translation.width) else { return }
+                if vertical > 36 {
+                    player.dismiss()
+                } else if vertical < -36 {
+                    player.requestExpansion()
+                }
+            }
+    }
+
     @ViewBuilder
     private var artwork: some View {
         ZStack {
@@ -123,7 +123,7 @@ struct MiniPlayerAccessory: View {
                 Image(systemName: "arrow.down.circle.fill")
                     .resizable()
                     .scaledToFit()
-                    .padding(6)
+                    .padding(4)
                     .background(.quaternary)
             } else if let thumbnail {
                 Image(uiImage: thumbnail)
@@ -133,13 +133,13 @@ struct MiniPlayerAccessory: View {
                 Image(systemName: "play.rectangle.fill")
                     .resizable()
                     .scaledToFit()
-                    .padding(6)
+                    .padding(4)
                     .background(.quaternary)
             }
 
             if isPreparingPlayback {
-                PlaybackActivityIndicator(size: 14, lineWidth: 2)
-                    .padding(4)
+                PlaybackActivityIndicator(size: 12, lineWidth: 2)
+                    .padding(3)
                     .background(.black.opacity(0.42), in: Circle())
                     .transition(.opacity)
             }
@@ -155,28 +155,10 @@ struct MiniPlayerAccessory: View {
         }
     }
 
-    private var subtitle: String {
-        switch player.loadState {
-        case .resolving:
-            "Preparing…"
-        case .downloading(let progress, let phase):
-            if let progress {
-                "\(phase.map { "Downloading \($0)" } ?? "Downloading") \(Int(progress * 100))%"
-            } else {
-                "Processing…"
-            }
-        case .failed(let message):
-            message
-        case .idle, .buffering, .readyToPlay:
-            player.currentVideo?.channelName ?? ""
-        }
-    }
-
     private var expandAccessibilityLabel: String {
         guard let title = player.currentVideo?.title, !title.isEmpty else { return "Expand player" }
         return "Expand player, \(title)"
     }
 
     private var primaryForeground: Color { oledMiniPlayer ? .white : .primary }
-    private var secondaryForeground: Color { oledMiniPlayer ? .white.opacity(0.66) : .secondary }
 }

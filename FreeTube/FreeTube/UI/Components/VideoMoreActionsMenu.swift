@@ -128,7 +128,7 @@ private struct VideoActionsContent: View {
             Button {
                 let channelID = video.channelID
                 let wasExpanded = player.fullScreenPresented
-                if wasExpanded { player.fullScreenPresented = false }
+                if wasExpanded { player.requestCollapse() }
                 Task { @MainActor in
                     // Let the native Menu finish dismissing before mutating its NavigationStack.
                     // An expanded player also needs time to reveal the selected tab first.

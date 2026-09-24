@@ -1,21 +1,19 @@
 import SwiftUI
 
-/// Presents the expanded player over the tab shell.
+/// Presents the expanded player as an overlay card over the tab shell.
 ///
-/// This used to own both halves of the presentation and cross-fade between them: a floating mini
-/// bar positioned by measuring the live `UITabBar`, an expanded sheet, and a pile of interpolation
-/// — `transitionProgress`, `miniOpacity`, `miniHandoffOffset`, `miniDismissTranslation` — to make
-/// one appear to become the other. The mini half is now the tab view's bottom accessory, so the
-/// system positions it, shapes it, and slides it into the tab bar as that bar minimises.
+/// The mini player is the tab view's bottom accessory — a different view tree — so this cannot
+/// morph the live video into that capsule the way Music morphs album art. What it can do is the
+/// other half of that language: a card that sits below the status bar, follows the finger on the
+/// way up and down, and uncovers the accessory as it recedes.
 ///
-/// What remains is the part the system does not offer: a full-bleed video sheet that follows the
-/// finger down and is interruptible mid-flight. It sits *above* the accessory rather than swapping
-/// with it, which is also why the cross-fade is gone — dragging the sheet down simply uncovers the
-/// accessory that was there the whole time, the same way a sheet reveals what is underneath it.
+/// `presentationProgress` (0 = parked, 1 = open) is the single visual. The accessory writes it
+/// during an upward drag; this container writes it during a downward drag; springs only run when
+/// the finger lifts. Implicit animations on `fullScreenPresented` are deliberately absent — they
+/// were what made the old slide feel like a modal popping in.
 ///
-/// `FullScreenPlayer` stays mounted while a video is loaded even when the sheet is closed. That is
-/// deliberate: it owns the `AVPlayerViewController`, and tearing that down on every collapse would
-/// flash the video surface on the way back up.
+/// `FullScreenPlayer` stays mounted while a video is loaded even when the card is parked. It owns
+/// the `AVPlayerViewController`, and tearing that down on every collapse flashes the video.
 struct SwiftUIPlayerContainer<Content: View>: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -23,11 +21,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     let content: Content
 
-    /// Live downward drag on the expanded sheet. Zero whenever the sheet is settled, open or shut.
-    @State private var dragTranslation: CGFloat = 0
     @State private var dragIsVertical: Bool?
     @State private var dragStartedDown = false
     @State private var dragCanCollapse = false
+    @State private var horizontalPageConsumed = false
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -35,119 +32,136 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let topInset = expandedTopInset(safeAreaTop: proxy.safeAreaInsets.top)
+            let topInset = statusBarSeparation
+            let travel = max(0, proxy.size.height - topInset)
 
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .top) {
                 content
-                    .allowsHitTesting(!player.fullScreenPresented)
+                    .overlay {
+                        Color.black
+                            .opacity(0.32 * min(1, player.presentationProgress))
+                            .ignoresSafeArea()
+                    }
+                    .allowsHitTesting(player.presentationProgress < 0.98)
 
                 if player.miniPlayerVisible {
                     FullScreenPlayer()
-                        .frame(
-                            width: proxy.size.width,
-                            height: max(0, proxy.size.height - topInset)
-                        )
+                        .frame(width: proxy.size.width, height: travel)
                         .background(Color.black)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: sheetCornerRadius, style: .continuous)
-                        )
-                        .offset(y: sheetOffset(in: proxy.size))
-                        .simultaneousGesture(collapseGesture(in: proxy.size))
-                        // Outermost, and not optional. Gesture modifiers install their own
-                        // hit-test participation, so disabling the content before attaching the
-                        // drag still let the closed sheet's recognizer cancel taps on rows behind
-                        // it.
-                        .allowsHitTesting(player.fullScreenPresented)
+                        .padding(.top, topInset)
+                        .clipped()
+                        .offset(y: cardOffset(travel: travel))
+                        .simultaneousGesture(cardGesture(travel: travel))
+                        .allowsHitTesting(player.presentationProgress > 0.08)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.86),
-                value: player.fullScreenPresented
-            )
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.86),
-                value: player.miniPlayerVisible
-            )
+            .onChange(of: travel, initial: true) { _, newTravel in
+                player.presentationTravel = newTravel
+            }
         }
         .ignoresSafeArea()
         .onChange(of: player.playerExpansionRequest) { _, _ in
             expand()
         }
+        .onChange(of: player.fullScreenPresented) { _, presented in
+            guard !player.presentationIsInteractive else { return }
+            settle(expanded: presented)
+        }
+        .onChange(of: player.presentationIsInteractive) { _, interactive in
+            guard !interactive else { return }
+            settle(expanded: player.fullScreenPresented)
+        }
+        .onChange(of: player.miniPlayerVisible) { _, visible in
+            if !visible {
+                player.presentationProgress = 0
+            }
+        }
     }
 
     // MARK: - Geometry
 
-    /// Portrait leaves the status area uncovered so the sheet reads as a sheet. Landscape and the
-    /// no-gesture presentation both go edge to edge.
-    private func expandedTopInset(safeAreaTop: CGFloat) -> CGFloat {
+    /// Portrait keeps the system status bar on the tab content behind the card. The card itself
+    /// never draws into that strip. Landscape and in-place portrait fullscreen go edge to edge.
+    private var statusBarSeparation: CGFloat {
         guard verticalSizeClass != .compact, player.playerPresentationGestureEnabled else { return 0 }
-        return safeAreaTop
+        return PlayerLayoutMetrics.safeAreaInsets.top
     }
 
-    private func sheetOffset(in size: CGSize) -> CGFloat {
-        guard player.fullScreenPresented else { return size.height + 28 }
-        return dragTranslation
+    private func cardOffset(travel: CGFloat) -> CGFloat {
+        let progress = player.presentationProgress
+        if progress <= 1 {
+            return (1 - progress) * travel
+        }
+        // Past fully-open the card rubber-bands a little instead of sliding under the status bar.
+        return -((progress - 1) / 0.12) * 18
     }
 
-    /// Square while it is filling the screen, rounded as soon as it starts to travel, so the
-    /// corners appear to lift off the display edge rather than being permanently inset.
-    private var sheetCornerRadius: CGFloat {
-        guard player.fullScreenPresented else { return 18 }
-        return min(18, dragTranslation / 6)
+    private var presentationSpring: Animation {
+        .spring(response: 0.36, dampingFraction: 0.92)
     }
 
-    // MARK: - Collapse gesture
+    // MARK: - Gestures
 
-    private func collapseGesture(in size: CGSize) -> some Gesture {
+    private func cardGesture(travel: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
-                guard player.fullScreenPresented,
+                guard player.fullScreenPresented || player.presentationIsInteractive,
                       verticalSizeClass != .compact,
                       player.playerPresentationGestureEnabled,
                       !player.chapterListPresented else { return }
                 let axisWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
+                if dragIsVertical == false {
+                    return
+                }
                 guard dragIsVertical == true else { return }
                 if axisWasUndetermined {
                     dragStartedDown = value.translation.height > 0
-                    // A drag beginning on the video always collapses. One beginning in the feed
-                    // below may only collapse if that feed is already scrolled to its top,
-                    // otherwise it is an ordinary scroll.
                     let startedOnVideo = value.startLocation.y
-                        <= player.expandedPlayerSurfaceHeight
+                        <= player.expandedPlayerSurfaceHeight + statusBarSeparation
                     dragCanCollapse = startedOnVideo || player.playerPanelAtTop
                 }
-                guard dragStartedDown, dragCanCollapse else { return }
-                player.playerPresentationGestureActive = true
-                // Initial resistance preserves the top-edge rubber band before the sheet commits
-                // to following the finger.
-                dragTranslation = max(0, value.translation.height - 12)
+                guard dragCanCollapse || !dragStartedDown else { return }
+                if !player.presentationIsInteractive {
+                    player.beginInteractivePresentation()
+                }
+                let raw = 1 - (value.translation.height / max(travel, 1))
+                player.updatePresentationProgress(raw)
             }
             .onEnded { value in
                 defer {
                     dragIsVertical = nil
                     dragStartedDown = false
                     dragCanCollapse = false
-                    player.playerPresentationGestureActive = false
+                    horizontalPageConsumed = false
                 }
-                guard player.fullScreenPresented,
-                      dragIsVertical == true,
-                      dragStartedDown,
-                      dragCanCollapse else {
-                    dragTranslation = 0
+                if dragIsVertical == false {
+                    pageIfNeeded(value)
                     return
                 }
-                let shouldCollapse = dragTranslation > 110
-                    || value.predictedEndTranslation.height > 230
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
-                    dragTranslation = 0
-                    if shouldCollapse {
-                        player.chapterListPresented = false
-                        player.fullScreenPresented = false
-                    }
-                }
+                guard player.presentationIsInteractive else { return }
+                player.endInteractivePresentation(velocity: value.velocity.height)
             }
+    }
+
+    /// Horizontal paging lives on the details card, not the video. The video surface already
+    /// owns horizontal-drag seeking; stealing that would make scrubbing fight next/previous.
+    private func pageIfNeeded(_ value: DragGesture.Value) {
+        guard player.presentationProgress > 0.9,
+              !horizontalPageConsumed,
+              abs(value.translation.width) > abs(value.translation.height),
+              value.startLocation.y > player.expandedPlayerSurfaceHeight + statusBarSeparation
+        else { return }
+        let distance = value.translation.width
+        let flicked = abs(value.velocity.width) > 650
+        guard abs(distance) > 80 || flicked else { return }
+        horizontalPageConsumed = true
+        if distance < 0 {
+            player.playNext()
+        } else {
+            player.playPrevious()
+        }
     }
 
     private func establishAxis(for translation: CGSize) {
@@ -157,11 +171,22 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func expand() {
-        guard player.miniPlayerVisible, !player.fullScreenPresented else { return }
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-            dragTranslation = 0
-            player.fullScreenPresented = true
-        }
+        guard player.miniPlayerVisible else { return }
+        player.presentationIsInteractive = false
+        player.fullScreenPresented = true
+        settle(expanded: true)
         player.requestInlinePlaybackRestoration()
+    }
+
+    private func settle(expanded: Bool) {
+        let target: CGFloat = expanded ? 1 : 0
+        guard abs(player.presentationProgress - target) > 0.001 else { return }
+        if reduceMotion {
+            player.presentationProgress = target
+            return
+        }
+        withAnimation(presentationSpring) {
+            player.presentationProgress = target
+        }
     }
 }

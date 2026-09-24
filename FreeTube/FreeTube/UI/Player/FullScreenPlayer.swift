@@ -220,9 +220,7 @@ struct FullScreenPlayer: View {
                             showPlayerControls()
                         },
                         onCollapse: {
-                            @Bindable var p = player
-                            p.chapterListPresented = false
-                            p.fullScreenPresented = false
+                            player.requestCollapse()
                         }
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
@@ -726,8 +724,7 @@ struct FullScreenPlayer: View {
     }
 
     private func openChannel(_ channelID: String) {
-        @Bindable var p = player
-        p.fullScreenPresented = false
+        player.requestCollapse()
         Task { @MainActor in
             // Let the SwiftUI collapse animation begin before routing the tab below.
             try? await Task.sleep(for: .milliseconds(180))
@@ -736,7 +733,7 @@ struct FullScreenPlayer: View {
     }
 
     private func openPlaylist(_ playlistID: String) {
-        player.fullScreenPresented = false
+        player.requestCollapse()
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(180))
             if playlistID.hasPrefix("local:") {
