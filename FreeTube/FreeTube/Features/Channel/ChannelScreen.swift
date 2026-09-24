@@ -171,6 +171,14 @@ struct ChannelScreen: View {
                 endPoint: .bottom
             )
         }
+        // `maxWidth` before the height, and not optional. `scaledToFill` reports a size that
+        // *covers* the proposal, so a 6:1 channel banner told only that it is 178pt tall reports
+        // itself ~1075pt wide, and `clipped()` clips the drawing without shrinking that reported
+        // size. The ZStack then hands it up to the header, the header to the root VStack, and every
+        // `maxWidth: .infinity` below inherits a width wider than the screen — which is what threw
+        // the subscribe button off the right edge and left the tab bar dividing a phantom width
+        // into five. Pinning the width here keeps the overflow inside the banner where it belongs.
+        .frame(maxWidth: .infinity)
         .frame(height: 178)
         .clipped()
         .accessibilityHidden(true)
@@ -352,7 +360,14 @@ struct ChannelScreen: View {
 
             if videos.isEmpty,
                (!model.hasLoadedVideos(for: videoSort) || model.isLoadingVideos(for: videoSort)) {
-                MediaListPlaceholder().padding(.horizontal, 16)
+                // `MediaListPlaceholder` is `List`-backed and a `List` has no intrinsic height, so
+                // it needs a bounded container. The other five call sites are screen roots or
+                // overlays that supply one; this is the only one inside a `ScrollView`, where the
+                // unbounded proposal leaves it laying out at an arbitrary height. Six rows, each a
+                // thumbnail tall plus its row insets.
+                MediaListPlaceholder()
+                    .frame(height: 6 * (81 + MediaStyle.listRowInsets.top + MediaStyle.listRowInsets.bottom))
+                    .padding(.horizontal, 16)
             } else {
                 videoRows(videos, emptyTitle: "No Videos", kind: .allVideos)
             }
