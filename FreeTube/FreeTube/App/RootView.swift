@@ -59,15 +59,15 @@ struct RootView: View {
     }
 
     var body: some View {
-        ZStack {
-            tabShell
-                .allowsHitTesting(!player.fullScreenPresented)
+        tabShell
+        .allowsHitTesting(!player.fullScreenPresented)
+        .overlay {
             // Host the custom player above the native TabView, independently of
-            // whichever tab is currently selected.
+            // whichever tab is currently selected. An overlay does not contribute
+            // to the tab view's layout or change its native bar placement.
             SwiftUIPlayerContainer(thumbnail: thumbnail) {
                 Color.clear.allowsHitTesting(false)
             }
-            .zIndex(1)
         }
         .overlay(alignment: .bottom) {
             if let notice = player.queueNotice {
