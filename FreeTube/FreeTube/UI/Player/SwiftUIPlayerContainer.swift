@@ -190,8 +190,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     presentationTranslation = 0
                     return
                 }
-                let shouldCollapse = presentationTranslation > 110
+                // The finger's last direction wins. A quick upward reversal must not commit a
+                // collapse merely because the sheet is still past its downward distance mark.
+                let isReversingUpward = value.velocity.height < -180
+                let shouldCollapse = !isReversingUpward && (
+                    presentationTranslation > 110
                     || value.predictedEndTranslation.height > 230
+                )
                 withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.88)) {
                     presentationTranslation = 0
                     if shouldCollapse {
@@ -232,7 +237,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
 
                 let predicted = value.predictedEndTranslation.height
-                if presentationTranslation < -90 || predicted < -190 {
+                if miniDismissTranslation > 0, value.velocity.height < -180 {
+                    // A downward dismiss drag that turns back up returns to rest, rather than
+                    // finishing from its earlier distance or accidentally opening the player.
+                    withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.82)) {
+                        presentationTranslation = 0
+                        miniDismissTranslation = 0
+                    }
+                } else if presentationTranslation < -90 || predicted < -190 {
                     expandPlayer()
                 } else if miniDismissTranslation > 70 || predicted > 170 {
                     let occlusionTravel = miniPlayerOcclusionTravel

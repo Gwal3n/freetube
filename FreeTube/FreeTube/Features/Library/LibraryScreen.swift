@@ -38,12 +38,6 @@ struct LibraryScreen: View {
                     }
                 }
             }
-            .sheet(isPresented: $showsSettings) {
-                SettingsScreen()
-            }
-            .onChange(of: settingsRequest, initial: true) { _, request in
-                if request > 0 { showsSettings = true }
-            }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .history: LocalHistoryScreen()
@@ -63,6 +57,15 @@ struct LibraryScreen: View {
             .refreshable {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 localPlaylistCount = await localPlaylistCountFromStore()
+            }
+            // Present outside the list's refresh environment. Settings has no refresh action;
+            // its downward gesture should belong to the system sheet instead.
+            .sheet(isPresented: $showsSettings) {
+                SettingsScreen()
+                    .presentationDragIndicator(.visible)
+            }
+            .onChange(of: settingsRequest, initial: true) { _, request in
+                if request > 0 { showsSettings = true }
             }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task {

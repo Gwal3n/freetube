@@ -82,17 +82,24 @@ struct CustomPlayerControls: View {
                                 .accessibilityLabel("Preparing video")
                         } else {
                             Button(action: onTogglePlayPause) {
-                                Image(systemName: hasEnded ? "arrow.counterclockwise" : (isPlaying ? "pause.fill" : "play.fill"))
-                                    .font(.system(size: 34, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 68, height: 68)
-                                    .contentShape(Circle())
-                                    .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
-                                    .contentTransition(.symbolEffect(.replace))
-                                    .animation(
-                                        reduceMotion ? nil : .linear(duration: 0.07),
-                                        value: playbackSymbolState
-                                    )
+                                Group {
+                                    if hasEnded {
+                                        Image(systemName: "arrow.counterclockwise")
+                                            .font(.system(size: 34, weight: .semibold))
+                                    } else {
+                                        PlaybackMorphShape(progress: isPlaying ? 1 : 0)
+                                            .fill(.white)
+                                            .frame(width: 34, height: 34)
+                                    }
+                                }
+                                .foregroundStyle(.white)
+                                .frame(width: 68, height: 68)
+                                .contentShape(Circle())
+                                .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
+                                .animation(
+                                    reduceMotion ? nil : .easeInOut(duration: 0.14),
+                                    value: isPlaying
+                                )
                             }
                             .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
                         }
@@ -129,12 +136,6 @@ struct CustomPlayerControls: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
     }
-
-    private var playbackSymbolState: Int {
-        if hasEnded { return 2 }
-        return isPlaying ? 1 : 0
-    }
-
 }
 
 extension Image {
