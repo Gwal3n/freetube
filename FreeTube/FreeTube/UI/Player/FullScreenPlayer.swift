@@ -129,6 +129,15 @@ struct FullScreenPlayer: View {
                         )
                         PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     }
+                    // Clip the media before transforming it, so the rounded edge used while
+                    // exiting travels with the picture. Clipping after the entry scale instead
+                    // cuts the upward stretch off at the original video frame below the status bar.
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: proxy.size.height),
+                            style: .continuous
+                        )
+                    )
                     // Entering fullscreen grows the media upward from a planted bottom edge,
                     // matching the direct-manipulation language used by YouTube. Exiting retains
                     // the subtle uniform shrink while travelling down.
@@ -136,12 +145,6 @@ struct FullScreenPlayer: View {
                     .scaleEffect(
                         fullscreenEntryScale(surfaceHeight: surfaceHeight),
                         anchor: .bottom
-                    )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: fullscreenSwipeCornerRadius(viewportHeight: proxy.size.height),
-                            style: .continuous
-                        )
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
                     Color.black
