@@ -15,11 +15,13 @@ struct LibraryScreen: View {
     }
 
     let navigationRequest: AppNavigationRequest?
+    var settingsRequest: Int = 0
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
     @State private var path: [Destination] = []
     @State private var didLoadRootData = false
+    @State private var showsSettings = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -27,6 +29,21 @@ struct LibraryScreen: View {
                 localHistorySection
             }
             .navigationTitle("Library")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showsSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                }
+            }
+            .sheet(isPresented: $showsSettings) {
+                SettingsScreen()
+            }
+            .onChange(of: settingsRequest, initial: true) { _, request in
+                if request > 0 { showsSettings = true }
+            }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .history: LocalHistoryScreen()

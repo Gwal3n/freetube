@@ -4,12 +4,12 @@ import UIKit
 
 /// Top-level tabbed shell. CLAUDE.md §8: mini-player sits above the tab bar and persists across tabs.
 ///
-/// Tab layout (5):
+/// Tab layout: Feed, Library, Downloads, and Search (a separate system button on iOS 26).
 /// - Feed (latest cached videos from local subscriptions)
-/// - Search (search field, suggestions, results, and local recent searches)
 /// - Library (device-local history, subscriptions, and playlists)
 /// - Downloads (saved videos, transfer queue, and yt-dlp link downloads)
-/// - Settings (preferences, quality, diagnostics)
+/// - Search (search field, suggestions, results, and local recent searches)
+/// Settings opens from Library's toolbar.
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
@@ -24,6 +24,7 @@ struct RootView: View {
     @State private var searchNavigationRequest: AppNavigationRequest?
     @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
+    @State private var settingsRequest = 0
     /// Direct observation of the shared download manager — no AsyncStream subscription needed since
     /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
     /// (for the list) read the same source of truth.
@@ -33,7 +34,7 @@ struct RootView: View {
     @State private var thumbnail: UIImage?
 
     enum Tab: String, Hashable {
-        case feed, search, library, downloads, settings
+        case feed, search, library, downloads
     }
 
     private var selectedTab: Tab {
@@ -122,6 +123,10 @@ struct RootView: View {
                 selectedTabRaw = tab.rawValue
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
+            selectedTabRaw = Tab.library.rawValue
+            settingsRequest &+= 1
+        }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
             routeFromPlayer(.channel(channelID))
@@ -156,12 +161,8 @@ struct RootView: View {
                     }
                 }
 
-                SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search) {
-                    HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
-                }
-
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
-                    LibraryScreen(navigationRequest: libraryNavigationRequest)
+                    LibraryScreen(navigationRequest: libraryNavigationRequest, settingsRequest: settingsRequest)
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
@@ -169,8 +170,8 @@ struct RootView: View {
                 }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
 
-                SwiftUI.Tab("Settings", systemImage: "gearshape.fill", value: Tab.settings) {
-                    SettingsScreen()
+                SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
+                    HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
                 }
             }
         } else {
@@ -179,7 +180,7 @@ struct RootView: View {
     }
 
     /// iOS 17–25 compatibility. iOS 26 uses the modern `Tab` declarations above for its
-    /// native Liquid Glass tab bar, while Search remains an ordinary peer tab on every OS.
+    /// native Liquid Glass tab bar and a separate Search button.
     private var legacyTabShell: some View {
         TabView(selection: tabSelection) {
             if showSubscriptionFeedTab {
@@ -192,7 +193,7 @@ struct RootView: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
-            LibraryScreen(navigationRequest: libraryNavigationRequest)
+            LibraryScreen(navigationRequest: libraryNavigationRequest, settingsRequest: settingsRequest)
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(Tab.library)
 
@@ -200,16 +201,10 @@ struct RootView: View {
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                 .tag(Tab.downloads)
-
-            SettingsScreen()
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                .tag(Tab.settings)
         }
     }
 
-    /// Keep Search as an ordinary peer tab. SwiftUI writes the selection binding even when an
-    /// already-selected tab item is tapped, which lets us request search activation without the
-    /// detached iOS 26 `.search` tab role or a gesture recognizer on the native tab bar.
+    /// Re-selecting Search requests focus without a gesture recognizer on the native tab bar.
     private var tabSelection: Binding<Tab> {
         Binding(
             get: { selectedTab },
@@ -241,7 +236,7 @@ struct RootView: View {
                 feedNavigationRequest = request
             case .search:
                 searchNavigationRequest = request
-            case .library, .downloads, .settings:
+            case .library, .downloads:
                 break
             }
         }

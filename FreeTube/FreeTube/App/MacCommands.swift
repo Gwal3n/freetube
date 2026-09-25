@@ -9,8 +9,7 @@ import SwiftUI
 /// We add three groups:
 ///
 /// 1. **Settings (⌘,)** — `CommandGroup(replacing: .appSettings)` is the standard slot;
-///    we post a notification that `RootView` reads to switch its `TabView` selection to
-///    the Settings tab. (No separate Settings scene — Settings is one of the five tabs.)
+///    we post a notification that opens Settings from Library.
 /// 2. **Navigate menu (⌘1 / ⌘F / ⌘2 / ⌘3)** — quick-jump to tab bar entries. ⌘F is the
 ///    standard "find" shortcut everywhere on Mac, so it maps to Search.
 /// 3. **Playback menu (Space, ⌘←/→, ⌘↑/↓)** — transport controls mirroring what
@@ -30,18 +29,15 @@ struct MacCommands: Commands {
     let player: PlayerStateManager
 
     var body: some Commands {
-        // 1. Replace the standard "App Settings" item (⌘,) with one that selects our
-        // in-window Settings tab instead of opening a separate Settings scene.
+        // 1. Open the in-window Settings sheet instead of a separate Settings scene.
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") {
-                postTab(.settings)
+                openSettings()
             }
             .keyboardShortcut(",", modifiers: .command)
         }
 
-        // 2. Navigate menu — quick-jump to tabs. Search lives inside Home now (folded in
-        // from the former dedicated Search tab), so ⌘F also lands on Home — the host's
-        // `.searchable` field is in the navigation bar and focus-able on macOS.
+        // 2. Navigate menu — quick-jump to tabs. ⌘F lands on Search.
         CommandMenu("Navigate") {
             Button("Feed") { postTab(.feed) }
                 .keyboardShortcut("1", modifiers: .command)
@@ -53,7 +49,7 @@ struct MacCommands: Commands {
                 .keyboardShortcut("3", modifiers: .command)
             Button("Downloads") { postTab(.downloads) }
                 .keyboardShortcut("4", modifiers: .command)
-            Button("Settings") { postTab(.settings) }
+            Button("Settings") { openSettings() }
                 .keyboardShortcut("5", modifiers: .command)
         }
 
@@ -99,12 +95,17 @@ struct MacCommands: Commands {
     private func postTab(_ tab: RootView.Tab) {
         NotificationCenter.default.post(name: .freetubeSelectTab, object: tab)
     }
+
+    private func openSettings() {
+        NotificationCenter.default.post(name: .freetubeOpenSettings, object: nil)
+    }
 }
 
 extension Notification.Name {
     /// Posted by `MacCommands` when the user picks a tab via menu / shortcut. `RootView`
     /// listens and updates its `@State selectedTab`. The `object` is a `RootView.Tab`.
     static let freetubeSelectTab = Notification.Name("com.leshko.freetube.selectTab")
+    static let freetubeOpenSettings = Notification.Name("com.leshko.freetube.openSettings")
     /// Requests app-level channel presentation after the expanded player has collapsed.
     /// The object is a channel ID string.
     static let freetubeOpenChannel = Notification.Name("com.leshko.freetube.openChannel")

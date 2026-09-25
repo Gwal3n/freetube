@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
+    @Environment(\.dismiss) private var dismiss
     private enum Destination: Hashable {
         case sponsorBlock
         case playerControls
@@ -268,6 +269,11 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .sponsorBlock:
