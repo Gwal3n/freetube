@@ -100,6 +100,7 @@ struct RootView: View {
             loadThumbnailForCurrentVideo()
         }
         .onChange(of: player.fullScreenPresented) { _, presented in
+            updateStatusBarOverride(forFullScreenOpen: presented)
             if presented {
                 player.requestInlinePlaybackRestoration()
             }
@@ -211,6 +212,15 @@ struct RootView: View {
                 break
             }
         }
+    }
+
+    private func updateStatusBarOverride(forFullScreenOpen open: Bool) {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first
+        window?.overrideUserInterfaceStyle = open ? .dark : .unspecified
     }
 
     /// Refreshes `thumbnail` whenever the current video changes. Tries three sources in order:

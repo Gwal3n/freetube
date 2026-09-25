@@ -4,10 +4,8 @@
 //
 //  Created by leshko on 17/5/26.
 //
-//  The deployment target is iOS 26.1. The tab shell is built on
-//  `tabViewBottomAccessory(isEnabled:)` (26.1+) and `Tab(role: .search)`, which have no
-//  backward-compatible equivalent, so this entry point and everything on the path down to them is
-//  deliberately unannotated rather than carrying a stale `@available(iOS 17.0, *)` floor.
+//  The deployment target is iOS 26.1. The tab shell uses the system Search tab role;
+//  the player is presented by the app's SwiftUI player container above that shell.
 //
 
 import SwiftUI

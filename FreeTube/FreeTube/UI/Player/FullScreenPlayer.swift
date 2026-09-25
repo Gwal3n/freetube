@@ -220,7 +220,9 @@ struct FullScreenPlayer: View {
                             showPlayerControls()
                         },
                         onCollapse: {
-                            player.requestCollapse()
+                            @Bindable var p = player
+                            p.chapterListPresented = false
+                            p.fullScreenPresented = false
                         }
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
@@ -308,11 +310,7 @@ struct FullScreenPlayer: View {
                           let video = player.currentVideo else { return }
                     detailsModel.loadIfNeeded(for: video, player: player)
             }
-            // Gated on the sheet actually being open. The video surface deliberately stays mounted
-            // while collapsed so returning to it doesn't flash, but the metadata panel underneath
-            // has no such requirement — and leaving it mounted meant every browse session carried
-            // the description, action bar, Up Next and comments laid out off-screen.
-            if let video = player.currentVideo, player.fullScreenPresented, !usesPortraitFullscreen {
+            if let video = player.currentVideo, !usesPortraitFullscreen {
                 panel(
                     video,
                     collapseRange: collapseRange,
@@ -724,7 +722,8 @@ struct FullScreenPlayer: View {
     }
 
     private func openChannel(_ channelID: String) {
-        player.requestCollapse()
+        @Bindable var p = player
+        p.fullScreenPresented = false
         Task { @MainActor in
             // Let the SwiftUI collapse animation begin before routing the tab below.
             try? await Task.sleep(for: .milliseconds(180))
@@ -733,7 +732,7 @@ struct FullScreenPlayer: View {
     }
 
     private func openPlaylist(_ playlistID: String) {
-        player.requestCollapse()
+        player.fullScreenPresented = false
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(180))
             if playlistID.hasPrefix("local:") {

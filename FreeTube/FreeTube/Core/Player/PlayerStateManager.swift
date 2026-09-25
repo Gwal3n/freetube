@@ -94,16 +94,6 @@ final class PlayerStateManager {
     /// details ScrollView pauses for that gesture so its rubber band cannot move metadata faster
     /// than the player surface that contains it.
     var playerPresentationGestureActive: Bool = false
-    /// Visual progress of the expanded overlay, 0 = parked as the accessory, 1 = fully open.
-    /// The accessory and the overlay both write this so open and close can follow the finger.
-    /// Do not animate this from SwiftUI view bodies; the container owns the springs.
-    var presentationProgress: CGFloat = 0
-    /// Distance the overlay travels from accessory to expanded, in points. The accessory uses
-    /// this to convert an upward drag into progress without measuring the overlay itself.
-    var presentationTravel: CGFloat = 0
-    /// True while a finger is driving `presentationProgress`. Settling animations must not
-    /// fight that write.
-    var presentationIsInteractive: Bool = false
 
     func removeFromUpNext(videoID: String) {
         if activePlaylist != nil {
@@ -885,49 +875,6 @@ final class PlayerStateManager {
         isLoadingMorePlaylistVideos || isLoadingMoreRecommendations
     }
 
-    /// Asks the presentation container to open the expanded player.
-    ///
-    /// Callers request rather than setting `fullScreenPresented` themselves so that one place owns
-    /// the animation. The mini player, playback commands, and Now Playing all arrive here, and the
-    /// container decides how the transition runs.
-    func requestExpansion() {
-        guard miniPlayerVisible, !fullScreenPresented else { return }
-        playerExpansionRequest &+= 1
-    }
-
-    /// Parks the overlay as the accessory without tearing playback down. The container animates
-    /// `presentationProgress` to 0 in response.
-    func requestCollapse() {
-        guard fullScreenPresented else { return }
-        chapterListPresented = false
-        fullScreenPresented = false
-    }
-
-    func beginInteractivePresentation() {
-        guard miniPlayerVisible else { return }
-        presentationIsInteractive = true
-        playerPresentationGestureActive = true
-        if !fullScreenPresented {
-            fullScreenPresented = true
-        }
-    }
-
-    func updatePresentationProgress(_ progress: CGFloat) {
-        presentationProgress = min(max(progress, 0), 1.12)
-    }
-
-    func endInteractivePresentation(velocity: CGFloat) {
-        // Commit the boolean before leaving interactive mode. The container ignores
-        // `fullScreenPresented` changes while a finger is down, then settles on this value
-        // the moment `presentationIsInteractive` becomes false. Flipping the flag first
-        // would settle against the stale boolean and bounce the card the wrong way.
-        let shouldExpand = presentationProgress > 0.32 || velocity < -820
-        chapterListPresented = shouldExpand ? chapterListPresented : false
-        fullScreenPresented = shouldExpand
-        presentationIsInteractive = false
-        playerPresentationGestureActive = false
-    }
-
     func dismiss() {
         log.info("dismiss()")
         persistCurrentPlaybackProgress(force: true)
@@ -952,9 +899,6 @@ final class PlayerStateManager {
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
-        presentationProgress = 0
-        presentationIsInteractive = false
-        presentationTravel = 0
         chapterListPresented = false
         expandedPlayerSurfaceHeight = 0
         playerPanelAtTop = true
