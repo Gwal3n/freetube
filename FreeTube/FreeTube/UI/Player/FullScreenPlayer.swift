@@ -23,6 +23,7 @@ struct FullScreenPlayer: View {
     @State private var portraitVideoFullscreen = false
     @State private var fullscreenSwipeTranslation: CGFloat = 0
     @State private var fullscreenSwipeIsVertical: Bool?
+    @State private var fullscreenSwipeStartedInExpectedDirection = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -291,6 +292,7 @@ struct FullScreenPlayer: View {
                     portraitVideoFullscreen = false
                     fullscreenSwipeTranslation = 0
                     fullscreenSwipeIsVertical = nil
+                    fullscreenSwipeStartedInExpectedDirection = false
                     panelScrollOffset = 0
                     player.playerPanelAtTop = true
                     if let videoID = player.currentVideo?.id {
@@ -395,6 +397,7 @@ struct FullScreenPlayer: View {
             if !isActive {
                 fullscreenSwipeTranslation = 0
                 fullscreenSwipeIsVertical = nil
+                fullscreenSwipeStartedInExpectedDirection = false
             }
         }
         .onDisappear {
@@ -475,21 +478,32 @@ struct FullScreenPlayer: View {
         DragGesture(minimumDistance: 12, coordinateSpace: .global)
             .onChanged { value in
                 guard verticalSwipeFullscreen else { return }
+                let expectedDirection: CGFloat = isFullscreen ? 1 : -1
                 if fullscreenSwipeIsVertical == nil {
                     fullscreenSwipeIsVertical = abs(value.translation.height)
                         > abs(value.translation.width) * 1.15
+                    // Lock eligibility when this drag first becomes vertical. A downward
+                    // collapse drag must not turn into an upward fullscreen swipe if the
+                    // finger reverses during the same gesture.
+                    fullscreenSwipeStartedInExpectedDirection = fullscreenSwipeIsVertical == true
+                        && value.translation.height * expectedDirection > 0
                 }
-                guard fullscreenSwipeIsVertical == true else { return }
+                guard fullscreenSwipeIsVertical == true,
+                      fullscreenSwipeStartedInExpectedDirection else { return }
 
-                let expectedDirection: CGFloat = isFullscreen ? 1 : -1
                 guard value.translation.height * expectedDirection > 0 else { return }
 
                 let travel = max(0, abs(value.translation.height) - 10)
                 fullscreenSwipeTranslation = travel * expectedDirection
             }
             .onEnded { value in
-                defer { fullscreenSwipeIsVertical = nil }
-                guard verticalSwipeFullscreen, fullscreenSwipeIsVertical == true else {
+                defer {
+                    fullscreenSwipeIsVertical = nil
+                    fullscreenSwipeStartedInExpectedDirection = false
+                }
+                guard verticalSwipeFullscreen,
+                      fullscreenSwipeIsVertical == true,
+                      fullscreenSwipeStartedInExpectedDirection else {
                     fullscreenSwipeTranslation = 0
                     return
                 }

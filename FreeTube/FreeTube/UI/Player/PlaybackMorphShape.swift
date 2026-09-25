@@ -14,12 +14,14 @@ struct PlaybackMorphShape: Shape {
 
     func path(in rect: CGRect) -> Path {
         let amount = min(1, max(0, progress))
+        let cornerRadius = min(rect.width, rect.height) * 0.04
         var path = Path()
 
         addPolygon(
             from: [(0.12, 0.05), (0.48, 0.25), (0.48, 0.75), (0.12, 0.95)],
             to: [(0.18, 0.08), (0.38, 0.08), (0.38, 0.92), (0.18, 0.92)],
             amount: amount,
+            cornerRadii: [cornerRadius, cornerRadius * amount, cornerRadius * amount, cornerRadius],
             in: rect,
             to: &path
         )
@@ -27,6 +29,7 @@ struct PlaybackMorphShape: Shape {
             from: [(0.48, 0.25), (0.92, 0.50), (0.92, 0.50), (0.48, 0.75)],
             to: [(0.62, 0.08), (0.82, 0.08), (0.82, 0.92), (0.62, 0.92)],
             amount: amount,
+            cornerRadii: [cornerRadius * amount, cornerRadius, cornerRadius, cornerRadius * amount],
             in: rect,
             to: &path
         )
@@ -37,18 +40,46 @@ struct PlaybackMorphShape: Shape {
         from start: [(CGFloat, CGFloat)],
         to end: [(CGFloat, CGFloat)],
         amount: CGFloat,
+        cornerRadii: [CGFloat],
         in rect: CGRect,
         to path: inout Path
     ) {
-        for index in start.indices {
+        let points = start.indices.map { index in
             let x = start[index].0 + (end[index].0 - start[index].0) * amount
             let y = start[index].1 + (end[index].1 - start[index].1) * amount
-            let point = CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height)
+            return CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height)
+        }
+        for index in points.indices {
+            let previous = points[(index + points.count - 1) % points.count]
+            let point = points[index]
+            let next = points[(index + 1) % points.count]
+            let incoming = (
+                (point.x - previous.x) * (point.x - previous.x)
+                + (point.y - previous.y) * (point.y - previous.y)
+            ).squareRoot()
+            let outgoing = (
+                (next.x - point.x) * (next.x - point.x)
+                + (next.y - point.y) * (next.y - point.y)
+            ).squareRoot()
+            let radius = min(cornerRadii[index], min(incoming * 0.35, outgoing * 0.35))
+            let before = incoming > 0
+                ? CGPoint(
+                    x: point.x + (previous.x - point.x) * radius / incoming,
+                    y: point.y + (previous.y - point.y) * radius / incoming
+                )
+                : point
+            let after = outgoing > 0
+                ? CGPoint(
+                    x: point.x + (next.x - point.x) * radius / outgoing,
+                    y: point.y + (next.y - point.y) * radius / outgoing
+                )
+                : point
             if index == start.startIndex {
-                path.move(to: point)
+                path.move(to: before)
             } else {
-                path.addLine(to: point)
+                path.addLine(to: before)
             }
+            path.addQuadCurve(to: after, control: point)
         }
         path.closeSubpath()
     }
