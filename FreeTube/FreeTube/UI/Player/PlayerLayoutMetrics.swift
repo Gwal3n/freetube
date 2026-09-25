@@ -21,7 +21,13 @@ enum PlayerLayoutMetrics {
               frame.maxY > window.bounds.height * 0.7 else {
             return safeAreaInsets.bottom + 50
         }
-        return max(safeAreaInsets.bottom, window.bounds.height - frame.minY) + 6
+        let clearance = window.bounds.height - frame.minY
+        // Ignore a converted frame that spans far more than a tab bar; using it
+        // would position the mini-player outside the visible viewport.
+        guard clearance > 0, clearance < 160 else {
+            return safeAreaInsets.bottom + 50
+        }
+        return max(safeAreaInsets.bottom, clearance) + 6
     }
 
     private static var keyWindow: UIWindow? {
