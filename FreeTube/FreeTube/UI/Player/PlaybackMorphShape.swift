@@ -14,7 +14,8 @@ struct PlaybackMorphShape: Shape {
 
     func path(in rect: CGRect) -> Path {
         let amount = min(1, max(0, progress))
-        let cornerRadius = min(rect.width, rect.height) * 0.04
+        // Match the softened edges of the adjacent filled transport SF Symbols.
+        let cornerRadius = min(rect.width, rect.height) * 0.06
         var path = Path()
 
         addPolygon(
@@ -26,7 +27,7 @@ struct PlaybackMorphShape: Shape {
             to: &path
         )
         addPolygon(
-            from: [(0.48, 0.25), (0.92, 0.50), (0.92, 0.50), (0.48, 0.75)],
+            from: [(0.48, 0.25), (0.92, 0.47), (0.92, 0.53), (0.48, 0.75)],
             to: [(0.62, 0.08), (0.82, 0.08), (0.82, 0.92), (0.62, 0.92)],
             amount: amount,
             cornerRadii: [cornerRadius * amount, cornerRadius, cornerRadius, cornerRadius * amount],

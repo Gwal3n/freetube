@@ -51,6 +51,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             width: proxy.size.width,
                             height: max(0, proxy.size.height - expandedTopInset)
                         )
+                        // Keep the player's existing viewport and controls below the status
+                        // area, but make its clipping host edge-to-edge. Only the scaled media
+                        // can then extend into that top inset during an upward fullscreen drag.
+                        .padding(.top, expandedTopInset)
+                        .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
                         .background(Color.black)
                         .clipShape(
                             RoundedRectangle(
@@ -63,11 +68,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // animation, exposing video at the destination while the chrome moves.
                         .position(
                             x: proxy.size.width / 2,
-                            y: expandedPlayerCenterY(
-                                transition: transition,
-                                in: proxy.size,
-                                topInset: expandedTopInset
-                            )
+                            y: expandedPlayerCenterY(transition: transition, in: proxy.size)
                         )
                         .zIndex(2)
                         .transition(.opacity)
@@ -141,12 +142,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     /// During a downward drag the sheet moves one point for every point travelled by the finger.
     /// Settled and mini-to-expanded transitions still animate across the complete viewport.
-    private func expandedPlayerCenterY(
-        transition: CGFloat,
-        in size: CGSize,
-        topInset: CGFloat
-    ) -> CGFloat {
-        let settledCenter = (size.height + topInset) / 2
+    private func expandedPlayerCenterY(transition: CGFloat, in size: CGSize) -> CGFloat {
+        let settledCenter = size.height / 2
         if player.fullScreenPresented, presentationTranslation > 0 {
             return settledCenter + presentationTranslation
         }

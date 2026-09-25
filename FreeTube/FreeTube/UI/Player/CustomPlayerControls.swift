@@ -152,5 +152,6 @@ extension Image {
             .foregroundStyle(.white)
             .frame(width: 48, height: 48)
             .contentShape(Circle())
+            .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
     }
 }
