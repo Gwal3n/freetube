@@ -335,39 +335,14 @@ final class DownloadManager: TemporaryDownloading {
         // embedded Python initialization can otherwise affect later directory resolution.
         _ = Self.downloadsDirectory
         startMonitoringPath()
-        downloadsChangeObserver = NotificationCenter.default.addObserver(
-            forName: DownloadsStore.didChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.localFileCache.removeAll() }
-        }
     }
 
     // MARK: - Public surface
 
-    /// Memoized answers for `localFile(for:)`.
-    ///
-    /// `@ObservationIgnored` is load-bearing, not an optimization: `localFile(for:)` is read from
-    /// SwiftUI bodies, so an observed cache would make every miss write a tracked property from
-    /// inside a body evaluation.
-    @ObservationIgnored private var localFileCache: [String: URL?] = [:]
-    @ObservationIgnored private var downloadsChangeObserver: NSObjectProtocol?
-
     /// Returns the local file URL for a downloaded video, or nil if it isn't on disk.
-    ///
-    /// Callers include `Menu` and player-panel bodies that re-evaluate on every playback time
-    /// tick, and an uncached answer costs two `stat` calls each time. The result is memoized and
-    /// dropped wholesale on `DownloadsStore.didChange`, which fires on every write, delete, and
-    /// cache eviction — the only ways the answer can change. Still no logging here (§15.10).
+    /// Pure filesystem check — no I/O beyond `fileExists`. Called from SwiftUI bodies, so
+    /// no logging here.
     func localFile(for videoID: String) -> URL? {
-        if let cached = localFileCache[videoID] { return cached }
-        let resolved = resolveLocalFile(for: videoID)
-        localFileCache[videoID] = resolved
-        return resolved
-    }
-
-    private func resolveLocalFile(for videoID: String) -> URL? {
         let url = Self.fileURL(for: videoID)
         guard FileManager.default.fileExists(atPath: url.path),
               let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -404,11 +379,7 @@ final class DownloadManager: TemporaryDownloading {
         let task = Task<URL, Error> { @MainActor [weak self] in
             guard let self else { throw YouTubeServiceError.unknown(NSError(domain: "DownloadManager", code: -1)) }
             defer { self.inflight[video.id] = nil }
-            let result = try await self.runYoutubeDLDownload(video: video, quality: quality, priority: priority)
-            // The memoized miss recorded above has to go even if this path wrote the file without
-            // going through `DownloadsStore`, which is where the invalidating notification lives.
-            self.invalidateLocalFile(for: video.id)
-            return result
+            return try await self.runYoutubeDLDownload(video: video, quality: quality, priority: priority)
         }
         inflight[video.id] = task
         return try await task.value
@@ -423,14 +394,7 @@ final class DownloadManager: TemporaryDownloading {
         // File-system backed: removing the file drops its xattr too. `DownloadsStore` posts
         // the change notification on our behalf so the Downloads tab refreshes.
         DownloadsStore.shared.delete(at: url)
-        invalidateLocalFile(for: videoID)
         log.info("Deleted download \(videoID, privacy: .public)")
-    }
-
-    /// Drops the memoized `localFile(for:)` answer for one video. Only needed by write paths that
-    /// bypass `DownloadsStore` and so never post `DownloadsStore.didChange`.
-    func invalidateLocalFile(for videoID: String) {
-        localFileCache[videoID] = nil
     }
 
     func cancel(taskID: String) {

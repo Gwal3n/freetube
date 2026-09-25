@@ -124,16 +124,10 @@ final class SearchViewModel {
     func loadMore() async {
         guard let token = results?.continuationToken, !isLoading else { return }
         errorState = nil
-        // Without this the page could land after a *different* query had already replaced
-        // `results`, and the merge below would splice two unrelated searches into one list.
-        let generation = searchGeneration
         isLoading = true
-        defer {
-            if searchGeneration == generation { isLoading = false }
-        }
+        defer { isLoading = false }
         do {
             let next = try await service.fetchMore(continuation: token)
-            guard searchGeneration == generation else { return }
             let mergedVideos = (results?.videos ?? []) + next.videos
             let mergedChannels = (results?.channels ?? []) + next.channels
             let mergedPlaylists = (results?.playlists ?? []) + next.playlists
@@ -144,7 +138,6 @@ final class SearchViewModel {
                 continuationToken: next.continuationToken
             )
         } catch {
-            guard searchGeneration == generation else { return }
             log.notice("Loading more search results failed: \(String(describing: error), privacy: .public)")
             errorState = ErrorState(message: "More results couldn’t be loaded. Please try again.")
         }
