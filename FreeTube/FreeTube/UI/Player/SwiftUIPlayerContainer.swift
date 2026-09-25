@@ -58,10 +58,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                                 style: .continuous
                             )
                         )
-                        .offset(y: expandedPlayerOffset(transition: transition, in: proxy.size))
+                        // Position the hosting view itself, not just its SwiftUI drawing. The
+                        // AVPlayerViewController inside can commit a frame ahead of an `.offset`
+                        // animation, exposing video at the destination while the chrome moves.
+                        .position(
+                            x: proxy.size.width / 2,
+                            y: expandedPlayerCenterY(
+                                transition: transition,
+                                in: proxy.size,
+                                topInset: expandedTopInset
+                            )
+                        )
                         .zIndex(2)
-                        // UIKit-backed video surfaces can visually outrun SwiftUI move
-                        // transitions. Position is animated by the container offset instead.
                         .transition(.opacity)
                         // The UIKit-backed player stays mounted for a seamless mini/expanded
                         // transition. Once settled in mini mode it is fully off-screen, but must
@@ -92,7 +100,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: player.fullScreenPresented)
+            // Expansion and collapse already supply their own interactive springs. A second
+            // animation bound to this Bool can reanimate the mini glass after it reappears.
             .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: player.miniPlayerVisible)
         }
         // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
@@ -132,11 +141,16 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     /// During a downward drag the sheet moves one point for every point travelled by the finger.
     /// Settled and mini-to-expanded transitions still animate across the complete viewport.
-    private func expandedPlayerOffset(transition: CGFloat, in size: CGSize) -> CGFloat {
+    private func expandedPlayerCenterY(
+        transition: CGFloat,
+        in size: CGSize,
+        topInset: CGFloat
+    ) -> CGFloat {
+        let settledCenter = (size.height + topInset) / 2
         if player.fullScreenPresented, presentationTranslation > 0 {
-            return presentationTranslation
+            return settledCenter + presentationTranslation
         }
-        return transition * (size.height + 28)
+        return settledCenter + transition * (size.height + 28)
     }
 
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {

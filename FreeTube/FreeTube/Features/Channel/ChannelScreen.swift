@@ -682,7 +682,10 @@ struct ChannelScreen: View {
     }
 
     private func availableTabs(for details: ChannelDetails) -> [ChannelProfileTab] {
-        var tabs: [ChannelProfileTab] = [.videos, .shorts]
+        var tabs: [ChannelProfileTab] = [.videos]
+        if !details.shorts.items.isEmpty || details.shorts.continuationToken != nil {
+            tabs.append(.shorts)
+        }
         if !details.directs.items.isEmpty { tabs.append(.live) }
         tabs.append(contentsOf: [.playlists, .about])
         return tabs

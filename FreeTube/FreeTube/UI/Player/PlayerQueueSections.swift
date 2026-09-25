@@ -335,7 +335,8 @@ struct PlayerQueueSections: View {
                 PlayerSectionHeading(
                     title: title,
                     detail: detail,
-                    isExpanded: isExpanded.wrappedValue
+                    isExpanded: isExpanded.wrappedValue,
+                    showsDisclosureIndicator: false
                 )
             }
             .buttonStyle(ResponsiveButtonStyle())
@@ -349,6 +350,20 @@ struct PlayerQueueSections: View {
                 .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel("Open playlist")
             }
+            Button {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    isExpanded.wrappedValue.toggle()
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel(isExpanded.wrappedValue ? "Collapse playlist" : "Expand playlist")
         }
         .padding(.horizontal)
     }
