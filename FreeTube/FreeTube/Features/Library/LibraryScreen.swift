@@ -62,7 +62,7 @@ struct LibraryScreen: View {
             // its downward gesture should belong to the system sheet instead.
             .sheet(isPresented: $showsSettings) {
                 SettingsScreen()
-                    .presentationDragIndicator(.visible)
+                    .presentationDragIndicator(.hidden)
             }
             .onChange(of: settingsRequest, initial: true) { _, request in
                 if request > 0 { showsSettings = true }

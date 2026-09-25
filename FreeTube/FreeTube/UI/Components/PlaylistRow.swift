@@ -36,21 +36,45 @@ struct PlaylistRow: View {
 
     private var content: some View {
         HStack(spacing: 12) {
-            KFImage(playlist.thumbnailURL)
-                .thumbnail(size: CGSize(width: 96, height: 56)) {
-                    MediaStyle.placeholderFill
+            ZStack(alignment: .bottom) {
+                KFImage(playlist.thumbnailURL)
+                    .thumbnail(size: CGSize(width: 96, height: 56)) {
+                        MediaStyle.placeholderFill
+                    }
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 96, height: 56)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    if let count = playlist.videoCount {
+                        Text(verbatim: count.formatted(.number.notation(.compactName)))
+                            .accessibilityLabel("\(count) videos")
+                    } else {
+                        Text("Playlist")
+                    }
+                    Spacer(minLength: 0)
                 }
-                .resizable()
-                .scaledToFill()
-                .frame(width: 96, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.black.opacity(0.76))
+            }
+            .frame(width: 96, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(playlist.title)
                     .font(MediaStyle.title)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
-                if let count = playlist.videoCount {
-                    Text("\(count) videos").font(.caption).foregroundStyle(.secondary)
+                if let channelName = playlist.channelName, !channelName.isEmpty {
+                    Text(channelName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             Spacer()
