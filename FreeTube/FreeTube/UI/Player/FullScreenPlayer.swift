@@ -24,6 +24,7 @@ struct FullScreenPlayer: View {
     @State private var fullscreenSwipeTranslation: CGFloat = 0
     @State private var fullscreenSwipeIsVertical: Bool?
     @State private var fullscreenSwipeStartedInExpectedDirection = false
+    @State private var fullscreenSwipeHidControls = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -296,6 +297,7 @@ struct FullScreenPlayer: View {
                     fullscreenSwipeTranslation = 0
                     fullscreenSwipeIsVertical = nil
                     fullscreenSwipeStartedInExpectedDirection = false
+                    fullscreenSwipeHidControls = false
                     panelScrollOffset = 0
                     player.playerPanelAtTop = true
                     if let videoID = player.currentVideo?.id {
@@ -401,6 +403,7 @@ struct FullScreenPlayer: View {
                 fullscreenSwipeTranslation = 0
                 fullscreenSwipeIsVertical = nil
                 fullscreenSwipeStartedInExpectedDirection = false
+                fullscreenSwipeHidControls = false
             }
         }
         .onDisappear {
@@ -490,6 +493,12 @@ struct FullScreenPlayer: View {
                     // finger reverses during the same gesture.
                     fullscreenSwipeStartedInExpectedDirection = fullscreenSwipeIsVertical == true
                         && value.translation.height * expectedDirection > 0
+                    if fullscreenSwipeStartedInExpectedDirection,
+                       !isFullscreen,
+                       controlsVisibility.isVisible {
+                        fullscreenSwipeHidControls = true
+                        controlsVisibility.hide(reduceMotion: reduceMotion)
+                    }
                 }
                 guard fullscreenSwipeIsVertical == true,
                       fullscreenSwipeStartedInExpectedDirection else { return }
@@ -500,14 +509,17 @@ struct FullScreenPlayer: View {
                 fullscreenSwipeTranslation = travel * expectedDirection
             }
             .onEnded { value in
+                let shouldRestoreControls = fullscreenSwipeHidControls
                 defer {
                     fullscreenSwipeIsVertical = nil
                     fullscreenSwipeStartedInExpectedDirection = false
+                    fullscreenSwipeHidControls = false
                 }
                 guard verticalSwipeFullscreen,
                       fullscreenSwipeIsVertical == true,
                       fullscreenSwipeStartedInExpectedDirection else {
                     fullscreenSwipeTranslation = 0
+                    if shouldRestoreControls { showPlayerControls() }
                     return
                 }
 
@@ -528,6 +540,9 @@ struct FullScreenPlayer: View {
                         }
                     }
                 }
+                if !shouldToggle, shouldRestoreControls {
+                    showPlayerControls()
+                }
                 if shouldToggle {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
@@ -542,7 +557,8 @@ struct FullScreenPlayer: View {
         } else {
             requestPlayerOrientation(.landscapeRight)
         }
-        showPlayerControls()
+        // The upward gesture faded the controls out before stretching the picture. Keep them
+        // hidden after entry; a normal tap can reveal them without flashing the fixed scrim back.
     }
 
     private func exitFullscreen() {
