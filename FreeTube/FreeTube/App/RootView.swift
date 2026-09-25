@@ -5,11 +5,8 @@ import UIKit
 /// Top-level tabbed shell.
 ///
 /// Three peer tabs — Feed, Library, Downloads — plus Search in the dedicated search role, which
-/// the system detaches into its own button beside the bar. The mini player is the tab view's
-/// bottom accessory, so the system owns its glass treatment, its inset above the bar, and the way
-/// it settles inline between the active tab and the search button once the bar minimises on
-/// scroll. Settings moved into Library's toolbar; five tabs left no room for the search button and
-/// preferences are not a browsing destination.
+/// the system detaches into its own button beside the bar. The mini player is the app's own
+/// overlay, sitting above the tab bar. Settings lives in Library's toolbar.
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
@@ -51,25 +48,18 @@ struct RootView: View {
         }.count
     }
 
-    /// Lifts the transient queue toast clear of the system chrome below it.
-    ///
-    /// The container ignores the safe area so the expanded player can go edge to edge, which means
-    /// a bottom-anchored overlay lands on the display edge and this has to put it back. The tab
-    /// bar and accessory heights are estimates — SwiftUI exposes the accessory's placement but not
-    /// its measured height — and an estimate is acceptable here in a way it was not for the mini
-    /// player itself, because this is a toast that appears for a few seconds rather than a
-    /// permanent surface that has to sit flush against the bar.
+    /// Lifts the transient queue toast clear of the tab bar and, when playback is collapsed, the
+    /// mini player sitting on top of it.
     private var queueNoticeBottomPadding: CGFloat {
         if player.fullScreenPresented {
             return PlayerLayoutMetrics.safeAreaInsets.bottom + 12
         }
-        let tabBar: CGFloat = 56
-        let accessory: CGFloat = player.miniPlayerVisible ? 68 : 0
-        return PlayerLayoutMetrics.safeAreaInsets.bottom + tabBar + accessory + 8
+        let miniPlayerClearance: CGFloat = player.miniPlayerVisible ? 68 : 8
+        return PlayerLayoutMetrics.bottomTabBarClearance + miniPlayerClearance
     }
 
     var body: some View {
-        SwiftUIPlayerContainer {
+        SwiftUIPlayerContainer(thumbnail: thumbnail) {
             tabShell
         }
         .overlay(alignment: .bottom) {
@@ -178,15 +168,9 @@ struct RootView: View {
             }
             .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
 
-            // The search role is what detaches this into its own button beside the bar, and it is
-            // also what gives the minimised bar something for the accessory to settle between.
             SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
                 HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
             }
-        }
-        .tabBarMinimizeBehavior(.onScrollDown)
-        .tabViewBottomAccessory(isEnabled: player.miniPlayerVisible) {
-            MiniPlayerAccessory(thumbnail: thumbnail)
         }
     }
 
