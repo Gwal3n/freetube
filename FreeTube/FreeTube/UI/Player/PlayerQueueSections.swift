@@ -139,24 +139,23 @@ struct PlayerQueueSections: View {
     }
 
     private var playlistWindowLowerBound: Int {
-        max(0, player.queue.currentIndex - playlistItemsBefore)
+        min(player.queue.items.count, max(0, player.queue.currentIndex - playlistItemsBefore))
     }
 
     private var playlistWindowUpperBound: Int {
-        min(player.queue.items.count, player.queue.currentIndex + playlistItemsAfter + 1)
+        max(
+            playlistWindowLowerBound,
+            min(player.queue.items.count, player.queue.currentIndex + playlistItemsAfter + 1)
+        )
     }
 
     private var displayedPlaylistIndices: Range<Int> {
         playlistWindowLowerBound..<playlistWindowUpperBound
     }
 
-    private var displayedQueueIndices: [Int] {
-        player.queue.items.indices.filter { player.queue.items[$0].id != player.currentVideo?.id }
-    }
-
     private var allUpNextVideos: [Video] {
         player.activePlaylist == nil
-            ? displayedQueueIndices.map { player.queue.items[$0] }
+            ? player.queue.items.filter { $0.id != player.currentVideo?.id }
             : player.playlistRecommendations
     }
 
@@ -173,6 +172,15 @@ struct PlayerQueueSections: View {
     @ViewBuilder
     private var playlistPanel: some View {
         if let playlist = player.activePlaylist {
+            // List may build a row after a tap has replaced the playlist queue with a single
+            // feed video. Capture the videos and indices together so a deferred row never
+            // indexes into the *new* queue using an index from the old playlist.
+            let playlistItems = player.queue.items
+            let lowerBound = min(playlistItems.count, max(0, player.queue.currentIndex - playlistItemsBefore))
+            let upperBound = max(
+                lowerBound,
+                min(playlistItems.count, player.queue.currentIndex + playlistItemsAfter + 1)
+            )
             VStack(alignment: .leading, spacing: 8) {
                 collapsiblePanelHeader(
                     title: "Playlist",
@@ -194,8 +202,8 @@ struct PlayerQueueSections: View {
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         }
-                        ForEach(displayedPlaylistIndices, id: \.self) { index in
-                            queueRow(player.queue.items[index], preservesPlaylistContext: true)
+                        ForEach(lowerBound..<upperBound, id: \.self) { index in
+                            queueRow(playlistItems[index], preservesPlaylistContext: true)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .frame(height: Self.queueRowHeight)
