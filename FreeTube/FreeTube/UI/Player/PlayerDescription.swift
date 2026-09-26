@@ -20,8 +20,10 @@ struct PlayerDescription: View {
                     RichDescriptionText(parts: parts, fallback: text, onSeek: onSeek)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
+                        .transition(.opacity)
                 } else if isLoading {
                     PlayerDescriptionPlaceholder()
+                        .transition(.opacity)
                 } else if loadFailed {
                     HStack(spacing: 8) {
                         Text("Description unavailable").font(.subheadline).foregroundStyle(.secondary)
@@ -47,6 +49,7 @@ struct PlayerDescription: View {
         }
         .padding(.horizontal)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
+        .animation(reduceMotion ? nil : InterfaceMotion.content, value: isLoading)
     }
 }
 

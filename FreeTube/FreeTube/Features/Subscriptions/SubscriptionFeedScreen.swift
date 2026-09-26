@@ -14,21 +14,6 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                if model.isRefreshing {
-                    HStack(spacing: 10) {
-                        ProgressView(
-                            value: Double(model.refreshedChannels),
-                            total: Double(max(1, model.refreshChannelCount))
-                        )
-                        Text(verbatim: "\(model.refreshedChannels)/\(model.refreshChannelCount)")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    .listRowSeparator(.hidden)
-                    .accessibilityLabel("Refreshing subscriptions")
-                    .accessibilityValue("\(model.refreshedChannels) of \(model.refreshChannelCount)")
-                }
-
                 if model.failedChannelCount > 0 {
                     Section {
                         Label(
@@ -62,6 +47,11 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .navigationTitle("Feed")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    FeedRefreshProgress(model: model)
+                }
+            }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)

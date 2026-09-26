@@ -43,7 +43,8 @@ struct PlaylistMetadataBlock: View {
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-                    .contentShape(Capsule())
+                    .frame(minHeight: MediaStyle.actionSize)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(ResponsiveButtonStyle())
             }

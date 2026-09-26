@@ -78,9 +78,13 @@ final class SubscriptionFeedViewModel {
 
     private func loadCache() async {
         let snapshots = await writer.fetchSubscriptionFeed(limit: visibleLimit)
-        videos = snapshots.map(\.video)
+        let refreshedVideos = snapshots.map(\.video)
         let totalCount = await writer.subscriptionFeedCount()
-        canLoadMore = videos.count < totalCount
-        playbackProgress = await writer.watchProgress(videoIDs: videos.map(\.id))
+        let progress = await writer.watchProgress(videoIDs: refreshedVideos.map(\.id))
+        // Commit rows and their progress together, rather than painting fresh rows with stale
+        // progress while the remaining persistence reads are suspended.
+        videos = refreshedVideos
+        canLoadMore = refreshedVideos.count < totalCount
+        playbackProgress = progress
     }
 }

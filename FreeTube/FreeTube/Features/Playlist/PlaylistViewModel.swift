@@ -21,6 +21,8 @@ final class PlaylistViewModel {
     }
 
     func load() async {
+        guard !isLoading else { return }
+        errorState = nil
         isLoading = true
         defer { isLoading = false }
         do {

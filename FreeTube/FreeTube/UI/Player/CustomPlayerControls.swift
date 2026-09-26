@@ -8,11 +8,7 @@ struct CustomPlayerControls: View {
     let isSeekPreviewActive: Bool
     let isPlaying: Bool
     let hasEnded: Bool
-    let elapsed: TimeInterval
-    let duration: TimeInterval
-    let isLive: Bool
-    let sponsorSegments: [SponsorBlockSegment]
-    let chapters: [VideoChapter]
+    let previewElapsed: TimeInterval?
     let hasPrevious: Bool
     let hasNext: Bool
     let videoTitle: String
@@ -116,12 +112,8 @@ struct CustomPlayerControls: View {
 
                 Spacer()
 
-                SponsorBlockTimeline(
-                    elapsed: elapsed,
-                    duration: duration,
-                    isLive: isLive,
-                    segments: sponsorSegments,
-                    chapters: chapters,
+                PlayerTimelineOverlay(
+                    previewElapsed: previewElapsed,
                     onSeek: onSeek,
                     onPreviewChanged: onSeekPreviewChanged,
                     onShowChapters: onShowChapters

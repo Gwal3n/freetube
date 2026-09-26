@@ -62,6 +62,17 @@ struct PlaylistScreen: View {
                         .padding(.vertical)
                 } else if model.isLoading {
                     playlistPlaceholder
+                } else if model.errorState != nil {
+                    ContentUnavailableView {
+                        Label("Unable to Load Playlist", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Check your connection and try again.")
+                    } actions: {
+                        Button("Try Again") { Task { await model.load() } }
+                            .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
                 }
             }
         }
@@ -212,6 +223,8 @@ struct PlaylistScreen: View {
             .padding(.vertical, 8)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+            .frame(minHeight: MediaStyle.actionSize)
+            .contentShape(Rectangle())
         }
         .buttonStyle(ResponsiveButtonStyle())
     }
@@ -252,7 +265,10 @@ struct PlaylistScreen: View {
                 .frame(width: 32, height: 32)
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                .contentShape(Rectangle())
         }
+        .accessibilityLabel("More playlist actions")
     }
 
     // MARK: - Videos

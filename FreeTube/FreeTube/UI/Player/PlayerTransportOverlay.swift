@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Narrow observation boundary for playback values that change frequently.
 ///
-/// Keeping elapsed time, duration, and timeline data here prevents their periodic updates from
-/// invalidating the expanded player's metadata and lower panels. Layout and actions remain
+/// Elapsed time and timeline data are observed only by the nested `PlayerTimelineOverlay`;
+/// this boundary observes infrequent transport changes, not each playback tick. Layout and actions remain
 /// supplied by `FullScreenPlayer`, so this component does not own presentation behavior.
 @available(iOS 17.0, *)
 struct PlayerTransportOverlay: View {
@@ -37,11 +37,7 @@ struct PlayerTransportOverlay: View {
             isSeekPreviewActive: isSeekPreviewActive,
             isPlaying: player.isPlaying,
             hasEnded: player.hasEnded,
-            elapsed: previewElapsed ?? player.elapsed,
-            duration: player.duration,
-            isLive: player.currentVideo?.isLive == true,
-            sponsorSegments: player.sponsorBlockSegments,
-            chapters: player.chapters,
+            previewElapsed: previewElapsed,
             hasPrevious: hasPrevious,
             hasNext: hasNext,
             videoTitle: videoTitle,
