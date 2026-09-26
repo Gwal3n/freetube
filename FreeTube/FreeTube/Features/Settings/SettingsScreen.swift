@@ -96,6 +96,7 @@ struct SettingsScreen: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.automatic)
+                    .tint(.white)
                 } header: {
                     Text("SponsorBlock")
                 } footer: {
@@ -121,6 +122,7 @@ struct SettingsScreen: View {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
                     .buttonStyle(.automatic)
+                    .tint(.white)
                 }
 
                 Section("Data") {
@@ -130,6 +132,7 @@ struct SettingsScreen: View {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
                     .buttonStyle(.automatic)
+                    .tint(.white)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)

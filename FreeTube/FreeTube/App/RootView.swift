@@ -15,9 +15,9 @@ struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    // A system picker temporarily deactivates and may reconstruct the tab hierarchy. Scene-backed
-    // selection prevents that lifecycle boundary from snapping the app back to Feed.
+    // Persist scene restoration separately from the native TabView's live selection.
     @SceneStorage("selectedRootTab") private var selectedTabRaw = Tab.feed.rawValue
+    @State private var tabState = RootTabSelection()
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var feedNavigationRequest: AppNavigationRequest?
@@ -25,29 +25,17 @@ struct RootView: View {
     @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
     @State private var settingsRequest = 0
-    /// Direct observation of the shared download manager — no AsyncStream subscription needed since
-    /// `DownloadManager` is itself `@Observable`. Both this view (for the badge) and `DownloadsScreen`
-    /// (for the list) read the same source of truth.
-    @State private var downloads = DownloadManager.shared
     /// Cached thumbnail for the current video so the mini-player bar shows the actual preview instead
     /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
     @State private var thumbnail: UIImage?
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     enum Tab: String, Hashable {
         case feed, search, library, downloads
     }
 
     private var selectedTab: Tab {
-        Tab(rawValue: selectedTabRaw) ?? .feed
-    }
-
-    private var activeDownloadsCount: Int {
-        downloads.activeTasks.filter { snapshot in
-            switch snapshot.state {
-            case .queued, .downloading, .paused: return true
-            case .completed, .failed: return false
-            }
-        }.count
+        tabState.selected
     }
 
     private var queueNoticeBottomPadding: CGFloat {
@@ -120,11 +108,11 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                selectedTabRaw = tab.rawValue
+                tabState.select(tab, showsFeed: showSubscriptionFeedTab)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
-            selectedTabRaw = Tab.library.rawValue
+            tabState.select(.library, showsFeed: showSubscriptionFeedTab)
             settingsRequest &+= 1
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
@@ -140,68 +128,28 @@ struct RootView: View {
             routeFromPlayer(.localPlaylist(playlistID))
         }
         .onAppear {
-            if !showSubscriptionFeedTab, selectedTab == .feed {
-                selectedTabRaw = Tab.search.rawValue
-            }
+            tabState.restore(rawValue: selectedTabRaw, showsFeed: showSubscriptionFeedTab)
         }
         .onChange(of: showSubscriptionFeedTab) { _, isVisible in
-            if !isVisible, selectedTab == .feed {
-                selectedTabRaw = Tab.search.rawValue
-            }
+            tabState.updateFeedVisibility(isVisible)
+        }
+        .onChange(of: tabState.selected) { previous, tab in
+            selectedTabRaw = tab.rawValue
+            log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
     }
 
-    @ViewBuilder
     private var tabShell: some View {
-        if #available(iOS 26.0, *) {
-            TabView(selection: tabSelection) {
-                if showSubscriptionFeedTab {
-                    SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: Tab.feed) {
-                        SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
-                    }
-                }
-
-                SwiftUI.Tab("Library", systemImage: "play.square.stack", value: Tab.library) {
-                    LibraryScreen(navigationRequest: libraryNavigationRequest, settingsRequest: settingsRequest)
-                }
-
-                SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: Tab.downloads) {
-                    DownloadsScreen(navigationRequest: downloadsNavigationRequest)
-                }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-
-                SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
-                    HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
-                }
-            }
-        } else {
-            legacyTabShell
-        }
-    }
-
-    /// iOS 17–25 compatibility. iOS 26 uses the modern `Tab` declarations above for its
-    /// native Liquid Glass tab bar and a separate Search button.
-    private var legacyTabShell: some View {
-        TabView(selection: tabSelection) {
-            if showSubscriptionFeedTab {
-                SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
-                    .tabItem { Label("Feed", systemImage: "rectangle.stack") }
-                    .tag(Tab.feed)
-            }
-
-            HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(Tab.search)
-
-            LibraryScreen(navigationRequest: libraryNavigationRequest, settingsRequest: settingsRequest)
-                .tabItem { Label("Library", systemImage: "play.square.stack") }
-                .tag(Tab.library)
-
-            DownloadsScreen(navigationRequest: downloadsNavigationRequest)
-                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-                .tag(Tab.downloads)
-        }
+        RootTabShell(
+            selection: tabSelection,
+            showsFeed: showSubscriptionFeedTab,
+            searchActivation: searchActivation,
+            feedNavigationRequest: feedNavigationRequest,
+            libraryNavigationRequest: libraryNavigationRequest,
+            downloadsNavigationRequest: downloadsNavigationRequest,
+            searchNavigationRequest: searchNavigationRequest,
+            settingsRequest: settingsRequest
+        )
     }
 
     /// Re-selecting Search requests focus without a gesture recognizer on the native tab bar.
@@ -210,35 +158,30 @@ struct RootView: View {
             get: { selectedTab },
             set: { newTab in
                 if newTab == .feed, !showSubscriptionFeedTab {
-                    selectedTabRaw = Tab.search.rawValue
+                    tabState.select(.search, showsFeed: false)
                     return
                 }
                 if newTab == .search, selectedTab == .search {
                     searchActivation &+= 1
                 }
-                selectedTabRaw = newTab.rawValue
+                tabState.select(newTab, showsFeed: showSubscriptionFeedTab)
             }
         )
     }
 
-    /// Player metadata is global, so its links need one stable navigation owner rather than being
-    /// handed to whichever unrelated tab happens to be visible. Feed is the app's browsing root;
-    /// Search is the fallback when the user hides Feed. Deliver the request on the next main-actor
-    /// turn so a lazily created tab observes a change instead of mounting with an already-set value.
+    /// Open player/context-menu links in the current tab's existing navigation stack. Ordinary
+    /// minimization and system alerts never select a tab or create navigation requests.
     private func routeFromPlayer(_ destination: AppNavigationRequest.Destination) {
         let request = AppNavigationRequest(destination: destination)
-        let destinationTab: Tab = showSubscriptionFeedTab ? .feed : .search
-        selectedTabRaw = destinationTab.rawValue
-        Task { @MainActor in
-            await Task.yield()
-            switch destinationTab {
-            case .feed:
-                feedNavigationRequest = request
-            case .search:
-                searchNavigationRequest = request
-            case .library, .downloads:
-                break
-            }
+        switch selectedTab {
+        case .feed:
+            feedNavigationRequest = request
+        case .search:
+            searchNavigationRequest = request
+        case .library:
+            libraryNavigationRequest = request
+        case .downloads:
+            downloadsNavigationRequest = request
         }
     }
 

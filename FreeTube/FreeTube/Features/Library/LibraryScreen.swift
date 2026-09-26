@@ -125,6 +125,7 @@ struct LibraryScreen: View {
                 )
             }
             .buttonStyle(.automatic)
+            .tint(.white)
 
             Button {
                 path.append(.subscriptions)
@@ -136,6 +137,7 @@ struct LibraryScreen: View {
                 )
             }
             .buttonStyle(.automatic)
+            .tint(.white)
 
             Button {
                 path.append(.playlists)
@@ -147,6 +149,7 @@ struct LibraryScreen: View {
                 )
             }
             .buttonStyle(.automatic)
+            .tint(.white)
         }
     }
 

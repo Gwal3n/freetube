@@ -11,7 +11,7 @@ struct LibraryDestinationRow: View {
         HStack(spacing: 14) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundStyle(.tint)
+                .foregroundStyle(.primary)
                 .frame(width: 28, alignment: .center)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
