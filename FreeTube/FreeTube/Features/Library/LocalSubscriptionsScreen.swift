@@ -6,7 +6,6 @@ struct LocalSubscriptionsScreen: View {
     @State private var showingClearConfirmation = false
     @State private var refreshError: String?
     @State private var isRefreshing = false
-    @State private var activeIndexTitle: String?
     private let channelService: any ChannelServicing = ChannelService()
 
     var body: some View {
@@ -60,7 +59,9 @@ struct LocalSubscriptionsScreen: View {
                         }
 
                         if store.subscriptions.count > 10, titles.count > 1 {
-                            sectionIndex(titles: titles, scrollProxy: scrollProxy)
+                            SubscriptionSectionIndex(titles: titles) { title in
+                                scrollProxy.scrollTo(title, anchor: .top)
+                            }
                         }
                     }
                 }
@@ -111,45 +112,6 @@ struct LocalSubscriptionsScreen: View {
         return title.unicodeScalars.allSatisfy { CharacterSet.letters.contains($0) }
             ? title
             : "#"
-    }
-
-    private func sectionIndex(titles: [String], scrollProxy: ScrollViewProxy) -> some View {
-        GeometryReader { geometry in
-            let itemHeight = min(18, geometry.size.height / CGFloat(titles.count))
-            let topInset = max(0, (geometry.size.height - itemHeight * CGFloat(titles.count)) / 2)
-
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                ForEach(titles, id: \.self) { title in
-                    Button {
-                        scrollProxy.scrollTo(title, anchor: .top)
-                    } label: {
-                        Text(verbatim: title)
-                            .font(.system(size: 11, weight: .semibold))
-                            .frame(width: 26, height: itemHeight)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Jump to \(title)")
-                }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(.tint)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let position = (value.location.y - topInset) / max(itemHeight, 1)
-                        let index = min(max(Int(position), 0), titles.count - 1)
-                        let title = titles[index]
-                        guard activeIndexTitle != title else { return }
-                        activeIndexTitle = title
-                        scrollProxy.scrollTo(title, anchor: .top)
-                    }
-                    .onEnded { _ in activeIndexTitle = nil }
-            )
-        }
-        .frame(width: 26)
     }
 
     /// Refresh in small batches: enough parallelism for a large imported list without launching

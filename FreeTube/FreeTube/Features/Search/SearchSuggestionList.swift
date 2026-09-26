@@ -34,6 +34,7 @@ struct SearchSuggestionList: View {
                         Image(systemName: "arrow.up.left")
                             .foregroundStyle(.secondary)
                             .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel("Fill search with \(suggestion.text)")

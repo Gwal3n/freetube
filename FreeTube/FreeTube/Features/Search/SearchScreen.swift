@@ -30,6 +30,17 @@ struct SearchContent: View {
                 resultsList(results)
             } else if model.isLoading {
                 MediaListPlaceholder()
+            } else if model.didSearchFail {
+                ContentUnavailableView {
+                    Label("Unable to Search", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text("Check your connection and try again.")
+                } actions: {
+                    Button("Try Again") {
+                        onRunSearch(model.submittedQuery ?? model.query)
+                    }
+                    .buttonStyle(.bordered)
+                }
             } else if !history.isEmpty {
                 historyList
             } else {
@@ -101,22 +112,7 @@ struct SearchContent: View {
                             }
                         }
                     } header: {
-                        Button {
-                            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                                arePlaylistsExpanded.toggle()
-                            }
-                        } label: {
-                            HStack {
-                                Text("Playlists")
-                                Spacer()
-                                Text("\(results.playlists.count)")
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(arePlaylistsExpanded ? 90 : 0))
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(ResponsiveButtonStyle())
+                        collapsibleHeader("Playlists", count: results.playlists.count, isExpanded: $arePlaylistsExpanded)
                     }
                 }
                 if !results.videos.isEmpty {
@@ -139,20 +135,24 @@ struct SearchContent: View {
                                 .onAppear {
                                     guard lookaheadIDs.contains(video.id),
                                           results.continuationToken != nil,
+                                          !model.paginationFailed,
                                           !model.isLoading else { return }
                                     Task { await model.loadMore() }
                                 }
                             }
                         }
-                        if model.isLoading {
-                            ProgressView("Loading more…")
-                                .controlSize(.small)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .listRowSeparator(.hidden)
-                                .accessibilityLabel("Loading more search results")
-                        }
                     } header: {
                         collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
+                    }
+                }
+                if results.continuationToken != nil || model.isLoading {
+                    MediaPaginationFooter(isLoading: model.isLoading, isRetry: model.paginationFailed) {
+                        Task { await model.loadMore() }
+                    }
+                    .listRowSeparator(.hidden)
+                    .onAppear {
+                        guard !model.paginationFailed else { return }
+                        Task { await model.loadMore() }
                     }
                 }
             }
@@ -182,14 +182,16 @@ struct SearchContent: View {
                 Text(title)
                 Spacer()
                 if let count {
-                    Text("\(count)").foregroundStyle(.secondary)
+                    Text(verbatim: count.formatted()).foregroundStyle(.secondary)
                 }
                 Image(systemName: "chevron.right")
                     .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
             }
+            .frame(minHeight: MediaStyle.actionSize)
             .contentShape(Rectangle())
         }
         .buttonStyle(ResponsiveButtonStyle())
+        .accessibilityValue(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
     }
 
     private func progressLookupID(for videos: [Video]) -> String {

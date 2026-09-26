@@ -11,6 +11,7 @@ final class PlaylistViewModel {
     /// Separate flag so the row-level prefetch trigger doesn't fire while a previous
     /// `loadMore` is still in flight.
     private(set) var isLoadingMore: Bool = false
+    private(set) var paginationFailed = false
     var errorState: ErrorState?
 
     private let service: any PlaylistServicing
@@ -23,6 +24,7 @@ final class PlaylistViewModel {
     func load() async {
         guard !isLoading else { return }
         errorState = nil
+        paginationFailed = false
         isLoading = true
         defer { isLoading = false }
         do {
@@ -41,8 +43,10 @@ final class PlaylistViewModel {
     /// with a new value (so `@Observable` notices), preserving the playlist header and the
     /// already-loaded videos.
     func loadMore() async {
-        guard let current = details, let token = current.continuationToken, !isLoadingMore else { return }
+        guard let current = details, let token = current.continuationToken, !isLoading, !isLoadingMore else { return }
         isLoadingMore = true
+        errorState = nil
+        paginationFailed = false
         defer { isLoadingMore = false }
         do {
             let page = try await service.fetchMore(continuation: token)
@@ -52,6 +56,7 @@ final class PlaylistViewModel {
                 continuationToken: page.continuationToken
             )
         } catch {
+            paginationFailed = true
             errorState = ErrorState(from: error)
         }
     }

@@ -16,6 +16,8 @@ final class SearchViewModel {
     private(set) var suggestions: [SearchSuggestion] = []
     private(set) var results: SearchResult?
     private(set) var isLoading: Bool = false
+    private(set) var didSearchFail = false
+    private(set) var paginationFailed = false
     var errorState: ErrorState?
 
     private let service: any SearchServicing
@@ -80,6 +82,9 @@ final class SearchViewModel {
         submittedQuery = nil
         suggestions = []
         isLoading = false
+        didSearchFail = false
+        paginationFailed = false
+        errorState = nil
         autocompleteTask?.cancel()
     }
 
@@ -97,6 +102,8 @@ final class SearchViewModel {
         suggestions = []
         results = nil
         errorState = nil
+        didSearchFail = false
+        paginationFailed = false
         self.submittedQuery = submittedQuery
         isLoading = true
         defer {
@@ -116,21 +123,27 @@ final class SearchViewModel {
             self.submittedQuery = submittedQuery
             suggestions = []
         } catch {
+            guard searchGeneration == generation,
+                  query.trimmingCharacters(in: .whitespacesAndNewlines) == submittedQuery else { return }
+            didSearchFail = true
             log.notice("Search failed: \(String(describing: error), privacy: .public)")
             errorState = ErrorState(message: "Search couldn’t be completed. Please try again.")
         }
     }
 
     func loadMore() async {
-        guard let token = results?.continuationToken, !isLoading else { return }
+        guard let current = results, let token = current.continuationToken, !isLoading else { return }
+        let generation = searchGeneration
         errorState = nil
+        paginationFailed = false
         isLoading = true
-        defer { isLoading = false }
+        defer { if searchGeneration == generation { isLoading = false } }
         do {
             let next = try await service.fetchMore(continuation: token)
-            let mergedVideos = (results?.videos ?? []) + next.videos
-            let mergedChannels = (results?.channels ?? []) + next.channels
-            let mergedPlaylists = (results?.playlists ?? []) + next.playlists
+            guard searchGeneration == generation else { return }
+            let mergedVideos = current.videos + next.videos
+            let mergedChannels = current.channels + next.channels
+            let mergedPlaylists = current.playlists + next.playlists
             results = SearchResult(
                 videos: mergedVideos,
                 channels: mergedChannels,
@@ -138,6 +151,8 @@ final class SearchViewModel {
                 continuationToken: next.continuationToken
             )
         } catch {
+            guard searchGeneration == generation else { return }
+            paginationFailed = true
             log.notice("Loading more search results failed: \(String(describing: error), privacy: .public)")
             errorState = ErrorState(message: "More results couldn’t be loaded. Please try again.")
         }
@@ -150,6 +165,7 @@ final class SearchViewModel {
         searchGeneration &+= 1
         let generation = searchGeneration
         errorState = nil
+        paginationFailed = false
         isLoading = true
         defer { if searchGeneration == generation { isLoading = false } }
         do {
@@ -160,6 +176,7 @@ final class SearchViewModel {
             guard searchGeneration == generation else { return }
             results = refreshed
         } catch {
+            guard searchGeneration == generation else { return }
             log.notice("Refreshing search failed: \(String(describing: error), privacy: .public)")
             errorState = ErrorState(message: "Search results couldn’t be refreshed. Please try again.")
         }

@@ -300,22 +300,18 @@ struct PlaylistScreen: View {
                         // Trigger the next-page fetch when the row 5 from the bottom appears.
                         // PlaylistService caches the continuation token on the response struct, so
                         // each `loadMore` advances the cursor for subsequent calls.
-                        if index >= videos.count - 5, model.canLoadMore {
+                        if index >= videos.count - 5, model.canLoadMore, !model.paginationFailed {
                             Task { await model.loadMore() }
                         }
                     }
                 }
                 if model.canLoadMore || model.isLoadingMore {
-                // Bottom spinner that doubles as a safety-net trigger for very short lists
-                // where the 5-row lookahead doesn't fire.
-                    ProgressView("Loading more…")
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .accessibilityLabel("Loading more playlist videos")
-                        .onAppear {
-                            if model.canLoadMore { Task { await model.loadMore() } }
-                        }
+                    MediaPaginationFooter(isLoading: model.isLoadingMore, isRetry: model.paginationFailed) {
+                        Task { await model.loadMore() }
+                    }
+                    .onAppear {
+                        if model.canLoadMore, !model.paginationFailed { Task { await model.loadMore() } }
+                    }
                 }
             }
         }
