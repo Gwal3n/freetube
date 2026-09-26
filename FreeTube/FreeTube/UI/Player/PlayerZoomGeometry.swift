@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// Pure fit/fill geometry shared by the fullscreen pinch interaction and its tests.
 nonisolated enum PlayerZoomGeometry {
