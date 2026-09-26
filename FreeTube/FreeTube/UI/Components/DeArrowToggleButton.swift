@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// An independent tap target above the thumbnail, not a button nested in the playback label.
+/// A subtle trailing action, kept separate from the video's playback tap target.
 @available(iOS 17.0, *)
 struct DeArrowToggleButton: View {
     let video: Video
@@ -16,9 +16,7 @@ struct DeArrowToggleButton: View {
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(model.showsOriginal(for: video) ? 0.65 : 1))
-                    .frame(width: 22, height: 22)
-                    .background(.black.opacity(0.55), in: Circle())
+                    .foregroundStyle(Color.secondary.opacity(model.showsOriginal(for: video) ? 0.65 : 1))
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }

@@ -31,7 +31,7 @@ struct VideoCard: View {
     var body: some View {
         DeArrowVideoContent(video: video) { branding in
             VStack(alignment: .leading, spacing: 8) {
-                ZStack(alignment: .topLeading) {
+                Group {
                     Button(action: onTap) {
                         thumbnail(branding: branding)
                     }
@@ -39,8 +39,6 @@ struct VideoCard: View {
                     // The metadata control below performs the same action and carries the complete
                     // spoken label. Exposing both would make VoiceOver announce every card twice.
                     .accessibilityHidden(true)
-                    DeArrowToggleButton(video: video, model: branding)
-                        .padding(5)
                 }
 
                 // Metadata row is split into its own HStack so the ellipsis Menu can live as a
@@ -98,8 +96,13 @@ struct VideoCard: View {
             .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
             .accessibilityHint("Plays video")
 
-            if showsMoreMenu {
-                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+            if showsMoreMenu || branding.hasReplacement(for: video) {
+                VStack(spacing: 0) {
+                    DeArrowToggleButton(video: video, model: branding)
+                    if showsMoreMenu {
+                        VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+                    }
+                }
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)

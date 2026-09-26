@@ -49,22 +49,23 @@ struct VideoRow: View {
     var body: some View {
         DeArrowVideoContent(video: video) { branding in
             HStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
+                Group {
                     Button(action: onTap) {
                         content(branding: branding)
                     }
                     .buttonStyle(ResponsiveButtonStyle())
                     .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
                     .accessibilityHint("Plays video")
-                    DeArrowToggleButton(video: video, model: branding)
-                        .padding(2)
                 }
 
                 switch accessory {
                 case .none:
-                    EmptyView()
+                    DeArrowToggleButton(video: video, model: branding)
                 case .actions(let offersPlayNext):
-                    VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+                    VStack(spacing: 0) {
+                        DeArrowToggleButton(video: video, model: branding)
+                        VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+                    }
                 case .reserved:
                     Color.clear
                         .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)

@@ -20,8 +20,13 @@ struct PlayerQueueSections: View {
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
 
-    private static let queueRowHeight: CGFloat = 56
-    private static let queueRowFootprint: CGFloat = queueRowHeight + 8
+    @AppStorage("com.leshko.freetube.deArrowTitles") private var replacesTitles = false
+    @AppStorage("com.leshko.freetube.deArrowThumbnails") private var replacesThumbnails = false
+
+    // Reserve the trailing action column before branding arrives, so loading it never moves
+    // neighboring rows or makes the fixed-height queue List clip its controls.
+    private var queueRowHeight: CGFloat { replacesTitles || replacesThumbnails ? 76 : 56 }
+    private var queueRowFootprint: CGFloat { queueRowHeight + 8 }
 
     @ViewBuilder
     var body: some View {
@@ -101,7 +106,7 @@ struct PlayerQueueSections: View {
                             )
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
-                            .frame(height: Self.queueRowHeight)
+                            .frame(height: queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
                         .onMove { offsets, destination in
@@ -122,19 +127,19 @@ struct PlayerQueueSections: View {
     // MARK: - Sizing
 
     private var manualQueueListHeight: CGFloat {
-        CGFloat(max(1, player.manualQueue.count)) * Self.queueRowFootprint + 32
+        CGFloat(max(1, player.manualQueue.count)) * queueRowFootprint + 32
     }
 
     private var queueListHeight: CGFloat {
         let loadMoreRows = canRevealMoreUpNext ? 1 : 0
         let count = max(1, displayedUpNextVideos.count + loadMoreRows)
-        return CGFloat(count) * Self.queueRowFootprint + 32
+        return CGFloat(count) * queueRowFootprint + 32
     }
 
     private var playlistListHeight: CGFloat {
         let controls = (playlistWindowLowerBound > 0 ? 1 : 0)
             + (playlistWindowUpperBound < player.queue.items.count || player.canLoadMorePlaylistItems ? 1 : 0)
-        return CGFloat(max(1, displayedPlaylistIndices.count + controls)) * Self.queueRowFootprint + 32
+        return CGFloat(max(1, displayedPlaylistIndices.count + controls)) * queueRowFootprint + 32
     }
 
     private var playlistWindowLowerBound: Int {
@@ -195,7 +200,7 @@ struct PlayerQueueSections: View {
                             } label: {
                                 Label("Load 20 previous", systemImage: "chevron.up")
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: Self.queueRowHeight)
+                                    .frame(height: queueRowHeight)
                             }
                             .buttonStyle(ResponsiveButtonStyle())
                             .listRowBackground(Color.clear)
@@ -205,7 +210,7 @@ struct PlayerQueueSections: View {
                             queueRow(playlistItems[index], preservesPlaylistContext: true)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
-                                .frame(height: Self.queueRowHeight)
+                                .frame(height: queueRowHeight)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
                         if playlistWindowUpperBound < player.queue.items.count {
@@ -214,7 +219,7 @@ struct PlayerQueueSections: View {
                             } label: {
                                 Label("Load 20 next", systemImage: "chevron.down")
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: Self.queueRowHeight)
+                                    .frame(height: queueRowHeight)
                             }
                             .buttonStyle(ResponsiveButtonStyle())
                             .listRowBackground(Color.clear)
@@ -269,7 +274,7 @@ struct PlayerQueueSections: View {
                             }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
-                            .frame(height: Self.queueRowHeight)
+                            .frame(height: queueRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
                     if canRevealMoreUpNext {
@@ -286,7 +291,7 @@ struct PlayerQueueSections: View {
                                 }
                                 Spacer()
                             }
-                            .frame(height: Self.queueRowHeight)
+                            .frame(height: queueRowHeight)
                         }
                         .buttonStyle(ResponsiveButtonStyle())
                         .disabled(player.isLoadingMoreRecommendations)
@@ -392,7 +397,7 @@ struct PlayerQueueSections: View {
                 }
                 Spacer()
             }
-            .frame(height: Self.queueRowHeight)
+            .frame(height: queueRowHeight)
         }
         .buttonStyle(ResponsiveButtonStyle())
         .disabled(isLoading)
@@ -418,7 +423,7 @@ struct PlayerQueueSections: View {
 
         return DeArrowVideoContent(video: video) { branding in
             HStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
+                Group {
                     Button {
                         if let onPlay {
                             onPlay()
@@ -457,11 +462,10 @@ struct PlayerQueueSections: View {
                                 NowPlayingIndicator(videoID: video.id)
                             }
                         }
-                        .frame(maxWidth: .infinity, minHeight: Self.queueRowHeight, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: queueRowHeight, alignment: .leading)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(ResponsiveButtonStyle())
-                    DeArrowToggleButton(video: video, model: branding)
                 }
 
                 if showsRemoveButton, let removalAction {
@@ -476,11 +480,14 @@ struct PlayerQueueSections: View {
                     .accessibilityLabel("Remove from queue")
                 }
 
-                VideoMoreActionsMenu(
-                    video: video,
-                    offersPlayNext: !preservesPlaylistContext,
-                    onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
-                )
+                VStack(spacing: 0) {
+                    DeArrowToggleButton(video: video, model: branding)
+                    VideoMoreActionsMenu(
+                        video: video,
+                        offersPlayNext: !preservesPlaylistContext,
+                        onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
+                    )
+                }
             }
             .background {
                 if preservesPlaylistContext, video.id == player.currentVideo?.id {
