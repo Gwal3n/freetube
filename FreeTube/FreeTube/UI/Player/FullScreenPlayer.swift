@@ -25,6 +25,7 @@ struct FullScreenPlayer: View {
     @State private var fullscreenSwipeIsVertical: Bool?
     @State private var fullscreenSwipeStartedInExpectedDirection = false
     @State private var fullscreenSwipeHidControls = false
+    @State private var zoomInteractionActive = false
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -130,6 +131,22 @@ struct FullScreenPlayer: View {
                         )
                         PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     }
+                    .modifier(PlayerZoomModifier(
+                        isEnabled: player.fullScreenPresented && (isLandscape || usesPortraitFullscreen),
+                        videoID: player.currentVideo?.id,
+                        presentationSize: player.videoPresentationSize,
+                        viewportSize: CGSize(width: surfaceWidth, height: surfaceHeight),
+                        topInset: usesPortraitFullscreen ? PlayerLayoutMetrics.safeAreaInsets.top : 0,
+                        onInteractionChanged: { active in
+                            zoomInteractionActive = active
+                            if active {
+                                // A moving two-finger centroid is not a fullscreen-exit swipe.
+                                fullscreenSwipeTranslation = 0
+                                fullscreenSwipeIsVertical = false
+                                fullscreenSwipeStartedInExpectedDirection = false
+                            }
+                        }
+                    ))
                     // Clip the media before transforming it, so the rounded edge used while
                     // exiting travels with the picture. Clipping after the entry scale instead
                     // cuts the upward stretch off at the original video frame below the status bar.
@@ -226,8 +243,10 @@ struct FullScreenPlayer: View {
                         },
                         onCollapse: {
                             @Bindable var p = player
-                            p.chapterListPresented = false
-                            p.fullScreenPresented = false
+                            withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
+                                p.chapterListPresented = false
+                                p.fullScreenPresented = false
+                            }
                         }
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
@@ -483,7 +502,7 @@ struct FullScreenPlayer: View {
     ) -> some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .global)
             .onChanged { value in
-                guard verticalSwipeFullscreen else { return }
+                guard verticalSwipeFullscreen, !zoomInteractionActive else { return }
                 let expectedDirection: CGFloat = isFullscreen ? 1 : -1
                 if fullscreenSwipeIsVertical == nil {
                     fullscreenSwipeIsVertical = abs(value.translation.height)
@@ -516,6 +535,7 @@ struct FullScreenPlayer: View {
                     fullscreenSwipeHidControls = false
                 }
                 guard verticalSwipeFullscreen,
+                      !zoomInteractionActive,
                       fullscreenSwipeIsVertical == true,
                       fullscreenSwipeStartedInExpectedDirection else {
                     fullscreenSwipeTranslation = 0

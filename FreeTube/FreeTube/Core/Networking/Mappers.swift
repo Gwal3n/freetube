@@ -166,7 +166,7 @@ enum Mappers {
             channelID: yt.channel?.channelId,
             channelName: yt.channel?.name,
             thumbnailURL: bestThumbnailURL(yt.thumbnails),
-            videoCount: Int(yt.videoCount ?? ""),
+            videoCount: parseAbbreviatedCount(yt.videoCount),
             descriptionText: nil,
             isOwnedByUser: false
         )

@@ -57,7 +57,7 @@ struct SwiftUIMiniPlayer: View {
                 } label: {
                     PlaybackMorphShape(progress: player.isPlaying ? 1 : 0)
                         .fill(primaryForeground)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 21, height: 21)
                         .frame(width: MediaStyle.actionSize, height: 50)
                         .contentShape(Rectangle())
                         .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: player.isPlaying)

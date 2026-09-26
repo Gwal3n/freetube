@@ -49,10 +49,10 @@ struct PlaylistRow: View {
                     Image(systemName: "rectangle.stack.fill")
                         .font(.system(size: 10, weight: .semibold))
                     if let count = playlist.videoCount {
-                        Text(verbatim: count.formatted(.number.notation(.compactName)))
+                        Text("\(count.formatted(.number.notation(.compactName))) videos")
                             .accessibilityLabel("\(count) videos")
                     } else {
-                        Text("Playlist")
+                        Text("Videos")
                     }
                     Spacer(minLength: 0)
                 }

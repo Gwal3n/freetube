@@ -59,7 +59,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .background(Color.black)
                         .clipShape(
                             RoundedRectangle(
-                                cornerRadius: 18 * transition,
+                                cornerRadius: 26 * sqrt(max(0, transition)),
                                 style: .continuous
                             )
                         )
@@ -87,6 +87,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         onExpand: expandPlayerFromTap,
                         onDismiss: dismissMiniPlayer
                     )
+                        .modifier(MiniPlayerArrivalModifier(isExpanded: player.fullScreenPresented))
                         .padding(.horizontal, 20)
                         .padding(.bottom, miniBottomPadding)
                         .offset(
@@ -194,7 +195,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     presentationTranslation > 110
                     || value.predictedEndTranslation.height > 230
                 )
-                withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.88)) {
+                withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
                     presentationTranslation = 0
                     if shouldCollapse {
                         player.chapterListPresented = false
