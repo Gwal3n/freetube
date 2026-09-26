@@ -15,6 +15,7 @@ final class ChannelViewModel {
     let channelID: String
     private(set) var details: ChannelDetails?
     private(set) var isLoading: Bool = false
+    private(set) var initialLoadFailed = false
     /// True while a per-tab continuation request is in flight. Used by the tab screen to avoid
     /// firing duplicate "load more" requests when the user is rapidly scrolling near the bottom.
     private(set) var isLoadingMore: [Tab: Bool] = [:]
@@ -37,10 +38,14 @@ final class ChannelViewModel {
     }
 
     func load() async {
+        guard !isLoading else { return }
+        initialLoadFailed = false
+        errorState = nil
         isLoading = true
         defer { isLoading = false }
         do {
             let loadedDetails = try await service.fetchChannel(id: channelID)
+            guard !Task.isCancelled else { return }
             details = loadedDetails
             videoTabs[.newest] = loadedDetails.videos
             if let channel = details?.channel, channel.isSubscribed {
@@ -49,6 +54,8 @@ final class ChannelViewModel {
                 localSubscriptions.add(channel)
             }
         } catch {
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            initialLoadFailed = details == nil
             errorState = ErrorState(from: error)
         }
     }

@@ -5,6 +5,7 @@ import Kingfisher
 struct LocalPlaylistsScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var playlists: [LocalPlaylistSnapshot] = []
+    @State private var hasLoaded = false
     @State private var showingCreate = false
     @State private var newTitle = ""
     @State private var editMode: EditMode = .inactive
@@ -18,9 +19,10 @@ struct LocalPlaylistsScreen: View {
             playlistSection("Saved from YouTube", items: savedPlaylists, savedFromYouTube: true)
         }
         .environment(\.editMode, $editMode)
+        .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle("Local Playlists")
         .overlay {
-            if playlists.isEmpty {
+            if hasLoaded && playlists.isEmpty {
                 ContentUnavailableView(
                     "No local playlists",
                     systemImage: "music.note.list",
@@ -73,7 +75,12 @@ struct LocalPlaylistsScreen: View {
         }
     }
 
-    private func reload() async { playlists = await service.playlists() }
+    private func reload() async {
+        let loaded = await service.playlists()
+        guard !Task.isCancelled else { return }
+        playlists = loaded
+        hasLoaded = true
+    }
 
     private func create() async {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)

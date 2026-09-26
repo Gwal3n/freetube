@@ -6,13 +6,14 @@ struct LocalHistoryScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @State private var entries: [WatchHistorySnapshot] = []
     @State private var isLoading = false
+    @State private var hasLoaded = false
     @State private var hasMore = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     private let pageSize = 50
 
     var body: some View {
         Group {
-            if entries.isEmpty && isLoading {
+            if !hasLoaded {
                 MediaListPlaceholder()
             } else if entries.isEmpty {
                 ContentUnavailableView(
@@ -105,8 +106,10 @@ struct LocalHistoryScreen: View {
             offset: entries.count,
             limit: pageSize
         )
+        guard !Task.isCancelled else { return }
         let existingIDs = Set(entries.map(\.videoID))
         entries.append(contentsOf: page.filter { !existingIDs.contains($0.videoID) })
         hasMore = page.count == pageSize
+        hasLoaded = true
     }
 }

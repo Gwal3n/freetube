@@ -26,6 +26,7 @@ struct LibraryDestinationRow: View {
                 .foregroundStyle(.tertiary)
         }
         .foregroundStyle(.primary)
+        .frame(minHeight: MediaStyle.actionSize)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }

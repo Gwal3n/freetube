@@ -12,11 +12,6 @@ struct SettingsScreen: View {
     @State private var model = SettingsViewModel()
     @State private var path: [Destination] = []
 
-    /// Drives the live cache-usage line under the download cache limit picker. The store is
-    /// `@Observable`, so reading `entries` here re-renders the view when downloads land or
-    /// the cache eviction sweep deletes files.
-    @State private var downloads = DownloadsStore.shared
-
     /// Observed so the "Save logs to file" section re-renders when the writer opens / closes
     /// the current log file.
     @State private var logWriter = LogFileWriter.shared
@@ -28,17 +23,6 @@ struct SettingsScreen: View {
     /// "Are you sure?" confirmation for the destructive Clear-all-logs button.
     @State private var showingClearLogsConfirmation = false
     @State private var showingClearHistoryConfirmation = false
-
-    private var currentCacheBytes: Int64 {
-        downloads.entries.reduce(0) { $0 + $1.fileSize }
-    }
-
-    private var formattedCacheUsage: String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB, .useGB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: currentCacheBytes)
-    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -107,8 +91,11 @@ struct SettingsScreen: View {
                                 .foregroundStyle(.secondary)
                             navigationChevron
                         }
+                        .foregroundStyle(.primary)
+                        .frame(minHeight: MediaStyle.actionSize)
+                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.automatic)
                 } header: {
                     Text("SponsorBlock")
                 } footer: {
@@ -133,7 +120,7 @@ struct SettingsScreen: View {
                     } label: {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.automatic)
                 }
 
                 Section("Data") {
@@ -142,7 +129,7 @@ struct SettingsScreen: View {
                     } label: {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.automatic)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
@@ -170,7 +157,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Downloads")
                 } footer: {
-                    Text("Currently using \(formattedCacheUsage). When the cache exceeds the limit, the oldest downloads are removed to fit.\n\nPrefetch starts a background download of the next queued video as soon as the current one plays, so tapping Next is instant. Turn off to save bandwidth.\n\nParallel fragments controls how many HLS chunks are downloaded at once — higher values are faster on good connections; values above 8 can trigger YouTube rate-limiting.")
+                    DownloadsSettingsFooter()
                 }
 
                 Section {
@@ -363,6 +350,7 @@ struct SettingsScreen: View {
             navigationChevron
         }
         .foregroundStyle(.primary)
+        .frame(minHeight: MediaStyle.actionSize)
         .contentShape(Rectangle())
     }
 }

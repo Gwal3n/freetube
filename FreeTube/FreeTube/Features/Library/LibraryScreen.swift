@@ -124,7 +124,7 @@ struct LibraryScreen: View {
                     systemImage: "clock.arrow.circlepath"
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.automatic)
 
             Button {
                 path.append(.subscriptions)
@@ -135,7 +135,7 @@ struct LibraryScreen: View {
                     systemImage: "person.2.fill"
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.automatic)
 
             Button {
                 path.append(.playlists)
@@ -146,7 +146,7 @@ struct LibraryScreen: View {
                     systemImage: "music.note.list"
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.automatic)
         }
     }
 

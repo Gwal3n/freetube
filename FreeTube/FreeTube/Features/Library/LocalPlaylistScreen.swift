@@ -9,6 +9,7 @@ struct LocalPlaylistScreen: View {
 
     let playlistID: String
     @State private var details: LocalPlaylistDetails?
+    @State private var hasLoaded = false
     @State private var isRestoring = false
     @State private var restoreError: String?
     @State private var showingEditor = false
@@ -67,11 +68,14 @@ struct LocalPlaylistScreen: View {
             }
         }
         .environment(\.editMode, $editMode)
+        .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle(details?.playlist.title ?? "Playlist")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
             if let details, details.videos.isEmpty {
                 ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
+            } else if hasLoaded && details == nil {
+                ContentUnavailableView("Playlist Unavailable", systemImage: "music.note.list")
             }
         }
         .task { await reload() }
@@ -165,7 +169,12 @@ struct LocalPlaylistScreen: View {
         }
     }
 
-    private func reload() async { details = await service.details(id: playlistID) }
+    private func reload() async {
+        let loaded = await service.details(id: playlistID)
+        guard !Task.isCancelled else { return }
+        details = loaded
+        hasLoaded = true
+    }
 
     private func playbackDetails(from local: LocalPlaylistDetails) -> PlaylistDetails {
         PlaylistDetails(

@@ -66,6 +66,15 @@ struct ChannelScreen: View {
             if let details = model.details {
                 pager(details)
                 header(details)
+            } else if model.initialLoadFailed {
+                ContentUnavailableView {
+                    Label("Unable to Load Channel", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text("Check your connection and try again.")
+                } actions: {
+                    Button("Try Again") { Task { await model.load() } }
+                        .buttonStyle(.bordered)
+                }
             } else {
                 channelHeaderPlaceholder
             }
