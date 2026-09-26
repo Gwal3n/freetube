@@ -26,6 +26,7 @@ struct FullScreenPlayer: View {
     @State private var fullscreenSwipeStartedInExpectedDirection = false
     @State private var fullscreenSwipeHidControls = false
     @State private var zoomInteractionActive = false
+    @State private var zoomModel = PlayerZoomModel()
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
@@ -127,11 +128,19 @@ struct FullScreenPlayer: View {
                             player.fullScreenPresented = true
                             player.requestInlinePlaybackRestoration()
                         },
-                        isInteractionEnabled: player.fullScreenPresented
+                        isInteractionEnabled: player.fullScreenPresented,
+                        isZoomEnabled: player.fullScreenPresented && (isLandscape || usesPortraitFullscreen),
+                        onZoomPinch: { magnitude, focalPoint, state in
+                            zoomModel.pinch(magnitude, focalPoint: focalPoint, state: state)
+                        },
+                        onZoomPan: { translation, state in
+                            zoomModel.pan(translation, state: state)
+                        }
                         )
                         PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
                     }
                     .modifier(PlayerZoomModifier(
+                        model: zoomModel,
                         isEnabled: player.fullScreenPresented && (isLandscape || usesPortraitFullscreen),
                         videoID: player.currentVideo?.id,
                         presentationSize: player.videoPresentationSize,

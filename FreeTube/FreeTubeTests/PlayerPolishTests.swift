@@ -38,4 +38,75 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(PlayerZoomGeometry.clamped(0.6, fillScale: 1.4), 1)
         XCTAssertEqual(PlayerZoomGeometry.clamped(8, fillScale: 1.4), 3)
     }
+
+    func testScreenFillHasAnAccessibleSnapRangeAndCanBeExceeded() {
+        XCTAssertEqual(PlayerZoomGeometry.settled(1.3, fillScale: 1.4), 1.4)
+        XCTAssertEqual(PlayerZoomGeometry.settled(1.8, fillScale: 1.4), 1.8)
+        XCTAssertEqual(PlayerZoomGeometry.clamped(6, fillScale: 4), 6)
+    }
+
+    func testPanningBoundsUseThePictureRatherThanLetterbox() {
+        let video = CGSize(width: 1600, height: 900)
+        let viewport = CGSize(width: 1000, height: 500)
+        XCTAssertEqual(PlayerZoomGeometry.offset(
+            CGSize(width: 300, height: 300), scale: 1, video: video, viewport: viewport
+        ), .zero)
+        let panned = PlayerZoomGeometry.offset(
+            CGSize(width: 2000, height: -2000), scale: 2, video: video, viewport: viewport
+        )
+        XCTAssertEqual(panned.width, 388.8889, accuracy: 0.001)
+        XCTAssertEqual(panned.height, -250, accuracy: 0.001)
+    }
+
+    func testOffCentrePinchAndTwoFingerPanPreserveArbitraryZoom() {
+        let model = PlayerZoomModel()
+        model.configure(video: CGSize(width: 2000, height: 1000), viewport: CGSize(width: 1000, height: 500), reduceMotion: true)
+        model.pinch(1, focalPoint: CGPoint(x: 200, y: 0), state: .began)
+        model.pinch(2, focalPoint: .zero, state: .changed)
+        model.pinch(2, focalPoint: .zero, state: .ended)
+        XCTAssertEqual(model.scale, 2)
+        XCTAssertEqual(model.offset.width, -200)
+        XCTAssertFalse(model.isInteracting)
+
+        model.pan(.zero, state: .began)
+        model.pan(CGSize(width: 900, height: 50), state: .changed)
+        model.pan(CGSize(width: 900, height: 50), state: .ended)
+        XCTAssertEqual(model.scale, 2)
+        XCTAssertEqual(model.offset.width, 500)
+        XCTAssertEqual(model.offset.height, 50)
+    }
+
+    func testSimultaneousPinchAndPanSettleOnlyWhenBothFinish() {
+        let model = PlayerZoomModel()
+        model.configure(video: CGSize(width: 1600, height: 900), viewport: CGSize(width: 2400, height: 900), reduceMotion: true)
+        model.pinch(1, focalPoint: .zero, state: .began)
+        model.pan(.zero, state: .began)
+        model.pinch(1.45, focalPoint: .zero, state: .changed)
+        model.pinch(1.45, focalPoint: .zero, state: .ended)
+        XCTAssertTrue(model.isInteracting)
+        XCTAssertEqual(model.scale, 1.45)
+        model.pan(.zero, state: .ended)
+        XCTAssertFalse(model.isInteracting)
+        XCTAssertEqual(model.scale, 1.5)
+        XCTAssertEqual(model.offset, .zero)
+        model.reset()
+        XCTAssertEqual(model.scale, 1)
+    }
+
+    func testPinchingAfterPanKeepsTheFocalPointStationary() {
+        let model = PlayerZoomModel()
+        model.configure(video: CGSize(width: 2000, height: 1000), viewport: CGSize(width: 1000, height: 500), reduceMotion: true)
+        model.pinch(1, focalPoint: .zero, state: .began)
+        model.pinch(2, focalPoint: .zero, state: .changed)
+        model.pinch(2, focalPoint: .zero, state: .ended)
+        model.pan(.zero, state: .began)
+        model.pan(CGSize(width: 100, height: 0), state: .changed)
+        model.pinch(1, focalPoint: CGPoint(x: 200, y: 0), state: .began)
+        model.pinch(1.5, focalPoint: .zero, state: .changed)
+        XCTAssertEqual(model.scale, 3)
+        XCTAssertEqual(model.offset.width, 0, accuracy: 0.001)
+        model.pinch(1.5, focalPoint: .zero, state: .ended)
+        model.pan(CGSize(width: 100, height: 0), state: .ended)
+        XCTAssertFalse(model.isInteracting)
+    }
 }

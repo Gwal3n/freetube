@@ -22,6 +22,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var twoFingerTapGesture: UITapGestureRecognizer?
     private var singleTapGesture: UITapGestureRecognizer?
     private var horizontalPanGesture: UIPanGestureRecognizer?
+    private var twoFingerPanGesture: UIPanGestureRecognizer?
+    var isZoomEnabled = false
+    var onZoomPinch: (CGFloat, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
+    var onZoomPan: (CGSize, UIGestureRecognizer.State) -> Void = { _, _ in }
     private var feedbackLabel: UILabel?
     private var feedbackBlurView: UIVisualEffectView?
     private var outlinedFeedbackLabel: UILabel?
@@ -128,6 +132,19 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         twoFingerTap.delaysTouchesEnded = false
         twoFingerTap.delegate = self
 
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(didPinch(_:)))
+        pinch.cancelsTouchesInView = false
+        pinch.delegate = self
+        let twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(didPanWithTwoFingers(_:)))
+        twoFingerPan.minimumNumberOfTouches = 2
+        twoFingerPan.maximumNumberOfTouches = 2
+        twoFingerPan.cancelsTouchesInView = false
+        twoFingerPan.delegate = self
+        // A genuine stationary tap still plays/pauses. Any recognized pinch or two-finger
+        // movement permanently fails that tap for this touch sequence, including on release.
+        twoFingerTap.require(toFail: pinch)
+        twoFingerTap.require(toFail: twoFingerPan)
+
         let singleTap = UITapGestureRecognizer(target: self, action: #selector(didPrimaryTap(_:)))
         singleTap.numberOfTapsRequired = 1
         singleTap.cancelsTouchesInView = false
@@ -140,7 +157,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         twoFingerTapGesture = twoFingerTap
         singleTapGesture = singleTap
         horizontalPanGesture = horizontalPan
-        gestures = [continuationTap, longPress, horizontalPan, twoFingerTap, singleTap]
+        twoFingerPanGesture = twoFingerPan
+        gestures = [continuationTap, longPress, horizontalPan, pinch, twoFingerPan, twoFingerTap, singleTap]
         gestures.forEach { rootView.addGestureRecognizer($0) }
         deferNativeSingleTaps(in: rootView, until: [singleTap, continuationTap, longPress, horizontalPan])
         // AVKit may finish installing its private control hierarchy after `makeUIViewController`
@@ -173,6 +191,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         twoFingerTapGesture = nil
         singleTapGesture = nil
         horizontalPanGesture = nil
+        twoFingerPanGesture = nil
         resetHorizontalSeek()
         feedbackLabel?.removeFromSuperview()
         feedbackLabel = nil
@@ -219,6 +238,21 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         log.info("Two-finger tap recognized; toggling playback")
         onTogglePlayback()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    @objc private func didPinch(_ gesture: UIPinchGestureRecognizer) {
+        guard isZoomEnabled, let view = gestureView, let window = view.window else { return }
+        // Measure in the unscaled window: using the transformed video's local coordinates
+        // feeds the applied zoom back into the next sample and makes panning accelerate/jump.
+        let center = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: window)
+        let location = gesture.location(in: window)
+        onZoomPinch(gesture.scale, CGPoint(x: location.x - center.x, y: location.y - center.y), gesture.state)
+    }
+
+    @objc private func didPanWithTwoFingers(_ gesture: UIPanGestureRecognizer) {
+        guard isZoomEnabled, let window = gestureView?.window else { return }
+        let translation = gesture.translation(in: window)
+        onZoomPan(CGSize(width: translation.x, height: translation.y), gesture.state)
     }
 
     @objc private func didContinueSeeking(_ gesture: UITapGestureRecognizer) {
@@ -596,6 +630,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     nonisolated func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         MainActor.assumeIsolated {
             guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+            if pan === twoFingerPanGesture { return isZoomEnabled }
             let velocity = pan.velocity(in: pan.view)
             return abs(velocity.x) > abs(velocity.y) * 1.15
         }

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import UIKit
 
 /// AVPlayerViewController remains the video/PiP engine. Its native playback chrome is hidden in
 /// favour of `CustomPlayerControls`, while the underlying controller still owns rendering and PiP.
@@ -16,6 +17,9 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var showsControls: Bool = false
     var entersPiPAutomatically: Bool = true
     var isInteractionEnabled: Bool = true
+    var isZoomEnabled = false
+    var onZoomPinch: (CGFloat, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
+    var onZoomPan: (CGSize, UIGestureRecognizer.State) -> Void = { _, _ in }
 
     func makeCoordinator() -> PlayerGestureCoordinator {
         PlayerGestureCoordinator(
@@ -41,6 +45,9 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.view.accessibilityElementsHidden = !isInteractionEnabled
         // Force the hierarchy to load before asking for `contentOverlayView`.
         _ = controller.view
+        context.coordinator.isZoomEnabled = isZoomEnabled
+        context.coordinator.onZoomPinch = onZoomPinch
+        context.coordinator.onZoomPan = onZoomPan
         context.coordinator.install(on: controller)
         controller.delegate = context.coordinator
         return controller
@@ -56,6 +63,9 @@ struct PlayerSurface: UIViewControllerRepresentable {
         // still-mounted player cannot cancel NavigationLink/Menu taps beneath the miniplayer.
         controller.view.isUserInteractionEnabled = isInteractionEnabled
         controller.view.accessibilityElementsHidden = !isInteractionEnabled
+        context.coordinator.isZoomEnabled = isZoomEnabled
+        context.coordinator.onZoomPinch = onZoomPinch
+        context.coordinator.onZoomPan = onZoomPan
         context.coordinator.dismissPiPIfRequested(
             on: controller,
             request: pipDismissalRequest
