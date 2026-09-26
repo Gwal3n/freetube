@@ -1,5 +1,4 @@
 import SwiftUI
-import Kingfisher
 
 /// Playlist context and recommendation queue shown below the expanded player's metadata.
 ///
@@ -417,87 +416,77 @@ struct PlayerQueueSections: View {
             nil
         }
 
-        return HStack(spacing: 0) {
-            Button {
-                if let onPlay {
-                    onPlay()
-                } else {
-                    player.load(video, skipRecommendations: preservesPlaylistContext)
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    ZStack(alignment: .bottomTrailing) {
-                        KFImage(video.thumbnailURL)
-                            .thumbnail(size: CGSize(width: 80, height: 45)) {
-                                MediaStyle.placeholderFill
-                            }
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 80, height: 45)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                        if !video.durationString.isEmpty {
-                            Text(video.durationString)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(
-                                    video.isLive ? Color.red : Color.black.opacity(0.78),
-                                    in: RoundedRectangle(cornerRadius: 3)
-                                )
-                                .padding(3)
+        return DeArrowVideoContent(video: video) { branding in
+            HStack(spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    Button {
+                        if let onPlay {
+                            onPlay()
+                        } else {
+                            player.load(video, skipRecommendations: preservesPlaylistContext)
                         }
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(video.title)
-                            .font(.subheadline)
-                            .foregroundStyle(
-                                preservesPlaylistContext && video.id == player.currentVideo?.id
-                                    ? Color.accentColor
-                                    : Color.primary
+                    } label: {
+                        HStack(spacing: 12) {
+                            VideoThumbnail(
+                                video: video,
+                                size: CGSize(width: 80, height: 45),
+                                cornerRadius: 4,
+                                replacementData: branding.thumbnailData(for: video),
+                                replacementCacheKey: branding.thumbnailCacheKey(for: video),
+                                compactBadge: true
                             )
-                            .lineLimit(2)
-                        Text(queueRowMetadata(for: video))
-                            .font(.caption)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(branding.title(for: video))
+                                    .contentTransition(.opacity)
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        preservesPlaylistContext && video.id == player.currentVideo?.id
+                                            ? Color.accentColor
+                                            : Color.primary
+                                    )
+                                    .lineLimit(2)
+                                Text(queueRowMetadata(for: video))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            if video.id == player.currentVideo?.id, !preservesPlaylistContext {
+                                NowPlayingIndicator(videoID: video.id)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: Self.queueRowHeight, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    DeArrowToggleButton(video: video, model: branding)
+                }
+
+                if showsRemoveButton, let removalAction {
+                    Button(action: removalAction) {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Circle())
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if video.id == player.currentVideo?.id, !preservesPlaylistContext {
-                        NowPlayingIndicator(videoID: video.id)
-                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel("Remove from queue")
                 }
-                .frame(maxWidth: .infinity, minHeight: Self.queueRowHeight, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(ResponsiveButtonStyle())
 
-            if showsRemoveButton, let removalAction {
-                Button(action: removalAction) {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                        .contentShape(Circle())
+                VideoMoreActionsMenu(
+                    video: video,
+                    offersPlayNext: !preservesPlaylistContext,
+                    onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
+                )
+            }
+            .background {
+                if preservesPlaylistContext, video.id == player.currentVideo?.id {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.10))
                 }
-                .buttonStyle(ResponsiveButtonStyle())
-                .accessibilityLabel("Remove from queue")
-            }
-
-            VideoMoreActionsMenu(
-                video: video,
-                offersPlayNext: !preservesPlaylistContext,
-                onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
-            )
-        }
-        .background {
-            if preservesPlaylistContext, video.id == player.currentVideo?.id {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.10))
             }
         }
     }

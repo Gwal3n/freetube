@@ -36,56 +36,62 @@ struct PlayerMetadataHeader<Actions: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button(action: onToggleDetails) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(video.title)
-                        .font(.title3.weight(.semibold))
-                        .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityLabel(video.title)
-            .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
-            .accessibilityHint("Shows or hides video details")
-
-            if video.isLive || !statsText.isEmpty {
-                HStack(spacing: 7) {
-                    if video.isLive {
-                        Text("LIVE")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.red, in: RoundedRectangle(cornerRadius: 3))
+        DeArrowVideoContent(video: video) { branding in
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 4) {
+                    Button(action: onToggleDetails) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(branding.title(for: video))
+                                .contentTransition(.opacity)
+                                .font(.title3.weight(.semibold))
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
+                        }
+                        .contentShape(Rectangle())
                     }
-                    if !statsText.isEmpty {
-                        Text(statsText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel(branding.title(for: video))
+                    .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
+                    .accessibilityHint("Shows or hides video details")
+                    DeArrowToggleButton(video: video, model: branding)
+                }
+
+                if video.isLive || !statsText.isEmpty {
+                    HStack(spacing: 7) {
+                        if video.isLive {
+                            Text("LIVE")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                        }
+                        if !statsText.isEmpty {
+                            Text(statsText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        channelControl
+                        Spacer(minLength: 4)
+                        actions
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        channelControl
+                        actions
                     }
                 }
             }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    channelControl
-                    Spacer(minLength: 4)
-                    actions
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    channelControl
-                    actions
-                }
-            }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
     }
 
     @ViewBuilder

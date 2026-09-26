@@ -235,6 +235,15 @@ and a rejected strategy is excluded before requesting the next candidate.
   so they never cover its time labels.
   AVKit has no public API for adding ranges to its native scrubber, so do not inspect or mutate its
   private seek-bar hierarchy; markers require a separate public/custom UI in a future change.
+- **DeArrow is optional presentation-only branding.** Independent title/thumbnail settings default
+  off; random-frame fallback defaults on when thumbnail replacement is enabled. `DeArrowService`
+  performs read-only hash-prefix branding lookups and low-priority thumbnail requests, with three
+  concurrent videos, bounded in-memory caches, and rate-limit backoff. `DeArrowVideoContent` owns
+  per-row observable state; originals remain visible until a valid replacement arrives. Never
+  overwrite `Video` or saved metadata, or make playback wait for branding. The small per-video
+  switch is a sibling of the playback tap target and shares original/replacement choices for the
+  current session through `DeArrowOriginalsStore`. An approved original thumbnail suppresses
+  random fallback; unknown-duration and live videos do not generate random frames.
 - **Expanded player details are resilient and optionally prefetched.** Tapping the video title toggles the description
   with a short animation. It stays expanded while `VideoService.fetchMoreInfo` loads the full
   description, retains a non-empty feed snippet when the fetched description is empty, shows

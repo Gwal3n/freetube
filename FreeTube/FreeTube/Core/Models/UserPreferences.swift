@@ -46,6 +46,9 @@ struct UserPreferences {
     @AppStorage("oledPlayerBackground") var oledPlayerBackground: Bool = false
     /// Replaces Liquid Glass only for the compact mini-player with an opaque true-black surface.
     @AppStorage("oledMiniPlayer") var oledMiniPlayer: Bool = false
+    @AppStorage("com.leshko.freetube.deArrowTitles") var deArrowTitles: Bool = false
+    @AppStorage("com.leshko.freetube.deArrowThumbnails") var deArrowThumbnails: Bool = false
+    @AppStorage("com.leshko.freetube.deArrowRandomThumbnails") var deArrowRandomThumbnails: Bool = true
     @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     /// When true, `LogFileWriter` opens a new file under `Application Support/Logs/` on every app

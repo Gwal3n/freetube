@@ -7,6 +7,9 @@ struct VideoThumbnail: View {
     let size: CGSize
     var progress: Double? = nil
     var cornerRadius: CGFloat = MediaStyle.thumbnailRadius
+    var replacementData: Data? = nil
+    var replacementCacheKey: String? = nil
+    var compactBadge = false
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -19,15 +22,28 @@ struct VideoThumbnail: View {
             .scaledToFill()
             .frame(width: size.width, height: size.height)
             .clipped()
+            .overlay {
+                if let replacementData, let replacementCacheKey {
+                    KFImage(source: .provider(RawImageDataProvider(data: replacementData, cacheKey: replacementCacheKey)))
+                        .thumbnail(size: size, scale: displayScale, fadeDuration: reduceMotion ? 0 : 0.15) {
+                            Color.clear
+                        }
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size.width, height: size.height)
+                        .clipped()
+                        .transition(.opacity)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if !video.durationString.isEmpty {
                     Text(verbatim: video.durationString)
-                        .font(.caption2.monospacedDigit().weight(.medium))
+                        .font(compactBadge ? .system(size: 9, weight: .semibold) : .caption2.monospacedDigit().weight(.medium))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(video.isLive ? Color.red : Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4))
-                        .padding(5)
+                        .padding(.horizontal, compactBadge ? 4 : 5)
+                        .padding(.vertical, compactBadge ? 1 : 2)
+                        .background(video.isLive ? Color.red : Color.black.opacity(compactBadge ? 0.78 : 0.75), in: RoundedRectangle(cornerRadius: compactBadge ? 3 : 4))
+                        .padding(compactBadge ? 3 : 5)
                 }
             }
             .overlay(alignment: .bottom) {

@@ -18,38 +18,43 @@ struct VideoContextPreview: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VideoThumbnail(
-                video: video,
-                size: CGSize(width: previewWidth, height: previewWidth * 9 / 16),
-                cornerRadius: 0
-            )
+        DeArrowVideoContent(video: video) { branding in
+            VStack(alignment: .leading, spacing: 0) {
+                VideoThumbnail(
+                    video: video,
+                    size: CGSize(width: previewWidth, height: previewWidth * 9 / 16),
+                    cornerRadius: 0,
+                    replacementData: branding.thumbnailData(for: video),
+                    replacementCacheKey: branding.thumbnailCacheKey(for: video)
+                )
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(video.title)
-                    .font(.headline)
-                    .lineLimit(2)
-
-                if !metadata.isEmpty {
-                    Text(metadata)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(branding.title(for: video))
+                        .contentTransition(.opacity)
+                        .font(.headline)
                         .lineLimit(2)
+
+                    if !metadata.isEmpty {
+                        Text(metadata)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .frame(width: previewWidth)
+            .background(.background)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabel(title: branding.title(for: video)))
         }
-        .frame(width: previewWidth)
-        .background(.background)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
     }
 
-    private var accessibilityLabel: String {
-        [video.title, metadata, video.durationString]
+    private func accessibilityLabel(title: String) -> String {
+        [title, metadata, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }

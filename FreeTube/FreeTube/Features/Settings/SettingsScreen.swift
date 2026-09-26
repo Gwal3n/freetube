@@ -115,6 +115,18 @@ struct SettingsScreen: View {
                     Text("Show or skip community-identified video segments without delaying playback.")
                 }
 
+                Section {
+                    Toggle("Replace video titles", isOn: Bindable(model).deArrowTitles)
+                    Toggle("Replace video thumbnails", isOn: Bindable(model).deArrowThumbnails)
+                    if model.deArrowThumbnails {
+                        Toggle("Random thumbnail when no submission exists", isOn: Bindable(model).deArrowRandomThumbnails)
+                    }
+                } header: {
+                    Text(verbatim: "DeArrow")
+                } footer: {
+                    Text("Use community titles and video frames to reduce clickbait. If no thumbnail has been submitted, a stable random frame can be requested instead. Tap the small switch on a video to see its original title and thumbnail. Originals stay saved on this device. Enabling this sends anonymous requests to DeArrow; thumbnail requests include the video ID. If the service is unavailable, the originals remain visible.")
+                }
+
                 Section("Player controls") {
                     Button {
                         path.append(.playerControls)

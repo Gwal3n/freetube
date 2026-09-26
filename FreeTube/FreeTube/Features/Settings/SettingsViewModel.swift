@@ -15,12 +15,24 @@ final class SettingsViewModel {
     var showUpNext: Bool {
         didSet { preferences.showUpNext = showUpNext }
     }
+    var deArrowTitles: Bool {
+        didSet { preferences.deArrowTitles = deArrowTitles }
+    }
+    var deArrowThumbnails: Bool {
+        didSet { preferences.deArrowThumbnails = deArrowThumbnails }
+    }
+    var deArrowRandomThumbnails: Bool {
+        didSet { preferences.deArrowRandomThumbnails = deArrowRandomThumbnails }
+    }
 
     init() {
         let preferences = UserPreferences()
         self.preferences = preferences
         self.upNextInitialCount = preferences.upNextInitialCount
         self.showUpNext = preferences.showUpNext
+        self.deArrowTitles = preferences.deArrowTitles
+        self.deArrowThumbnails = preferences.deArrowThumbnails
+        self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
     }
 
     var preferredQuality: VideoQuality {

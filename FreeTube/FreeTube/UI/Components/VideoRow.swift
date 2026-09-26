@@ -47,37 +47,43 @@ struct VideoRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: onTap) {
-                content
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityLabel(rowAccessibilityLabel)
-            .accessibilityHint("Plays video")
-
-            switch accessory {
-            case .none:
-                EmptyView()
-            case .actions(let offersPlayNext):
-                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
-            case .reserved:
-                Color.clear
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    .accessibilityHidden(true)
-            }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            if offersPlayNext {
-                Button {
-                    player.enqueue(video)
-                } label: {
-                    Label("Add to queue", systemImage: "text.badge.plus")
+        DeArrowVideoContent(video: video) { branding in
+            HStack(spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    Button(action: onTap) {
+                        content(branding: branding)
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
+                    .accessibilityHint("Plays video")
+                    DeArrowToggleButton(video: video, model: branding)
+                        .padding(2)
                 }
-                .tint(.indigo)
+
+                switch accessory {
+                case .none:
+                    EmptyView()
+                case .actions(let offersPlayNext):
+                    VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+                case .reserved:
+                    Color.clear
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .accessibilityHidden(true)
+                }
             }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                if offersPlayNext {
+                    Button {
+                        player.enqueue(video)
+                    } label: {
+                        Label("Add to queue", systemImage: "text.badge.plus")
+                    }
+                    .tint(.indigo)
+                }
+            }
+            .videoContextMenu(video: video, offersPlayNext: true)
+            .mediaListRow()
         }
-        .videoContextMenu(video: video, offersPlayNext: true)
-        .mediaListRow()
     }
 
     private var offersPlayNext: Bool {
@@ -85,23 +91,26 @@ struct VideoRow: View {
         return offersPlayNext
     }
 
-    private var rowAccessibilityLabel: String {
-        [video.title, video.channelName, statsLine, video.durationString]
+    private func rowAccessibilityLabel(title: String) -> String {
+        [title, video.channelName, statsLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }
 
-    private var content: some View {
+    private func content(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: MediaStyle.spacing) {
             VideoThumbnail(
                 video: video,
                 size: CGSize(width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
                              height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81),
-                progress: playbackProgress
+                progress: playbackProgress,
+                replacementData: branding.thumbnailData(for: video),
+                replacementCacheKey: branding.thumbnailCacheKey(for: video)
             )
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(video.title)
+                Text(branding.title(for: video))
+                    .contentTransition(.opacity)
                     .font(MediaStyle.title)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 Text(video.channelName)

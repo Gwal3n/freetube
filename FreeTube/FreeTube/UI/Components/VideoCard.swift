@@ -29,36 +29,44 @@ struct VideoCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(action: onTap) {
-                thumbnail
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            // The metadata control below performs the same action and carries the complete
-            // spoken label. Exposing both would make VoiceOver announce every card twice.
-            .accessibilityHidden(true)
+        DeArrowVideoContent(video: video) { branding in
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack(alignment: .topLeading) {
+                    Button(action: onTap) {
+                        thumbnail(branding: branding)
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    // The metadata control below performs the same action and carries the complete
+                    // spoken label. Exposing both would make VoiceOver announce every card twice.
+                    .accessibilityHidden(true)
+                    DeArrowToggleButton(video: video, model: branding)
+                        .padding(5)
+                }
 
-            // Metadata row is split into its own HStack so the ellipsis Menu can live as a
-            // sibling of the title/avatar tap target (which still routes to `onTap`). Nesting
-            // the Menu inside the outer Button would route taps to playback instead of to the
-            // Menu, since SwiftUI's outer Button consumes the gesture first.
-            metadataRow
+                // Metadata row is split into its own HStack so the ellipsis Menu can live as a
+                // sibling of the title/avatar tap target (which still routes to `onTap`). Nesting
+                // the Menu inside the outer Button would route taps to playback instead of to the
+                // Menu, since SwiftUI's outer Button consumes the gesture first.
+                metadataRow(branding: branding)
+            }
+            .videoContextMenu(video: video, offersPlayNext: true)
         }
-        .videoContextMenu(video: video, offersPlayNext: true)
     }
 
-    private var thumbnail: some View {
+    private func thumbnail(branding: DeArrowVideoViewModel) -> some View {
         GeometryReader { proxy in
             VideoThumbnail(
                 video: video,
                 size: CGSize(width: proxy.size.width, height: proxy.size.width * 9 / 16),
-                progress: playbackProgress
+                progress: playbackProgress,
+                replacementData: branding.thumbnailData(for: video),
+                replacementCacheKey: branding.thumbnailCacheKey(for: video)
             )
         }
         .aspectRatio(16 / 9, contentMode: .fit)
     }
 
-    private var metadataRow: some View {
+    private func metadataRow(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Button(action: onTap) {
                 HStack(alignment: .top, spacing: 12) {
@@ -72,7 +80,8 @@ struct VideoCard: View {
                         .clipShape(Circle())
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(video.title)
+                        Text(branding.title(for: video))
+                            .contentTransition(.opacity)
                             .font(MediaStyle.title)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                         Text(metadataLine)
@@ -86,7 +95,7 @@ struct VideoCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityLabel(cardAccessibilityLabel)
+            .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
             .accessibilityHint("Plays video")
 
             if showsMoreMenu {
@@ -96,8 +105,8 @@ struct VideoCard: View {
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)
     }
 
-    private var cardAccessibilityLabel: String {
-        [video.title, metadataLine, video.durationString]
+    private func cardAccessibilityLabel(title: String) -> String {
+        [title, metadataLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }
