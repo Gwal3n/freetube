@@ -1,6 +1,7 @@
 import SwiftUI
 import Kingfisher
 
+@available(iOS 17.0, *)
 struct ChannelRow: View {
     let channel: Channel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -33,6 +34,7 @@ struct ChannelRow: View {
             }
         }
         .mediaListRow()
+        .channelContextMenu(channel: channel)
     }
 
     private var content: some View {

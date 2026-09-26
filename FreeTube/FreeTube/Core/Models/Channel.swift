@@ -10,4 +10,10 @@ struct Channel: Identifiable, Hashable, Sendable {
     let videoCount: Int?
     let isSubscribed: Bool
     let descriptionText: String?
+
+    var youtubeURL: URL? {
+        let channelID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !channelID.isEmpty else { return nil }
+        return URL(string: "https://www.youtube.com/channel")?.appendingPathComponent(channelID)
+    }
 }

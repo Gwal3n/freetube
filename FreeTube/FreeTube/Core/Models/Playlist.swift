@@ -15,6 +15,15 @@ struct Playlist: Identifiable, Hashable, Sendable {
 }
 
 extension Playlist {
+    var youtubeURL: URL? {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bare = trimmed.hasPrefix("VL") ? String(trimmed.dropFirst(2)) : trimmed
+        guard !bare.isEmpty else { return nil }
+        var components = URLComponents(string: "https://www.youtube.com/playlist")
+        components?.queryItems = [URLQueryItem(name: "list", value: bare)]
+        return components?.url
+    }
+
     /// Convenience initializer that defaults `viewCount` to nil so existing call sites
     /// (mappers from search results, channel tabs, etc.) keep compiling without each one
     /// being updated to pass an unknown view count.

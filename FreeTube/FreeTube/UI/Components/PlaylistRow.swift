@@ -4,12 +4,13 @@ import Kingfisher
 /// Playlist list row. Used by search results, channel/library playlist lists.
 ///
 /// Set `showsMoreMenu: true` to render a trailing ellipsis Menu next to the row content
-/// (open in browser, copy URL, favorites). The Menu is a sibling of the tap target so taps
+/// (share, open in browser, copy URL, local save). The Menu is a sibling of the tap target so taps
 /// on it don't trigger `onTap` / the surrounding NavigationLink.
 @available(iOS 17.0, *)
 struct PlaylistRow: View {
     let playlist: Playlist
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var actionsModel = PlaylistActionsModel()
 
     /// Optional tap handler. **Leave nil when wrapping this row inside a `NavigationLink`** —
     /// an inner `Button` swallows the link's tap and pushing never happens. We only attach a
@@ -28,10 +29,20 @@ struct PlaylistRow: View {
             }
 
             if showsMoreMenu {
-                PlaylistMoreActionsMenu(playlist: playlist)
+                PlaylistMoreActionsMenu(playlist: playlist, model: actionsModel)
             }
         }
         .mediaListRow()
+        .contextMenu {
+            PlaylistActionsContent(playlist: playlist, model: actionsModel, offersOpen: true)
+        } preview: {
+            PlaylistContextPreview(playlist: playlist)
+        }
+        .task(id: playlist.id) { await actionsModel.refresh(id: playlist.id) }
+        .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
+            Task { await actionsModel.refresh(id: playlist.id) }
+        }
+        .errorToast(Bindable(actionsModel).errorState)
     }
 
     private var content: some View {
