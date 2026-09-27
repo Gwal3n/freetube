@@ -115,40 +115,31 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            Button {
-                path.append(.history)
-            } label: {
+            NavigationLink(value: Destination.history) {
                 LibraryDestinationRow(
                     title: "Local history",
                     subtitle: countSubtitle(localHistoryCount, noun: "video"),
                     systemImage: "clock.arrow.circlepath"
                 )
             }
-            .buttonStyle(.automatic)
             .tint(.white)
 
-            Button {
-                path.append(.subscriptions)
-            } label: {
+            NavigationLink(value: Destination.subscriptions) {
                 LibraryDestinationRow(
                     title: "Local subscriptions",
                     subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
                     systemImage: "person.2.fill"
                 )
             }
-            .buttonStyle(.automatic)
             .tint(.white)
 
-            Button {
-                path.append(.playlists)
-            } label: {
+            NavigationLink(value: Destination.playlists) {
                 LibraryDestinationRow(
                     title: "Local playlists",
                     subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
                     systemImage: "music.note.list"
                 )
             }
-            .buttonStyle(.automatic)
             .tint(.white)
         }
     }

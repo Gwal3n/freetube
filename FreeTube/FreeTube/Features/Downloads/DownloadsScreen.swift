@@ -95,7 +95,9 @@ struct DownloadsScreen: View {
                     savedHeader
                 }
             }
-            .navigationTitle("Downloads")
+            .navigationTitle(isSelecting
+                             ? String(localized: "\(selectedIDs.count) selected")
+                             : String(localized: "Downloads"))
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)
@@ -108,18 +110,6 @@ struct DownloadsScreen: View {
                 transferToolbarItem
                 selectionToolbarLeading
                 sortAndSelectToolbarTrailing
-                // When selection mode is active, replace the nav title with a stacked
-                // "Downloads" + "N selected" so the count reads as a subtitle, not a separate row.
-                if isSelecting {
-                    ToolbarItem(placement: .principal) {
-                        VStack(spacing: 1) {
-                            Text("Downloads").font(.headline)
-                            Text("\(selectedIDs.count) selected")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
             }
             // Glass-style action bar with just two pill buttons: Select all + Delete.
             .safeAreaInset(edge: .top) {

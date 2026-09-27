@@ -231,12 +231,19 @@ and a rejected strategy is excluded before requesting the next candidate.
   of silently repeating lookahead requests. Search continuations and errors are generation-guarded
   so a cleared or newer query never receives old pages. `SubscriptionSectionIndex` keeps its
   drag state outside the grouped subscriptions List. Do not attach parent gestures to that List.
-- **Browsing polish must not animate unrelated state.** `ResponsiveButtonStyle` uses scoped
-  animation only for its opacity/scale feedback. Local playlist Lists remain mounted through
-  their first read via `InitialContentLoadingModifier`, with opacity-only handoff and no empty
-  state until that read finishes. Preserve native List editing and navigation transactions.
-  Library/Settings destination buttons use system press feedback and at least 44-point rows.
+- **Browsing polish must preserve native navigation environments.** `ResponsiveButtonStyle`
+  uses ordinary value-keyed animation for its opacity/scale feedback. Do not reintroduce scoped
+  placeholder-content animation wrappers around List or navigation/button labels. Local playlist
+  Lists remain mounted through their first read via `InitialContentLoadingModifier`, with an
+  opacity handoff and no empty state until that read finishes. Library/Settings use native
+  value-based NavigationLinks, system disclosure indicators, and standard row sizing. Native List
+  rows already provide the minimum touch height; do not add another 44 points inside their labels.
   Download-cache observations belong to `DownloadsSettingsFooter`, not the whole Settings form.
+- **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
+  in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
+  Channel titles still appear after header collapse and Downloads shows its selection count,
+  but neither uses a custom `.principal` toolbar host. This hardens the reported path; the IPS
+  does not include an application source line proving the precise originating view.
 - **Tab selection must survive player and system presentations.** `RootTabShell` owns the native
   tab view separately from player rendering. `RootTabSelection` holds live selection; SceneStorage
   restores it only once and mirrors later changes. Player/context links route into the current

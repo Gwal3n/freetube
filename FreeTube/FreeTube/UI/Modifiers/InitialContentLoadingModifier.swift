@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Keeps the native List mounted during its first local read. Only opacity animates; row layout,
-/// selection, reordering, and navigation retain their own system transactions.
+/// Keeps the native List mounted during its first local read without a placeholder-content
+/// animation wrapper around its navigation environment.
 @available(iOS 17.0, *)
 struct InitialContentLoadingModifier: ViewModifier {
     let hasLoaded: Bool
@@ -9,9 +9,8 @@ struct InitialContentLoadingModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .animation(reduceMotion ? nil : InterfaceMotion.content) { view in
-                view.opacity(hasLoaded ? 1 : 0)
-            }
+            .opacity(hasLoaded ? 1 : 0)
+            .animation(reduceMotion ? nil : InterfaceMotion.content, value: hasLoaded)
             .allowsHitTesting(hasLoaded)
             .accessibilityHidden(!hasLoaded)
             .overlay {

@@ -85,19 +85,9 @@ struct ChannelScreen: View {
             }
         }
         .preferredColorScheme(.dark)
+        .navigationTitle(showsNavigationTitle ? (model.details?.channel.name ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // A principal item rather than `navigationTitle`, because the title has to fade rather
-            // than appear: it stays hidden while the channel's own name is on screen in the header,
-            // and takes over only once that name has scrolled under the bar.
-            ToolbarItem(placement: .principal) {
-                Text(model.details?.channel.name ?? "")
-                    .font(.headline)
-                    .lineLimit(1)
-                    .opacity(showsNavigationTitle ? 1 : 0)
-                    .offset(y: showsNavigationTitle ? 0 : 8)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsNavigationTitle)
-            }
             channelActionsToolbar
         }
         // Transparent over the banner, which is what makes the top of the screen feel immersive,

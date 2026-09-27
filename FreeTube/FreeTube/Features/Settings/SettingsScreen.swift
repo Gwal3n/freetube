@@ -81,21 +81,16 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    Button {
-                        path.append(.sponsorBlock)
-                    } label: {
+                    NavigationLink(value: Destination.sponsorBlock) {
                         HStack {
                             Text("Categories and behavior")
                             Spacer()
                             Text(model.sponsorBlockEnabled ? "On" : "Off")
                                 .foregroundStyle(.secondary)
-                            navigationChevron
                         }
                         .foregroundStyle(.primary)
-                        .frame(minHeight: MediaStyle.actionSize)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.automatic)
                     .tint(.white)
                 } header: {
                     Text("SponsorBlock")
@@ -116,22 +111,16 @@ struct SettingsScreen: View {
                 }
 
                 Section("Player controls") {
-                    Button {
-                        path.append(.playerControls)
-                    } label: {
+                    NavigationLink(value: Destination.playerControls) {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
-                    .buttonStyle(.automatic)
                     .tint(.white)
                 }
 
                 Section("Data") {
-                    Button {
-                        path.append(.importData)
-                    } label: {
+                    NavigationLink(value: Destination.importData) {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
-                    .buttonStyle(.automatic)
                     .tint(.white)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
@@ -326,12 +315,6 @@ struct SettingsScreen: View {
         }
     }
 
-    private var navigationChevron: some View {
-        Image(systemName: "chevron.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.tertiary)
-    }
-
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     }
@@ -350,10 +333,8 @@ struct SettingsScreen: View {
         HStack {
             Label(title, systemImage: systemImage)
             Spacer()
-            navigationChevron
         }
         .foregroundStyle(.primary)
-        .frame(minHeight: MediaStyle.actionSize)
         .contentShape(Rectangle())
     }
 }

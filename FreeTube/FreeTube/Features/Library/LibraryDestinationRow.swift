@@ -21,12 +21,8 @@ struct LibraryDestinationRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
         .foregroundStyle(.primary)
-        .frame(minHeight: MediaStyle.actionSize)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
