@@ -5,23 +5,16 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    private enum Destination: Hashable {
-        case history
-        case subscriptions
-        case playlists
-        case channel(String)
-        case playlist(String)
-        case localPlaylist(String)
-    }
-
     let navigationRequest: AppNavigationRequest?
     var settingsRequest: Int = 0
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
-    @State private var path: [Destination] = []
+    @State private var path = NavigationPath()
+    @State private var rootIsVisible = false
     @State private var didLoadRootData = false
     @State private var showsSettings = false
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -38,11 +31,8 @@ struct LibraryScreen: View {
                     }
                 }
             }
-            .navigationDestination(for: Destination.self) { destination in
+            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
-                case .history: LocalHistoryScreen()
-                case .subscriptions: LocalSubscriptionsScreen()
-                case .playlists: LocalPlaylistsScreen()
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
@@ -50,8 +40,10 @@ struct LibraryScreen: View {
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
             // preventing late count/account mutations from invalidating the List mid-transition.
-            .task(id: path.isEmpty) {
-                guard path.isEmpty, !didLoadRootData else { return }
+            .onAppear { rootIsVisible = true }
+            .onDisappear { rootIsVisible = false }
+            .task(id: rootIsVisible) {
+                guard rootIsVisible, !didLoadRootData else { return }
                 await loadRootData()
             }
             .refreshable {
@@ -70,18 +62,18 @@ struct LibraryScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task {
                     let count = await PersistenceWriter.shared.watchHistoryCount()
-                    guard path.isEmpty else { return }
+                    guard rootIsVisible else { return }
                     localHistoryCount = count
                 }
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
-                path.append(route(for: destination))
+                path.append(destination)
             }
             .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
                 Task {
                     let count = await localPlaylistCountFromStore()
-                    guard path.isEmpty else { return }
+                    guard rootIsVisible else { return }
                     localPlaylistCount = count
                 }
             }
@@ -90,9 +82,9 @@ struct LibraryScreen: View {
 
     private func loadRootData() async {
         let historyCount = await PersistenceWriter.shared.watchHistoryCount()
-        guard !Task.isCancelled, path.isEmpty else { return }
+        guard !Task.isCancelled, rootIsVisible else { return }
         let playlistCount = await localPlaylistCountFromStore()
-        guard !Task.isCancelled, path.isEmpty else { return }
+        guard !Task.isCancelled, rootIsVisible else { return }
         localHistoryCount = historyCount
         localPlaylistCount = playlistCount
 
@@ -104,18 +96,13 @@ struct LibraryScreen: View {
         return playlists.count
     }
 
-    private func route(for destination: AppNavigationRequest.Destination) -> Destination {
-        switch destination {
-        case .channel(let id): .channel(id)
-        case .playlist(let id): .playlist(id)
-        case .localPlaylist(let id): .localPlaylist(id)
-        }
-    }
-
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            NavigationLink(value: Destination.history) {
+            NavigationLink {
+                LocalHistoryScreen()
+                    .onAppear { log.info("Opened Library: local history") }
+            } label: {
                 LibraryDestinationRow(
                     title: "Local history",
                     subtitle: countSubtitle(localHistoryCount, noun: "video"),
@@ -124,7 +111,10 @@ struct LibraryScreen: View {
             }
             .tint(.white)
 
-            NavigationLink(value: Destination.subscriptions) {
+            NavigationLink {
+                LocalSubscriptionsScreen()
+                    .onAppear { log.info("Opened Library: local subscriptions") }
+            } label: {
                 LibraryDestinationRow(
                     title: "Local subscriptions",
                     subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
@@ -133,7 +123,10 @@ struct LibraryScreen: View {
             }
             .tint(.white)
 
-            NavigationLink(value: Destination.playlists) {
+            NavigationLink {
+                LocalPlaylistsScreen()
+                    .onAppear { log.info("Opened Library: local playlists") }
+            } label: {
                 LibraryDestinationRow(
                     title: "Local playlists",
                     subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),

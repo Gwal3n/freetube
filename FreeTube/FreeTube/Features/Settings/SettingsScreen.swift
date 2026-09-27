@@ -3,14 +3,8 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
-    private enum Destination: Hashable {
-        case sponsorBlock
-        case playerControls
-        case importData
-    }
-
     @State private var model = SettingsViewModel()
-    @State private var path: [Destination] = []
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     /// Observed so the "Save logs to file" section re-renders when the writer opens / closes
     /// the current log file.
@@ -25,7 +19,7 @@ struct SettingsScreen: View {
     @State private var showingClearHistoryConfirmation = false
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             Form {
                 Section {
                     Picker("Preferred quality", selection: Bindable(model).preferredQuality) {
@@ -81,7 +75,10 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    NavigationLink(value: Destination.sponsorBlock) {
+                    NavigationLink {
+                        SponsorBlockSettingsScreen(model: model)
+                            .onAppear { log.info("Opened Settings: SponsorBlock") }
+                    } label: {
                         HStack {
                             Text("Categories and behavior")
                             Spacer()
@@ -111,14 +108,20 @@ struct SettingsScreen: View {
                 }
 
                 Section("Player controls") {
-                    NavigationLink(value: Destination.playerControls) {
+                    NavigationLink {
+                        PlayerControlsSettingsScreen(model: model)
+                            .onAppear { log.info("Opened Settings: player controls") }
+                    } label: {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
                     .tint(.white)
                 }
 
                 Section("Data") {
-                    NavigationLink(value: Destination.importData) {
+                    NavigationLink {
+                        ImportDataScreen()
+                            .onAppear { log.info("Opened Settings: import data") }
+                    } label: {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
                     .tint(.white)
@@ -264,16 +267,6 @@ struct SettingsScreen: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                }
-            }
-            .navigationDestination(for: Destination.self) { destination in
-                switch destination {
-                case .sponsorBlock:
-                    SponsorBlockSettingsScreen(model: model)
-                case .playerControls:
-                    PlayerControlsSettingsScreen(model: model)
-                case .importData:
-                    ImportDataScreen()
                 }
             }
             // System Share sheet for the log file. `ShareLink` would be cleaner, but
