@@ -408,6 +408,22 @@ struct FullScreenPlayer: View {
         .sheet(item: $saveToPlaylistVideo) { video in
             AddToPlaylistSheet(video: video)
         }
+        .confirmationDialog(
+            "Delete downloaded video?",
+            isPresented: Binding(
+                get: { actionsModel.pendingDownloadDeletion != nil },
+                set: { if !$0 { actionsModel.pendingDownloadDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: actionsModel.pendingDownloadDeletion
+        ) { video in
+            Button("Delete Download", role: .destructive) {
+                actionsModel.confirmDownloadDeletion(video)
+            }
+            Button("Cancel", role: .cancel) { actionsModel.pendingDownloadDeletion = nil }
+        } message: { _ in
+            Text("This removes the downloaded file from this device.")
+        }
         .task(id: player.currentVideo?.id) {
             await actionsModel.refreshPlaylistMembership(for: player.currentVideo?.id)
         }
@@ -738,7 +754,7 @@ struct FullScreenPlayer: View {
                 shareFileURL = downloadedFileURL
             },
             onDownload: {
-                actionsModel.startDownload(video)
+                actionsModel.handleDownloadTap(video)
             }
         )
     }

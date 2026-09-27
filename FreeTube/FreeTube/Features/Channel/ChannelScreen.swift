@@ -175,6 +175,9 @@ struct ChannelScreen: View {
     /// — but there is no single scroll offset that means it. Keeping the header position and the
     /// content position as separate numbers is what lets a tab switch preserve both.
     private func handlePageScroll(tab: ChannelProfileTab, offset: CGFloat) {
+        // Rubber-banding is native visual feedback, not movement through the channel's content.
+        // Counting its negative offset and positive rebound collapses the header on every pull.
+        let offset = Self.normalizedPageOffset(offset)
         let previous = pageOffsets[tab.id] ?? offset
         pageOffsets[tab.id] = offset
         // Only the page the user is actually looking at moves the header. Everything else that
@@ -317,6 +320,10 @@ struct ChannelScreen: View {
 
     private static func pageSpace(_ tab: ChannelProfileTab) -> String {
         "channelPage-\(tab.id)"
+    }
+
+    static func normalizedPageOffset(_ offset: CGFloat) -> CGFloat {
+        max(0, offset)
     }
 
     // MARK: - Header
@@ -1015,7 +1022,7 @@ private struct PageScrollGeometry: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content.onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.contentOffset.y + geometry.contentInsets.top
+                ChannelScreen.normalizedPageOffset(geometry.contentOffset.y + geometry.contentInsets.top)
             } action: { _, new in
                 onScroll(new)
             }

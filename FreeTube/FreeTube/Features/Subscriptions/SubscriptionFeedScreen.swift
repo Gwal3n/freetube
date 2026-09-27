@@ -5,6 +5,7 @@ struct SubscriptionFeedScreen: View {
     let navigationRequest: AppNavigationRequest?
     @State private var model = SubscriptionFeedViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
+    @State private var handledNavigationRequestID: UUID?
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
@@ -105,9 +106,11 @@ struct SubscriptionFeedScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await model.refreshProgress() }
             }
-            .onChange(of: navigationRequest?.id) { _, _ in
-                guard let destination = navigationRequest?.destination else { return }
-                path.append(destination)
+            .onChange(of: navigationRequest?.id, initial: true) { _, _ in
+                guard let request = navigationRequest,
+                      request.id != handledNavigationRequestID else { return }
+                handledNavigationRequestID = request.id
+                path.append(request.destination)
             }
         }
     }

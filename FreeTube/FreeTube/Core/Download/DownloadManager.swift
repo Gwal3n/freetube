@@ -361,6 +361,7 @@ final class DownloadManager: TemporaryDownloading {
     /// pending `.background` items (playlist Download All, queue prefetch). The currently-running
     /// yt-dlp cannot be preempted, but the new high-priority item runs immediately after it.
     func ensureDownloaded(video: Video, quality: VideoQuality, priority: DownloadPriority = .background) async throws -> URL {
+        try Task.checkCancellation()
         log.info("ensureDownloaded(\(video.id, privacy: .public)) — title=\"\(video.title, privacy: .public)\" quality=\(quality.rawValue, privacy: .public) priority=\(String(describing: priority), privacy: .public)")
         if let existing = localFile(for: video.id) {
             log.info("ensureDownloaded(\(video.id, privacy: .public)): cache hit, skipping yt-dlp")
@@ -374,6 +375,7 @@ final class DownloadManager: TemporaryDownloading {
 
         log.info("ensureDownloaded(\(video.id, privacy: .public)): checking network gate (allowCellular=\(self.preferences.allowCellularDownloads, privacy: .public))")
         try await waitForAllowedNetwork()
+        try Task.checkCancellation()
         log.info("ensureDownloaded(\(video.id, privacy: .public)): network gate passed, spawning download task")
 
         let task = Task<URL, Error> { @MainActor [weak self] in
@@ -479,6 +481,7 @@ final class DownloadManager: TemporaryDownloading {
                 state: .downloading(progress: 0), createdAt: .now
             ))
             let resolved = try await NativeStreamService().resolve(video: video, quality: quality)
+            try Task.checkCancellation()
             try await downloadResolvedSource(
                 resolved.url,
                 to: destination,
@@ -487,6 +490,7 @@ final class DownloadManager: TemporaryDownloading {
                 video: video,
                 snapshotID: snapshotID
             )
+            try Task.checkCancellation()
             try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
             await persistDownloaded(video: video, fileURL: destination)
             publish(snapshot: DownloadTaskSnapshot(
@@ -505,6 +509,7 @@ final class DownloadManager: TemporaryDownloading {
             throw CancellationError()
         } catch {
             try? FileManager.default.removeItem(at: destination)
+            if Task.isCancelled { throw CancellationError() }
             if NativeHLSDownloadService.isAuthorizationFailure(error) {
                 log.notice("native-download[\(video.id, privacy: .public)] authorization failed; invalidating the signed URL and resolving once more")
                 await StreamURLCache.shared.remove(videoID: video.id, formatID: "native-\(quality.rawValue)")
@@ -538,6 +543,7 @@ final class DownloadManager: TemporaryDownloading {
                     log.notice("native-download[\(video.id, privacy: .public)] fresh-resolution retry failed: \(String(describing: error), privacy: .public)")
                 }
             }
+            try Task.checkCancellation()
             log.notice("native-download[\(video.id, privacy: .public)] failed: \(String(describing: error), privacy: .public); trying yt-dlp")
         }
 

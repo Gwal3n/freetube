@@ -9,6 +9,10 @@ import Observation
 final class PlayerActionsModel {
     private(set) var isSavedToPersonalPlaylist = false
     var downloadError: ErrorState?
+    var pendingDownloadDeletion: Video?
+    private(set) var requestedDownloadIDs: Set<String> = []
+    @ObservationIgnored private var downloadRequests: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var downloadRequestTokens: [String: UUID] = [:]
 
     private let downloads: DownloadManager
     private let playlists: LocalPlaylistService
@@ -39,7 +43,7 @@ final class PlayerActionsModel {
         for videoID: String,
         downloadedFileURL: URL?
     ) -> PlayerDownloadPresentationState {
-        if downloadedFileURL != nil { return .downloaded }
+        if requestedDownloadIDs.contains(videoID) { return .downloading }
         if downloads.activeTasks.contains(where: { snapshot in
             guard snapshot.videoID == videoID else { return false }
             switch snapshot.state {
@@ -49,17 +53,65 @@ final class PlayerActionsModel {
         }) {
             return .downloading
         }
+        if downloadedFileURL != nil { return .downloaded }
         return .available
     }
 
     func startDownload(_ video: Video) {
+        guard !requestedDownloadIDs.contains(video.id) else { return }
+        downloadError = nil
         let quality = UserPreferences().preferredQuality
-        Task {
+        let token = UUID()
+        downloadRequestTokens[video.id] = token
+        requestedDownloadIDs.insert(video.id)
+        downloadRequests[video.id] = Task {
+            defer {
+                if downloadRequestTokens[video.id] == token {
+                    downloadRequestTokens[video.id] = nil
+                    downloadRequests[video.id] = nil
+                    requestedDownloadIDs.remove(video.id)
+                }
+            }
+            guard !Task.isCancelled else { return }
             do {
                 _ = try await downloads.ensureDownloaded(video: video, quality: quality)
             } catch {
+                guard !Task.isCancelled, !(error is CancellationError),
+                      downloadRequestTokens[video.id] == token else { return }
                 downloadError = ErrorState(from: error)
             }
+        }
+    }
+
+    func handleDownloadTap(_ video: Video) {
+        // A transfer may have written its destination before validation finishes. Do not
+        // mistake that partial file for a completed download eligible for deletion.
+        if downloadState(for: video.id, downloadedFileURL: nil) == .downloading {
+            downloadRequests[video.id]?.cancel()
+            for snapshot in downloads.activeTasks where snapshot.videoID == video.id {
+                switch snapshot.state {
+                case .queued, .downloading, .paused: downloads.cancel(taskID: snapshot.id)
+                case .completed, .failed: break
+                }
+            }
+            return
+        }
+        if downloadedFile(for: video.id) != nil {
+            pendingDownloadDeletion = video
+            return
+        }
+        startDownload(video)
+    }
+
+    func confirmDownloadDeletion(_ video: Video) {
+        pendingDownloadDeletion = nil
+        guard let url = downloadedFile(for: video.id) else { return }
+        DownloadsStore.shared.delete(at: url)
+        if FileManager.default.fileExists(atPath: url.path) {
+            downloadError = ErrorState(from: NSError(
+                domain: "PlayerActions", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The downloaded file could not be deleted."]
+            ))
         }
     }
 }

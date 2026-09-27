@@ -55,15 +55,23 @@ struct SwiftUIMiniPlayer: View {
                 Button {
                     player.togglePlayPause()
                 } label: {
-                    PlaybackMorphShape(progress: player.isPlaying ? 1 : 0)
-                        .fill(primaryForeground)
+                    Group {
+                        if player.hasEnded {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 21, weight: .semibold))
+                                .foregroundStyle(primaryForeground)
+                        } else {
+                            PlaybackMorphShape(progress: player.isPlaying ? 1 : 0)
+                                .fill(primaryForeground)
+                        }
+                    }
                         .frame(width: 21, height: 21)
                         .frame(width: MediaStyle.actionSize, height: 50)
                         .contentShape(Rectangle())
                         .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: player.isPlaying)
                 }
                 .buttonStyle(ResponsiveButtonStyle())
-                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+                .accessibilityLabel(player.hasEnded ? "Replay" : (player.isPlaying ? "Pause" : "Play"))
             }
             .padding(.horizontal, 4)
             .frame(height: 56, alignment: .center)

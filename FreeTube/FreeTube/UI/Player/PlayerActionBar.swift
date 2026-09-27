@@ -76,7 +76,6 @@ struct PlayerActionBar: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
-            .disabled(downloadState != .available)
             .opacity(downloadState == .downloading ? 0.72 : 1)
             .accessibilityLabel(downloadAccessibilityLabel)
         }
@@ -98,8 +97,8 @@ struct PlayerActionBar: View {
 
     private var downloadAccessibilityLabel: String {
         switch downloadState {
-        case .downloaded: "Downloaded"
-        case .downloading: "Downloading"
+        case .downloaded: "Delete download"
+        case .downloading: "Cancel download"
         case .available: "Download"
         }
     }
