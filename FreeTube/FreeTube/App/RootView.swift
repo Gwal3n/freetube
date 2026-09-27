@@ -90,12 +90,17 @@ struct RootView: View {
         // Force light status-bar glyphs while the dark expanded player is visible, then restore
         // the app's normal appearance when it returns to the mini-player.
         .onChange(of: player.fullScreenPresented) { _, presented in
+            log.info("Player expanded presentation changed: \(presented)")
             updateStatusBarOverride(forFullScreenOpen: presented)
             if presented {
                 player.requestInlinePlaybackRestoration()
             }
         }
+        .onChange(of: player.miniPlayerVisible) { _, visible in
+            log.info("Player mini presentation changed: \(visible)")
+        }
         .onChange(of: scenePhase) { _, phase in
+            log.info("Scene phase changed: \(String(describing: phase))")
             // Reopening the app from an automatic PiP session may leave the popup binding true,
             // so there is no false→true popup transition to observe. Foreground activation is
             // the second explicit signal that the same video should return inline.

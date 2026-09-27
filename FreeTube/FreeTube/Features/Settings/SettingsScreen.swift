@@ -78,6 +78,7 @@ struct SettingsScreen: View {
                     NavigationLink {
                         SponsorBlockSettingsScreen(model: model)
                             .onAppear { log.info("Opened Settings: SponsorBlock") }
+                            .navigationDiagnostics("Settings destination SponsorBlock")
                     } label: {
                         HStack {
                             Text("Categories and behavior")
@@ -89,6 +90,7 @@ struct SettingsScreen: View {
                         .contentShape(Rectangle())
                     }
                     .tint(.white)
+                    .navigationDiagnostics("Settings link SponsorBlock", observesTap: true)
                 } header: {
                     Text("SponsorBlock")
                 } footer: {
@@ -111,20 +113,24 @@ struct SettingsScreen: View {
                     NavigationLink {
                         PlayerControlsSettingsScreen(model: model)
                             .onAppear { log.info("Opened Settings: player controls") }
+                            .navigationDiagnostics("Settings destination player controls")
                     } label: {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
                     .tint(.white)
+                    .navigationDiagnostics("Settings link player controls", observesTap: true)
                 }
 
                 Section("Data") {
                     NavigationLink {
                         ImportDataScreen()
                             .onAppear { log.info("Opened Settings: import data") }
+                            .navigationDiagnostics("Settings destination import data")
                     } label: {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
                     .tint(.white)
+                    .navigationDiagnostics("Settings link import data", observesTap: true)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
@@ -215,6 +221,7 @@ struct SettingsScreen: View {
                         // so the Share button still works right after the toggle is flipped
                         // off (writer closes the file, currentLogFileURL goes nil, but the
                         // file is still on disk and shareable).
+                        log.info("Settings Share latest log requested")
                         shareLogURL = logWriter.currentLogFileURL ?? LogFileWriter.allLogFiles().first
                     } label: {
                         Label("Share latest log…", systemImage: "square.and.arrow.up")
@@ -263,10 +270,14 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationDiagnostics("Settings root form")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        log.info("Settings Done requested")
+                        dismiss()
+                    }
                 }
             }
             // System Share sheet for the log file. `ShareLink` would be cleaner, but

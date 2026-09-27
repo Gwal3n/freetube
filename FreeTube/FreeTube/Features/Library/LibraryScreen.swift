@@ -22,9 +22,11 @@ struct LibraryScreen: View {
                 localHistorySection
             }
             .navigationTitle("Library")
+            .navigationDiagnostics("Library root list")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        log.info("Library Settings button tapped")
                         showsSettings = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")
@@ -52,9 +54,18 @@ struct LibraryScreen: View {
             }
             // Present outside the list's refresh environment. Settings has no refresh action;
             // its downward gesture should belong to the system sheet instead.
-            .sheet(isPresented: $showsSettings) {
+            .sheet(isPresented: $showsSettings, onDismiss: {
+                log.info("Library Settings sheet dismissed")
+            }) {
                 SettingsScreen()
+                    .navigationDiagnostics("Settings sheet stack")
                     .presentationDragIndicator(.hidden)
+            }
+            .onChange(of: showsSettings) { previous, current in
+                log.info("Library Settings sheet binding: \(previous) → \(current)")
+            }
+            .onChange(of: path.count) { previous, current in
+                log.info("Library path count: \(previous) → \(current)")
             }
             .onChange(of: settingsRequest, initial: true) { _, request in
                 if request > 0 { showsSettings = true }
@@ -102,6 +113,7 @@ struct LibraryScreen: View {
             NavigationLink {
                 LocalHistoryScreen()
                     .onAppear { log.info("Opened Library: local history") }
+                    .navigationDiagnostics("Library destination local history")
             } label: {
                 LibraryDestinationRow(
                     title: "Local history",
@@ -110,10 +122,12 @@ struct LibraryScreen: View {
                 )
             }
             .tint(.white)
+            .navigationDiagnostics("Library link local history", observesTap: true)
 
             NavigationLink {
                 LocalSubscriptionsScreen()
                     .onAppear { log.info("Opened Library: local subscriptions") }
+                    .navigationDiagnostics("Library destination local subscriptions")
             } label: {
                 LibraryDestinationRow(
                     title: "Local subscriptions",
@@ -122,10 +136,12 @@ struct LibraryScreen: View {
                 )
             }
             .tint(.white)
+            .navigationDiagnostics("Library link local subscriptions", observesTap: true)
 
             NavigationLink {
                 LocalPlaylistsScreen()
                     .onAppear { log.info("Opened Library: local playlists") }
+                    .navigationDiagnostics("Library destination local playlists")
             } label: {
                 LibraryDestinationRow(
                     title: "Local playlists",
@@ -134,6 +150,7 @@ struct LibraryScreen: View {
                 )
             }
             .tint(.white)
+            .navigationDiagnostics("Library link local playlists", observesTap: true)
         }
     }
 
