@@ -310,6 +310,8 @@ final class DownloadManager: TemporaryDownloading {
     private(set) var phaseByVideoID: [String: String] = [:]
 
     private var tasks: [String: DownloadTaskSnapshot] = [:]
+    @ObservationIgnored private var overallProgress: [String: DownloadOverallProgress] = [:]
+    @ObservationIgnored private var cancelledSnapshotIDs: [String] = []
 
     /// Throttles the progress publish stream. yt-dlp emits progress events 5–10× per second per
     /// active download, and each `publish(snapshot:)` writes to 3 `@Observable` dictionaries plus
@@ -401,6 +403,11 @@ final class DownloadManager: TemporaryDownloading {
 
     func cancel(taskID: String) {
         guard let snapshot = tasks[taskID] else { return }
+        cancelledSnapshotIDs.append(taskID)
+        if cancelledSnapshotIDs.count > 256 { cancelledSnapshotIDs.removeFirst() }
+        overallProgress[taskID] = nil
+        progressByVideoID[snapshot.videoID] = nil
+        phaseByVideoID[snapshot.videoID] = nil
         tasks[taskID] = nil
         publishSnapshots()
         if let task = inflight[snapshot.videoID] {
@@ -682,16 +689,23 @@ final class DownloadManager: TemporaryDownloading {
                     log.info("yt-dlp: \(message, privacy: .public)")
                 }
                 // The "[Merger]" line is yt-dlp's last visible step before it hands off to ffmpeg.
-                // ffmpeg runs CPU-bound on the device for 10–60s and emits no progress, so we flip
-                // the progress overlay to a spinner ("Processing…") instead of leaving it at 100%.
+                // Preserve overall progress during finalization instead of replacing it with
+                // an indeterminate spinner or resetting to zero between tracks.
                 if message.contains("[Merger]") || message.contains("[ExtractAudio]") || message.contains("Fixup") {
                     let id = video.id
                     Task { @MainActor in
-                        self?.progressByVideoID.removeValue(forKey: id)
+                        guard let self, let snapshot = self.tasks[snapshotID],
+                              !self.cancelledSnapshotIDs.contains(snapshotID) else { return }
+                        self.phaseByVideoID[id] = "muxing"
+                        self.publish(snapshot: DownloadTaskSnapshot(
+                            id: snapshot.id, videoID: id, title: snapshot.title,
+                            state: .downloading(progress: 0), createdAt: snapshot.createdAt
+                        ))
                     }
                 }
             }, priority: priority == .userInitiated ? .high : .low)
         } catch {
+            try Task.checkCancellation()
             log.error("yt-dlp[\(video.id, privacy: .public)] threw: \(String(describing: error), privacy: .public)")
             // **Don't fail yet** — try the YouTubeKit / TVHTML5_SIMPLY_EMBEDDED_PLAYER fallback
             // before giving up. yt-dlp's no-JS-runtime path can produce "This video is not
@@ -853,6 +867,7 @@ final class DownloadManager: TemporaryDownloading {
         videoID: String,
         videoTitle: String
     ) {
+        guard !cancelledSnapshotIDs.contains(snapshotID) else { return }
         let progress = total > 0 ? max(0, min(1, Double(downloaded) / Double(total))) : 0
 
         if status == "downloading" {
@@ -880,8 +895,7 @@ final class DownloadManager: TemporaryDownloading {
             ))
         } else if status == "finished" {
             log.info("yt-dlp[\(videoID, privacy: .public)] \(phase, privacy: .public) finished — moving to next phase")
-            // Clear known progress so the UI overlay flips from "Downloading 100%" to a spinner.
-            progressByVideoID.removeValue(forKey: videoID)
+            // Keep overall progress visible while the next track or finalization starts.
             // Reset throttle so the next phase (audio after video, or mux) gets its first event
             // through immediately rather than waiting out the window from the previous phase.
             lastProgressPublishedAt.removeValue(forKey: videoID)
@@ -997,7 +1011,6 @@ final class DownloadManager: TemporaryDownloading {
         phaseByVideoID[video.id] = "audio"
         try await downloadStream(from: audioURL, to: audioFile, videoID: video.id, snapshotID: snapshotID, title: video.title)
         phaseByVideoID[video.id] = "muxing"
-        progressByVideoID.removeValue(forKey: video.id)
 
         try await muxToDestination(video: videoFile, audio: audioFile, destination: destination)
     }
@@ -1484,12 +1497,26 @@ final class DownloadManager: TemporaryDownloading {
     }
 
     private func publish(snapshot: DownloadTaskSnapshot) {
+        // Progress callbacks already queued on the main actor can outlive cancellation.
+        guard !cancelledSnapshotIDs.contains(snapshot.id) else { return }
+        var snapshot = snapshot
+        if !snapshot.id.hasPrefix("fetch-"), case .downloading(let raw) = snapshot.state {
+            var tracker = overallProgress[snapshot.id] ?? DownloadOverallProgress()
+            let value = tracker.update(raw, phase: phaseByVideoID[snapshot.videoID] ?? "stream")
+            overallProgress[snapshot.id] = tracker
+            snapshot = DownloadTaskSnapshot(
+                id: snapshot.id, videoID: snapshot.videoID, title: snapshot.title,
+                state: .downloading(progress: value), createdAt: snapshot.createdAt
+            )
+        }
         tasks[snapshot.id] = snapshot
         if case .downloading(let value) = snapshot.state {
             progressByVideoID[snapshot.videoID] = value
         } else if case .completed = snapshot.state {
+            overallProgress[snapshot.id] = nil
             progressByVideoID.removeValue(forKey: snapshot.videoID)
         } else if case .failed = snapshot.state {
+            overallProgress[snapshot.id] = nil
             progressByVideoID.removeValue(forKey: snapshot.videoID)
         }
         publishSnapshots()

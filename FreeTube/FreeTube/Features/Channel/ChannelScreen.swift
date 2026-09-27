@@ -282,13 +282,17 @@ struct ChannelScreen: View {
                 // Reserves the header's footprint, plus a little air so the first row isn't
                 // crowded against the tab bar. The header is drawn over the top of this.
                 Color.clear.frame(height: headerTotalHeight + Metrics.contentTopInset)
-                // The minimum height is what lets a short tab — About, or a channel with three
-                // videos — still scroll far enough to hold the header collapsed. Without it that
-                // tab has no room to accept an alignment, so arriving at it would spring the
-                // header back open. The cost is that a short tab can be scrolled past its content
-                // into empty space, which is the same bargain every tabbed profile makes.
+                // Reserve only enough content for the header to collapse. A full viewport here
+                // adds the tab bar and top inset again, letting short tabs scroll into blank space.
                 channelContent(details, tab: tab)
-                    .frame(maxWidth: .infinity, minHeight: pageViewportHeight, alignment: .topLeading)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: Self.minimumPageContentHeight(
+                            viewport: pageViewportHeight, tabBar: tabBarHeight,
+                            topInset: Metrics.contentTopInset
+                        ),
+                        alignment: .topLeading
+                    )
             }
             .background {
                 GeometryReader { geometry in
@@ -314,6 +318,10 @@ struct ChannelScreen: View {
 
     static func normalizedPageOffset(_ offset: CGFloat) -> CGFloat {
         max(0, offset)
+    }
+
+    static func minimumPageContentHeight(viewport: CGFloat, tabBar: CGFloat, topInset: CGFloat) -> CGFloat {
+        max(0, viewport - tabBar - topInset)
     }
 
     // MARK: - Header

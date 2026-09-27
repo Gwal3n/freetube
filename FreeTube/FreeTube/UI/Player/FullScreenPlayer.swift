@@ -538,7 +538,6 @@ struct FullScreenPlayer: View {
                     fullscreenSwipeStartedInExpectedDirection = fullscreenSwipeIsVertical == true
                         && value.translation.height * expectedDirection > 0
                     if fullscreenSwipeStartedInExpectedDirection,
-                       !isFullscreen,
                        controlsVisibility.isVisible {
                         fullscreenSwipeHidControls = true
                         controlsVisibility.hide(reduceMotion: reduceMotion)
@@ -579,7 +578,7 @@ struct FullScreenPlayer: View {
                     fullscreenSwipeTranslation = 0
                     if shouldToggle {
                         if isFullscreen {
-                            exitFullscreen()
+                            exitFullscreen(revealControls: false)
                         } else {
                             enterFullscreen()
                         }
@@ -606,13 +605,13 @@ struct FullScreenPlayer: View {
         // hidden after entry; a normal tap can reveal them without flashing the fixed scrim back.
     }
 
-    private func exitFullscreen() {
+    private func exitFullscreen(revealControls: Bool = true) {
         if portraitFullscreenActive {
             portraitVideoFullscreen = false
         } else {
             requestPlayerOrientation(.portrait)
         }
-        showPlayerControls()
+        if revealControls { showPlayerControls() }
     }
 
     private func requestPlayerOrientation(_ orientations: UIInterfaceOrientationMask) {
