@@ -14,7 +14,9 @@ final class ChannelViewModel {
 
     let channelID: String
     private(set) var details: ChannelDetails?
-    private(set) var isLoading: Bool = false
+    // The screen schedules its initial load on appearance. Reserve loading geometry from the
+    // first frame, rather than briefly showing the idle/retry state before `.task` starts.
+    private(set) var isLoading: Bool = true
     private(set) var initialLoadFailed = false
     /// True while a per-tab continuation request is in flight. Used by the tab screen to avoid
     /// firing duplicate "load more" requests when the user is rapidly scrolling near the bottom.
@@ -26,6 +28,7 @@ final class ChannelViewModel {
 
     private let service: any ChannelServicing
     private let localSubscriptions: LocalSubscriptionStore
+    @ObservationIgnored private var initialLoadTask: Task<Void, Never>?
 
     init(
         channelID: String,
@@ -38,14 +41,30 @@ final class ChannelViewModel {
     }
 
     func load() async {
-        guard !isLoading else { return }
+        if let task = initialLoadTask {
+            // Reopening joins the same request instead of exiting while the cancelled view's
+            // task owns it. This task belongs to this channel model, not a view appearance.
+            await task.value
+            return
+        }
         initialLoadFailed = false
         errorState = nil
         isLoading = true
-        defer { isLoading = false }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performInitialLoad()
+        }
+        initialLoadTask = task
+        await task.value
+    }
+
+    private func performInitialLoad() async {
+        defer {
+            isLoading = false
+            initialLoadTask = nil
+        }
         do {
             let loadedDetails = try await service.fetchChannel(id: channelID)
-            guard !Task.isCancelled else { return }
             details = loadedDetails
             videoTabs[.newest] = loadedDetails.videos
             if let channel = details?.channel, channel.isSubscribed {

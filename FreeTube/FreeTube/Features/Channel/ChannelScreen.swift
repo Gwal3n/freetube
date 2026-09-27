@@ -66,17 +66,22 @@ struct ChannelScreen: View {
             if let details = model.details {
                 pager(details)
                 header(details)
-            } else if model.initialLoadFailed {
+            } else if model.isLoading {
+                channelHeaderPlaceholder
+            } else {
                 ContentUnavailableView {
-                    Label("Unable to Load Channel", systemImage: "wifi.exclamationmark")
+                    Label(
+                        model.initialLoadFailed ? "Unable to Load Channel" : "Channel Not Loaded",
+                        systemImage: model.initialLoadFailed ? "wifi.exclamationmark" : "person.crop.circle"
+                    )
                 } description: {
-                    Text("Check your connection and try again.")
+                    Text(model.initialLoadFailed
+                         ? "The channel could not be loaded. Try again."
+                         : "Loading was interrupted. Try again.")
                 } actions: {
                     Button("Try Again") { Task { await model.load() } }
                         .buttonStyle(.bordered)
                 }
-            } else {
-                channelHeaderPlaceholder
             }
         }
         .preferredColorScheme(.dark)

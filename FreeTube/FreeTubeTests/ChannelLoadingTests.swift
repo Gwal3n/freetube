@@ -4,6 +4,29 @@ import XCTest
 
 @MainActor
 final class ChannelLoadingTests: XCTestCase {
+    func testCancelledAppearanceAndReopeningShareTheRequest() async {
+        let service = ChannelLoadingFixture()
+        service.allowSuccess()
+        service.holdRequests = true
+        let model = ChannelViewModel(channelID: "test-channel", service: service)
+        let appearance = Task { await model.load() }
+        await service.waitForRequest()
+        appearance.cancel()
+
+        // The queued completion runs when the reopened caller yields to the shared request.
+        // No real networking, arbitrary delays, or reliance on a cancelled URLSession task.
+        let completion = Task { service.completeRequest() }
+        await model.load()
+        await completion.value
+        await appearance.value
+
+        XCTAssertEqual(service.requestCount, 1)
+        XCTAssertEqual(model.details?.channel.id, "test-channel")
+        XCTAssertFalse(model.isLoading)
+        XCTAssertFalse(model.initialLoadFailed)
+        XCTAssertNil(model.errorState)
+    }
+
     func testFailureRemainsRecoverableAfterToastDismissal() async {
         let service = ChannelLoadingFixture()
         let model = ChannelViewModel(channelID: "test-channel", service: service)
@@ -31,18 +54,47 @@ final class ChannelLoadingTests: XCTestCase {
         XCTAssertFalse(model.isLoading)
         XCTAssertNil(model.errorState)
         XCTAssertNil(model.details)
+        service.allowSuccess()
+        await model.load()
+        XCTAssertEqual(model.details?.channel.id, "test-channel")
+        XCTAssertFalse(model.isLoading)
     }
 }
 
 @MainActor
 private final class ChannelLoadingFixture: ChannelServicing {
+    var holdRequests = false
+    private(set) var requestCount = 0
+    private var pendingRequest: CheckedContinuation<Void, Never>?
+    private var requestStarted: CheckedContinuation<Void, Never>?
     private var succeeds = false
     private var cancels = false
 
-    func allowSuccess() { succeeds = true }
+    func allowSuccess() {
+        succeeds = true
+        cancels = false
+    }
     func cancelRequests() { cancels = true }
 
+    func waitForRequest() async {
+        if pendingRequest != nil { return }
+        await withCheckedContinuation { requestStarted = $0 }
+    }
+
+    func completeRequest() {
+        pendingRequest?.resume()
+        pendingRequest = nil
+    }
+
     func fetchChannel(id: String) async throws -> ChannelDetails {
+        requestCount += 1
+        if holdRequests {
+            await withCheckedContinuation { continuation in
+                pendingRequest = continuation
+                requestStarted?.resume()
+                requestStarted = nil
+            }
+        }
         if cancels { throw CancellationError() }
         guard succeeds else { throw URLError(.notConnectedToInternet) }
         return ChannelDetails(
