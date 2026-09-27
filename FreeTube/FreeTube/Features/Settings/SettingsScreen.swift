@@ -2,6 +2,11 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
+    private enum Destination: String, Hashable {
+        case sponsorBlock, playerControls, importData
+    }
+
+    @State private var path = NavigationPath()
     @Environment(\.dismiss) private var dismiss
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
@@ -19,7 +24,7 @@ struct SettingsScreen: View {
     @State private var showingClearHistoryConfirmation = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: navigationPathBinding) {
             Form {
                 Section {
                     Picker("Preferred quality", selection: Bindable(model).preferredQuality) {
@@ -75,22 +80,21 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    NavigationLink {
-                        SponsorBlockSettingsScreen(model: model)
-                            .onAppear { log.info("Opened Settings: SponsorBlock") }
-                            .navigationDiagnostics("Settings destination SponsorBlock")
+                    Button {
+                        open(.sponsorBlock)
                     } label: {
                         HStack {
                             Text("Categories and behavior")
                             Spacer()
                             Text(model.sponsorBlockEnabled ? "On" : "Off")
                                 .foregroundStyle(.secondary)
+                            disclosureIndicator
                         }
                         .foregroundStyle(.primary)
                         .contentShape(Rectangle())
                     }
                     .tint(.white)
-                    .navigationDiagnostics("Settings link SponsorBlock", observesTap: true)
+                    .navigationDiagnostics("Settings row SponsorBlock")
                 } header: {
                     Text("SponsorBlock")
                 } footer: {
@@ -110,27 +114,23 @@ struct SettingsScreen: View {
                 }
 
                 Section("Player controls") {
-                    NavigationLink {
-                        PlayerControlsSettingsScreen(model: model)
-                            .onAppear { log.info("Opened Settings: player controls") }
-                            .navigationDiagnostics("Settings destination player controls")
+                    Button {
+                        open(.playerControls)
                     } label: {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
                     .tint(.white)
-                    .navigationDiagnostics("Settings link player controls", observesTap: true)
+                    .navigationDiagnostics("Settings row player controls")
                 }
 
                 Section("Data") {
-                    NavigationLink {
-                        ImportDataScreen()
-                            .onAppear { log.info("Opened Settings: import data") }
-                            .navigationDiagnostics("Settings destination import data")
+                    Button {
+                        open(.importData)
                     } label: {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
                     .tint(.white)
-                    .navigationDiagnostics("Settings link import data", observesTap: true)
+                    .navigationDiagnostics("Settings row import data")
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
@@ -270,6 +270,19 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(for: Destination.self) { destination in
+                switch destination {
+                case .sponsorBlock:
+                    SponsorBlockSettingsScreen(model: model)
+                        .navigationDiagnostics("Settings destination SponsorBlock")
+                case .playerControls:
+                    PlayerControlsSettingsScreen(model: model)
+                        .navigationDiagnostics("Settings destination player controls")
+                case .importData:
+                    ImportDataScreen()
+                        .navigationDiagnostics("Settings destination import data")
+                }
+            }
             .navigationDiagnostics("Settings root form")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -317,6 +330,29 @@ struct SettingsScreen: View {
                 Text("This removes watch history stored by FreeTube on this device.")
             }
         }
+        .onChange(of: path.count) { previous, current in
+            log.info("Settings path rendered: \(previous) → \(current)")
+        }
+    }
+
+    private var navigationPathBinding: Binding<NavigationPath> {
+        Binding(get: { path }, set: { updated in
+            log.info("Settings framework path write: \(path.count) → \(updated.count)")
+            path = updated
+        })
+    }
+
+    private func open(_ destination: Destination) {
+        log.info("Settings action requested: \(destination.rawValue) depth=\(path.count)")
+        path.append(destination)
+        log.info("Settings path appended: \(destination.rawValue) depth=\(path.count)")
+    }
+
+    private var disclosureIndicator: some View {
+        Image(systemName: "chevron.right")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .accessibilityHidden(true)
     }
 
     private var appVersion: String {
@@ -337,6 +373,7 @@ struct SettingsScreen: View {
         HStack {
             Label(title, systemImage: systemImage)
             Spacer()
+            disclosureIndicator
         }
         .foregroundStyle(.primary)
         .contentShape(Rectangle())

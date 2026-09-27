@@ -4,7 +4,6 @@ import SwiftUI
 @available(iOS 17.0, *)
 private struct NavigationDiagnosticsModifier: ViewModifier {
     let name: String
-    let observesTap: Bool
 
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.isPresented) private var isPresented
@@ -14,22 +13,11 @@ private struct NavigationDiagnosticsModifier: ViewModifier {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     func body(content: Content) -> some View {
-        observedContent(content)
+        content
             .onAppear { record("appear") }
             .onDisappear { record("disappear") }
             .onChange(of: isPresented) { _, _ in record("presentation environment changed") }
             .onChange(of: isEnabled) { _, _ in record("enabled environment changed") }
-    }
-
-    @ViewBuilder
-    private func observedContent(_ content: Content) -> some View {
-        if observesTap {
-            // On the individual link only, never its Form/List parent. This observer neither
-            // replaces the link's action nor makes a push itself. Remove after diagnosis.
-            content.simultaneousGesture(TapGesture().onEnded { record("tap observed") })
-        } else {
-            content
-        }
     }
 
     private func record(_ event: String) {
@@ -39,8 +27,8 @@ private struct NavigationDiagnosticsModifier: ViewModifier {
 
 @available(iOS 17.0, *)
 extension View {
-    /// Observes lifecycle/environment changes; optional tap observation is for individual links only.
-    func navigationDiagnostics(_ name: String, observesTap: Bool = false) -> some View {
-        modifier(NavigationDiagnosticsModifier(name: name, observesTap: observesTap))
+    /// Observes lifecycle/environment changes without installing any gesture recognizers.
+    func navigationDiagnostics(_ name: String) -> some View {
+        modifier(NavigationDiagnosticsModifier(name: name))
     }
 }

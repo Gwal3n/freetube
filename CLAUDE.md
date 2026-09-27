@@ -238,12 +238,15 @@ and a rejected strategy is excluded before requesting the next candidate.
   opacity handoff and no empty state until that read finishes. Library/Settings use native
   direct destination NavigationLinks, system disclosure indicators, and standard row sizing. Native List
   rows already provide the minimum touch height; do not add another 44 points inside their labels.
-- **Library and Settings navigation do not use private typed destination arrays.** Settings lets
-  its native NavigationStack own direct-link pushes. Library uses NavigationPath for external
-  channel/playlist requests while its local entries use direct destinations. Do not regress these
-  rows to Buttons that append private enum values. Library count work is gated on root visibility,
-  not path emptiness, because direct destinations need not serialize into the bound path.
-  Download-cache observations belong to `DownloadsSettingsFooter`, not the whole Settings form.
+- **Library and Settings navigation are currently under diagnosis.** Both bind native
+  `NavigationStack`s to `NavigationPath`; individual row Buttons explicitly append typed
+  destinations. This user-approved diagnostic replaces non-activating direct links so logs can
+  distinguish button actions, app path appends, framework path writes, rendered depth changes,
+  and destination appearance. Destination registrations belong outside lazy List/Form sections.
+  `NavigationDiagnosticsModifier` observes lifecycle only, with no tap recognizers. Library count
+  work remains gated on root visibility. Download-cache observations belong to
+  `DownloadsSettingsFooter`, not the whole Settings form. Do not claim the navigation failure is
+  resolved without device confirmation.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
