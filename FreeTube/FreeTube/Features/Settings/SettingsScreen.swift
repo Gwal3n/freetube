@@ -3,7 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     private enum Destination: String, Hashable {
-        case sponsorBlock, playerControls, importData
+        case sponsorBlock, playerControls, importData, probe
     }
 
     @State private var path = NavigationPath()
@@ -207,6 +207,9 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    Button("Test Settings navigation") {
+                        open(.probe)
+                    }
                     Toggle("Save logs to file", isOn: Bindable(model).logToFile)
                     if model.logToFile, let url = logWriter.currentLogFileURL {
                         LabeledContent("Current log") {
@@ -281,6 +284,10 @@ struct SettingsScreen: View {
                 case .importData:
                     ImportDataScreen()
                         .navigationDiagnostics("Settings destination import data")
+                case .probe:
+                    Text("Navigation succeeded")
+                        .navigationTitle("Settings probe")
+                        .onAppear { log.info("Settings probe destination appeared") }
                 }
             }
             .navigationDiagnostics("Settings root form")

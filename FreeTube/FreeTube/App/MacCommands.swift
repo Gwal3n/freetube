@@ -106,6 +106,7 @@ extension Notification.Name {
     /// listens and updates its `@State selectedTab`. The `object` is a `RootView.Tab`.
     static let freetubeSelectTab = Notification.Name("com.leshko.freetube.selectTab")
     static let freetubeOpenSettings = Notification.Name("com.leshko.freetube.openSettings")
+    static let freetubeOpenNavigationProbe = Notification.Name("com.leshko.freetube.openNavigationProbe")
     /// Requests app-level channel presentation after the expanded player has collapsed.
     /// The object is a channel ID string.
     static let freetubeOpenChannel = Notification.Name("com.leshko.freetube.openChannel")

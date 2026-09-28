@@ -25,6 +25,7 @@ struct RootView: View {
     @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
     @State private var settingsRequest = 0
+    @State private var showsNavigationProbe = false
     /// Cached thumbnail for the current video so the mini-player bar shows the actual preview instead
     /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
     @State private var thumbnail: UIImage?
@@ -82,6 +83,11 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
+        .sheet(isPresented: $showsNavigationProbe, onDismiss: {
+            log.info("Root navigation probe dismissed")
+        }) {
+            NavigationProbeScreen()
+        }
         // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
         // mini-player can show the actual preview.
         .onChange(of: player.currentVideo?.id, initial: true) {
@@ -119,6 +125,13 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
             tabState.select(.library, showsFeed: showSubscriptionFeedTab)
             settingsRequest &+= 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenNavigationProbe)) { _ in
+            log.info("Root navigation probe requested")
+            showsNavigationProbe = true
+        }
+        .onChange(of: showsNavigationProbe) { previous, current in
+            log.info("Root navigation probe binding: \(previous) → \(current)")
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }

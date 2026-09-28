@@ -30,6 +30,14 @@ struct LibraryScreen: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        log.info("Library requested root navigation probe")
+                        NotificationCenter.default.post(name: .freetubeOpenNavigationProbe, object: nil)
+                    } label: {
+                        Label("Navigation probe", systemImage: "stethoscope")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         log.info("Library Settings button tapped")
                         showsSettings = true
                     } label: {
