@@ -10,7 +10,6 @@ struct RootTabShell: View {
     let libraryNavigationRequest: AppNavigationRequest?
     let downloadsNavigationRequest: AppNavigationRequest?
     let searchNavigationRequest: AppNavigationRequest?
-    let settingsRequest: Int
 
     private let downloads = DownloadManager.shared
 
@@ -34,7 +33,7 @@ struct RootTabShell: View {
                 }
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
-                    LibraryScreen(navigationRequest: libraryNavigationRequest, settingsRequest: settingsRequest)
+                    LibraryScreen(navigationRequest: libraryNavigationRequest)
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: RootView.Tab.downloads) {
@@ -65,7 +64,7 @@ struct RootTabShell: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(RootView.Tab.search)
 
-            LibraryScreen(navigationRequest: libraryNavigationRequest, settingsRequest: settingsRequest)
+            LibraryScreen(navigationRequest: libraryNavigationRequest)
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(RootView.Tab.library)
 

@@ -24,8 +24,13 @@ struct RootView: View {
     @State private var searchNavigationRequest: AppNavigationRequest?
     @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
-    @State private var settingsRequest = 0
-    @State private var showsNavigationProbe = false
+    private enum RootSheet: String, Identifiable {
+        case settings, navigationProbe
+
+        var id: String { rawValue }
+    }
+
+    @State private var rootSheet: RootSheet?
     /// Cached thumbnail for the current video so the mini-player bar shows the actual preview instead
     /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
     @State private var thumbnail: UIImage?
@@ -83,10 +88,17 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
-        .sheet(isPresented: $showsNavigationProbe, onDismiss: {
-            log.info("Root navigation probe dismissed")
-        }) {
-            NavigationProbeScreen()
+        .sheet(item: $rootSheet, onDismiss: {
+            log.info("Root sheet dismissed")
+        }) { sheet in
+            switch sheet {
+            case .settings:
+                SettingsScreen()
+                    .navigationDiagnostics("Root-owned Settings sheet")
+                    .presentationDragIndicator(.hidden)
+            case .navigationProbe:
+                NavigationProbeScreen()
+            }
         }
         // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
         // mini-player can show the actual preview.
@@ -123,15 +135,15 @@ struct RootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
-            tabState.select(.library, showsFeed: showSubscriptionFeedTab)
-            settingsRequest &+= 1
+            log.info("Root-owned Settings requested")
+            rootSheet = .settings
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenNavigationProbe)) { _ in
             log.info("Root navigation probe requested")
-            showsNavigationProbe = true
+            rootSheet = .navigationProbe
         }
-        .onChange(of: showsNavigationProbe) { previous, current in
-            log.info("Root navigation probe binding: \(previous) → \(current)")
+        .onChange(of: rootSheet) { previous, current in
+            log.info("Root sheet binding: \(previous?.rawValue ?? "none") → \(current?.rawValue ?? "none")")
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
@@ -165,8 +177,7 @@ struct RootView: View {
             feedNavigationRequest: feedNavigationRequest,
             libraryNavigationRequest: libraryNavigationRequest,
             downloadsNavigationRequest: downloadsNavigationRequest,
-            searchNavigationRequest: searchNavigationRequest,
-            settingsRequest: settingsRequest
+            searchNavigationRequest: searchNavigationRequest
         )
     }
 

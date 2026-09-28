@@ -10,14 +10,12 @@ struct LibraryScreen: View {
     }
 
     let navigationRequest: AppNavigationRequest?
-    var settingsRequest: Int = 0
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
     @State private var path = NavigationPath()
     @State private var rootIsVisible = false
     @State private var didLoadRootData = false
-    @State private var showsSettings = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
@@ -39,7 +37,7 @@ struct LibraryScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         log.info("Library Settings button tapped")
-                        showsSettings = true
+                        NotificationCenter.default.post(name: .freetubeOpenSettings, object: nil)
                     } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
@@ -73,21 +71,6 @@ struct LibraryScreen: View {
             .refreshable {
                 localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
                 localPlaylistCount = await localPlaylistCountFromStore()
-            }
-            // Present outside the list's refresh environment. Settings has no refresh action;
-            // its downward gesture should belong to the system sheet instead.
-            .sheet(isPresented: $showsSettings, onDismiss: {
-                log.info("Library Settings sheet dismissed")
-            }) {
-                SettingsScreen()
-                    .navigationDiagnostics("Settings sheet stack")
-                    .presentationDragIndicator(.hidden)
-            }
-            .onChange(of: showsSettings) { previous, current in
-                log.info("Library Settings sheet binding: \(previous) → \(current)")
-            }
-            .onChange(of: settingsRequest, initial: true) { _, request in
-                if request > 0 { showsSettings = true }
             }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task {

@@ -251,6 +251,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   opened by the Library toolbar's stethoscope button, and a data-free Settings navigation row.
   Compare their success/failure with the real destinations before changing player or tab
   presentation. Remove these probe controls once the cause is identified.
+  The following device log showed the root-owned probe navigates both ways, while even
+  a data-free destination in Library-owned Settings sheet does not. Settings is therefore
+  currently presented by one root-owned sheet (also serving the temporary probe), not as
+  a nested Library sheet. The stethoscope remains temporarily to test cold Library behavior.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
