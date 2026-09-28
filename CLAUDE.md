@@ -252,8 +252,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   trace did not restore navigation. A one-time identity change on Library's first selection
   also failed and was removed. A plain text destination inside Library's stack is now being
   tested to distinguish a broken stack host from a real-destination registration problem;
-  the data-free destination also failed. The current build temporarily starts on Library
-  instead of Feed as a single-variable A/B test. Restore Feed startup after evaluating it.
+  the data-free destination also failed. A controlled Library-first launch made the same
+  probe and real destinations open. Feed startup is restored, but `RootTabShell` now defers
+  constructing Library's `NavigationStack` until Library is first selected; this avoids
+  creating its navigation host while the tab is inactive. The result still needs device
+  confirmation. Remove the test row and temporary lifecycle trace after verification.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,

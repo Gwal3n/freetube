@@ -8,6 +8,7 @@ struct RootTabShell: View {
     let searchActivation: Int
     let feedNavigationRequest: AppNavigationRequest?
     let libraryNavigationRequest: AppNavigationRequest?
+    let libraryHasBeenSelected: Bool
     let downloadsNavigationRequest: AppNavigationRequest?
     let searchNavigationRequest: AppNavigationRequest?
 
@@ -33,7 +34,7 @@ struct RootTabShell: View {
                 }
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
-                    LibraryScreen(navigationRequest: libraryNavigationRequest)
+                    libraryContent
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: RootView.Tab.downloads) {
@@ -64,7 +65,7 @@ struct RootTabShell: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(RootView.Tab.search)
 
-            LibraryScreen(navigationRequest: libraryNavigationRequest)
+            libraryContent
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(RootView.Tab.library)
 
@@ -72,6 +73,15 @@ struct RootTabShell: View {
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                 .tag(RootView.Tab.downloads)
+        }
+    }
+
+    @ViewBuilder
+    private var libraryContent: some View {
+        if libraryHasBeenSelected {
+            LibraryScreen(navigationRequest: libraryNavigationRequest)
+        } else {
+            Color.clear.accessibilityHidden(true)
         }
     }
 }
