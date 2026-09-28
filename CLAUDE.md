@@ -245,7 +245,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   open with the root-owned presentation. Both Library and Settings use bound `NavigationPath`s,
   with destination registrations outside lazy List/Form sections. Library count work remains
   gated on root visibility. Download-cache observations belong to `DownloadsSettingsFooter`,
-  not the whole Settings form. Temporary navigation probes have been removed.
+  not the whole Settings form. Temporary navigation probes were removed. A subsequent
+  Feed-default build showed Library path appends without destination appearance again; a
+  temporary Library-only, gesture-free lifecycle trace is being used for a controlled A/B
+  check before attributing that regression to tab startup or removing all diagnostics.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,

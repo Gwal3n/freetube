@@ -24,6 +24,7 @@ struct LibraryScreen: View {
                 localHistorySection
             }
             .navigationTitle("Library")
+            .libraryNavigationTrace("root")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -44,11 +45,11 @@ struct LibraryScreen: View {
             .navigationDestination(for: LocalDestination.self) { destination in
                 switch destination {
                 case .history:
-                    LocalHistoryScreen()
+                    LocalHistoryScreen().libraryNavigationTrace("history destination")
                 case .subscriptions:
-                    LocalSubscriptionsScreen()
+                    LocalSubscriptionsScreen().libraryNavigationTrace("subscriptions destination")
                 case .playlists:
-                    LocalPlaylistsScreen()
+                    LocalPlaylistsScreen().libraryNavigationTrace("playlists destination")
                 }
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
@@ -134,6 +135,7 @@ struct LibraryScreen: View {
                 .contentShape(Rectangle())
             }
             .tint(.white)
+            .libraryNavigationTrace("history row")
 
             Button {
                 open(.subscriptions)
@@ -149,6 +151,7 @@ struct LibraryScreen: View {
                 .contentShape(Rectangle())
             }
             .tint(.white)
+            .libraryNavigationTrace("subscriptions row")
 
             Button {
                 open(.playlists)
@@ -164,6 +167,7 @@ struct LibraryScreen: View {
                 .contentShape(Rectangle())
             }
             .tint(.white)
+            .libraryNavigationTrace("playlists row")
         }
     }
 
