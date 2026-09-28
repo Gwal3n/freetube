@@ -1,7 +1,7 @@
 import Observation
 
-/// Live selection is synchronous observable state. Each app launch begins on Feed (or Search
-/// when Feed is hidden), while sheet/player reappearances preserve the in-session selection.
+/// Live selection is synchronous observable state. Temporary Library-start A/B diagnostic:
+/// restore Feed startup after comparing navigation logs, keeping in-session selection intact.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
@@ -12,7 +12,7 @@ final class RootTabSelection {
     func start(showsFeed: Bool) {
         guard !hasStarted else { return }
         hasStarted = true
-        select(.feed, showsFeed: showsFeed)
+        select(.library, showsFeed: showsFeed)
     }
 
     func select(_ tab: RootView.Tab, showsFeed: Bool) {
