@@ -3,10 +3,10 @@ import XCTest
 
 @MainActor
 final class RootTabSelectionTests: XCTestCase {
-    func testLaunchStartsOnFeedAndReappearanceKeepsLiveSelection() {
+    func testTemporaryLaunchStartsOnLibraryAndReappearanceKeepsLiveSelection() {
         let state = RootTabSelection()
         state.start(showsFeed: true)
-        XCTAssertEqual(state.selected, .feed)
+        XCTAssertEqual(state.selected, .library)
         state.select(.downloads, showsFeed: true)
         state.start(showsFeed: true)
         XCTAssertEqual(state.selected, .downloads)
@@ -23,10 +23,10 @@ final class RootTabSelectionTests: XCTestCase {
         }
     }
 
-    func testHiddenFeedStartsOnAnAvailableTab() {
+    func testTemporaryLibraryStartRemainsAvailableWhenFeedHidden() {
         let state = RootTabSelection()
         state.start(showsFeed: false)
-        XCTAssertEqual(state.selected, .search)
+        XCTAssertEqual(state.selected, .library)
         state.select(.library, showsFeed: false)
         XCTAssertEqual(state.selected, .library)
     }

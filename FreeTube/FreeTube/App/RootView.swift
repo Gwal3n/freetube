@@ -16,7 +16,6 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tabState = RootTabSelection()
-    @State private var libraryHasBeenSelected = false
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var feedNavigationRequest: AppNavigationRequest?
@@ -127,7 +126,6 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                if tab == .library { activateLibrary() }
                 tabState.select(tab, showsFeed: showSubscriptionFeedTab)
             }
         }
@@ -168,7 +166,6 @@ struct RootView: View {
             searchActivation: searchActivation,
             feedNavigationRequest: feedNavigationRequest,
             libraryNavigationRequest: libraryNavigationRequest,
-            libraryHasBeenSelected: libraryHasBeenSelected,
             downloadsNavigationRequest: downloadsNavigationRequest,
             searchNavigationRequest: searchNavigationRequest
         )
@@ -179,7 +176,6 @@ struct RootView: View {
         Binding(
             get: { selectedTab },
             set: { newTab in
-                if newTab == .library { activateLibrary() }
                 if newTab == .feed, !showSubscriptionFeedTab {
                     tabState.select(.search, showsFeed: false)
                     return
@@ -190,12 +186,6 @@ struct RootView: View {
                 tabState.select(newTab, showsFeed: showSubscriptionFeedTab)
             }
         )
-    }
-
-    private func activateLibrary() {
-        guard !libraryHasBeenSelected else { return }
-        libraryHasBeenSelected = true
-        log.info("Library first selection: mounting navigation stack")
     }
 
     /// Open player/context-menu links in the current tab's existing navigation stack. Ordinary
