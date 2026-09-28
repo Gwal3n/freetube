@@ -259,8 +259,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   reverted. A later attempt to render Library over a blank tab also produced a black tab and was
   reverted. Library now uses a single typed route and native value links inside its original tab;
   this simpler structure still requires a device test before considering navigation repaired.
-  Library-first startup remains temporary. Restore Feed startup only after the Library navigation
-  is verified from a Feed-first cold launch. The test row and temporary lifecycle trace are removed.
+  Feed startup is restored now that Library's native links have passed a Library-first device test;
+  verify a Feed-first cold launch before treating the intermittent navigation issue as resolved.
+  The test row and temporary lifecycle trace are removed.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,

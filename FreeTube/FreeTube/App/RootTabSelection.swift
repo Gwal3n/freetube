@@ -1,7 +1,7 @@
 import Observation
 
-/// Live selection is synchronous observable state. Library-first is temporary while Library's
-/// tab-hosted navigation is repaired; preserve selection through presentations in-session.
+/// Live selection is synchronous observable state. Each launch starts on Feed (Search if Feed
+/// is hidden); preserve selection through presentations in-session.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
@@ -12,7 +12,7 @@ final class RootTabSelection {
     func start(showsFeed: Bool) {
         guard !hasStarted else { return }
         hasStarted = true
-        select(.library, showsFeed: showsFeed)
+        select(.feed, showsFeed: showsFeed)
     }
 
     func select(_ tab: RootView.Tab, showsFeed: Bool) {
