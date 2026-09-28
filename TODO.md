@@ -1,16 +1,27 @@
 ## TODO
-- Merge the copy button, open in browser,  copy url at current time into one share button. That button should not be in the player but below
-- Sponsorblock should also add the “Highlight” option and ask to skip if one is detected.
-- For all the sponsorblock options add a choice to disable, always skip, or just show in player but not skip.
-- Seems like a bug where scrolling back after skipping does not skip the sponsor again. Similarly, seeking forward into a sponsor does not skip it. It should automatically be skipped in all cases.
-- It would be nice to add the function to seek anywhere on the player by holding and moving your finger horizontally.
-- It would be nice to have these square video previews when seeking through a video.
-- Add a fullscreen button to the player which rotates the screen notch to the left.
-- Would be nice to add caption and quality selection button to the player. The quality selection should ideally showcase the current quality.
-- Add a download button under the player which uses yt-dlp and downloads the video in the downloads tab.
-- Add a switch for autoplay in the add next dropdown.
-- Store the previous videos (up to a certain amount) so that the back button would go to the previous video, but don’t show the video in the up next.
-- Add a history tab which shows the local history but stores it only on device, and has a clear history button.
-- When tapping the channel name, video should minimize and the channel
-should open in fullscreen. Right now it opens under the video. 
-- Add an extra playlist dropdown for when a video is opened from a playlist, which shows the full playlist.
+
+### Feature requests (ambitious):
+- Feature request: Working captions.
+- Feature request: Useful quality toggle.
+- Add an audio only mode
+- Add haptic touch (touch, NOT feedback) support (long press for preview) wherever possible
+- Add support to change font in app (maybe a handful of selected fonts like Avenir, like many other sideloading apps support (https://github.com/NeoFreeBird/tweak)
+- Subscritpion groups, ability to filter feed by groups
+- Any other newpipe feature?
+
+### Polish
+
+- Polish the custom player. Specifically miniplayer. Implement the LNPopupUI phsyics. Add the bounce on minimizer, improve corner radii, increase the size of the play/pause button and make it animate, improve the physics, improve the interactive gestures, improve the frame rate of minimization, make the miniplayer behave in accordance to liquid glass physics instead of being static as it currently is, allow for interactive forward / bakward swipe (left/right) to go to the next/previous video and many others... I want the same smoothness as LNPopupUI
+- Add last refresh information to feed
+- Polish the playlist ui, make the playlist banner immersive similar to the channel view, then make the playlist name in the header appear on scroll (after scrolling down), and make the videos look the same way as in the compact feed: no gray background, comfortable sizing, consisteny
+- Add an add video option to custom playlists
+- Polish the downloads tab: add an option to save video to Photos, add an option to save to files. Have the same UI for videos list as in the compact feed. Make sure that videos opened from the downloads tab don't load again, everything should be saved locally.
+- Channel view header should be immersive, and go under the status bar all the way to the edge of the display. I.e. this is probably equivalent to the scroll status starting higher.
+
+
+### Current bugs:
+- Go to channel does not work from the feed (through the ... or haptic touch menu)
+- Menus in the settings don't really open, just remain gray
+
+
+ 

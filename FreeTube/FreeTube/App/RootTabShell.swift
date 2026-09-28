@@ -7,7 +7,6 @@ struct RootTabShell: View {
     let showsFeed: Bool
     let searchActivation: Int
     let feedNavigationRequest: AppNavigationRequest?
-    let libraryNavigationRequest: AppNavigationRequest?
     let downloadsNavigationRequest: AppNavigationRequest?
     let searchNavigationRequest: AppNavigationRequest?
 
@@ -33,7 +32,9 @@ struct RootTabShell: View {
                 }
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
-                    LibraryScreen(navigationRequest: libraryNavigationRequest)
+                    // Library's stack is hosted beside this tab, not inside it. A stack built
+                    // here while Feed is selected never presents its destinations.
+                    Color.clear.accessibilityHidden(true)
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: RootView.Tab.downloads) {
@@ -64,7 +65,8 @@ struct RootTabShell: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(RootView.Tab.search)
 
-            LibraryScreen(navigationRequest: libraryNavigationRequest)
+            Color.clear
+                .accessibilityHidden(true)
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(RootView.Tab.library)
 

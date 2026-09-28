@@ -52,7 +52,14 @@ struct RootView: View {
 
     var body: some View {
         SwiftUIPlayerContainer(thumbnail: thumbnail) {
-            tabShell
+            ZStack {
+                tabShell
+                // Built only while Library is selected, and not inside the tab. A stack created
+                // inside an unselected tab accepts taps and never presents.
+                if selectedTab == .library {
+                    libraryHost
+                }
+            }
         }
         .overlay(alignment: .bottom) {
             if let notice = player.queueNotice {
@@ -126,7 +133,7 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                tabState.select(tab, showsFeed: showSubscriptionFeedTab)
+                selectTab(tab)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
@@ -165,27 +172,41 @@ struct RootView: View {
             showsFeed: showSubscriptionFeedTab,
             searchActivation: searchActivation,
             feedNavigationRequest: feedNavigationRequest,
-            libraryNavigationRequest: libraryNavigationRequest,
             downloadsNavigationRequest: downloadsNavigationRequest,
             searchNavigationRequest: searchNavigationRequest
         )
+    }
+
+    /// Library sits in the tab's content area, above the tab bar, with its own navigation stack.
+    private var libraryHost: some View {
+        VStack(spacing: 0) {
+            LibraryScreen(navigationRequest: libraryNavigationRequest)
+                .ignoresSafeArea(edges: .bottom)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemGroupedBackground))
+            Color.clear
+                .frame(height: PlayerLayoutMetrics.bottomTabBarClearance)
+                .allowsHitTesting(false)
+        }
     }
 
     /// Re-selecting Search requests focus without a gesture recognizer on the native tab bar.
     private var tabSelection: Binding<Tab> {
         Binding(
             get: { selectedTab },
-            set: { newTab in
-                if newTab == .feed, !showSubscriptionFeedTab {
-                    tabState.select(.search, showsFeed: false)
-                    return
-                }
-                if newTab == .search, selectedTab == .search {
-                    searchActivation &+= 1
-                }
-                tabState.select(newTab, showsFeed: showSubscriptionFeedTab)
-            }
+            set: { selectTab($0) }
         )
+    }
+
+    private func selectTab(_ tab: Tab) {
+        if tab == .feed, !showSubscriptionFeedTab {
+            tabState.select(.search, showsFeed: false)
+            return
+        }
+        if tab == .search, selectedTab == .search {
+            searchActivation &+= 1
+        }
+        tabState.select(tab, showsFeed: showSubscriptionFeedTab)
     }
 
     /// Open player/context-menu links in the current tab's existing navigation stack. Ordinary

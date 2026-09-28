@@ -5,10 +5,6 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    private enum LocalDestination: String, Hashable {
-        case history, subscriptions, playlists, probe
-    }
-
     let navigationRequest: AppNavigationRequest?
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
@@ -19,7 +15,7 @@ struct LibraryScreen: View {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
-        NavigationStack(path: navigationPathBinding) {
+        NavigationStack(path: $path) {
             List {
                 localHistorySection
             }
@@ -40,20 +36,6 @@ struct LibraryScreen: View {
                 case .channel(let id): ChannelScreen(channelID: id)
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
-                }
-            }
-            .navigationDestination(for: LocalDestination.self) { destination in
-                switch destination {
-                case .history:
-                    LocalHistoryScreen().libraryNavigationTrace("history destination")
-                case .subscriptions:
-                    LocalSubscriptionsScreen().libraryNavigationTrace("subscriptions destination")
-                case .playlists:
-                    LocalPlaylistsScreen().libraryNavigationTrace("playlists destination")
-                case .probe:
-                    Text("Library navigation succeeded")
-                        .navigationTitle("Library probe")
-                        .onAppear { log.info("Library probe destination appeared") }
                 }
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
@@ -93,19 +75,6 @@ struct LibraryScreen: View {
         }
     }
 
-    private var navigationPathBinding: Binding<NavigationPath> {
-        Binding(get: { path }, set: { updated in
-            log.info("Library framework path write: \(path.count) → \(updated.count)")
-            path = updated
-        })
-    }
-
-    private func open(_ destination: LocalDestination) {
-        log.info("Library action requested: \(destination.rawValue) depth=\(path.count)")
-        path.append(destination)
-        log.info("Library path appended: \(destination.rawValue) depth=\(path.count)")
-    }
-
     private func loadRootData() async {
         let historyCount = await PersistenceWriter.shared.watchHistoryCount()
         guard !Task.isCancelled, rootIsVisible else { return }
@@ -125,66 +94,39 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            Button("Test Library navigation") {
-                open(.probe)
-            }
-            .foregroundStyle(.secondary)
-
-            Button {
-                open(.history)
+            NavigationLink {
+                LocalHistoryScreen().libraryNavigationTrace("history destination")
             } label: {
-                HStack {
-                    LibraryDestinationRow(
-                        title: "Local history",
-                        subtitle: countSubtitle(localHistoryCount, noun: "video"),
-                        systemImage: "clock.arrow.circlepath"
-                    )
-                    disclosureIndicator
-                }
-                .contentShape(Rectangle())
+                LibraryDestinationRow(
+                    title: "Local history",
+                    subtitle: countSubtitle(localHistoryCount, noun: "video"),
+                    systemImage: "clock.arrow.circlepath"
+                )
             }
             .tint(.white)
-            .libraryNavigationTrace("history row")
 
-            Button {
-                open(.subscriptions)
+            NavigationLink {
+                LocalSubscriptionsScreen().libraryNavigationTrace("subscriptions destination")
             } label: {
-                HStack {
-                    LibraryDestinationRow(
-                        title: "Local subscriptions",
-                        subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
-                        systemImage: "person.2.fill"
-                    )
-                    disclosureIndicator
-                }
-                .contentShape(Rectangle())
+                LibraryDestinationRow(
+                    title: "Local subscriptions",
+                    subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
+                    systemImage: "person.2.fill"
+                )
             }
             .tint(.white)
-            .libraryNavigationTrace("subscriptions row")
 
-            Button {
-                open(.playlists)
+            NavigationLink {
+                LocalPlaylistsScreen().libraryNavigationTrace("playlists destination")
             } label: {
-                HStack {
-                    LibraryDestinationRow(
-                        title: "Local playlists",
-                        subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
-                        systemImage: "music.note.list"
-                    )
-                    disclosureIndicator
-                }
-                .contentShape(Rectangle())
+                LibraryDestinationRow(
+                    title: "Local playlists",
+                    subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
+                    systemImage: "music.note.list"
+                )
             }
             .tint(.white)
-            .libraryNavigationTrace("playlists row")
         }
-    }
-
-    private var disclosureIndicator: some View {
-        Image(systemName: "chevron.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.tertiary)
-            .accessibilityHidden(true)
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't
