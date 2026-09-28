@@ -6,7 +6,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
     private enum LocalDestination: String, Hashable {
-        case history, subscriptions, playlists
+        case history, subscriptions, playlists, probe
     }
 
     let navigationRequest: AppNavigationRequest?
@@ -50,6 +50,10 @@ struct LibraryScreen: View {
                     LocalSubscriptionsScreen().libraryNavigationTrace("subscriptions destination")
                 case .playlists:
                     LocalPlaylistsScreen().libraryNavigationTrace("playlists destination")
+                case .probe:
+                    Text("Library navigation succeeded")
+                        .navigationTitle("Library probe")
+                        .onAppear { log.info("Library probe destination appeared") }
                 }
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
@@ -121,6 +125,11 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
+            Button("Test Library navigation") {
+                open(.probe)
+            }
+            .foregroundStyle(.secondary)
+
             Button {
                 open(.history)
             } label: {

@@ -8,7 +8,6 @@ struct RootTabShell: View {
     let searchActivation: Int
     let feedNavigationRequest: AppNavigationRequest?
     let libraryNavigationRequest: AppNavigationRequest?
-    let libraryActivated: Bool
     let downloadsNavigationRequest: AppNavigationRequest?
     let searchNavigationRequest: AppNavigationRequest?
 
@@ -35,7 +34,6 @@ struct RootTabShell: View {
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
                     LibraryScreen(navigationRequest: libraryNavigationRequest)
-                        .id(libraryActivated)
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: RootView.Tab.downloads) {
@@ -67,7 +65,6 @@ struct RootTabShell: View {
                 .tag(RootView.Tab.search)
 
             LibraryScreen(navigationRequest: libraryNavigationRequest)
-                .id(libraryActivated)
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(RootView.Tab.library)
 

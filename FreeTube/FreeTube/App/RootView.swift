@@ -16,7 +16,6 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tabState = RootTabSelection()
-    @State private var libraryActivated = false
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var feedNavigationRequest: AppNavigationRequest?
@@ -156,12 +155,6 @@ struct RootView: View {
             tabState.updateFeedVisibility(isVisible)
         }
         .onChange(of: tabState.selected) { previous, tab in
-            if tab == .library, !libraryActivated {
-                // TabView can construct inactive tab content before its navigation host is
-                // attached. Remount Library once when it first becomes the selected tab.
-                libraryActivated = true
-                log.info("Library first activation: remounting navigation stack")
-            }
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
     }
@@ -173,7 +166,6 @@ struct RootView: View {
             searchActivation: searchActivation,
             feedNavigationRequest: feedNavigationRequest,
             libraryNavigationRequest: libraryNavigationRequest,
-            libraryActivated: libraryActivated,
             downloadsNavigationRequest: downloadsNavigationRequest,
             searchNavigationRequest: searchNavigationRequest
         )

@@ -250,8 +250,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   temporary Library-only, gesture-free lifecycle trace is being used for a controlled A/B
   check before attributing that regression to tab startup or removing all diagnostics. That
   trace did not restore navigation. A one-time identity change on Library's first selection
-  is now being tested to attach its NavigationStack while the tab is active; do not treat
-  that hypothesis as confirmed until the device log shows destination appearance.
+  also failed and was removed. A plain text destination inside Library's stack is now being
+  tested to distinguish a broken stack host from a real-destination registration problem.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
