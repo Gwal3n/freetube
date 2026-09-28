@@ -20,7 +20,7 @@ struct RootView: View {
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var feedNavigationRequest: AppNavigationRequest?
     @State private var searchNavigationRequest: AppNavigationRequest?
-    @State private var libraryPath = NavigationPath()
+    @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
     private enum RootSheet: String, Identifiable {
         case settings
@@ -52,36 +52,7 @@ struct RootView: View {
 
     var body: some View {
         SwiftUIPlayerContainer(thumbnail: thumbnail) {
-            NavigationStack(path: libraryPathBinding) {
-                tabShell
-                    // The outer host supplies Library's title/toolbar. Other tabs continue
-                    // showing the bars owned by their existing inner stacks.
-                    .toolbar(selectedTab == .library ? .visible : .hidden, for: .navigationBar)
-                    .navigationDestination(for: LibraryNavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            LocalHistoryScreen()
-                                .libraryNavigationTrace("root-hosted history")
-                        case .subscriptions:
-                            LocalSubscriptionsScreen()
-                                .libraryNavigationTrace("root-hosted subscriptions")
-                        case .playlists:
-                            LocalPlaylistsScreen()
-                                .libraryNavigationTrace("root-hosted playlists")
-                        case .probe:
-                            Text("Library navigation succeeded")
-                                .navigationTitle("Library probe")
-                                .onAppear { log.info("Root-hosted Library probe destination appeared") }
-                        }
-                    }
-                    .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
-                        switch destination {
-                        case .channel(let id): ChannelScreen(channelID: id)
-                        case .playlist(let id): PlaylistScreen(playlistID: id)
-                        case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
-                        }
-                    }
-            }
+            tabShell
         }
         .overlay(alignment: .bottom) {
             if let notice = player.queueNotice {
@@ -162,17 +133,8 @@ struct RootView: View {
             log.info("Root-owned Settings requested")
             rootSheet = .settings
         }
-        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenLibraryDestination)) { note in
-            guard selectedTab == .library,
-                  let destination = note.object as? LibraryNavigationDestination else { return }
-            log.info("Root Library route requested: \(destination.rawValue) depth=\(libraryPath.count)")
-            libraryPath.append(destination)
-        }
         .onChange(of: rootSheet) { previous, current in
             log.info("Root sheet binding: \(previous?.rawValue ?? "none") → \(current?.rawValue ?? "none")")
-        }
-        .onChange(of: libraryPath.count) { previous, current in
-            log.info("Root Library path rendered: \(previous) → \(current)")
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
@@ -203,6 +165,7 @@ struct RootView: View {
             showsFeed: showSubscriptionFeedTab,
             searchActivation: searchActivation,
             feedNavigationRequest: feedNavigationRequest,
+            libraryNavigationRequest: libraryNavigationRequest,
             downloadsNavigationRequest: downloadsNavigationRequest,
             searchNavigationRequest: searchNavigationRequest
         )
@@ -235,18 +198,10 @@ struct RootView: View {
         case .search:
             searchNavigationRequest = request
         case .library:
-            log.info("Root Library external route requested depth=\(libraryPath.count)")
-            libraryPath.append(destination)
+            libraryNavigationRequest = request
         case .downloads:
             downloadsNavigationRequest = request
         }
-    }
-
-    private var libraryPathBinding: Binding<NavigationPath> {
-        Binding(get: { libraryPath }, set: { updated in
-            log.info("Root Library framework path write: \(libraryPath.count) → \(updated.count)")
-            libraryPath = updated
-        })
     }
 
     private func updateStatusBarOverride(forFullScreenOpen open: Bool) {
