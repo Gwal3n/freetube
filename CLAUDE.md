@@ -248,7 +248,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   not the whole Settings form. Temporary navigation probes were removed. A subsequent
   Feed-default build showed Library path appends without destination appearance again; a
   temporary Library-only, gesture-free lifecycle trace is being used for a controlled A/B
-  check before attributing that regression to tab startup or removing all diagnostics.
+  check before attributing that regression to tab startup or removing all diagnostics. That
+  trace did not restore navigation. A one-time identity change on Library's first selection
+  is now being tested to attach its NavigationStack while the tab is active; do not treat
+  that hypothesis as confirmed until the device log shows destination appearance.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
