@@ -1,28 +1,21 @@
 import SwiftUI
 
 /// Device-local library following NewPipe's account-free model. Remote channel and playlist
-/// destinations remain available when linked from other parts of the app, but this root owns
-/// only history, subscriptions, and playlists persisted on this device.
+/// destinations remain available when linked from other parts of the app. Its list stays inside
+/// the Library tab; RootView owns the navigation stack so pushes do not depend on TabView hosting.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    private enum LocalDestination: String, Hashable {
-        case history, subscriptions, playlists, probe
-    }
-
-    let navigationRequest: AppNavigationRequest?
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
-    @State private var path = NavigationPath()
     @State private var rootIsVisible = false
     @State private var didLoadRootData = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
-        NavigationStack(path: navigationPathBinding) {
-            List {
-                localHistorySection
-            }
+        List {
+            localHistorySection
+        }
             .navigationTitle("Library")
             .libraryNavigationTrace("root")
             .toolbar {
@@ -33,27 +26,6 @@ struct LibraryScreen: View {
                     } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
-                }
-            }
-            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
-                switch destination {
-                case .channel(let id): ChannelScreen(channelID: id)
-                case .playlist(let id): PlaylistScreen(playlistID: id)
-                case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
-                }
-            }
-            .navigationDestination(for: LocalDestination.self) { destination in
-                switch destination {
-                case .history:
-                    LocalHistoryScreen().libraryNavigationTrace("history destination")
-                case .subscriptions:
-                    LocalSubscriptionsScreen().libraryNavigationTrace("subscriptions destination")
-                case .playlists:
-                    LocalPlaylistsScreen().libraryNavigationTrace("playlists destination")
-                case .probe:
-                    Text("Library navigation succeeded")
-                        .navigationTitle("Library probe")
-                        .onAppear { log.info("Library probe destination appeared") }
                 }
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
@@ -75,11 +47,6 @@ struct LibraryScreen: View {
                     localHistoryCount = count
                 }
             }
-            .onChange(of: navigationRequest?.id) { _, _ in
-                guard let destination = navigationRequest?.destination else { return }
-                log.info("Library external destination requested; depth=\(path.count)")
-                path.append(destination)
-            }
             .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
                 Task {
                     let count = await localPlaylistCountFromStore()
@@ -87,23 +54,11 @@ struct LibraryScreen: View {
                     localPlaylistCount = count
                 }
             }
-        }
-        .onChange(of: path.count) { previous, current in
-            log.info("Library path rendered: \(previous) → \(current)")
-        }
     }
 
-    private var navigationPathBinding: Binding<NavigationPath> {
-        Binding(get: { path }, set: { updated in
-            log.info("Library framework path write: \(path.count) → \(updated.count)")
-            path = updated
-        })
-    }
-
-    private func open(_ destination: LocalDestination) {
-        log.info("Library action requested: \(destination.rawValue) depth=\(path.count)")
-        path.append(destination)
-        log.info("Library path appended: \(destination.rawValue) depth=\(path.count)")
+    private func open(_ destination: LibraryNavigationDestination) {
+        log.info("Library action requested: \(destination.rawValue)")
+        NotificationCenter.default.post(name: .freetubeOpenLibraryDestination, object: destination)
     }
 
     private func loadRootData() async {

@@ -255,9 +255,12 @@ and a rejected strategy is excluded before requesting the next candidate.
   the data-free destination also failed. A controlled Library-first launch made the same
   probe and real destinations open. Deferring Library's stack until first tab selection
   then failed, and its placeholder caused a blank tab on first access; that experiment was
-  reverted. Library-first startup is temporarily retained so the working Library remains
-  available while navigation ownership is redesigned. Restore Feed startup only with a
-  verified structural fix. Remove the test row and temporary lifecycle trace afterward.
+  reverted. The current test puts one app-owned `NavigationStack` around `RootTabShell`
+  inside `SwiftUIPlayerContainer`, with Library's lightweight routes registered on that
+  outer host. The Library tab itself contains only its List. Feed startup is restored.
+  Preserve the other tabs' inner stacks and the player container. Check the Library toolbar,
+  other tabs' navigation bars, and mini-player on device before calling this a fix. Remove
+  the test row and temporary lifecycle trace afterward.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
