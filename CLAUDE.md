@@ -235,9 +235,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   uses ordinary value-keyed animation for its opacity/scale feedback. Do not reintroduce scoped
   placeholder-content animation wrappers around List or navigation/button labels. Local playlist
   Lists remain mounted through their first read via `InitialContentLoadingModifier`, with an
-  opacity handoff and no empty state until that read finishes. Library/Settings use native
-  `NavigationStack` with bound paths and explicit row actions, neutral disclosure indicators,
-  and standard row sizing. Native List rows already provide the minimum touch height.
+  opacity handoff and no empty state until that read finishes. Library uses one native
+  `NavigationStack` inside its tab, with value-based `NavigationLink` rows and a typed path for
+  external channel/playlist routes; Settings keeps its root-presented stack. Native List rows
+  already provide the minimum touch height.
 - **Settings presentation belongs to RootView, outside Library's NavigationStack.** On iOS 26.3.1
   inside LiveContainer, even a data-free destination in Library-owned Settings sheet accepted
   path appends but never presented. An otherwise identical root-owned sheet navigated normally;
@@ -255,9 +256,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   the data-free destination also failed. A controlled Library-first launch made the same
   probe and real destinations open. Deferring Library's stack until first tab selection
   then failed, and its placeholder caused a blank tab on first access; that experiment was
-  reverted. Library-first startup is temporarily retained so the working Library remains
-  available while navigation ownership is redesigned. Restore Feed startup only with a
-  verified structural fix. Remove the test row and temporary lifecycle trace afterward.
+  reverted. A later attempt to render Library over a blank tab also produced a black tab and was
+  reverted. Library now uses a single typed route and native value links inside its original tab;
+  this simpler structure still requires a device test before considering navigation repaired.
+  Library-first startup remains temporary. Restore Feed startup only after the Library navigation
+  is verified from a Feed-first cold launch. The test row and temporary lifecycle trace are removed.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,

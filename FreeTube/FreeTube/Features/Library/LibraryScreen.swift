@@ -5,26 +5,26 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    private enum LocalDestination: String, Hashable {
-        case history, subscriptions, playlists, probe
+    private enum Destination: Hashable {
+        case history, subscriptions, playlists
+        case external(AppNavigationRequest.Destination)
     }
 
     let navigationRequest: AppNavigationRequest?
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
-    @State private var path = NavigationPath()
+    @State private var path: [Destination] = []
     @State private var rootIsVisible = false
     @State private var didLoadRootData = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
-        NavigationStack(path: navigationPathBinding) {
+        NavigationStack(path: $path) {
             List {
                 localHistorySection
             }
             .navigationTitle("Library")
-            .libraryNavigationTrace("root")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -35,25 +35,20 @@ struct LibraryScreen: View {
                     }
                 }
             }
-            .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
-                switch destination {
-                case .channel(let id): ChannelScreen(channelID: id)
-                case .playlist(let id): PlaylistScreen(playlistID: id)
-                case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
-                }
-            }
-            .navigationDestination(for: LocalDestination.self) { destination in
+            .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .history:
-                    LocalHistoryScreen().libraryNavigationTrace("history destination")
+                    LocalHistoryScreen()
                 case .subscriptions:
-                    LocalSubscriptionsScreen().libraryNavigationTrace("subscriptions destination")
+                    LocalSubscriptionsScreen()
                 case .playlists:
-                    LocalPlaylistsScreen().libraryNavigationTrace("playlists destination")
-                case .probe:
-                    Text("Library navigation succeeded")
-                        .navigationTitle("Library probe")
-                        .onAppear { log.info("Library probe destination appeared") }
+                    LocalPlaylistsScreen()
+                case .external(.channel(let id)):
+                    ChannelScreen(channelID: id)
+                case .external(.playlist(let id)):
+                    PlaylistScreen(playlistID: id)
+                case .external(.localPlaylist(let id)):
+                    LocalPlaylistScreen(playlistID: id)
                 }
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
@@ -78,7 +73,7 @@ struct LibraryScreen: View {
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
                 log.info("Library external destination requested; depth=\(path.count)")
-                path.append(destination)
+                path.append(.external(destination))
             }
             .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
                 Task {
@@ -91,19 +86,6 @@ struct LibraryScreen: View {
         .onChange(of: path.count) { previous, current in
             log.info("Library path rendered: \(previous) → \(current)")
         }
-    }
-
-    private var navigationPathBinding: Binding<NavigationPath> {
-        Binding(get: { path }, set: { updated in
-            log.info("Library framework path write: \(path.count) → \(updated.count)")
-            path = updated
-        })
-    }
-
-    private func open(_ destination: LocalDestination) {
-        log.info("Library action requested: \(destination.rawValue) depth=\(path.count)")
-        path.append(destination)
-        log.info("Library path appended: \(destination.rawValue) depth=\(path.count)")
     }
 
     private func loadRootData() async {
@@ -125,66 +107,33 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            Button("Test Library navigation") {
-                open(.probe)
-            }
-            .foregroundStyle(.secondary)
-
-            Button {
-                open(.history)
-            } label: {
-                HStack {
-                    LibraryDestinationRow(
-                        title: "Local history",
-                        subtitle: countSubtitle(localHistoryCount, noun: "video"),
-                        systemImage: "clock.arrow.circlepath"
-                    )
-                    disclosureIndicator
-                }
-                .contentShape(Rectangle())
+            NavigationLink(value: Destination.history) {
+                LibraryDestinationRow(
+                    title: "Local history",
+                    subtitle: countSubtitle(localHistoryCount, noun: "video"),
+                    systemImage: "clock.arrow.circlepath"
+                )
             }
             .tint(.white)
-            .libraryNavigationTrace("history row")
 
-            Button {
-                open(.subscriptions)
-            } label: {
-                HStack {
-                    LibraryDestinationRow(
-                        title: "Local subscriptions",
-                        subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
-                        systemImage: "person.2.fill"
-                    )
-                    disclosureIndicator
-                }
-                .contentShape(Rectangle())
+            NavigationLink(value: Destination.subscriptions) {
+                LibraryDestinationRow(
+                    title: "Local subscriptions",
+                    subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
+                    systemImage: "person.2.fill"
+                )
             }
             .tint(.white)
-            .libraryNavigationTrace("subscriptions row")
 
-            Button {
-                open(.playlists)
-            } label: {
-                HStack {
-                    LibraryDestinationRow(
-                        title: "Local playlists",
-                        subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
-                        systemImage: "music.note.list"
-                    )
-                    disclosureIndicator
-                }
-                .contentShape(Rectangle())
+            NavigationLink(value: Destination.playlists) {
+                LibraryDestinationRow(
+                    title: "Local playlists",
+                    subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
+                    systemImage: "music.note.list"
+                )
             }
             .tint(.white)
-            .libraryNavigationTrace("playlists row")
         }
-    }
-
-    private var disclosureIndicator: some View {
-        Image(systemName: "chevron.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.tertiary)
-            .accessibilityHidden(true)
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't
