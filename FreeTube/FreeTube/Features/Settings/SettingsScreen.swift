@@ -3,7 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     private enum Destination: String, Hashable {
-        case sponsorBlock, playerControls, importData, probe
+        case sponsorBlock, playerControls, importData
     }
 
     @State private var path = NavigationPath()
@@ -94,7 +94,6 @@ struct SettingsScreen: View {
                         .contentShape(Rectangle())
                     }
                     .tint(.white)
-                    .navigationDiagnostics("Settings row SponsorBlock")
                 } header: {
                     Text("SponsorBlock")
                 } footer: {
@@ -120,7 +119,6 @@ struct SettingsScreen: View {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
                     .tint(.white)
-                    .navigationDiagnostics("Settings row player controls")
                 }
 
                 Section("Data") {
@@ -130,7 +128,6 @@ struct SettingsScreen: View {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
                     .tint(.white)
-                    .navigationDiagnostics("Settings row import data")
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
@@ -207,9 +204,6 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    Button("Test Settings navigation") {
-                        open(.probe)
-                    }
                     Toggle("Save logs to file", isOn: Bindable(model).logToFile)
                     if model.logToFile, let url = logWriter.currentLogFileURL {
                         LabeledContent("Current log") {
@@ -277,20 +271,12 @@ struct SettingsScreen: View {
                 switch destination {
                 case .sponsorBlock:
                     SponsorBlockSettingsScreen(model: model)
-                        .navigationDiagnostics("Settings destination SponsorBlock")
                 case .playerControls:
                     PlayerControlsSettingsScreen(model: model)
-                        .navigationDiagnostics("Settings destination player controls")
                 case .importData:
                     ImportDataScreen()
-                        .navigationDiagnostics("Settings destination import data")
-                case .probe:
-                    Text("Navigation succeeded")
-                        .navigationTitle("Settings probe")
-                        .onAppear { log.info("Settings probe destination appeared") }
                 }
             }
-            .navigationDiagnostics("Settings root form")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

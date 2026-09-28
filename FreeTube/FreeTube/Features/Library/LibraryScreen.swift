@@ -24,16 +24,7 @@ struct LibraryScreen: View {
                 localHistorySection
             }
             .navigationTitle("Library")
-            .navigationDiagnostics("Library root list")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        log.info("Library requested root navigation probe")
-                        NotificationCenter.default.post(name: .freetubeOpenNavigationProbe, object: nil)
-                    } label: {
-                        Label("Navigation probe", systemImage: "stethoscope")
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         log.info("Library Settings button tapped")
@@ -53,11 +44,11 @@ struct LibraryScreen: View {
             .navigationDestination(for: LocalDestination.self) { destination in
                 switch destination {
                 case .history:
-                    LocalHistoryScreen().navigationDiagnostics("Library destination local history")
+                    LocalHistoryScreen()
                 case .subscriptions:
-                    LocalSubscriptionsScreen().navigationDiagnostics("Library destination local subscriptions")
+                    LocalSubscriptionsScreen()
                 case .playlists:
-                    LocalPlaylistsScreen().navigationDiagnostics("Library destination local playlists")
+                    LocalPlaylistsScreen()
                 }
             }
             // Tie cold-start work to the visible root. A first navigation push cancels this task,
@@ -143,7 +134,6 @@ struct LibraryScreen: View {
                 .contentShape(Rectangle())
             }
             .tint(.white)
-            .navigationDiagnostics("Library row local history")
 
             Button {
                 open(.subscriptions)
@@ -159,7 +149,6 @@ struct LibraryScreen: View {
                 .contentShape(Rectangle())
             }
             .tint(.white)
-            .navigationDiagnostics("Library row local subscriptions")
 
             Button {
                 open(.playlists)
@@ -175,7 +164,6 @@ struct LibraryScreen: View {
                 .contentShape(Rectangle())
             }
             .tint(.white)
-            .navigationDiagnostics("Library row local playlists")
         }
     }
 

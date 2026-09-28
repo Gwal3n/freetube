@@ -236,34 +236,26 @@ and a rejected strategy is excluded before requesting the next candidate.
   placeholder-content animation wrappers around List or navigation/button labels. Local playlist
   Lists remain mounted through their first read via `InitialContentLoadingModifier`, with an
   opacity handoff and no empty state until that read finishes. Library/Settings use native
-  direct destination NavigationLinks, system disclosure indicators, and standard row sizing. Native List
-  rows already provide the minimum touch height; do not add another 44 points inside their labels.
-- **Library and Settings navigation are currently under diagnosis.** Both bind native
-  `NavigationStack`s to `NavigationPath`; individual row Buttons explicitly append typed
-  destinations. This user-approved diagnostic replaces non-activating direct links so logs can
-  distinguish button actions, app path appends, framework path writes, rendered depth changes,
-  and destination appearance. Destination registrations belong outside lazy List/Form sections.
-  `NavigationDiagnosticsModifier` observes lifecycle only, with no tap recognizers. Library count
-  work remains gated on root visibility. Download-cache observations belong to
-  `DownloadsSettingsFooter`, not the whole Settings form. Do not claim the navigation failure is
-  resolved without device confirmation.
-  The September 28 diagnostic build also adds a temporary root-owned `NavigationProbeScreen`,
-  opened by the Library toolbar's stethoscope button, and a data-free Settings navigation row.
-  Compare their success/failure with the real destinations before changing player or tab
-  presentation. Remove these probe controls once the cause is identified.
-  The following device log showed the root-owned probe navigates both ways, while even
-  a data-free destination in Library-owned Settings sheet does not. Settings is therefore
-  currently presented by one root-owned sheet (also serving the temporary probe), not as
-  a nested Library sheet. The stethoscope remains temporarily to test cold Library behavior.
+  `NavigationStack` with bound paths and explicit row actions, neutral disclosure indicators,
+  and standard row sizing. Native List rows already provide the minimum touch height.
+- **Settings presentation belongs to RootView, outside Library's NavigationStack.** On iOS 26.3.1
+  inside LiveContainer, even a data-free destination in Library-owned Settings sheet accepted
+  path appends but never presented. An otherwise identical root-owned sheet navigated normally;
+  the September 28 device logs confirmed real Settings destinations and cold Library destinations
+  open with the root-owned presentation. Both Library and Settings use bound `NavigationPath`s,
+  with destination registrations outside lazy List/Form sections. Library count work remains
+  gated on root visibility. Download-cache observations belong to `DownloadsSettingsFooter`,
+  not the whole Settings form. Temporary navigation probes have been removed.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
   but neither uses a custom `.principal` toolbar host. This hardens the reported path; the IPS
   does not include an application source line proving the precise originating view.
 - **Tab selection must survive player and system presentations.** `RootTabShell` owns the native
-  tab view separately from player rendering. `RootTabSelection` holds live selection; SceneStorage
-  restores it only once and mirrors later changes. Player/context links route into the current
-  tab's stack, not Feed. Minimization, alerts, and ordinary reappearance must never select Feed.
+  tab view separately from player rendering. `RootTabSelection` holds live selection; each app
+  launch starts on Feed (or Search if Feed is hidden), not the last scene-restored tab. Within
+  a session, player/context links route into the current tab's stack, not Feed. Minimization,
+  alerts, and ordinary reappearance must not reset the selection.
   Library/Settings destination buttons keep a white tint rather than inheriting the red accent.
 - **Channel initial loads are model-owned.** Concurrent/reopened callers await the same
   `ChannelViewModel.initialLoadTask`; cancelling a view appearance must not discard its channel

@@ -3,12 +3,12 @@ import XCTest
 
 @MainActor
 final class RootTabSelectionTests: XCTestCase {
-    func testSceneRestorationDoesNotReplaceLiveSelectionOnReappearance() {
+    func testLaunchStartsOnFeedAndReappearanceKeepsLiveSelection() {
         let state = RootTabSelection()
-        state.restore(rawValue: "library", showsFeed: true)
-        XCTAssertEqual(state.selected, .library)
+        state.start(showsFeed: true)
+        XCTAssertEqual(state.selected, .feed)
         state.select(.downloads, showsFeed: true)
-        state.restore(rawValue: "feed", showsFeed: true)
+        state.start(showsFeed: true)
         XCTAssertEqual(state.selected, .downloads)
     }
 
@@ -23,9 +23,9 @@ final class RootTabSelectionTests: XCTestCase {
         }
     }
 
-    func testHiddenFeedRestoresToAnAvailableTab() {
+    func testHiddenFeedStartsOnAnAvailableTab() {
         let state = RootTabSelection()
-        state.restore(rawValue: "feed", showsFeed: false)
+        state.start(showsFeed: false)
         XCTAssertEqual(state.selected, .search)
         state.select(.library, showsFeed: false)
         XCTAssertEqual(state.selected, .library)
@@ -33,7 +33,7 @@ final class RootTabSelectionTests: XCTestCase {
 
     func testRepeatedDownloadsSelectionStaysInDownloads() {
         let state = RootTabSelection()
-        state.restore(rawValue: "downloads", showsFeed: true)
+        state.start(showsFeed: true)
         state.select(.downloads, showsFeed: true)
         XCTAssertEqual(state.selected, .downloads)
     }

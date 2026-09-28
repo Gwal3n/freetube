@@ -1,18 +1,18 @@
 import Observation
 
-/// Live selection is synchronous observable state. Scene storage is used only to restore it
-/// once, never as the TabView's live getter during a player or system-alert presentation.
+/// Live selection is synchronous observable state. Each app launch begins on Feed (or Search
+/// when Feed is hidden), while sheet/player reappearances preserve the in-session selection.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
 final class RootTabSelection {
     private(set) var selected: RootView.Tab = .feed
-    private var hasRestored = false
+    private var hasStarted = false
 
-    func restore(rawValue: String, showsFeed: Bool) {
-        guard !hasRestored else { return }
-        hasRestored = true
-        select(RootView.Tab(rawValue: rawValue) ?? .feed, showsFeed: showsFeed)
+    func start(showsFeed: Bool) {
+        guard !hasStarted else { return }
+        hasStarted = true
+        select(.feed, showsFeed: showsFeed)
     }
 
     func select(_ tab: RootView.Tab, showsFeed: Bool) {

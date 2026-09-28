@@ -15,8 +15,6 @@ struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    // Persist scene restoration separately from the native TabView's live selection.
-    @SceneStorage("selectedRootTab") private var selectedTabRaw = Tab.feed.rawValue
     @State private var tabState = RootTabSelection()
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
@@ -25,7 +23,7 @@ struct RootView: View {
     @State private var libraryNavigationRequest: AppNavigationRequest?
     @State private var downloadsNavigationRequest: AppNavigationRequest?
     private enum RootSheet: String, Identifiable {
-        case settings, navigationProbe
+        case settings
 
         var id: String { rawValue }
     }
@@ -94,10 +92,7 @@ struct RootView: View {
             switch sheet {
             case .settings:
                 SettingsScreen()
-                    .navigationDiagnostics("Root-owned Settings sheet")
                     .presentationDragIndicator(.hidden)
-            case .navigationProbe:
-                NavigationProbeScreen()
             }
         }
         // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
@@ -138,10 +133,6 @@ struct RootView: View {
             log.info("Root-owned Settings requested")
             rootSheet = .settings
         }
-        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenNavigationProbe)) { _ in
-            log.info("Root navigation probe requested")
-            rootSheet = .navigationProbe
-        }
         .onChange(of: rootSheet) { previous, current in
             log.info("Root sheet binding: \(previous?.rawValue ?? "none") → \(current?.rawValue ?? "none")")
         }
@@ -158,13 +149,12 @@ struct RootView: View {
             routeFromPlayer(.localPlaylist(playlistID))
         }
         .onAppear {
-            tabState.restore(rawValue: selectedTabRaw, showsFeed: showSubscriptionFeedTab)
+            tabState.start(showsFeed: showSubscriptionFeedTab)
         }
         .onChange(of: showSubscriptionFeedTab) { _, isVisible in
             tabState.updateFeedVisibility(isVisible)
         }
         .onChange(of: tabState.selected) { previous, tab in
-            selectedTabRaw = tab.rawValue
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
     }
