@@ -47,43 +47,41 @@ struct RootView: View {
     }
 
     var body: some View {
-        ZStack {
+        SwiftUIPlayerContainer(thumbnail: thumbnail) {
             tabShell
-                .allowsHitTesting(!player.fullScreenPresented)
-            SwiftUIPlayerContainer(thumbnail: thumbnail)
-                .overlay(alignment: .bottom) {
-                    if let notice = player.queueNotice {
-                        HStack(spacing: 10) {
-                            Label {
-                                Text(notice.message)
-                            } icon: {
-                                Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "checkmark")
-                            }
-                            if notice.offersUndo {
-                                Divider()
-                                    .frame(height: 18)
-                                Button("Undo") {
-                                    player.undoQueueNotice()
-                                }
-                                .fontWeight(.semibold)
-                                .buttonStyle(.plain)
-                            }
+        }
+        .overlay(alignment: .bottom) {
+            if let notice = player.queueNotice {
+                HStack(spacing: 10) {
+                    Label {
+                        Text(notice.message)
+                    } icon: {
+                        Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "checkmark")
+                    }
+                    if notice.offersUndo {
+                        Divider()
+                            .frame(height: 18)
+                        Button("Undo") {
+                            player.undoQueueNotice()
                         }
-                        .lineLimit(1)
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .background(.regularMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
-                        .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
-                        .padding(.bottom, queueNoticeBottomPadding)
-                        .allowsHitTesting(notice.offersUndo)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .fontWeight(.semibold)
+                        .buttonStyle(.plain)
                     }
                 }
-                .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
+                .lineLimit(1)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .fixedSize(horizontal: true, vertical: false)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+                .padding(.bottom, queueNoticeBottomPadding)
+                .allowsHitTesting(notice.offersUndo)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
         .sheet(item: $rootSheet, onDismiss: {
             log.info("Root sheet dismissed")
         }) { sheet in

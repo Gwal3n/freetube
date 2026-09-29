@@ -243,9 +243,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   inside LiveContainer, a Library-owned Settings sheet accepted navigation actions without showing
   destinations; the root-owned sheet navigated normally. Library's three rows are plain native
   links, but device tests showed they worked on a Library-first launch and failed on a Feed-first
-  launch even after removing the path binding. The app shell now owns a stable native `TabView`
-  beside the player presentation; the Library tab directly owns its `NavigationStack`. Verify a
-  Feed-first cold launch before considering this navigation issue resolved. Do not restore the
+  launch even after removing the path binding. Giving the Library tab direct ownership of its
+  `NavigationStack` and using simple `@State` selection made all three rows work from Feed on device,
+  but moving the player beside the tab made playback audio-only with no visible overlay. The known-good
+  `SwiftUIPlayerContainer` layout is therefore restored while retaining the navigation changes;
+  verify both Library and player on device before considering this issue resolved. Do not restore the
   failed blank-tab overlay, one-time remount, or temporary navigation probe. Library count work
   remains gated on root visibility. Download-cache observations belong to
   `DownloadsSettingsFooter`, not the whole Settings form.
