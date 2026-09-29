@@ -236,8 +236,8 @@ and a rejected strategy is excluded before requesting the next candidate.
   placeholder-content animation wrappers around List or navigation/button labels. Local playlist
   Lists remain mounted through their first read via `InitialContentLoadingModifier`, with an
   opacity handoff and no empty state until that read finishes. Library uses one native
-  `NavigationStack` inside its tab, with value-based `NavigationLink` rows and a typed path for
-  external channel/playlist routes; Settings keeps its root-presented stack. Native List rows
+  `NavigationStack` inside its tab, with direct `NavigationLink` rows and an item-based destination
+  for external channel/playlist routes; Settings keeps its root-presented stack. Native List rows
   already provide the minimum touch height.
 - **Settings presentation belongs to RootView, outside Library's NavigationStack.** On iOS 26.3.1
   inside LiveContainer, even a data-free destination in Library-owned Settings sheet accepted
@@ -257,10 +257,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   probe and real destinations open. Deferring Library's stack until first tab selection
   then failed, and its placeholder caused a blank tab on first access; that experiment was
   reverted. A later attempt to render Library over a blank tab also produced a black tab and was
-  reverted. Library now uses a single typed route and native value links inside its original tab;
-  this simpler structure still requires a device test before considering navigation repaired.
-  Feed startup is restored now that Library's native links have passed a Library-first device test;
-  verify a Feed-first cold launch before treating the intermittent navigation issue as resolved.
+  reverted. A typed path and native value links worked on a Library-first launch but failed on a
+  Feed-first launch. Library now lets SwiftUI own navigation for its three direct links and uses
+  item-based presentation only for external routes; verify a Feed-first cold launch before treating
+  the intermittent navigation issue as resolved.
   The test row and temporary lifecycle trace are removed.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.

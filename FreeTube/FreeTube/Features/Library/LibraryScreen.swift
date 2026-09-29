@@ -5,22 +5,17 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    private enum Destination: Hashable {
-        case history, subscriptions, playlists
-        case external(AppNavigationRequest.Destination)
-    }
-
     let navigationRequest: AppNavigationRequest?
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
-    @State private var path: [Destination] = []
+    @State private var externalDestination: AppNavigationRequest.Destination?
     @State private var rootIsVisible = false
     @State private var didLoadRootData = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             List {
                 localHistorySection
             }
@@ -35,19 +30,13 @@ struct LibraryScreen: View {
                     }
                 }
             }
-            .navigationDestination(for: Destination.self) { destination in
+            .navigationDestination(item: $externalDestination) { destination in
                 switch destination {
-                case .history:
-                    LocalHistoryScreen()
-                case .subscriptions:
-                    LocalSubscriptionsScreen()
-                case .playlists:
-                    LocalPlaylistsScreen()
-                case .external(.channel(let id)):
+                case .channel(let id):
                     ChannelScreen(channelID: id)
-                case .external(.playlist(let id)):
+                case .playlist(let id):
                     PlaylistScreen(playlistID: id)
-                case .external(.localPlaylist(let id)):
+                case .localPlaylist(let id):
                     LocalPlaylistScreen(playlistID: id)
                 }
             }
@@ -72,8 +61,8 @@ struct LibraryScreen: View {
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
-                log.info("Library external destination requested; depth=\(path.count)")
-                path.append(.external(destination))
+                log.info("Library external destination requested")
+                externalDestination = destination
             }
             .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
                 Task {
@@ -82,9 +71,6 @@ struct LibraryScreen: View {
                     localPlaylistCount = count
                 }
             }
-        }
-        .onChange(of: path.count) { previous, current in
-            log.info("Library path rendered: \(previous) → \(current)")
         }
     }
 
@@ -107,7 +93,10 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
-            NavigationLink(value: Destination.history) {
+            NavigationLink {
+                LocalHistoryScreen()
+                    .onAppear { log.info("Library history destination appeared") }
+            } label: {
                 LibraryDestinationRow(
                     title: "Local history",
                     subtitle: countSubtitle(localHistoryCount, noun: "video"),
@@ -116,7 +105,10 @@ struct LibraryScreen: View {
             }
             .tint(.white)
 
-            NavigationLink(value: Destination.subscriptions) {
+            NavigationLink {
+                LocalSubscriptionsScreen()
+                    .onAppear { log.info("Library subscriptions destination appeared") }
+            } label: {
                 LibraryDestinationRow(
                     title: "Local subscriptions",
                     subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
@@ -125,7 +117,10 @@ struct LibraryScreen: View {
             }
             .tint(.white)
 
-            NavigationLink(value: Destination.playlists) {
+            NavigationLink {
+                LocalPlaylistsScreen()
+                    .onAppear { log.info("Library playlists destination appeared") }
+            } label: {
                 LibraryDestinationRow(
                     title: "Local playlists",
                     subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
