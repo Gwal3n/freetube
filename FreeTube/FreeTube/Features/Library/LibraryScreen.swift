@@ -15,61 +15,59 @@ struct LibraryScreen: View {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
-        NavigationStack {
-            List {
-                localHistorySection
-            }
-            .navigationTitle("Library")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        log.info("Library Settings button tapped")
-                        NotificationCenter.default.post(name: .freetubeOpenSettings, object: nil)
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
+        List {
+            localHistorySection
+        }
+        .navigationTitle("Library")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    log.info("Library Settings button tapped")
+                    NotificationCenter.default.post(name: .freetubeOpenSettings, object: nil)
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
                 }
             }
-            .navigationDestination(item: $externalDestination) { destination in
-                switch destination {
-                case .channel(let id):
-                    ChannelScreen(channelID: id)
-                case .playlist(let id):
-                    PlaylistScreen(playlistID: id)
-                case .localPlaylist(let id):
-                    LocalPlaylistScreen(playlistID: id)
-                }
+        }
+        .navigationDestination(item: $externalDestination) { destination in
+            switch destination {
+            case .channel(let id):
+                ChannelScreen(channelID: id)
+            case .playlist(let id):
+                PlaylistScreen(playlistID: id)
+            case .localPlaylist(let id):
+                LocalPlaylistScreen(playlistID: id)
             }
-            // Tie cold-start work to the visible root. A first navigation push cancels this task,
-            // preventing late count/account mutations from invalidating the List mid-transition.
-            .onAppear { rootIsVisible = true }
-            .onDisappear { rootIsVisible = false }
-            .task(id: rootIsVisible) {
-                guard rootIsVisible, !didLoadRootData else { return }
-                await loadRootData()
+        }
+        // Tie cold-start work to the visible root. A first navigation push cancels this task,
+        // preventing late count/account mutations from invalidating the List mid-transition.
+        .onAppear { rootIsVisible = true }
+        .onDisappear { rootIsVisible = false }
+        .task(id: rootIsVisible) {
+            guard rootIsVisible, !didLoadRootData else { return }
+            await loadRootData()
+        }
+        .refreshable {
+            localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
+            localPlaylistCount = await localPlaylistCountFromStore()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
+            Task {
+                let count = await PersistenceWriter.shared.watchHistoryCount()
+                guard rootIsVisible else { return }
+                localHistoryCount = count
             }
-            .refreshable {
-                localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
-                localPlaylistCount = await localPlaylistCountFromStore()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
-                Task {
-                    let count = await PersistenceWriter.shared.watchHistoryCount()
-                    guard rootIsVisible else { return }
-                    localHistoryCount = count
-                }
-            }
-            .onChange(of: navigationRequest?.id) { _, _ in
-                guard let destination = navigationRequest?.destination else { return }
-                log.info("Library external destination requested")
-                externalDestination = destination
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
-                Task {
-                    let count = await localPlaylistCountFromStore()
-                    guard rootIsVisible else { return }
-                    localPlaylistCount = count
-                }
+        }
+        .onChange(of: navigationRequest?.id) { _, _ in
+            guard let destination = navigationRequest?.destination else { return }
+            log.info("Library external destination requested")
+            externalDestination = destination
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
+            Task {
+                let count = await localPlaylistCountFromStore()
+                guard rootIsVisible else { return }
+                localPlaylistCount = count
             }
         }
     }

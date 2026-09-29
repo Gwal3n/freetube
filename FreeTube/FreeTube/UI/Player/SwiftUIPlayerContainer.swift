@@ -5,13 +5,12 @@ import UIKit
 /// Playback remains in `PlayerStateManager`; this view only moves between expanded, mini, and
 /// dismissed presentations of that shared state.
 @available(iOS 17.0, *)
-struct SwiftUIPlayerContainer<Content: View>: View {
+struct SwiftUIPlayerContainer: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let thumbnail: UIImage?
-    let content: Content
 
     @State private var presentationTranslation: CGFloat = 0
     @State private var miniDismissTranslation: CGFloat = 0
@@ -19,11 +18,6 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var expandedDragStartedDown = false
     @State private var expandedDragCanCollapse = false
     @State private var suppressMiniPlayerTap = false
-
-    init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
-        self.thumbnail = thumbnail
-        self.content = content()
-    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -36,9 +30,6 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             let miniBottomPadding = PlayerLayoutMetrics.bottomTabBarClearance
 
             ZStack(alignment: .bottom) {
-                content
-                    .allowsHitTesting(!player.fullScreenPresented)
-
                 if player.miniPlayerVisible {
                     Color.black
                         .opacity(max(0, 1 - transition * 1.4))
@@ -106,8 +97,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             // animation bound to this Bool can reanimate the mini glass after it reappears.
             .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: player.miniPlayerVisible)
         }
-        // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
-        // FullScreenPlayer itself is inset below the portrait status area.
+        // The player presentation is a sibling of the tab view. Its own geometry remains
+        // edge-to-edge without changing the tab/navigation host's safe-area layout.
         .ignoresSafeArea()
         .onChange(of: player.playerExpansionRequest) { _, _ in
             // Feed/Search selections and first playback launches arrive here instead of mutating

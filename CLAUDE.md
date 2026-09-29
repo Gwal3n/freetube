@@ -240,35 +240,22 @@ and a rejected strategy is excluded before requesting the next candidate.
   for external channel/playlist routes; Settings keeps its root-presented stack. Native List rows
   already provide the minimum touch height.
 - **Settings presentation belongs to RootView, outside Library's NavigationStack.** On iOS 26.3.1
-  inside LiveContainer, even a data-free destination in Library-owned Settings sheet accepted
-  path appends but never presented. An otherwise identical root-owned sheet navigated normally;
-  the September 28 device logs confirmed real Settings destinations and cold Library destinations
-  open with the root-owned presentation. Both Library and Settings use bound `NavigationPath`s,
-  with destination registrations outside lazy List/Form sections. Library count work remains
-  gated on root visibility. Download-cache observations belong to `DownloadsSettingsFooter`,
-  not the whole Settings form. Temporary navigation probes were removed. A subsequent
-  Feed-default build showed Library path appends without destination appearance again; a
-  temporary Library-only, gesture-free lifecycle trace is being used for a controlled A/B
-  check before attributing that regression to tab startup or removing all diagnostics. That
-  trace did not restore navigation. A one-time identity change on Library's first selection
-  also failed and was removed. A plain text destination inside Library's stack is now being
-  tested to distinguish a broken stack host from a real-destination registration problem;
-  the data-free destination also failed. A controlled Library-first launch made the same
-  probe and real destinations open. Deferring Library's stack until first tab selection
-  then failed, and its placeholder caused a blank tab on first access; that experiment was
-  reverted. A later attempt to render Library over a blank tab also produced a black tab and was
-  reverted. A typed path and native value links worked on a Library-first launch but failed on a
-  Feed-first launch. Library now lets SwiftUI own navigation for its three direct links and uses
-  item-based presentation only for external routes; verify a Feed-first cold launch before treating
-  the intermittent navigation issue as resolved.
-  The test row and temporary lifecycle trace are removed.
+  inside LiveContainer, a Library-owned Settings sheet accepted navigation actions without showing
+  destinations; the root-owned sheet navigated normally. Library's three rows are plain native
+  links, but device tests showed they worked on a Library-first launch and failed on a Feed-first
+  launch even after removing the path binding. The app shell now owns a stable native `TabView`
+  beside the player presentation; the Library tab directly owns its `NavigationStack`. Verify a
+  Feed-first cold launch before considering this navigation issue resolved. Do not restore the
+  failed blank-tab overlay, one-time remount, or temporary navigation probe. Library count work
+  remains gated on root visibility. Download-cache observations belong to
+  `DownloadsSettingsFooter`, not the whole Settings form.
 - **Navigation titles use native title APIs.** The September 27 LiveContainer report trapped
   in SwiftUI's environment lookup while a custom navigation-title toolbar host was laid out.
   Channel titles still appear after header collapse and Downloads shows its selection count,
   but neither uses a custom `.principal` toolbar host. This hardens the reported path; the IPS
   does not include an application source line proving the precise originating view.
 - **Tab selection must survive player and system presentations.** `RootTabShell` owns the native
-  tab view separately from player rendering. `RootTabSelection` holds live selection; each app
+  tab view separately from player rendering. `RootView` holds selection in `@State`; each app
   launch starts on Feed (or Search if Feed is hidden), not the last scene-restored tab. Within
   a session, player/context links route into the current tab's stack, not Feed. Minimization,
   alerts, and ordinary reappearance must not reset the selection.

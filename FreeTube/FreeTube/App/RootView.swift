@@ -15,7 +15,7 @@ struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var tabState = RootTabSelection()
+    @State private var selectedTab: Tab = .feed
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var feedNavigationRequest: AppNavigationRequest?
@@ -38,10 +38,6 @@ struct RootView: View {
         case feed, search, library, downloads
     }
 
-    private var selectedTab: Tab {
-        tabState.selected
-    }
-
     private var queueNoticeBottomPadding: CGFloat {
         if player.fullScreenPresented {
             return PlayerLayoutMetrics.safeAreaInsets.bottom + 12
@@ -51,41 +47,43 @@ struct RootView: View {
     }
 
     var body: some View {
-        SwiftUIPlayerContainer(thumbnail: thumbnail) {
+        ZStack {
             tabShell
-        }
-        .overlay(alignment: .bottom) {
-            if let notice = player.queueNotice {
-                HStack(spacing: 10) {
-                    Label {
-                        Text(notice.message)
-                    } icon: {
-                        Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "checkmark")
-                    }
-                    if notice.offersUndo {
-                        Divider()
-                            .frame(height: 18)
-                        Button("Undo") {
-                            player.undoQueueNotice()
+                .allowsHitTesting(!player.fullScreenPresented)
+            SwiftUIPlayerContainer(thumbnail: thumbnail)
+                .overlay(alignment: .bottom) {
+                    if let notice = player.queueNotice {
+                        HStack(spacing: 10) {
+                            Label {
+                                Text(notice.message)
+                            } icon: {
+                                Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "checkmark")
+                            }
+                            if notice.offersUndo {
+                                Divider()
+                                    .frame(height: 18)
+                                Button("Undo") {
+                                    player.undoQueueNotice()
+                                }
+                                .fontWeight(.semibold)
+                                .buttonStyle(.plain)
+                            }
                         }
-                        .fontWeight(.semibold)
-                        .buttonStyle(.plain)
+                        .lineLimit(1)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .background(.regularMaterial, in: Capsule())
+                        .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
+                        .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+                        .padding(.bottom, queueNoticeBottomPadding)
+                        .allowsHitTesting(notice.offersUndo)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .lineLimit(1)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .fixedSize(horizontal: true, vertical: false)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
-                .padding(.bottom, queueNoticeBottomPadding)
-                .allowsHitTesting(notice.offersUndo)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+                .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
         }
-        .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
         .sheet(item: $rootSheet, onDismiss: {
             log.info("Root sheet dismissed")
         }) { sheet in
@@ -126,7 +124,7 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                tabState.select(tab, showsFeed: showSubscriptionFeedTab)
+                selectedTab = tab == .feed && !showSubscriptionFeedTab ? .search : tab
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
@@ -149,12 +147,16 @@ struct RootView: View {
             routeFromPlayer(.localPlaylist(playlistID))
         }
         .onAppear {
-            tabState.start(showsFeed: showSubscriptionFeedTab)
+            if !showSubscriptionFeedTab, selectedTab == .feed {
+                selectedTab = .search
+            }
         }
         .onChange(of: showSubscriptionFeedTab) { _, isVisible in
-            tabState.updateFeedVisibility(isVisible)
+            if !isVisible, selectedTab == .feed {
+                selectedTab = .search
+            }
         }
-        .onChange(of: tabState.selected) { previous, tab in
+        .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
     }
@@ -177,13 +179,13 @@ struct RootView: View {
             get: { selectedTab },
             set: { newTab in
                 if newTab == .feed, !showSubscriptionFeedTab {
-                    tabState.select(.search, showsFeed: false)
+                    selectedTab = .search
                     return
                 }
                 if newTab == .search, selectedTab == .search {
                     searchActivation &+= 1
                 }
-                tabState.select(newTab, showsFeed: showSubscriptionFeedTab)
+                selectedTab = newTab
             }
         )
     }
