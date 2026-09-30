@@ -81,10 +81,20 @@ actor LocalPlaylistWriter {
         let membership = "\(playlistID):\(video.id)"
         let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(predicate: #Predicate { $0.membershipID == membership })
         guard (try? modelContext.fetch(descriptor).first) == nil else { return }
+        let existing = videoRecords(playlistID: playlistID)
+        let firstPosition = existing.first?.position ?? 1
+        let newPosition: Int
+        if firstPosition == Int.min {
+            // An extremely old playlist can exhaust descending positions; compact only then.
+            for (index, item) in existing.enumerated() { item.position = index + 1 }
+            newPosition = 0
+        } else {
+            newPosition = firstPosition - 1
+        }
         modelContext.insert(LocalPlaylistVideoRecord(
             playlistID: playlistID,
             video: video,
-            position: videoRecords(playlistID: playlistID).count
+            position: newPosition
         ))
         touch(playlistID)
         try? modelContext.save()

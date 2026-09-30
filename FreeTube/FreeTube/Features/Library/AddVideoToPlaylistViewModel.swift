@@ -26,6 +26,7 @@ final class AddVideoToPlaylistViewModel {
     private(set) var searchFailed = false
     private(set) var paginationFailed = false
     private(set) var continuationToken: String?
+    private(set) var savedVideoIDs = Set<String>()
     var errorState: ErrorState?
     private let service: LocalPlaylistService
     private let searchService: any SearchServicing
@@ -38,6 +39,18 @@ final class AddVideoToPlaylistViewModel {
     ) {
         self.service = service
         self.searchService = searchService
+    }
+
+    func loadSavedVideos(in playlistID: String) async {
+        guard let details = await service.details(id: playlistID) else { return }
+        savedVideoIDs.formUnion(details.videos.map(\.id))
+    }
+
+    func isSaved(_ video: Video) -> Bool { savedVideoIDs.contains(video.id) }
+
+    var isCurrentInputSaved: Bool {
+        guard let id = YouTubeVideoLink.videoID(from: query, allowBareID: true) else { return false }
+        return savedVideoIDs.contains(id)
     }
 
     func search() async {
@@ -83,39 +96,40 @@ final class AddVideoToPlaylistViewModel {
         }
     }
 
-    func add(video: Video, to playlistID: String) async -> Bool {
-        guard !isAdding else { return false }
+    func add(video: Video, to playlistID: String) async {
+        guard !isAdding, !savedVideoIDs.contains(video.id) else { return }
         isAdding = true
         errorState = nil
         defer { isAdding = false }
         do {
             try await service.addSearchedVideo(video, to: playlistID)
-            return true
+            savedVideoIDs.insert(video.id)
         } catch {
             errorState = ErrorState(from: error)
-            return false
         }
     }
 
     /// The one field accepts either a direct video reference or a normal search phrase.
-    /// Returns true only when a direct video was successfully saved and the sheet can close.
-    func submit(to playlistID: String) async -> Bool {
+    func submit(to playlistID: String) async {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else { return false }
-        guard YouTubeVideoLink.videoID(from: term, allowBareID: true) != nil else {
+        guard !term.isEmpty else { return }
+        guard let id = YouTubeVideoLink.videoID(from: term, allowBareID: true) else {
             await search()
-            return false
+            return
         }
-        guard !isAdding else { return false }
+        guard !isAdding else { return }
+        if savedVideoIDs.contains(id) {
+            errorState = ErrorState(from: LocalPlaylistAddError.alreadySaved)
+            return
+        }
         isAdding = true
         errorState = nil
         defer { isAdding = false }
         do {
             try await service.addVideo(from: term, to: playlistID)
-            return true
+            savedVideoIDs.insert(id)
         } catch {
             errorState = ErrorState(from: error)
-            return false
         }
     }
 }

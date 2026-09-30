@@ -6,6 +6,7 @@ import Kingfisher
 struct AddVideoToPlaylistSheet: View {
     let playlistID: String
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = AddVideoToPlaylistViewModel()
 
     var body: some View {
@@ -14,8 +15,8 @@ struct AddVideoToPlaylistSheet: View {
                 .navigationTitle("Add Video")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
                             .disabled(model.isAdding)
                     }
                 }
@@ -24,6 +25,7 @@ struct AddVideoToPlaylistSheet: View {
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(model.isAdding)
         .errorToast(Bindable(model).errorState)
+        .task { await model.loadSavedVideos(in: playlistID) }
     }
 
     private var searchResults: some View {
@@ -40,6 +42,11 @@ struct AddVideoToPlaylistSheet: View {
                 if model.isAdding {
                     ProgressView().controlSize(.small)
                 } else if !model.query.isEmpty {
+                    if model.isCurrentInputSaved {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.primary)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
                     Button {
                         model.query = ""
                     } label: {
@@ -92,8 +99,9 @@ struct AddVideoToPlaylistSheet: View {
                         } label: {
                             videoRow(video)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(model.isAdding)
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .disabled(model.isAdding || model.isSaved(video))
+                        .accessibilityValue(model.isSaved(video) ? "Saved" : "Not saved")
                     }
                     if model.continuationToken != nil {
                         loadMoreButton
@@ -122,7 +130,8 @@ struct AddVideoToPlaylistSheet: View {
     }
 
     private func videoRow(_ video: Video) -> some View {
-        HStack(spacing: 12) {
+        let isSaved = model.isSaved(video)
+        return HStack(spacing: 12) {
             KFImage(video.thumbnailURL)
                 .resizable()
                 .scaledToFill()
@@ -141,20 +150,22 @@ struct AddVideoToPlaylistSheet: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Image(systemName: "plus.circle")
+            Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
+                .contentTransition(.symbolEffect(.replace))
+                .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isSaved)
         }
         .contentShape(Rectangle())
         .padding(.vertical, 3)
-        .accessibilityLabel("Add \(video.title) to playlist")
+        .accessibilityLabel(isSaved ? "\(video.title) is in the playlist" : "Add \(video.title) to playlist")
     }
 
     private func add(_ video: Video) async {
-        if await model.add(video: video, to: playlistID) { dismiss() }
+        await model.add(video: video, to: playlistID)
     }
 
     private func submit() async {
-        if await model.submit(to: playlistID) { dismiss() }
+        await model.submit(to: playlistID)
     }
 }
