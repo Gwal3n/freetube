@@ -7,8 +7,6 @@ struct AddVideoToPlaylistSheet: View {
     let playlistID: String
     @Environment(\.dismiss) private var dismiss
     @State private var model = AddVideoToPlaylistViewModel()
-    @State private var showingLinkEntry = false
-    @FocusState private var linkFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -20,18 +18,6 @@ struct AddVideoToPlaylistSheet: View {
                         Button("Cancel") { dismiss() }
                             .disabled(model.isAdding)
                     }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showingLinkEntry = true
-                        } label: {
-                            Image(systemName: "link")
-                        }
-                        .accessibilityLabel("Add by Link or ID")
-                        .disabled(model.isAdding)
-                    }
-                }
-                .navigationDestination(isPresented: $showingLinkEntry) {
-                    linkEntry
                 }
         }
         .presentationDetents([.large])
@@ -45,12 +31,15 @@ struct AddVideoToPlaylistSheet: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search videos", text: Bindable(model).query)
+                TextField("Search videos or paste a link", text: Bindable(model).query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
-                    .onSubmit { Task { await model.search() } }
-                if !model.query.isEmpty {
+                    .disabled(model.isAdding)
+                    .onSubmit { Task { await submit() } }
+                if model.isAdding {
+                    ProgressView().controlSize(.small)
+                } else if !model.query.isEmpty {
                     Button {
                         model.query = ""
                     } label: {
@@ -87,7 +76,7 @@ struct AddVideoToPlaylistSheet: View {
                     ContentUnavailableView(
                         "Find a Video",
                         systemImage: "magnifyingglass",
-                        description: Text("Search by title or channel, then tap a video to add it.")
+                        description: Text("Search by title or channel, or paste a YouTube link or video ID.")
                     )
                     .listRowBackground(Color.clear)
                 } else if model.videos.isEmpty {
@@ -161,44 +150,11 @@ struct AddVideoToPlaylistSheet: View {
         .accessibilityLabel("Add \(video.title) to playlist")
     }
 
-    private var linkEntry: some View {
-        Form {
-            Section {
-                TextField("YouTube link or video ID", text: Bindable(model).link)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-                    .submitLabel(.done)
-                    .focused($linkFocused)
-                    .onSubmit { Task { await addLink() } }
-            } footer: {
-                Text("Paste a video link or ID. The video information is saved locally with this playlist.")
-            }
-        }
-        .navigationTitle("Add by Link")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button {
-                    Task { await addLink() }
-                } label: {
-                    if model.isAdding {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text("Add")
-                    }
-                }
-                .disabled(model.link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isAdding)
-            }
-        }
-        .task { linkFocused = true }
-    }
-
     private func add(_ video: Video) async {
         if await model.add(video: video, to: playlistID) { dismiss() }
     }
 
-    private func addLink() async {
-        if await model.addLink(to: playlistID) { dismiss() }
+    private func submit() async {
+        if await model.submit(to: playlistID) { dismiss() }
     }
 }

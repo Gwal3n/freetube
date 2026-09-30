@@ -18,7 +18,6 @@ final class AddVideoToPlaylistViewModel {
             }
         }
     }
-    var link = ""
     private(set) var isAdding = false
     private(set) var isSearching = false
     private(set) var isLoadingMore = false
@@ -98,13 +97,21 @@ final class AddVideoToPlaylistViewModel {
         }
     }
 
-    func addLink(to playlistID: String) async -> Bool {
+    /// The one field accepts either a direct video reference or a normal search phrase.
+    /// Returns true only when a direct video was successfully saved and the sheet can close.
+    func submit(to playlistID: String) async -> Bool {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return false }
+        guard YouTubeVideoLink.videoID(from: term, allowBareID: true) != nil else {
+            await search()
+            return false
+        }
         guard !isAdding else { return false }
         isAdding = true
         errorState = nil
         defer { isAdding = false }
         do {
-            try await service.addVideo(from: link, to: playlistID)
+            try await service.addVideo(from: term, to: playlistID)
             return true
         } catch {
             errorState = ErrorState(from: error)
