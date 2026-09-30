@@ -17,14 +17,16 @@ struct VideoMoreActionsMenu: View {
     let video: Video
     var offersPlayNext = false
     var onRemoveFromUpNext: (() -> Void)? = nil
+    var onOpenChannel: (() -> Void)? = nil
 
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
 
-    init(video: Video, offersPlayNext: Bool = false, onRemoveFromUpNext: (() -> Void)? = nil) {
+    init(video: Video, offersPlayNext: Bool = false, onRemoveFromUpNext: (() -> Void)? = nil, onOpenChannel: (() -> Void)? = nil) {
         self.video = video
         self.offersPlayNext = offersPlayNext
         self.onRemoveFromUpNext = onRemoveFromUpNext
+        self.onOpenChannel = onOpenChannel
     }
 
     var body: some View {
@@ -34,6 +36,7 @@ struct VideoMoreActionsMenu: View {
                 offersPlay: false,
                 offersPlayNext: offersPlayNext,
                 onRemoveFromUpNext: onRemoveFromUpNext,
+                onOpenChannel: onOpenChannel,
                 shareFileURL: $shareFileURL,
                 addToPlaylistVideo: $addToPlaylistVideo
             )
@@ -71,6 +74,7 @@ private struct VideoActionsContent: View {
     let offersPlay: Bool
     let offersPlayNext: Bool
     let onRemoveFromUpNext: (() -> Void)?
+    let onOpenChannel: (() -> Void)?
     @Binding var shareFileURL: URL?
     @Binding var addToPlaylistVideo: Video?
 
@@ -83,6 +87,7 @@ private struct VideoActionsContent: View {
         offersPlay: Bool,
         offersPlayNext: Bool,
         onRemoveFromUpNext: (() -> Void)?,
+        onOpenChannel: (() -> Void)?,
         shareFileURL: Binding<URL?>,
         addToPlaylistVideo: Binding<Video?>
     ) {
@@ -90,6 +95,7 @@ private struct VideoActionsContent: View {
         self.offersPlay = offersPlay
         self.offersPlayNext = offersPlayNext
         self.onRemoveFromUpNext = onRemoveFromUpNext
+        self.onOpenChannel = onOpenChannel
         _shareFileURL = shareFileURL
         _addToPlaylistVideo = addToPlaylistVideo
         let videoID = video.id
@@ -124,8 +130,12 @@ private struct VideoActionsContent: View {
             )
             Divider()
         }
-        if !video.channelID.isEmpty {
+        if !video.channelID.isEmpty || onOpenChannel != nil {
             Button {
+                if let onOpenChannel {
+                    onOpenChannel()
+                    return
+                }
                 let channelID = video.channelID
                 let wasExpanded = player.fullScreenPresented
                 if wasExpanded { player.fullScreenPresented = false }
@@ -223,6 +233,7 @@ private struct VideoContextMenuModifier: ViewModifier {
     let video: Video
     let offersPlayNext: Bool
     let onRemoveFromUpNext: (() -> Void)?
+    let onOpenChannel: (() -> Void)?
 
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
@@ -235,6 +246,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                     offersPlay: true,
                     offersPlayNext: offersPlayNext,
                     onRemoveFromUpNext: onRemoveFromUpNext,
+                    onOpenChannel: onOpenChannel,
                     shareFileURL: $shareFileURL,
                     addToPlaylistVideo: $addToPlaylistVideo
                 )
@@ -260,12 +272,14 @@ extension View {
     func videoContextMenu(
         video: Video,
         offersPlayNext: Bool = false,
-        onRemoveFromUpNext: (() -> Void)? = nil
+        onRemoveFromUpNext: (() -> Void)? = nil,
+        onOpenChannel: (() -> Void)? = nil
     ) -> some View {
         modifier(VideoContextMenuModifier(
             video: video,
             offersPlayNext: offersPlayNext,
-            onRemoveFromUpNext: onRemoveFromUpNext
+            onRemoveFromUpNext: onRemoveFromUpNext,
+            onOpenChannel: onOpenChannel
         ))
     }
 }

@@ -10,7 +10,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct HomeScreen: View {
     let searchActivation: Int
-    let navigationRequest: AppNavigationRequest?
+    @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var searchModel = SearchViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var isSearchPresented = false
@@ -71,10 +71,11 @@ struct HomeScreen: View {
                     searchModel.clearResults()
                 }
             }
-            .onChange(of: navigationRequest?.id) { _, _ in
-                guard let destination = navigationRequest?.destination else { return }
+            .onChange(of: navigationRouter.search?.id, initial: true) { _, _ in
+                guard let request = navigationRouter.search else { return }
+                navigationRouter.search = nil
                 navigationLog.info("Search received player destination")
-                openDestination(destination)
+                openDestination(request.destination)
             }
             .onChange(of: searchActivation) { _, _ in
                 guard !MacIntegration.isRunningOnMac else { return }

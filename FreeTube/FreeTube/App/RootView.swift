@@ -18,10 +18,7 @@ struct RootView: View {
     @State private var selectedTab: Tab = .feed
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
-    @State private var feedNavigationRouter = FeedNavigationRouter()
-    @State private var searchNavigationRequest: AppNavigationRequest?
-    @State private var libraryNavigationRequest: AppNavigationRequest?
-    @State private var downloadsNavigationRequest: AppNavigationRequest?
+    @State private var navigationRouter = AppNavigationRouter()
     private enum RootSheet: String, Identifiable {
         case settings
 
@@ -164,12 +161,9 @@ struct RootView: View {
         RootTabShell(
             selection: tabSelection,
             showsFeed: showSubscriptionFeedTab,
-            searchActivation: searchActivation,
-            libraryNavigationRequest: libraryNavigationRequest,
-            downloadsNavigationRequest: downloadsNavigationRequest,
-            searchNavigationRequest: searchNavigationRequest
+            searchActivation: searchActivation
         )
-        .environment(feedNavigationRouter)
+        .environment(navigationRouter)
     }
 
     /// Re-selecting Search requests focus without a gesture recognizer on the native tab bar.
@@ -196,13 +190,13 @@ struct RootView: View {
         log.info("Root routing player destination to tab=\(selectedTab.rawValue)")
         switch selectedTab {
         case .feed:
-            feedNavigationRouter.request = request
+            navigationRouter.feed = request
         case .search:
-            searchNavigationRequest = request
+            navigationRouter.search = request
         case .library:
-            libraryNavigationRequest = request
+            navigationRouter.library = request
         case .downloads:
-            downloadsNavigationRequest = request
+            navigationRouter.downloads = request
         }
     }
 

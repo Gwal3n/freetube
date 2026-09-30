@@ -8,6 +8,8 @@ struct LocalHistoryScreen: View {
     @State private var isLoading = false
     @State private var hasLoaded = false
     @State private var hasMore = true
+    @State private var channelNavigation = LocalHistoryChannelNavigationModel()
+    @State private var channelToOpen: String?
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     private let pageSize = 50
 
@@ -30,7 +32,12 @@ struct LocalHistoryScreen: View {
                                 VideoRow(
                                     video: video,
                                     accessory: .actions(offersPlayNext: true),
-                                    playbackProgress: showHistoryProgressBars ? entry.resumableProgress : nil
+                                    playbackProgress: showHistoryProgressBars ? entry.resumableProgress : nil,
+                                    onOpenChannel: {
+                                        Task {
+                                            channelToOpen = await channelNavigation.channelID(for: entry.videoID)
+                                        }
+                                    }
                                 ) {
                                     player.load(video)
                                 }
@@ -57,6 +64,16 @@ struct LocalHistoryScreen: View {
         }
         .navigationTitle("Local History")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if channelNavigation.isResolving {
+                ProgressView()
+                    .accessibilityLabel("Opening channel")
+            }
+        }
+        .navigationDestination(item: $channelToOpen) { channelID in
+            ChannelScreen(channelID: channelID)
+        }
+        .errorToast(Bindable(channelNavigation).errorState)
         .task {
             if entries.isEmpty && hasMore { await loadMore() }
         }

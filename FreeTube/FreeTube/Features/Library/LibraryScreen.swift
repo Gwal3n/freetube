@@ -5,7 +5,7 @@ import SwiftUI
 /// only history, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
-    let navigationRequest: AppNavigationRequest?
+    @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var localHistoryCount: Int?
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
@@ -59,10 +59,11 @@ struct LibraryScreen: View {
                 localHistoryCount = count
             }
         }
-        .onChange(of: navigationRequest?.id) { _, _ in
-            guard let destination = navigationRequest?.destination else { return }
+        .onChange(of: navigationRouter.library?.id, initial: true) { _, _ in
+            guard let request = navigationRouter.library else { return }
+            navigationRouter.library = nil
             log.info("Library external destination requested")
-            externalDestination = destination
+            externalDestination = request.destination
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task {

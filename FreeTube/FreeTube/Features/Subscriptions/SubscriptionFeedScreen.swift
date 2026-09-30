@@ -2,7 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SubscriptionFeedScreen: View {
-    @Environment(FeedNavigationRouter.self) private var navigationRouter
+    @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var model = SubscriptionFeedViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var handledNavigationRequestID: UUID?
@@ -109,13 +109,13 @@ struct SubscriptionFeedScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await model.refreshProgress() }
             }
-            .onChange(of: navigationRouter.request?.id, initial: true) { _, _ in
-                guard let request = navigationRouter.request,
+            .onChange(of: navigationRouter.feed?.id, initial: true) { _, _ in
+                guard let request = navigationRouter.feed,
                       request.id != handledNavigationRequestID else { return }
                 handledNavigationRequestID = request.id
                 log.info("Feed received player destination; appending to navigation path")
                 path.append(request.destination)
-                navigationRouter.request = nil
+                navigationRouter.feed = nil
             }
         }
     }

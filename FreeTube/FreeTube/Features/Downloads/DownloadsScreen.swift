@@ -5,7 +5,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct DownloadsScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let navigationRequest: AppNavigationRequest?
+    @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var model = DownloadsViewModel()
     /// File-system + xattr backed downloads list. Replaces the SwiftData `@Query` —
     /// the store rebuilds `entries` from the Documents root on launch and after every
@@ -153,11 +153,12 @@ struct DownloadsScreen: View {
                     ActivityShareSheet(activityItems: [url])
                 }
             }
-            .onChange(of: navigationRequest?.id) { _, _ in
-                guard let destination = navigationRequest?.destination else { return }
+            .onChange(of: navigationRouter.downloads?.id, initial: true) { _, _ in
+                guard let request = navigationRouter.downloads else { return }
+                navigationRouter.downloads = nil
                 AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
                     .info("Downloads received player destination")
-                path.append(destination)
+                path.append(request.destination)
             }
         }
     }

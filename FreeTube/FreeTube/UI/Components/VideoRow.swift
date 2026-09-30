@@ -19,6 +19,7 @@ struct VideoRow: View {
     var accessory: Accessory
     var playbackProgress: Double?
     var relativeDateReference: Date?
+    var onOpenChannel: (() -> Void)?
     var onTap: () -> Void
 
     /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
@@ -28,12 +29,14 @@ struct VideoRow: View {
         accessory: Accessory = .none,
         playbackProgress: Double? = nil,
         relativeDateReference: Date? = nil,
+        onOpenChannel: (() -> Void)? = nil,
         onTap: @escaping () -> Void = {}
     ) {
         self.video = video
         self.accessory = accessory
         self.playbackProgress = playbackProgress
         self.relativeDateReference = relativeDateReference
+        self.onOpenChannel = onOpenChannel
         self.onTap = onTap
     }
 
@@ -64,7 +67,7 @@ struct VideoRow: View {
                 case .actions(let offersPlayNext):
                     VStack(spacing: 0) {
                         DeArrowToggleButton(video: video, model: branding)
-                        VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+                        VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext, onOpenChannel: onOpenChannel)
                     }
                 case .reserved:
                     Color.clear
@@ -82,7 +85,7 @@ struct VideoRow: View {
                     .tint(.indigo)
                 }
             }
-            .videoContextMenu(video: video, offersPlayNext: true)
+            .videoContextMenu(video: video, offersPlayNext: true, onOpenChannel: onOpenChannel)
             .mediaListRow()
         }
     }

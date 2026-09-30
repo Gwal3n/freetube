@@ -6,9 +6,6 @@ struct RootTabShell: View {
     @Binding var selection: RootView.Tab
     let showsFeed: Bool
     let searchActivation: Int
-    let libraryNavigationRequest: AppNavigationRequest?
-    let downloadsNavigationRequest: AppNavigationRequest?
-    let searchNavigationRequest: AppNavigationRequest?
 
     private let downloads = DownloadManager.shared
 
@@ -33,17 +30,17 @@ struct RootTabShell: View {
 
                 SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
                     NavigationStack {
-                        LibraryScreen(navigationRequest: libraryNavigationRequest)
+                        LibraryScreen()
                     }
                 }
 
                 SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: RootView.Tab.downloads) {
-                    DownloadsScreen(navigationRequest: downloadsNavigationRequest)
+                    DownloadsScreen()
                 }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
 
                 SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: RootView.Tab.search, role: .search) {
-                    HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
+                    HomeScreen(searchActivation: searchActivation)
                 }
             }
         } else {
@@ -61,17 +58,17 @@ struct RootTabShell: View {
                     .tag(RootView.Tab.feed)
             }
 
-            HomeScreen(searchActivation: searchActivation, navigationRequest: searchNavigationRequest)
+            HomeScreen(searchActivation: searchActivation)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(RootView.Tab.search)
 
             NavigationStack {
-                LibraryScreen(navigationRequest: libraryNavigationRequest)
+                LibraryScreen()
             }
                 .tabItem { Label("Library", systemImage: "play.square.stack") }
                 .tag(RootView.Tab.library)
 
-            DownloadsScreen(navigationRequest: downloadsNavigationRequest)
+            DownloadsScreen()
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                 .tag(RootView.Tab.downloads)
