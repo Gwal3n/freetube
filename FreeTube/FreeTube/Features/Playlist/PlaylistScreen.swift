@@ -22,6 +22,7 @@ struct PlaylistScreen: View {
     /// and every available stat (view count + video count + creator). Collapsed by default so the
     /// header stays compact and the video list isn't pushed below the fold.
     @State private var isDetailsExpanded = false
+    @State private var showsNavigationTitle = false
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @State private var playbackProgress: [String: Double] = [:]
 
@@ -33,16 +34,9 @@ struct PlaylistScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let details = model.details {
-                    // Header section: artwork + metadata + toolbar inside a leading-aligned
-                    // VStack, with the blurred-artwork backdrop applied via `.background { … }`.
-                    // The VStack's `.frame(maxWidth: .infinity, alignment: .leading)` forces
-                    // full-width layout — earlier I'd used a `ZStack(alignment: .top)` which
-                    // *center-aligns horizontally* (the alignment-`.top` shorthand pairs `.top`
-                    // vertical with `.center` horizontal), shifting every row to the right.
-                    // The background's `.ignoresSafeArea(.top)` extends the blurred image up
-                    // under the navigation bar and status bar — combined with
-                    // `.toolbarBackground(.hidden)` on the ScrollView below, the blur reaches
-                    // the very top of the screen.
+                    // The artwork fills the available width; only the metadata and controls
+                    // use the standard horizontal content inset. A blurred copy continues
+                    // behind the navigation area while the expanded header is visible.
                     VStack(alignment: .leading, spacing: 16) {
                         artworkHeader(details)
                         PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
@@ -55,11 +49,9 @@ struct PlaylistScreen: View {
                         blurredArtworkBackground(for: details)
                     }
 
-                    // Full-bleed divider — no horizontal padding so the line spans edge to edge.
-                    Divider()
-
                     videosList(details)
-                        .padding(.vertical)
+                        .padding(.top, 8)
+                        .padding(.bottom, 16)
                 } else if model.isLoading {
                     playlistPlaceholder
                 } else if model.errorState != nil {
@@ -76,11 +68,17 @@ struct PlaylistScreen: View {
                 }
             }
         }
+        .background(Color.black)
+        .coordinateSpace(name: "playlistScroll")
+        .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
+            guard titleBottom.isFinite else { return }
+            showsNavigationTitle = model.details != nil && titleBottom <= 0
+        }
+        .navigationTitle(showsNavigationTitle ? (model.details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
-        // Hide the navigation bar's own background so the blurred artwork shows through it —
-        // without this the nav bar paints its standard translucent material on top, hiding the
-        // top edge of the backdrop.
-        .toolbarBackground(.hidden, for: .navigationBar)
+        // Let artwork show through initially, then restore native bar material when the
+        // scrolled-away playlist name becomes the compact navigation title.
+        .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .task { await model.load() }
         .task(id: model.details?.playlist.id) {
             guard let id = model.details?.playlist.id else { return }
@@ -101,34 +99,34 @@ struct PlaylistScreen: View {
     /// this static avoids shimmer work and prevents the whole page from jumping after resolution.
     private var playlistPlaceholder: some View {
         VStack(alignment: .leading, spacing: 14) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.quaternary)
+            Rectangle()
+                .fill(MediaStyle.placeholderFill)
                 .aspectRatio(16 / 9, contentMode: .fit)
-            RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(height: 20)
-            RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 150, height: 11)
-            ForEach(0..<3, id: \.self) { _ in
-                HStack(spacing: MediaStyle.spacing) {
-                    RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
-                        .fill(.quaternary)
-                        .frame(width: 144, height: 81)
-                    VStack(alignment: .leading, spacing: 9) {
-                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
-                        RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 90, height: 9)
+            VStack(alignment: .leading, spacing: 14) {
+                RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(height: 20)
+                RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 150, height: 11)
+                ForEach(0..<3, id: \.self) { _ in
+                    HStack(spacing: MediaStyle.spacing) {
+                        RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
+                            .fill(.quaternary)
+                            .frame(width: 144, height: 81)
+                        VStack(alignment: .leading, spacing: 9) {
+                            RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
+                            RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 90, height: 9)
+                        }
                     }
                 }
             }
+            .padding(.horizontal, 16)
         }
-        .padding(16)
+        .padding(.top, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading playlist")
         .allowsHitTesting(false)
     }
 
-    /// Heavily-blurred, dimmed copy of the playlist artwork. Layered behind the header section
-    /// via the surrounding `ZStack`. Extends up under the status/navigation bar via
-    /// `.ignoresSafeArea(edges: .top)`, and down exactly to the bottom of the toolbar — the
-    /// `ZStack`'s height matches the foreground VStack, so the blur stops naturally at the
-    /// divider underneath.
+    /// Heavily-blurred, dimmed copy of the playlist artwork behind the header. It extends
+    /// under the status/navigation bar and ends with the header's toolbar.
     ///
     /// Three layers stacked inside:
     ///   1. The artwork itself, `.resizable().scaledToFill().blur(radius: 60)`.
@@ -161,23 +159,30 @@ struct PlaylistScreen: View {
 
     // MARK: - Artwork
 
-    /// Full-bleed playlist artwork at the top — uses the playlist's own thumbnail when present,
-    /// falls back to the first video's thumbnail (YouTubeKit doesn't always return a playlist
-    /// banner). 16:9 aspect ratio keeps the layout stable across loading states.
+    /// Width-constrained full-bleed playlist artwork. GeometryReader keeps the image's frame
+    /// within the actual viewport instead of letting a scaled image widen the scroll content.
     @ViewBuilder
     private func artworkHeader(_ details: PlaylistDetails) -> some View {
         let url = details.playlist.thumbnailURL ?? details.videos.first?.thumbnailURL
-        KFImage(url)
-            .thumbnail(size: CGSize(width: 400, height: 225)) {
-                MediaStyle.placeholderFill
-            }
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .aspectRatio(16/9, contentMode: .fill)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
+        GeometryReader { geometry in
+            KFImage(url)
+                .thumbnail(size: CGSize(width: 500, height: 281)) {
+                    MediaStyle.placeholderFill
+                }
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+                .overlay(alignment: .bottom) {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.35)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 70)
+                }
+        }
+        .aspectRatio(16 / 9, contentMode: .fit)
     }
 
     // MARK: - Glass toolbar
@@ -288,14 +293,16 @@ struct PlaylistScreen: View {
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                     VideoRow(
                         video: video,
+                        accessory: .actions(offersPlayNext: true),
                         playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
                     ) {
                         // Make sure the queue reflects the playlist's order before kicking off
                         // playback, so "next video" actually means the next playlist entry.
                         player.loadPlaylist(details, startAt: video)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 6)
+                    .padding(.leading, MediaStyle.listRowInsets.leading)
+                    .padding(.trailing, MediaStyle.listRowInsets.trailing)
+                    .padding(.vertical, MediaStyle.listRowInsets.top)
                     .onAppear {
                         // Trigger the next-page fetch when the row 5 from the bottom appears.
                         // PlaylistService caches the continuation token on the response struct, so

@@ -12,6 +12,14 @@ struct PlaylistMetadataBlock: View {
             Text(details.playlist.title)
                 .font(.title3.weight(.semibold))
                 .lineLimit(3)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: PlaylistTitlePositionKey.self,
+                            value: geometry.frame(in: .named("playlistScroll")).maxY
+                        )
+                    }
+                }
 
             if let channelName = details.playlist.channelName, !channelName.isEmpty {
                 Text(channelName)

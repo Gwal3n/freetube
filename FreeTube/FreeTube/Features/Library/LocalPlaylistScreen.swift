@@ -10,6 +10,7 @@ struct LocalPlaylistScreen: View {
     let playlistID: String
     @State private var details: LocalPlaylistDetails?
     @State private var hasLoaded = false
+    @State private var showsNavigationTitle = false
     @State private var isRestoring = false
     @State private var restoreError: String?
     @State private var showingEditor = false
@@ -30,6 +31,7 @@ struct LocalPlaylistScreen: View {
                     playlistHeader(details)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
                 ForEach(details.videos) { video in
                     VideoRow(
@@ -58,6 +60,7 @@ struct LocalPlaylistScreen: View {
                     }
                     .tag(video.id)
                     .moveDisabled(editingMode == nil)
+                    .listRowBackground(Color.clear)
                 }
                 .onMove { source, destination in
                     guard editingMode != nil else { return }
@@ -68,9 +71,17 @@ struct LocalPlaylistScreen: View {
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.black)
+        .coordinateSpace(name: "playlistScroll")
+        .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
+            guard titleBottom.isFinite else { return }
+            showsNavigationTitle = titleBottom <= 0
+        }
         .environment(\.editMode, $editMode)
         .initialContentLoading(hasLoaded: hasLoaded)
-        .navigationTitle(details?.playlist.title ?? "Playlist")
+        .navigationTitle(showsNavigationTitle ? (details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
             if let details, details.videos.isEmpty {
@@ -220,6 +231,14 @@ struct LocalPlaylistScreen: View {
                     Text(local.playlist.title)
                         .font(.title2.bold())
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key: PlaylistTitlePositionKey.self,
+                                    value: geometry.frame(in: .named("playlistScroll")).maxY
+                                )
+                            }
+                        }
                     glassActionButton(systemImage: "play.fill", label: "Play All") {
                         guard let first = local.videos.first else { return }
                         player.loadPlaylist(playbackDetails(from: local), startAt: first)
