@@ -11,6 +11,8 @@ final class WatchHistoryEntry {
     @Attribute(.unique) var videoID: String
     var title: String
     var channelName: String
+    /// Optional so existing SwiftData stores can migrate without resolving every video.
+    var channelID: String? = nil
     var thumbnailURL: URL?
     var watchedAt: Date
     var lastPosition: TimeInterval
@@ -24,6 +26,7 @@ final class WatchHistoryEntry {
         videoID: String,
         title: String,
         channelName: String,
+        channelID: String? = nil,
         thumbnailURL: URL?,
         watchedAt: Date = .now,
         lastPosition: TimeInterval = 0,
@@ -32,6 +35,7 @@ final class WatchHistoryEntry {
         self.videoID = videoID
         self.title = title
         self.channelName = channelName
+        self.channelID = channelID
         self.thumbnailURL = thumbnailURL
         self.watchedAt = watchedAt
         self.lastPosition = lastPosition
@@ -60,6 +64,8 @@ struct WatchHistorySnapshot: Identifiable, Sendable, Codable {
     let videoID: String
     let title: String
     let channelName: String
+    /// Missing from older backups; synthesized Codable decodes a missing optional as nil.
+    let channelID: String?
     let thumbnailURL: URL?
     let watchedAt: Date
     let lastPosition: TimeInterval

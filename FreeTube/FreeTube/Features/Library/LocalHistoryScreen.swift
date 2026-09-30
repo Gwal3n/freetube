@@ -34,8 +34,12 @@ struct LocalHistoryScreen: View {
                                     accessory: .actions(offersPlayNext: true),
                                     playbackProgress: showHistoryProgressBars ? entry.resumableProgress : nil,
                                     onOpenChannel: {
-                                        Task {
-                                            channelToOpen = await channelNavigation.channelID(for: entry.videoID)
+                                        if let channelID = entry.channelID, !channelID.isEmpty {
+                                            channelToOpen = channelID
+                                        } else {
+                                            Task {
+                                                channelToOpen = await channelNavigation.channelID(for: entry.videoID)
+                                            }
                                         }
                                     }
                                 ) {
@@ -97,7 +101,7 @@ struct LocalHistoryScreen: View {
         Video(
             id: entry.videoID,
             title: entry.title,
-            channelID: "",
+            channelID: entry.channelID ?? "",
             channelName: entry.channelName,
             channelThumbnailURL: nil,
             thumbnailURL: entry.thumbnailURL,

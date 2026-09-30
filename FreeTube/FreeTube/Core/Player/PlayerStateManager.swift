@@ -469,6 +469,7 @@ final class PlayerStateManager {
                     videoID: video.id,
                     title: video.title,
                     channelName: video.channelName,
+                    channelID: video.channelID,
                     thumbnailURL: video.thumbnailURL
                 )
             }
@@ -1799,6 +1800,7 @@ final class PlayerStateManager {
                     videoID: video.id,
                     title: video.title,
                     channelName: video.channelName,
+                    channelID: video.channelID,
                     thumbnailURL: video.thumbnailURL,
                     position: position,
                     duration: totalDuration

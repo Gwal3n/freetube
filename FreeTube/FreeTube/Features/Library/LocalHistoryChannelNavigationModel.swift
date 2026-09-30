@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// Resolves legacy History rows on demand. History stores channel names, not IDs, so
-/// showing the action must not trigger a network request for every visible row.
+/// Resolves legacy History rows on demand. New rows retain channel IDs; older rows
+/// should not trigger a network request merely because they are visible.
 @available(iOS 17.0, *)
 @Observable
 @MainActor
@@ -34,6 +34,12 @@ final class LocalHistoryChannelNavigationModel {
                     return nil
                 }
                 channelIDs[videoID] = channelID
+                Task {
+                    await PersistenceWriter.shared.updateWatchHistoryChannelID(
+                        videoID: videoID,
+                        channelID: channelID
+                    )
+                }
             }
             return channelID
         } catch {

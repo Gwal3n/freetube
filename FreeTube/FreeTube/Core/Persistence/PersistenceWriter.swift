@@ -101,6 +101,7 @@ actor PersistenceWriter {
         videoID: String,
         title: String,
         channelName: String,
+        channelID: String,
         thumbnailURL: URL?,
         position: TimeInterval,
         duration: TimeInterval
@@ -111,6 +112,7 @@ actor PersistenceWriter {
             existing.watchedAt = .now
             existing.title = title
             existing.channelName = channelName
+            if !channelID.isEmpty { existing.channelID = channelID }
             existing.thumbnailURL = thumbnailURL
             existing.lastPosition = position
             existing.duration = duration
@@ -119,6 +121,7 @@ actor PersistenceWriter {
                 videoID: videoID,
                 title: title,
                 channelName: channelName,
+                channelID: channelID.isEmpty ? nil : channelID,
                 thumbnailURL: thumbnailURL,
                 lastPosition: position,
                 duration: duration
@@ -151,6 +154,7 @@ actor PersistenceWriter {
         videoID: String,
         title: String,
         channelName: String,
+        channelID: String,
         thumbnailURL: URL?
     ) {
         let target = videoID
@@ -158,7 +162,19 @@ actor PersistenceWriter {
         guard let existing = try? modelContext.fetch(descriptor).first else { return }
         existing.title = title
         existing.channelName = channelName
+        if !channelID.isEmpty { existing.channelID = channelID }
         existing.thumbnailURL = thumbnailURL
+        try? modelContext.save()
+    }
+
+    /// Fill a legacy History row after its channel is resolved on demand, without moving
+    /// the row to the top or overwriting its playback progress.
+    func updateWatchHistoryChannelID(videoID: String, channelID: String) {
+        guard !channelID.isEmpty else { return }
+        let target = videoID
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+        guard let existing = try? modelContext.fetch(descriptor).first else { return }
+        existing.channelID = channelID
         try? modelContext.save()
     }
 
@@ -195,6 +211,7 @@ actor PersistenceWriter {
                 videoID: $0.videoID,
                 title: $0.title,
                 channelName: $0.channelName,
+                channelID: $0.channelID,
                 thumbnailURL: $0.thumbnailURL,
                 watchedAt: $0.watchedAt,
                 lastPosition: $0.lastPosition,
@@ -221,6 +238,7 @@ actor PersistenceWriter {
                 videoID: item.videoID,
                 title: item.title,
                 channelName: item.channelName,
+                channelID: item.channelID,
                 thumbnailURL: item.thumbnailURL,
                 watchedAt: item.watchedAt,
                 lastPosition: item.lastPosition,
