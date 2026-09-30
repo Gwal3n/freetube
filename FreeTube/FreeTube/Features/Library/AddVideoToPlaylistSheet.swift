@@ -41,58 +41,78 @@ struct AddVideoToPlaylistSheet: View {
     }
 
     private var searchResults: some View {
-        List {
-            if model.isSearching {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-            } else if model.searchFailed {
-                ContentUnavailableView {
-                    Label("Search Unavailable", systemImage: "wifi.exclamationmark")
-                } description: {
-                    Text("Please try again.")
-                } actions: {
-                    Button("Retry") { Task { await model.search() } }
-                }
-                .listRowBackground(Color.clear)
-            } else if model.searchedQuery == nil {
-                ContentUnavailableView(
-                    "Find a Video",
-                    systemImage: "magnifyingglass",
-                    description: Text("Search by title or channel, then tap a video to add it.")
-                )
-                .listRowBackground(Color.clear)
-            } else if model.videos.isEmpty {
-                ContentUnavailableView.search(text: model.searchedQuery ?? "")
-                    .listRowBackground(Color.clear)
-                if model.continuationToken != nil {
-                    loadMoreButton
-                }
-            } else {
-                ForEach(model.videos) { video in
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search videos", text: Bindable(model).query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .onSubmit { Task { await model.search() } }
+                if !model.query.isEmpty {
                     Button {
-                        Task { await add(video) }
+                        model.query = ""
                     } label: {
-                        videoRow(video)
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(model.isAdding)
-                }
-                if model.continuationToken != nil {
-                    loadMoreButton
+                    .accessibilityLabel("Clear Search")
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            List {
+                if model.isSearching {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                } else if model.searchFailed {
+                    ContentUnavailableView {
+                        Label("Search Unavailable", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Please try again.")
+                    } actions: {
+                        Button("Retry") { Task { await model.search() } }
+                    }
+                    .listRowBackground(Color.clear)
+                } else if model.searchedQuery == nil {
+                    ContentUnavailableView(
+                        "Find a Video",
+                        systemImage: "magnifyingglass",
+                        description: Text("Search by title or channel, then tap a video to add it.")
+                    )
+                    .listRowBackground(Color.clear)
+                } else if model.videos.isEmpty {
+                    ContentUnavailableView.search(text: model.searchedQuery ?? "")
+                        .listRowBackground(Color.clear)
+                    if model.continuationToken != nil {
+                        loadMoreButton
+                    }
+                } else {
+                    ForEach(model.videos) { video in
+                        Button {
+                            Task { await add(video) }
+                        } label: {
+                            videoRow(video)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.isAdding)
+                    }
+                    if model.continuationToken != nil {
+                        loadMoreButton
+                    }
+                }
+            }
+            .scrollDismissesKeyboard(.immediately)
         }
-        .scrollDismissesKeyboard(.immediately)
-        .searchable(
-            text: Bindable(model).query,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search videos"
-        )
-        .onSubmit(of: .search) { Task { await model.search() } }
     }
 
     private var loadMoreButton: some View {
