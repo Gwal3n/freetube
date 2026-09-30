@@ -6,7 +6,6 @@ struct RootTabShell: View {
     @Binding var selection: RootView.Tab
     let showsFeed: Bool
     let searchActivation: Int
-    let feedNavigationRequest: AppNavigationRequest?
     let libraryNavigationRequest: AppNavigationRequest?
     let downloadsNavigationRequest: AppNavigationRequest?
     let searchNavigationRequest: AppNavigationRequest?
@@ -28,7 +27,7 @@ struct RootTabShell: View {
             TabView(selection: $selection) {
                 if showsFeed {
                     SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: RootView.Tab.feed) {
-                        SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
+                        SubscriptionFeedScreen()
                     }
                 }
 
@@ -57,7 +56,7 @@ struct RootTabShell: View {
     private var legacyTabShell: some View {
         TabView(selection: $selection) {
             if showsFeed {
-                SubscriptionFeedScreen(navigationRequest: feedNavigationRequest)
+                SubscriptionFeedScreen()
                     .tabItem { Label("Feed", systemImage: "rectangle.stack") }
                     .tag(RootView.Tab.feed)
             }
