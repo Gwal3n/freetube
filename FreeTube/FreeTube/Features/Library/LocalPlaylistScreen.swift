@@ -13,6 +13,7 @@ struct LocalPlaylistScreen: View {
     @State private var isRestoring = false
     @State private var restoreError: String?
     @State private var showingEditor = false
+    @State private var showingAddVideo = false
     @State private var showingRestoreConfirmation = false
     @State private var editingMode: EditingMode?
     @State private var editMode: EditMode = .inactive
@@ -94,35 +95,43 @@ struct LocalPlaylistScreen: View {
                     Button("Done") { finishEditing() }
                 }
                 if editingMode == nil {
+                    if details?.playlist.isSavedFromYouTube == false {
+                        Button {
+                            showingAddVideo = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .accessibilityLabel("Add Video")
+                    }
                     Menu {
-                    Button {
-                        showingEditor = true
-                    } label: {
-                        Label("Edit Details", systemImage: "square.and.pencil")
-                    }
-                    Button {
-                        beginEditing()
-                    } label: {
-                        Label("Edit Playlist", systemImage: "list.bullet")
-                    }
-                    if details?.playlist.isSavedFromYouTube == true {
                         Button {
-                            showingRestoreConfirmation = true
+                            showingEditor = true
                         } label: {
-                            Label("Restore from YouTube", systemImage: "arrow.clockwise")
+                            Label("Edit Details", systemImage: "square.and.pencil")
                         }
-                        .disabled(isRestoring)
-                    }
-                    if let playlist = details?.playlist, playlist.metadataHydrationFailures > 0 {
                         Button {
-                            Task {
-                                await service.retryFailedMetadata(id: playlistID)
-                                await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
+                            beginEditing()
+                        } label: {
+                            Label("Edit Playlist", systemImage: "list.bullet")
+                        }
+                        if details?.playlist.isSavedFromYouTube == true {
+                            Button {
+                                showingRestoreConfirmation = true
+                            } label: {
+                                Label("Restore from YouTube", systemImage: "arrow.clockwise")
                             }
-                        } label: {
-                            Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
+                            .disabled(isRestoring)
                         }
-                    }
+                        if let playlist = details?.playlist, playlist.metadataHydrationFailures > 0 {
+                            Button {
+                                Task {
+                                    await service.retryFailedMetadata(id: playlistID)
+                                    await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
+                                }
+                            } label: {
+                                Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
+                            }
+                        }
                     } label: {
                         if isRestoring { ProgressView() } else { Image(systemName: "ellipsis.circle") }
                     }
@@ -144,6 +153,9 @@ struct LocalPlaylistScreen: View {
                     await reload()
                 }
             }
+        }
+        .sheet(isPresented: $showingAddVideo) {
+            AddVideoToPlaylistSheet(playlistID: playlistID)
         }
         .confirmationDialog(
             "Restore the original playlist?",

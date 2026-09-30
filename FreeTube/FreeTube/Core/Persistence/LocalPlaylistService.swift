@@ -21,6 +21,31 @@ final class LocalPlaylistService: Sendable {
     func details(id: String) async -> LocalPlaylistDetails? { await writer.details(playlistID: id) }
     func create(title: String) async -> String { await writer.create(title: title) }
     func add(video: Video, to playlistID: String) async { await writer.add(video: video, to: playlistID) }
+    /// Resolve a single pasted link before saving; unlike a CSV import, this action should
+    /// show an error for unavailable videos instead of leaving a placeholder in the list.
+    func addVideo(from link: String, to playlistID: String) async throws {
+        guard let id = YouTubeVideoLink.videoID(from: link, allowBareID: true) else {
+            throw LocalPlaylistAddError.invalidVideoLink
+        }
+        guard !(await writer.contains(videoID: id, playlistID: playlistID)) else {
+            throw LocalPlaylistAddError.alreadySaved
+        }
+        let placeholder = Video(
+            id: id, title: id, channelID: "", channelName: "",
+            channelThumbnailURL: nil,
+            thumbnailURL: URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"),
+            duration: nil, viewCount: nil, publishedAt: nil, descriptionSnippet: nil,
+            isLive: false, isShort: false
+        )
+        let video: Video
+        do {
+            video = try await resolveImportedMetadata(for: placeholder)
+        } catch LocalPlaylistImportError.noVideos {
+            throw LocalPlaylistAddError.videoUnavailable
+        }
+        try Task.checkCancellation()
+        await writer.add(video: video, to: playlistID)
+    }
     func remove(videoID: String, from playlistID: String) async { await writer.remove(videoID: videoID, from: playlistID) }
     func remove(videoIDs: Set<String>, from playlistID: String) async {
         await writer.remove(videoIDs: videoIDs, from: playlistID)
