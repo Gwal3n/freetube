@@ -33,6 +33,7 @@ struct LibraryScreen: View {
             switch destination {
             case .channel(let id):
                 ChannelScreen(channelID: id)
+                    .onAppear { log.info("Library channel destination appeared") }
             case .playlist(let id):
                 PlaylistScreen(playlistID: id)
             case .localPlaylist(let id):

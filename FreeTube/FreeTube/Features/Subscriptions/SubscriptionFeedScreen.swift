@@ -11,6 +11,7 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @State private var currentDate = Date.now
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -55,7 +56,9 @@ struct SubscriptionFeedScreen: View {
             }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
-                case .channel(let id): ChannelScreen(channelID: id)
+                case .channel(let id):
+                    ChannelScreen(channelID: id)
+                        .onAppear { log.info("Feed channel destination appeared") }
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
@@ -110,6 +113,7 @@ struct SubscriptionFeedScreen: View {
                 guard let request = navigationRequest,
                       request.id != handledNavigationRequestID else { return }
                 handledNavigationRequestID = request.id
+                log.info("Feed received player destination; appending to navigation path")
                 path.append(request.destination)
             }
         }

@@ -799,11 +799,15 @@ struct FullScreenPlayer: View {
     }
 
     private func openChannel(_ channelID: String) {
+        AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+            .info("Player Go to channel tapped; collapsing player")
         @Bindable var p = player
         p.fullScreenPresented = false
         Task { @MainActor in
             // Let the SwiftUI collapse animation begin before routing the tab below.
             try? await Task.sleep(for: .milliseconds(180))
+            AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+                .info("Player posting channel navigation")
             NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
         }
     }

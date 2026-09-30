@@ -16,6 +16,7 @@ struct HomeScreen: View {
     @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
+    private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
@@ -48,7 +49,9 @@ struct HomeScreen: View {
             ))
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
-                case .channel(let id): ChannelScreen(channelID: id)
+                case .channel(let id):
+                    ChannelScreen(channelID: id)
+                        .onAppear { navigationLog.info("Search channel destination appeared") }
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
@@ -70,6 +73,7 @@ struct HomeScreen: View {
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
+                navigationLog.info("Search received player destination")
                 openDestination(destination)
             }
             .onChange(of: searchActivation) { _, _ in

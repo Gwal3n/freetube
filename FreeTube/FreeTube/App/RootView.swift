@@ -134,6 +134,7 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in
             guard let channelID = note.object as? String, !channelID.isEmpty else { return }
+            log.info("Root received player channel navigation on tab=\(selectedTab.rawValue)")
             routeFromPlayer(.channel(channelID))
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenPlaylist)) { note in
@@ -192,6 +193,7 @@ struct RootView: View {
     /// minimization and system alerts never select a tab or create navigation requests.
     private func routeFromPlayer(_ destination: AppNavigationRequest.Destination) {
         let request = AppNavigationRequest(destination: destination)
+        log.info("Root routing player destination to tab=\(selectedTab.rawValue)")
         switch selectedTab {
         case .feed:
             feedNavigationRequest = request

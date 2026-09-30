@@ -155,6 +155,8 @@ struct DownloadsScreen: View {
             }
             .onChange(of: navigationRequest?.id) { _, _ in
                 guard let destination = navigationRequest?.destination else { return }
+                AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+                    .info("Downloads received player destination")
                 path.append(destination)
             }
         }
