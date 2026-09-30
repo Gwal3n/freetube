@@ -21,6 +21,14 @@ final class LocalPlaylistService: Sendable {
     func details(id: String) async -> LocalPlaylistDetails? { await writer.details(playlistID: id) }
     func create(title: String) async -> String { await writer.create(title: title) }
     func add(video: Video, to playlistID: String) async { await writer.add(video: video, to: playlistID) }
+    /// Search results already carry display metadata, so save them without a second video request.
+    func addSearchedVideo(_ video: Video, to playlistID: String) async throws {
+        guard !(await writer.contains(videoID: video.id, playlistID: playlistID)) else {
+            throw LocalPlaylistAddError.alreadySaved
+        }
+        try Task.checkCancellation()
+        await writer.add(video: video, to: playlistID)
+    }
     /// Resolve a single pasted link before saving; unlike a CSV import, this action should
     /// show an error for unavailable videos instead of leaving a placeholder in the list.
     func addVideo(from link: String, to playlistID: String) async throws {
