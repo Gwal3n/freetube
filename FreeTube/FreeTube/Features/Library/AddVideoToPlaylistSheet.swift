@@ -17,13 +17,13 @@ struct AddVideoToPlaylistSheet: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { dismiss() }
-                            .disabled(model.isAdding)
+                            .disabled(model.isUpdating)
                     }
                 }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .interactiveDismissDisabled(model.isAdding)
+        .interactiveDismissDisabled(model.isUpdating)
         .errorToast(Bindable(model).errorState)
         .task { await model.loadSavedVideos(in: playlistID) }
     }
@@ -37,9 +37,9 @@ struct AddVideoToPlaylistSheet: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
-                    .disabled(model.isAdding)
+                    .disabled(model.isUpdating || model.isLoadingSavedVideos)
                     .onSubmit { Task { await submit() } }
-                if model.isAdding {
+                if model.isUpdating || model.isLoadingSavedVideos {
                     ProgressView().controlSize(.small)
                 } else if !model.query.isEmpty {
                     if model.isCurrentInputSaved {
@@ -95,12 +95,12 @@ struct AddVideoToPlaylistSheet: View {
                 } else {
                     ForEach(model.videos) { video in
                         Button {
-                            Task { await add(video) }
+                            Task { await toggle(video) }
                         } label: {
                             videoRow(video)
                         }
                         .buttonStyle(ResponsiveButtonStyle())
-                        .disabled(model.isAdding || model.isSaved(video))
+                        .disabled(model.isUpdating || model.isLoadingSavedVideos)
                         .accessibilityValue(model.isSaved(video) ? "Saved" : "Not saved")
                     }
                     if model.continuationToken != nil {
@@ -126,7 +126,7 @@ struct AddVideoToPlaylistSheet: View {
                 Spacer()
             }
         }
-        .disabled(model.isLoadingMore || model.isAdding)
+        .disabled(model.isLoadingMore || model.isUpdating)
     }
 
     private func videoRow(_ video: Video) -> some View {
@@ -158,11 +158,11 @@ struct AddVideoToPlaylistSheet: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 3)
-        .accessibilityLabel(isSaved ? "\(video.title) is in the playlist" : "Add \(video.title) to playlist")
+        .accessibilityLabel(isSaved ? "Remove \(video.title) from playlist" : "Add \(video.title) to playlist")
     }
 
-    private func add(_ video: Video) async {
-        await model.add(video: video, to: playlistID)
+    private func toggle(_ video: Video) async {
+        await model.toggle(video: video, in: playlistID)
     }
 
     private func submit() async {

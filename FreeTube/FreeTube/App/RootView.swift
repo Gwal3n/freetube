@@ -15,7 +15,7 @@ struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("com.leshko.freetube.selectedTab") private var selectedTabRaw = Tab.feed.rawValue
+    @Binding var selectedTab: Tab
     @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var navigationRouter = AppNavigationRouter()
@@ -33,11 +33,6 @@ struct RootView: View {
 
     enum Tab: String, Hashable {
         case feed, search, library, downloads
-    }
-
-    private var selectedTab: Tab {
-        get { Tab(rawValue: selectedTabRaw) ?? .feed }
-        nonmutating set { selectedTabRaw = newValue.rawValue }
     }
 
     private var queueNoticeBottomPadding: CGFloat {

@@ -15,10 +15,13 @@ import SwiftData
 @available(iOS 17.0, *)
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
+    // Process-local: preserve the user's tab while SwiftUI rebuilds the root, but start a
+    // genuinely new launch on Feed instead of restoring a UserDefaults-backed selection.
+    @State private var selectedTab: RootView.Tab = .feed
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(selectedTab: $selectedTab)
                 .environment(appEnvironment.playerStateManager)
                 .modelContainer(PersistenceController.sharedContainer)
                 // Dark-only appearance app-wide. No user-facing toggle — the player chrome,

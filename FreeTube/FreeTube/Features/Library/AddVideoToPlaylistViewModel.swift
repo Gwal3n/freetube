@@ -18,7 +18,8 @@ final class AddVideoToPlaylistViewModel {
             }
         }
     }
-    private(set) var isAdding = false
+    private(set) var isUpdating = false
+    private(set) var isLoadingSavedVideos = true
     private(set) var isSearching = false
     private(set) var isLoadingMore = false
     private(set) var videos: [Video] = []
@@ -42,8 +43,9 @@ final class AddVideoToPlaylistViewModel {
     }
 
     func loadSavedVideos(in playlistID: String) async {
+        defer { isLoadingSavedVideos = false }
         guard let details = await service.details(id: playlistID) else { return }
-        savedVideoIDs.formUnion(details.videos.map(\.id))
+        savedVideoIDs = Set(details.videos.map(\.id))
     }
 
     func isSaved(_ video: Video) -> Bool { savedVideoIDs.contains(video.id) }
@@ -96,11 +98,16 @@ final class AddVideoToPlaylistViewModel {
         }
     }
 
-    func add(video: Video, to playlistID: String) async {
-        guard !isAdding, !savedVideoIDs.contains(video.id) else { return }
-        isAdding = true
+    func toggle(video: Video, in playlistID: String) async {
+        guard !isUpdating, !isLoadingSavedVideos else { return }
+        isUpdating = true
         errorState = nil
-        defer { isAdding = false }
+        defer { isUpdating = false }
+        if savedVideoIDs.contains(video.id) {
+            await service.remove(videoID: video.id, from: playlistID)
+            savedVideoIDs.remove(video.id)
+            return
+        }
         do {
             try await service.addSearchedVideo(video, to: playlistID)
             savedVideoIDs.insert(video.id)
@@ -109,7 +116,7 @@ final class AddVideoToPlaylistViewModel {
         }
     }
 
-    /// The one field accepts either a direct video reference or a normal search phrase.
+    /// The one field searches phrases and toggles saved state for direct video references.
     func submit(to playlistID: String) async {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return }
@@ -117,14 +124,17 @@ final class AddVideoToPlaylistViewModel {
             await search()
             return
         }
-        guard !isAdding else { return }
+        guard !isUpdating, !isLoadingSavedVideos else { return }
+        errorState = nil
         if savedVideoIDs.contains(id) {
-            errorState = ErrorState(from: LocalPlaylistAddError.alreadySaved)
+            isUpdating = true
+            await service.remove(videoID: id, from: playlistID)
+            savedVideoIDs.remove(id)
+            isUpdating = false
             return
         }
-        isAdding = true
-        errorState = nil
-        defer { isAdding = false }
+        isUpdating = true
+        defer { isUpdating = false }
         do {
             try await service.addVideo(from: term, to: playlistID)
             savedVideoIDs.insert(id)
