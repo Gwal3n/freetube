@@ -13,6 +13,7 @@ final class SubscriptionFeedViewModel {
     private(set) var hasLoaded = false
     private(set) var failedChannelCount = 0
     private(set) var canLoadMore = false
+    private(set) var lastRefreshAt: Date?
 
     private let pageSize = 100
     private var visibleLimit = 100
@@ -81,10 +82,12 @@ final class SubscriptionFeedViewModel {
         let refreshedVideos = snapshots.map(\.video)
         let totalCount = await writer.subscriptionFeedCount()
         let progress = await writer.watchProgress(videoIDs: refreshedVideos.map(\.id))
+        let refreshDate = await writer.latestSubscriptionFeedRefreshDate()
         // Commit rows and their progress together, rather than painting fresh rows with stale
         // progress while the remaining persistence reads are suspended.
         videos = refreshedVideos
         canLoadMore = refreshedVideos.count < totalCount
         playbackProgress = progress
+        lastRefreshAt = refreshDate
     }
 }

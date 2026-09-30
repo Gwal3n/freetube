@@ -53,6 +53,15 @@ actor PersistenceWriter {
         (try? modelContext.fetchCount(FetchDescriptor<SubscriptionFeedEntry>())) ?? 0
     }
 
+    /// Latest successful cached channel refresh, independent of video publish order.
+    func latestSubscriptionFeedRefreshDate() -> Date? {
+        var descriptor = FetchDescriptor<SubscriptionFeedEntry>(
+            sortBy: [SortDescriptor(\SubscriptionFeedEntry.refreshedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return (try? modelContext.fetch(descriptor))?.first?.refreshedAt
+    }
+
     /// Replaces only one successfully refreshed channel. Failed channels consequently retain
     /// their last good rows, while a successful empty response correctly clears stale entries.
     func replaceSubscriptionFeedChannel(channelID: String, videos: [Video], refreshedAt: Date) {

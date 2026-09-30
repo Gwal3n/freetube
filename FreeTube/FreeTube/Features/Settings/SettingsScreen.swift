@@ -2,11 +2,6 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
-    private enum Destination: String, Hashable {
-        case sponsorBlock, playerControls, importData
-    }
-
-    @State private var path = NavigationPath()
     @Environment(\.dismiss) private var dismiss
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
@@ -24,7 +19,7 @@ struct SettingsScreen: View {
     @State private var showingClearHistoryConfirmation = false
 
     var body: some View {
-        NavigationStack(path: navigationPathBinding) {
+        NavigationStack {
             Form {
                 Section {
                     Picker("Preferred quality", selection: Bindable(model).preferredQuality) {
@@ -80,15 +75,15 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    Button {
-                        open(.sponsorBlock)
+                    NavigationLink {
+                        SponsorBlockSettingsScreen(model: model)
+                            .onAppear { log.info("Settings SponsorBlock destination appeared") }
                     } label: {
                         HStack {
                             Text("Categories and behavior")
                             Spacer()
                             Text(model.sponsorBlockEnabled ? "On" : "Off")
                                 .foregroundStyle(.secondary)
-                            disclosureIndicator
                         }
                         .foregroundStyle(.primary)
                         .contentShape(Rectangle())
@@ -113,8 +108,9 @@ struct SettingsScreen: View {
                 }
 
                 Section("Player controls") {
-                    Button {
-                        open(.playerControls)
+                    NavigationLink {
+                        PlayerControlsSettingsScreen(model: model)
+                            .onAppear { log.info("Settings controls destination appeared") }
                     } label: {
                         navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
                     }
@@ -122,8 +118,9 @@ struct SettingsScreen: View {
                 }
 
                 Section("Data") {
-                    Button {
-                        open(.importData)
+                    NavigationLink {
+                        ImportDataScreen()
+                            .onAppear { log.info("Settings import destination appeared") }
                     } label: {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
@@ -267,16 +264,6 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
-            .navigationDestination(for: Destination.self) { destination in
-                switch destination {
-                case .sponsorBlock:
-                    SponsorBlockSettingsScreen(model: model)
-                case .playerControls:
-                    PlayerControlsSettingsScreen(model: model)
-                case .importData:
-                    ImportDataScreen()
-                }
-            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -323,29 +310,6 @@ struct SettingsScreen: View {
                 Text("This removes watch history stored by FreeTube on this device.")
             }
         }
-        .onChange(of: path.count) { previous, current in
-            log.info("Settings path rendered: \(previous) → \(current)")
-        }
-    }
-
-    private var navigationPathBinding: Binding<NavigationPath> {
-        Binding(get: { path }, set: { updated in
-            log.info("Settings framework path write: \(path.count) → \(updated.count)")
-            path = updated
-        })
-    }
-
-    private func open(_ destination: Destination) {
-        log.info("Settings action requested: \(destination.rawValue) depth=\(path.count)")
-        path.append(destination)
-        log.info("Settings path appended: \(destination.rawValue) depth=\(path.count)")
-    }
-
-    private var disclosureIndicator: some View {
-        Image(systemName: "chevron.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.tertiary)
-            .accessibilityHidden(true)
     }
 
     private var appVersion: String {
@@ -363,12 +327,7 @@ struct SettingsScreen: View {
     }
 
     private func navigationLabel(_ title: String, systemImage: String) -> some View {
-        HStack {
-            Label(title, systemImage: systemImage)
-            Spacer()
-            disclosureIndicator
-        }
+        Label(title, systemImage: systemImage)
         .foregroundStyle(.primary)
-        .contentShape(Rectangle())
     }
 }

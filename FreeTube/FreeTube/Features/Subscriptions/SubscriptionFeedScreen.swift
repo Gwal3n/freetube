@@ -16,6 +16,18 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
+                if let lastRefreshAt = model.lastRefreshAt {
+                    HStack(spacing: 4) {
+                        Text("Last refreshed")
+                        Text(lastRefreshAt, style: .relative)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .accessibilityElement(children: .combine)
+                }
                 if model.failedChannelCount > 0 {
                     Section {
                         Label(
@@ -49,11 +61,6 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .navigationTitle("Feed")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    FeedRefreshProgress(model: model)
-                }
-            }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id):
@@ -93,6 +100,9 @@ struct SubscriptionFeedScreen: View {
                 } else if model.videos.isEmpty && model.isRefreshing {
                     MediaListPlaceholder()
                 }
+            }
+            .overlay(alignment: .top) {
+                FeedRefreshProgress(model: model)
             }
             .task { await model.load() }
             .task {
