@@ -9,8 +9,8 @@ import OSLog
 /// that real URLs need `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running
 /// them first was spending ~1.5s per play on candidates that could not be produced. They still earn
 /// their place behind the native resolver for the cases where it comes back empty.
-/// The download pipeline remains a final compatibility fallback and explicit Download actions
-/// continue to use `DownloadManager` directly.
+/// Playback never starts a download as a side effect. Explicit Download actions continue to use
+/// `DownloadManager` directly.
 final class PlaybackResolver: PlaybackResolving {
     private let downloads: DownloadManagerLike
     private let nativeStreams: any NativeStreamServicing
@@ -79,12 +79,8 @@ final class PlaybackResolver: PlaybackResolving {
             } catch {}
         }
 
-        guard !strategies.contains(.legacyDownload) else {
-            throw PlaybackResolverError.noRemainingCandidates
-        }
-        log.notice("Direct resolvers failed for \(videoID, privacy: .public); using legacy download fallback")
-        let url = try await downloads.ensureDownloaded(video: video, quality: quality, priority: .userInitiated)
-        return PlaybackCandidate(source: .localFile(url), strategy: .legacyDownload)
+        log.notice("No playable stream remained for \(videoID, privacy: .public)")
+        throw PlaybackResolverError.noRemainingCandidates
     }
 
     private static func pickStreamURL(from info: VideoInfo, quality: VideoQuality) -> URL? {
@@ -106,13 +102,12 @@ final class PlaybackResolver: PlaybackResolving {
 private enum PlaybackResolverError: LocalizedError {
     case noRemainingCandidates
 
-    var errorDescription: String? { "No playable stream candidate remained." }
+    var errorDescription: String? { "This video couldn't be played because no stream was available." }
 }
 
-/// Subset of `DownloadManager` the resolver depends on. Allows tests to swap a mock.
+/// Local-file lookup used by playback. Allows tests to swap a mock without initiating downloads.
 protocol DownloadManagerLike: Sendable {
     func localFile(for videoID: String) -> URL?
-    func ensureDownloaded(video: Video, quality: VideoQuality, priority: DownloadPriority) async throws -> URL
 }
 
 @available(iOS 17.0, *)

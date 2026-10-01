@@ -1558,7 +1558,7 @@ final class PlayerStateManager {
         switch strategy {
         case .b5iIOS, .b5iTVHTML5:
             return .seconds(4)
-        case .localFile, .native, .legacyDownload:
+        case .localFile, .native:
             return .seconds(12)
         }
     }

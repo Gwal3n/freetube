@@ -153,7 +153,7 @@ in an `AVPlayerItem`, and never imports either extraction library itself. Resolu
 2. **Native local extraction, HLS-first.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It reads the InnerTube player response's `hlsManifestUrl` **before** touching `youtube.streams`, for live and on-demand alike. That path never runs the JavaScriptCore signature/n-parameter solver, which re-parses the whole ~2.5 MB player.js once per InnerTube client and was costing ~4s per play for a result the resolver then discarded in favour of this same HLS URL. Progressive selection (natively playable audio+video within `preferredQuality.heightCap`) runs only when no HLS manifest exists, and remains the sole path for the `audioOnly` preference since a master playlist always carries video. The dependency's hosted remote extractor is never enabled. Candidates are AVPlayer-validated.
    The same cached player response also supplies `playerStoryboardSpecRenderer`; the native result carries that dependency-neutral storyboard with the stream candidate, so previews require no second player request.
 3. **b5i direct streams, validated by AVPlayer.** `PlaybackResolver` produces iOS and then TVHTML5 HLS/progressive candidates through `VideoService`. These sit *behind* the native resolver: for ordinary VOD, `VideoInfosResponse` reports no HLS URL and its formats carry metadata without usable URLs (upstream documents that real URLs require `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running them first spent ~1.5s per play on candidates that could not be produced. `PlayerStateManager` only accepts a candidate after its `AVPlayerItem` reaches `.readyToPlay`; failure or a four-second readiness timeout advances to the next strategy.
-4. **Legacy download fallback.** Only after every direct resolver fails, `DownloadManager.ensureDownloaded` runs the existing yt-dlp → YouTubeKit download pipeline. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
+4. **Failure without a side-effect download.** If every direct resolver fails, playback reports a stream failure. It must not start an offline download. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
 
 Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
 `AVPlayerItem.preferredMaximumResolution` from `preferredQuality.heightCap` so the user's quality
@@ -445,18 +445,18 @@ and a rejected strategy is excluded before requesting the next candidate.
   nested stale-container path.
 - Visible in the Downloads screen, playable offline.
 
-### Playback-side download (compatibility fallback)
+### Playback and downloads stay separate
 
-- `PlaybackResolver` calls `ensureDownloaded` at `.userInitiated` priority only after every direct candidate has failed AVPlayer validation.
-- Successful direct playback does not create an offline file. The Downloads tab changes only after an explicit download or a legacy playback fallback.
+- `PlaybackResolver` checks existing local files and direct streams only. Failed playback reports an error rather than calling `ensureDownloaded`.
+- Playback never creates an offline file. The Downloads tab changes only after an explicit download.
 - Automatic next-item download prefetch is disabled; recommendation queue filling does not initiate downloads.
 
 ### PythonRunner priority queue
 
-- **`.high` / `.userInitiated`** — play taps. Jumps the line.
+- **`.high` / `.userInitiated`** — explicitly initiated high-priority downloads. Jumps the line.
 - **`.low` / `.background`** — Download All, queue prefetch.
 - Within priority: FIFO. Cannot preempt the currently-running yt-dlp (Python has no safe interrupt point).
-- This is the fix for "user taps a video while a 50-item playlist Download All is in flight" — without the priority lane the user waits behind the entire batch.
+- This priority lane keeps an explicit one-video download from waiting behind a playlist Download All batch.
 
 ### Network gate
 

@@ -9,9 +9,8 @@ import SwiftUI
 ///   `PlayerArtworkBackdrop`'s thumbnail. All we add is a small spinner, with no scrim and no label:
 ///   dimming the artwork and captioning it "Preparing…" is exactly the "this app is loading" tell
 ///   the perception pass exists to remove.
-/// - **`.downloading` / `.failed`** — the legacy yt-dlp fallback and hard errors, which can run for
-///   minutes and genuinely need words. These keep the dimmed scrim, the label, and the determinate
-///   bar, now reading over the thumbnail rather than over black.
+/// - **`.downloading` / `.failed`** — long-running transfer feedback and hard errors. These keep
+///   the dimmed scrim, the label, and the determinate bar over the thumbnail rather than black.
 @available(iOS 17.0, *)
 struct DownloadProgressOverlay: View {
     let state: PlayerStateManager.LoadState

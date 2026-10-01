@@ -35,12 +35,6 @@ struct DownloadOptionsPopover: View {
                 }
             }
             .scrollIndicators(.hidden)
-
-            Text("Approximate sizes when available. Exact size appears after download.")
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.65))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
         }
         .foregroundStyle(.white)
         .frame(width: 282, height: verticalSizeClass == .compact ? 260 : 450)
