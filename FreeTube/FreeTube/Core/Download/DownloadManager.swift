@@ -1057,24 +1057,38 @@ final class DownloadManager: TemporaryDownloading {
 
     /// Downloads a single stream to `destination` with periodic progress updates fed into
     /// `handleProgress` so the UI's progress bar moves.
-    private func downloadStream(from url: URL, to destination: URL, videoID: String, snapshotID: String, title: String) async throws {
+    private func downloadStream(
+        from url: URL,
+        to destination: URL,
+        videoID: String,
+        snapshotID: String,
+        title: String,
+        sendTVClientUserAgent: Bool = true,
+        sourceLabel: String = "fallback"
+    ) async throws {
         try? FileManager.default.removeItem(at: destination)
         var request = URLRequest(url: url)
-        // Match the TVHTML5_SIMPLY_EMBEDDED_PLAYER user-agent we set on `tvHtmlModel`.
-        // The CDN occasionally rejects requests whose UA doesn't match the client that minted
-        // the URL.
-        request.setValue("Mozilla/5.0 (PlayStation; PlayStation 4/12.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        if sendTVClientUserAgent {
+            // Match the TVHTML5_SIMPLY_EMBEDDED_PLAYER user-agent we set on `tvHtmlModel`.
+            // The CDN occasionally rejects requests whose UA doesn't match the client that
+            // minted the URL. Native progressive audio uses URLSession's normal agent instead.
+            request.setValue("Mozilla/5.0 (PlayStation; PlayStation 4/12.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        }
 
         let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw YouTubeServiceError.streamExtractionFailed
         }
         guard (200..<300).contains(http.statusCode) else {
-            log.error("[fallback] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
+            log.error("[\(sourceLabel, privacy: .public)] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
         let expected = http.expectedContentLength
-        let total = expected > 0 ? Int(expected) : 0
+        // Googlevideo sometimes omits Content-Length while retaining its `clen` parameter.
+        // Read it for progress only; never persist or log the signed URL itself.
+        let declaredLength = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int.init)
+        let total = expected > 0 ? Int(expected) : (declaredLength ?? 0)
 
         // Write the streamed bytes to disk in 64 KB chunks so we don't buffer the entire
         // video in memory. Emit progress on every chunk; `handleProgress` itself throttles
@@ -1091,6 +1105,7 @@ final class DownloadManager: TemporaryDownloading {
         for try await byte in asyncBytes {
             buffer.append(byte)
             if buffer.count >= 65_536 {
+                try Task.checkCancellation()
                 try handle.write(contentsOf: buffer)
                 written += buffer.count
                 buffer.removeAll(keepingCapacity: true)
@@ -1113,22 +1128,23 @@ final class DownloadManager: TemporaryDownloading {
         }
         try handle.synchronize()
         try handle.close()
-        log.info("[fallback] wrote \(written, privacy: .public) bytes to \(destination.lastPathComponent, privacy: .public)")
+        log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes to \(destination.lastPathComponent, privacy: .public)")
 
         guard written >= Self.minimumDownloadSize else {
-            log.error("[fallback] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
+            log.error("[\(sourceLabel, privacy: .public)] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
             try? FileManager.default.removeItem(at: destination)
             throw YouTubeServiceError.streamExtractionFailed
         }
         if expected > 0, Int64(written) != expected {
-            log.error("[fallback] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
+            log.error("[\(sourceLabel, privacy: .public)] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
             try? FileManager.default.removeItem(at: destination)
             throw YouTubeServiceError.streamExtractionFailed
         }
     }
 
-    /// Materializes the exact HLS source used by normal playback through the native transfer
-    /// service. Neither embedded Python nor yt-dlp participates in the primary download path.
+    /// Materializes the native source used by playback. Audio-only resolution returns a direct
+    /// progressive media URL, not an HLS manifest, so it uses the existing bounded-memory stream
+    /// writer. Video continues through the HLS transfer service. Neither path needs embedded Python.
     private func downloadResolvedSource(
         _ source: URL,
         to destination: URL,
@@ -1137,6 +1153,35 @@ final class DownloadManager: TemporaryDownloading {
         video: Video,
         snapshotID: String
     ) async throws {
+        if audioOnly {
+            log.info("native-download[\(video.id, privacy: .public)] direct progressive audio transfer")
+            phaseByVideoID[video.id] = "audio"
+            let temporaryAudio = destination.deletingPathExtension().appendingPathExtension("audio.m4a")
+            defer { try? FileManager.default.removeItem(at: temporaryAudio) }
+            try await downloadStream(
+                from: source,
+                to: temporaryAudio,
+                videoID: video.id,
+                snapshotID: snapshotID,
+                title: video.title,
+                sendTVClientUserAgent: false,
+                sourceLabel: "native-audio"
+            )
+            try Task.checkCancellation()
+            phaseByVideoID[video.id] = "muxing"
+            publish(snapshot: DownloadTaskSnapshot(
+                id: snapshotID, videoID: video.id, title: video.title,
+                state: .downloading(progress: 0), createdAt: .now
+            ))
+            let exit = await FFmpegRunner.shared.run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
+                "-i", temporaryAudio.path, "-map", "0:a:0", "-vn", "-c:a", "copy",
+                "-movflags", "+faststart", destination.path
+            ])
+            try Task.checkCancellation()
+            guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
+            return
+        }
         let fragmentCount = max(1, min(16, preferences.concurrentFragments))
         log.info("native-download[\(video.id, privacy: .public)] native HLS transfer concurrency=\(fragmentCount, privacy: .public)")
         try await NativeHLSDownloadService().download(
