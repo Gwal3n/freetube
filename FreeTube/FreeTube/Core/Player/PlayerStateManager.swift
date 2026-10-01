@@ -137,6 +137,7 @@ final class PlayerStateManager {
     private struct PlaybackHistoryItem {
         let video: Video
         let skipRecommendations: Bool
+        let preservesPlaylistPosition: Bool
     }
     private var playbackHistory: [PlaybackHistoryItem] = []
     private var playbackHistoryIndex = -1
@@ -356,13 +357,16 @@ final class PlayerStateManager {
     ///   Search / Mini-player still get the YouTube-app-style autoplay chain.
     /// - Parameter expandPlayer: when `true`, opens the popup immediately. Automatic queue
     ///   transitions pass `false` so a user who collapsed the player is not pulled back into it.
+    /// - Parameter preservePlaylistPosition: plays a manual-queue item between playlist videos
+    ///   without adding it to the playlist or advancing the playlist's current position.
     func load(
         _ video: Video,
         autoplay: Bool = true,
         skipRecommendations: Bool = false,
         expandPlayer: Bool = true,
         recordInPlaybackHistory: Bool = true,
-        localFileURL: URL? = nil
+        localFileURL: URL? = nil,
+        preservePlaylistPosition: Bool = false
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
         if localFileURL == nil, currentVideo?.id == video.id {
@@ -392,8 +396,13 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         videoPresentationSize = .zero
+        let isPlaylistInterlude = preservePlaylistPosition && skipRecommendations && activePlaylist != nil
         if recordInPlaybackHistory {
-            recordPlaybackNavigation(video: video, skipRecommendations: skipRecommendations)
+            recordPlaybackNavigation(
+                video: video,
+                skipRecommendations: skipRecommendations,
+                preservesPlaylistPosition: isPlaylistInterlude
+            )
         }
         queueAcceptsRecommendations = !skipRecommendations
         if skipRecommendations, activePlaylist != nil {
@@ -426,7 +435,9 @@ final class PlayerStateManager {
         // Ordinary playback gets a fresh, bounded recommendation set for each video and retains no
         // history. Explicit playlist batches keep their curated order and skip recommendations.
         if skipRecommendations {
-            queue.setCurrent(video)
+            if !isPlaylistInterlude {
+                queue.setCurrent(video)
+            }
         } else {
             queue.replace(with: [video])
         }
@@ -465,7 +476,8 @@ final class PlayerStateManager {
             let previous = playbackHistory[playbackHistoryIndex]
             playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
                 video: video,
-                skipRecommendations: previous.skipRecommendations
+                skipRecommendations: previous.skipRecommendations,
+                preservesPlaylistPosition: previous.preservesPlaylistPosition
             )
         }
         refreshArtwork(for: video)
@@ -789,14 +801,24 @@ final class PlayerStateManager {
                 item.video,
                 skipRecommendations: item.skipRecommendations,
                 expandPlayer: false,
-                recordInPlaybackHistory: false
+                recordInPlaybackHistory: false,
+                preservePlaylistPosition: item.preservesPlaylistPosition
             )
             return
         }
         if let next = manualQueue.first {
             manualQueue.removeFirst()
             persistManualQueue()
-            load(next, expandPlayer: false)
+            let interruptsPlaylist = activePlaylist != nil
+            if interruptsPlaylist {
+                log.info("Playing manual queue interlude; preserving playlist index=\(self.queue.currentIndex, privacy: .public)")
+            }
+            load(
+                next,
+                skipRecommendations: interruptsPlaylist,
+                expandPlayer: false,
+                preservePlaylistPosition: interruptsPlaylist
+            )
             return
         }
         if let next = queue.advance() {
@@ -840,7 +862,8 @@ final class PlayerStateManager {
             item.video,
             skipRecommendations: item.skipRecommendations,
             expandPlayer: false,
-            recordInPlaybackHistory: false
+            recordInPlaybackHistory: false,
+            preservePlaylistPosition: item.preservesPlaylistPosition
         )
     }
 
@@ -941,7 +964,11 @@ final class PlayerStateManager {
         sponsorBlockNotice = nil
     }
 
-    private func recordPlaybackNavigation(video: Video, skipRecommendations: Bool) {
+    private func recordPlaybackNavigation(
+        video: Video,
+        skipRecommendations: Bool,
+        preservesPlaylistPosition: Bool
+    ) {
         if playbackHistory.indices.contains(playbackHistoryIndex),
            playbackHistory[playbackHistoryIndex].video.id == video.id {
             return
@@ -951,7 +978,8 @@ final class PlayerStateManager {
         }
         playbackHistory.append(PlaybackHistoryItem(
             video: video,
-            skipRecommendations: skipRecommendations
+            skipRecommendations: skipRecommendations,
+            preservesPlaylistPosition: preservesPlaylistPosition
         ))
         if playbackHistory.count > 50 {
             playbackHistory.removeFirst(playbackHistory.count - 50)
