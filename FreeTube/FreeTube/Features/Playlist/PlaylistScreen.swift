@@ -34,15 +34,12 @@ struct PlaylistScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let details = model.details {
-                    // The artwork fills the available width; only the metadata and controls
-                    // use the standard horizontal content inset. A blurred copy continues
-                    // behind the navigation area while the expanded header is visible.
+                    // The artwork owns the top edge and actions; metadata keeps the standard
+                    // content inset below it. The image continues beneath the transparent bar.
                     VStack(alignment: .leading, spacing: 16) {
                         artworkHeader(details)
                         PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
-                        actionToolbar(details)
                     }
-                    .padding(.top, 12)
                     .padding(.bottom, 16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background {
@@ -68,6 +65,7 @@ struct PlaylistScreen: View {
                 }
             }
         }
+        .ignoresSafeArea(.container, edges: model.details == nil ? [] : .top)
         .background(Color.black)
         .coordinateSpace(name: "playlistScroll")
         .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
@@ -175,11 +173,15 @@ struct PlaylistScreen: View {
                 .clipped()
                 .overlay(alignment: .bottom) {
                     LinearGradient(
-                        colors: [.clear, .black.opacity(0.35)],
+                        colors: [.clear, .black.opacity(0.65)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .frame(height: 70)
+                    .frame(height: 100)
+                }
+                .overlay(alignment: .bottom) {
+                    actionToolbar(details)
+                        .padding(.bottom, 12)
                 }
         }
         .aspectRatio(16 / 9, contentMode: .fit)
