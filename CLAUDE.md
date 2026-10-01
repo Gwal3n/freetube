@@ -444,6 +444,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   embedded Python can corrupt Foundation's lazy `.documentDirectory` search-path result into a
   nested stale-container path.
 - Visible in the Downloads screen, playable offline.
+- Native audio-only and direct Link transfers use `DirectFileDownloadService`, which writes through
+  a `URLSessionDownloadTask` with delegate progress. Do not return to per-byte
+  `URLSession.AsyncBytes` iteration: on device it limited an 18 MB audio file to about 32 KB/s.
+  Normal video HLS transfers continue through `NativeHLSDownloadService`.
 
 ### Playback and downloads stay separate
 

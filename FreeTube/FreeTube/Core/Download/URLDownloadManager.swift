@@ -8,7 +8,7 @@ import OSLog
 /// non-YouTube workflows don't drag along Video / SwiftData / queue-priority concerns.
 ///
 /// **Dispatch by protocol** (CLAUDE.md §15.3 — yt-dlp's Python-side ffmpeg merger hangs):
-///   - `.https` (plain HTTP/HTTPS direct file) → `URLSession.bytes(for:)` with real %-progress.
+///   - `.https` (plain HTTP/HTTPS direct file) → file-backed URLSession download with real %-progress.
 ///   - `.hls` (m3u8 manifest) → `FFmpegRunner.run(["-i", url, "-c", "copy", …])`. ffmpeg reads
 ///     the manifest, fetches segments, writes a single mp4. No incremental progress (FFmpegSupport
 ///     doesn't surface stderr), so the UI shows an indeterminate spinner with elapsed time.
@@ -39,9 +39,8 @@ final class URLDownloadManager {
     /// (instead of just hiding the row). Cleared on completion/failure/cancellation.
     @ObservationIgnored private var taskHandles: [String: Task<URL, Error>] = [:]
 
-    // `nonisolated` so the off-main execute() chain (downloadDirect's byte loop in
-    // particular) can read these without hopping back to the main actor for every log
-    // line / cookie peek.
+    // `nonisolated` so the off-main execute() chain can read these without hopping back
+    // to the main actor for every log line / cookie peek.
     @ObservationIgnored private nonisolated let log = AppLog(subsystem: "com.leshko.freetube", category: "URLDownloadManager")
     @ObservationIgnored private nonisolated let preferences = UserPreferences()
 
@@ -94,8 +93,8 @@ final class URLDownloadManager {
 
         // **Detached** so the worker runs off the main actor. With the class marked
         // `@MainActor`, a plain `Task { }` here would inherit MainActor isolation
-        // (CLAUDE.md §15.12), pinning the entire URLSession byte-loop and ffmpeg
-        // orchestration to the main thread. `execute` and the helpers it calls are all
+        // (CLAUDE.md §15.12), pinning transfer orchestration and ffmpeg to the main
+        // thread. `execute` and the helpers it calls are all
         // `nonisolated` — they hop back to main only via `await updateState(...)` for
         // the few `@Observable jobs[key]` writes.
         let task = Task.detached(priority: .utility) { [weak self] in
@@ -177,8 +176,8 @@ final class URLDownloadManager {
         }
     }
 
-    /// Cancels a live download. The `URLSession.bytes` loop checks `Task.checkCancellation()`
-    /// after every 64KB chunk, so HTTPS downloads stop quickly. The ffmpeg-driven HLS/DASH
+    /// Cancels a live download. The direct file transfer cancels its URLSession task with the
+    /// worker Task, so HTTPS downloads stop promptly. The ffmpeg-driven HLS/DASH
     /// path can't be interrupted mid-segment (FFmpegSupport has no cancellation hook), so
     /// HLS downloads finish their current ffmpeg call before the cancel takes effect.
     ///
@@ -455,52 +454,31 @@ final class URLDownloadManager {
         }
     }
 
-    /// Plain HTTPS download via `URLSession.bytes`. Mirrors `DownloadManager.downloadStream`
-    /// — same 64 KB buffered writes, same progress emission via the actor-isolated state map.
+    /// Plain HTTPS transfer backed by a URLSession download task. The previous per-byte async
+    /// loop was needlessly slow for both direct Link video and audio downloads.
     private nonisolated func downloadDirect(url: URL, destination: URL, key: String, totalBytes: Int64?, phaseLabel: String? = nil) async throws {
+        try? FileManager.default.removeItem(at: destination)
         var request = URLRequest(url: url)
         // Some CDNs reject default URLSession UA; use a generic browser string. yt-dlp itself
         // does the same. We don't carry cookies — generic URLs are usually unauthenticated.
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw FetchError.httpStatus((response as? HTTPURLResponse)?.statusCode ?? -1)
-        }
-        let expected: Int64 = http.expectedContentLength > 0 ? http.expectedContentLength : (totalBytes ?? 0)
-
-        FileManager.default.createFile(atPath: destination.path, contents: nil)
-        guard let handle = try? FileHandle(forWritingTo: destination) else {
-            throw FetchError.cannotWrite(destination.path)
-        }
-        defer { try? handle.close() }
-
-        var buffer = Data()
-        buffer.reserveCapacity(65_536)
-        var written: Int64 = 0
-        var lastEmit: ContinuousClock.Instant = .now
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            buffer.append(byte)
-            if buffer.count >= 65_536 {
-                try handle.write(contentsOf: buffer)
-                written += Int64(buffer.count)
-                buffer.removeAll(keepingCapacity: true)
-                // Throttle: emit at most ~5 updates / sec so we don't thrash the @Observable
-                // dictionary. Same throttle window `DownloadManager` uses for yt-dlp progress.
-                let now = ContinuousClock.now
-                if (now - lastEmit) > .milliseconds(200) {
-                    lastEmit = now
-                    let pct = expected > 0 ? Double(written) / Double(expected) : 0
-                    try await updateState(key: key, .downloading(progress: pct, phase: phaseLabel))
-                }
+        let startedAt = Date()
+        let response = try await DirectFileDownloadService.download(
+            request: request,
+            to: destination,
+            expectedSizeHint: totalBytes
+        ) { [weak self] written, total in
+            Task { @MainActor [weak self] in
+                guard let self, let job = self.jobs[key], !job.state.isTerminal else { return }
+                let pct = total > 0 ? min(1, Double(written) / Double(total)) : 0
+                try? await self.updateState(key: key, .downloading(progress: pct, phase: phaseLabel))
             }
         }
-        if !buffer.isEmpty {
-            try handle.write(contentsOf: buffer)
-            written += Int64(buffer.count)
+        guard (200..<300).contains(response.statusCode) else {
+            throw FetchError.httpStatus(response.statusCode)
         }
-        try handle.close()
-        log.info("[fetch] direct OK wrote=\(written, privacy: .public) → \(destination.lastPathComponent, privacy: .public)")
+        let written = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
+        log.info("[fetch] direct OK wrote=\(written, privacy: .public) elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s → \(destination.lastPathComponent, privacy: .public)")
     }
 
     /// HLS / DASH path. ffmpeg reads the manifest URL directly and writes the output file

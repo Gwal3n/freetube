@@ -1055,8 +1055,10 @@ final class DownloadManager: TemporaryDownloading {
         }
     }
 
-    /// Downloads a single stream to `destination` with periodic progress updates fed into
-    /// `handleProgress` so the UI's progress bar moves.
+    /// Downloads a single direct stream with a file-backed URLSession task. The previous
+    /// `AsyncBytes` loop suspended once per byte and capped an 18 MB audio file near 32 KB/s.
+    /// Progress still feeds the existing snapshot pipeline; final size and media validation stay
+    /// unchanged.
     private func downloadStream(
         from url: URL,
         to destination: URL,
@@ -1075,67 +1077,47 @@ final class DownloadManager: TemporaryDownloading {
             request.setValue("Mozilla/5.0 (PlayStation; PlayStation 4/12.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
         }
 
-        let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            log.error("[\(sourceLabel, privacy: .public)] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        let expected = http.expectedContentLength
         // Googlevideo sometimes omits Content-Length while retaining its `clen` parameter.
-        // Read it for progress only; never persist or log the signed URL itself.
+        // Use it for progress only; never persist or log the signed URL itself.
         let declaredLength = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int.init)
-        let total = expected > 0 ? Int(expected) : (declaredLength ?? 0)
-
-        // Write the streamed bytes to disk in 64 KB chunks so we don't buffer the entire
-        // video in memory. Emit progress on every chunk; `handleProgress` itself throttles
-        // the UI publish rate to ~5/sec.
-        FileManager.default.createFile(atPath: destination.path, contents: nil)
-        guard let handle = try? FileHandle(forWritingTo: destination) else {
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        defer { try? handle.close() }
-
-        var buffer = Data()
-        buffer.reserveCapacity(65_536)
-        var written = 0
-        for try await byte in asyncBytes {
-            buffer.append(byte)
-            if buffer.count >= 65_536 {
-                try Task.checkCancellation()
-                try handle.write(contentsOf: buffer)
-                written += buffer.count
-                buffer.removeAll(keepingCapacity: true)
-                handleProgress(
+            .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int64.init)
+        let startedAt = Date()
+        let http = try await DirectFileDownloadService.download(
+            request: request,
+            to: destination,
+            expectedSizeHint: declaredLength
+        ) { [weak self] written, total in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      let snapshot = self.tasks[snapshotID],
+                      case .downloading = snapshot.state else { return }
+                self.handleProgress(
                     status: "downloading",
-                    downloaded: written,
-                    total: total,
+                    downloaded: Int(clamping: written),
+                    total: Int(clamping: total),
                     speed: 0,
                     eta: 0,
-                    phase: phaseByVideoID[videoID] ?? "stream",
+                    phase: self.phaseByVideoID[videoID] ?? "stream",
                     snapshotID: snapshotID,
                     videoID: videoID,
                     videoTitle: title
                 )
             }
         }
-        if !buffer.isEmpty {
-            try handle.write(contentsOf: buffer)
-            written += buffer.count
+        guard (200..<300).contains(http.statusCode) else {
+            log.error("[\(sourceLabel, privacy: .public)] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
+            throw YouTubeServiceError.streamExtractionFailed
         }
-        try handle.synchronize()
-        try handle.close()
-        log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes to \(destination.lastPathComponent, privacy: .public)")
+        let expected = http.expectedContentLength
+        let written = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
+        log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes in \(Date().timeIntervalSince(startedAt), privacy: .public)s to \(destination.lastPathComponent, privacy: .public)")
 
         guard written >= Self.minimumDownloadSize else {
             log.error("[\(sourceLabel, privacy: .public)] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
             try? FileManager.default.removeItem(at: destination)
             throw YouTubeServiceError.streamExtractionFailed
         }
-        if expected > 0, Int64(written) != expected {
+        if expected > 0, written != expected {
             log.error("[\(sourceLabel, privacy: .public)] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
             try? FileManager.default.removeItem(at: destination)
             throw YouTubeServiceError.streamExtractionFailed
@@ -1143,8 +1125,8 @@ final class DownloadManager: TemporaryDownloading {
     }
 
     /// Materializes the native source used by playback. Audio-only resolution returns a direct
-    /// progressive media URL, not an HLS manifest, so it uses the existing bounded-memory stream
-    /// writer. Video continues through the HLS transfer service. Neither path needs embedded Python.
+    /// progressive media URL, not an HLS manifest, so it uses a file-backed direct transfer.
+    /// Video continues through the HLS transfer service. Neither path needs embedded Python.
     private func downloadResolvedSource(
         _ source: URL,
         to destination: URL,
