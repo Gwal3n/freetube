@@ -505,7 +505,9 @@ struct ChannelScreen: View {
         .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
     }
 
-    /// Full-bleed banner whose size is defined by an empty spacer, not by the image.
+    /// Full-bleed banner whose layout stays at its original height while only its artwork extends
+    /// behind the transparent navigation bar and status area. The profile row and pager therefore
+    /// keep their existing measured positions and collapse behaviour.
     ///
     /// `Color.clear` is the only thing here that participates in layout: it accepts the proposed
     /// width and the fixed height, and that is the size the banner reports to the header. The
@@ -515,37 +517,47 @@ struct ChannelScreen: View {
     /// only a height to go on; a 6:1 banner asked to be 178pt tall reports itself roughly 1075pt
     /// wide, and every ancestor inherited that.
     private func banner(_ channel: Channel) -> some View {
-        Color.clear
-            .frame(height: Metrics.bannerHeight)
-            .overlay {
-                if let bannerURL = channel.bannerURL {
-                    KFImage(bannerURL)
-                        .thumbnail(size: CGSize(width: 900, height: 300)) {
-                            bannerPlaceholder
-                        }
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    bannerPlaceholder
+        GeometryReader { geometry in
+            // `headerOffset` cancels the header's own upward translation while it collapses,
+            // keeping the artwork's extra height stable instead of resizing it during scroll.
+            let topExtension = max(0, geometry.frame(in: .global).minY + headerOffset)
+            let artworkHeight = Metrics.bannerHeight + topExtension
+
+            Color.clear
+                .frame(width: geometry.size.width, height: artworkHeight)
+                .overlay {
+                    if let bannerURL = channel.bannerURL {
+                        KFImage(bannerURL)
+                            .thumbnail(size: CGSize(width: 900, height: 300)) {
+                                bannerPlaceholder
+                            }
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: artworkHeight)
+                    } else {
+                        bannerPlaceholder
+                    }
                 }
-            }
-            .overlay {
-                // Top scrim keeps the navigation title legible over a bright banner; the bottom one
-                // dissolves the artwork into the black page background so the header reads as one
-                // surface rather than a pasted-on image.
-                LinearGradient(
-                    stops: [
-                        .init(color: .black.opacity(0.55), location: 0),
-                        .init(color: .clear, location: 0.35),
-                        .init(color: .clear, location: 0.55),
-                        .init(color: .black.opacity(0.85), location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .clipped()
-            .accessibilityHidden(true)
+                .overlay {
+                    // Keep navigation actions legible over bright banners and dissolve the lower
+                    // edge into the profile row's black background.
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.55), location: 0),
+                            .init(color: .clear, location: 0.35),
+                            .init(color: .clear, location: 0.55),
+                            .init(color: .black.opacity(0.85), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .clipped()
+                .offset(y: -topExtension)
+        }
+        .frame(height: Metrics.bannerHeight)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
     }
 
     private var bannerPlaceholder: some View {
