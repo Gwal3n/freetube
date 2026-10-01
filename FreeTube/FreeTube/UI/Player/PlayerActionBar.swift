@@ -15,8 +15,6 @@ enum PlayerDownloadPresentationState: Equatable {
 /// component rather than acquiring playlist, clipboard, or download-manager responsibilities.
 @available(iOS 17.0, *)
 struct PlayerActionBar: View {
-    @State private var showsDownloadOptions = false
-
     let video: Video
     let isSavedToPlaylist: Bool
     let watchURL: URL?
@@ -73,26 +71,21 @@ struct PlayerActionBar: View {
             .foregroundStyle(.primary)
             .accessibilityLabel("Share")
 
-            Button {
-                if downloadState == .available {
-                    showsDownloadOptions = true
-                } else {
-                    onDownload()
+            if downloadState == .available {
+                DownloadOptionsMenu(video: video, onSelect: onDownloadChoice)
+                    .id(video.id)
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .foregroundStyle(.primary)
+            } else {
+                Button(action: onDownload) {
+                    downloadLabel
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Rectangle())
                 }
-            } label: {
-                downloadLabel
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .foregroundStyle(.primary)
-            .opacity(downloadState == .downloading ? 0.72 : 1)
-            .accessibilityLabel(downloadAccessibilityLabel)
-            .popover(isPresented: $showsDownloadOptions, arrowEdge: .top) {
-                DownloadOptionsPopover(video: video) { quality in
-                    showsDownloadOptions = false
-                    onDownloadChoice(quality)
-                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .foregroundStyle(.primary)
+                .opacity(downloadState == .downloading ? 0.72 : 1)
+                .accessibilityLabel(downloadAccessibilityLabel)
             }
         }
     }

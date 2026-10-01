@@ -18,7 +18,7 @@ final class DownloadOptionsViewModel {
     }
 
     func loadEstimates(for video: Video) async {
-        guard !hasLoaded else { return }
+        guard !hasLoaded, !isLoading else { return }
         isLoading = true
         defer {
             isLoading = false
