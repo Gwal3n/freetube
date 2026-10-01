@@ -9,11 +9,31 @@ import Observation
 @MainActor
 final class DownloadsViewModel {
     var errorState: ErrorState?
+    private(set) var isSavingToPhotos = false
 
     let manager: DownloadManager
+    private let exportService: DownloadedVideoExportService
 
-    init(manager: DownloadManager = .shared) {
+    init(
+        manager: DownloadManager = .shared,
+        exportService: DownloadedVideoExportService = DownloadedVideoExportService()
+    ) {
         self.manager = manager
+        self.exportService = exportService
+    }
+
+    func saveToPhotos(fileURL: URL) async -> Bool {
+        guard !isSavingToPhotos else { return false }
+        isSavingToPhotos = true
+        errorState = nil
+        defer { isSavingToPhotos = false }
+        do {
+            try await exportService.saveToPhotos(fileURL: fileURL)
+            return true
+        } catch {
+            errorState = ErrorState(from: error)
+            return false
+        }
     }
 
     /// Cancel a transfer-queue row. Routes by snapshot kind:

@@ -58,6 +58,7 @@ struct DownloadTransferRow: View {
 
 @available(iOS 17.0, *)
 struct DownloadedVideoRow<MenuContent: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let item: SavedItem
     let isSelecting: Bool
     let onPlay: () -> Void
@@ -79,29 +80,35 @@ struct DownloadedVideoRow<MenuContent: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: MediaStyle.spacing) {
+        HStack(alignment: .top, spacing: MediaStyle.spacing) {
             thumbnail
-                .frame(width: 96, height: 56)
+                .frame(width: thumbnailSize.width, height: thumbnailSize.height)
+                .overlay(alignment: .bottomTrailing) {
+                    if let duration = item.duration, duration.isFinite, duration > 0 {
+                        Text(durationText(duration))
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 3))
+                            .padding(5)
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .font(MediaStyle.title)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 if !item.channelName.isEmpty {
                     Text(item.channelName)
                         .font(MediaStyle.metadata)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                HStack(spacing: 6) {
-                    Text(ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-                    if let duration = item.duration {
-                        Text(verbatim: "• \(durationText(duration))")
-                    }
-                }
+                Text(ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
                 .font(MediaStyle.tertiaryMetadata)
                 .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if !isSelecting { menu() }
         }
         .contentShape(Rectangle())
@@ -116,6 +123,12 @@ struct DownloadedVideoRow<MenuContent: View>: View {
             }
         }
         .mediaListRow()
+    }
+
+    private var thumbnailSize: CGSize {
+        dynamicTypeSize.isAccessibilitySize
+            ? CGSize(width: 104, height: 58.5)
+            : CGSize(width: 144, height: 81)
     }
 
     @ViewBuilder

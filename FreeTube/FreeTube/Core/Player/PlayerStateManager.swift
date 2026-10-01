@@ -361,10 +361,11 @@ final class PlayerStateManager {
         autoplay: Bool = true,
         skipRecommendations: Bool = false,
         expandPlayer: Bool = true,
-        recordInPlaybackHistory: Bool = true
+        recordInPlaybackHistory: Bool = true,
+        localFileURL: URL? = nil
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
-        if currentVideo?.id == video.id {
+        if localFileURL == nil, currentVideo?.id == video.id {
             if case .failed = loadState {
                 // A deliberate second tap retries a failed resolution.
             } else {
@@ -443,7 +444,12 @@ final class PlayerStateManager {
         refreshArtwork(for: video)
         loadSponsorBlockSegments(for: video.id)
         resolutionTask = Task { [weak self] in
-            await self?.resolveAndPlay(video: video, autoplay: autoplay, skipRecommendations: skipRecommendations)
+            await self?.resolveAndPlay(
+                video: video,
+                autoplay: autoplay,
+                skipRecommendations: skipRecommendations,
+                localFileURL: localFileURL
+            )
         }
     }
 
@@ -1291,7 +1297,12 @@ final class PlayerStateManager {
         return String(bytes: bytes, encoding: .ascii) ?? String(value)
     }
 
-    private func resolveAndPlay(video: Video, autoplay: Bool, skipRecommendations: Bool = false) async {
+    private func resolveAndPlay(
+        video: Video,
+        autoplay: Bool,
+        skipRecommendations: Bool = false,
+        localFileURL: URL? = nil
+    ) async {
         log.info("resolveAndPlay: start for \(video.id, privacy: .public)")
         let resolutionStartedAt = Date()
         // The model-actor read runs alongside network resolution and is consumed only after the
@@ -1305,11 +1316,19 @@ final class PlayerStateManager {
         while !Task.isCancelled, currentVideo?.id == video.id {
             let candidate: PlaybackCandidate
             do {
-                candidate = try await resolver.resolve(
-                    video: video,
-                    quality: preferences.preferredQuality,
-                    excluding: excludedStrategies
-                )
+                if let localFileURL {
+                    guard !excludedStrategies.contains(.localFile) else {
+                        loadState = .failed("The saved video couldn’t be played from this device.")
+                        return
+                    }
+                    candidate = PlaybackCandidate(source: .localFile(localFileURL), strategy: .localFile)
+                } else {
+                    candidate = try await resolver.resolve(
+                        video: video,
+                        quality: preferences.preferredQuality,
+                        excluding: excludedStrategies
+                    )
+                }
             } catch is CancellationError {
                 log.debug("resolveAndPlay: cancelled for \(video.id, privacy: .public)")
                 return

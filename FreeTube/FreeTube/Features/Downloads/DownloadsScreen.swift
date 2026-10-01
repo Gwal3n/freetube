@@ -26,6 +26,8 @@ struct DownloadsScreen: View {
     @State private var pendingSingleDelete: SavedItem?
     /// When non-nil, the user tapped "Open in…" on a row — present the system activity sheet.
     @State private var shareFileURL: URL?
+    @State private var exportFileURL: URL?
+    @State private var showsPhotosSavedNotice = false
 
     /// What the user can sort by. `duration` reads each file's AVAsset at row-build time —
     /// inexpensive because we already cached it once per launch.
@@ -95,6 +97,9 @@ struct DownloadsScreen: View {
                     savedHeader
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.black)
             .navigationTitle(isSelecting
                              ? String(localized: "\(selectedIDs.count) selected")
                              : String(localized: "Downloads"))
@@ -143,6 +148,17 @@ struct DownloadsScreen: View {
                 Text("“\(item.title)” will be permanently removed from your device.")
             }
             .errorToast(Bindable(model).errorState)
+            .overlay(alignment: .bottom) {
+                if showsPhotosSavedNotice {
+                    Label("Saved to Photos", systemImage: "checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.bottom, 16)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             // Presents UIActivityViewController for the per-row "Open in…" action. The bound bool
             // mirrors `shareFileURL` so the sheet lifecycle matches user intent.
             .sheet(isPresented: Binding(
@@ -151,6 +167,14 @@ struct DownloadsScreen: View {
             )) {
                 if let url = shareFileURL {
                     ActivityShareSheet(activityItems: [url])
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { exportFileURL != nil },
+                set: { if !$0 { exportFileURL = nil } }
+            )) {
+                if let url = exportFileURL {
+                    DownloadedFileExportPicker(fileURL: url) { exportFileURL = nil }
                 }
             }
             .onChange(of: navigationRouter.downloads?.id, initial: true) { _, _ in
@@ -202,11 +226,23 @@ struct DownloadsScreen: View {
         ) {
             rowMenu(item).buttonStyle(.plain)
         }
+        .listRowBackground(Color.clear)
     }
 
     @ViewBuilder
     private func rowMenu(_ item: SavedItem) -> some View {
         Menu {
+            Button {
+                Task { await saveToPhotos(item) }
+            } label: {
+                Label("Save to Photos", systemImage: "photo.on.rectangle")
+            }
+            .disabled(model.isSavingToPhotos)
+            Button {
+                exportFileURL = item.fileURL
+            } label: {
+                Label("Save to Files", systemImage: "folder")
+            }
             // System "Open in…" share sheet for the downloaded mp4 — opens UIActivityViewController
             // with the local file URL so the user can send it to VLC, Files, AirDrop, etc. We use
             // a Button + sheet rather than `ShareLink` because the latter is unreliable for
@@ -423,6 +459,10 @@ struct DownloadsScreen: View {
             )
             return
         }
+        guard FileManager.default.fileExists(atPath: item.fileURL.path) else {
+            model.errorState = ErrorState(from: DownloadedVideoExportError.fileMissing)
+            return
+        }
         let video = Video(
             id: item.videoID,
             title: item.title,
@@ -430,14 +470,27 @@ struct DownloadsScreen: View {
             channelName: item.channelName,
             channelThumbnailURL: nil,
             thumbnailURL: nil,
-            duration: nil,
+            duration: item.duration,
             viewCount: nil,
             publishedAt: nil,
             descriptionSnippet: nil,
             isLive: false,
             isShort: false
         )
-        player.load(video)
+        // A Downloads-row tap is file-only: a missing or unreadable local item must not
+        // silently switch to a remote stream or restart the download pipeline.
+        player.load(video, localFileURL: item.fileURL)
+    }
+
+    private func saveToPhotos(_ item: SavedItem) async {
+        guard await model.saveToPhotos(fileURL: item.fileURL) else { return }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+            showsPhotosSavedNotice = true
+        }
+        try? await Task.sleep(for: .seconds(2))
+        withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+            showsPhotosSavedNotice = false
+        }
     }
 }
 

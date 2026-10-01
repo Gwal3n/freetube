@@ -51,8 +51,9 @@ struct AddVideoToPlaylistSheet: View {
                         model.query = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.white.opacity(0.75))
                     }
+                    .tint(.white)
                     .accessibilityLabel("Clear Search")
                 }
             }
