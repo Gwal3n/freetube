@@ -18,6 +18,7 @@ struct FullScreenPlayer: View {
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
+    @State private var isPlaylistPanelPresented = false
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
@@ -49,10 +50,10 @@ struct FullScreenPlayer: View {
         GeometryReader { proxy in
             let isLandscape = verticalSizeClass == .compact
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
-            let chapterPanelWidth: CGFloat = isLandscape && player.chapterListPresented
+            let sidePanelWidth: CGFloat = isLandscape && (player.chapterListPresented || isPlaylistPanelPresented)
                 ? min(360, proxy.size.width * 0.38)
                 : 0
-            let surfaceWidth = proxy.size.width - chapterPanelWidth
+            let surfaceWidth = proxy.size.width - sidePanelWidth
             // Landscape controls occupy the available viewport instead of insisting on a 16:9
             // frame taller than a modern phone's safe height. AVPlayer aspect-fits the video in
             // that region, preventing the timeline and bottom edge from being cropped.
@@ -76,11 +77,16 @@ struct FullScreenPlayer: View {
                 ? 0
                 : max(0, expandedSurfaceHeight - compactSurfaceHeight)
             let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
-            let surfaceHeight = expandedSurfaceHeight - consumedCollapse
+            // While browsing a playlist, keep the video at the existing compact height. The
+            // panel then has a useful viewport even for tall videos, and its top edge does not
+            // chase each video's expanded aspect ratio when a different row starts playing.
+            let surfaceHeight = isPlaylistPanelPresented && !isLandscape
+                ? compactSurfaceHeight
+                : expandedSurfaceHeight - consumedCollapse
             let controlFrame = PlayerViewportLayout.controlFrame(
                 surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight),
                 isLandscape: isLandscape,
-                hasChapterSidebar: chapterPanelWidth > 0,
+                hasChapterSidebar: sidePanelWidth > 0,
                 presentationSize: player.videoPresentationSize,
                 safeAreaInsets: PlayerLayoutMetrics.safeAreaInsets
             )
@@ -238,6 +244,7 @@ struct FullScreenPlayer: View {
                         onShowChapters: {
                             guard !player.chapters.isEmpty else { return }
                             withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                                isPlaylistPanelPresented = false
                                 player.chapterListPresented.toggle()
                             }
                             showPlayerControls()
@@ -254,6 +261,7 @@ struct FullScreenPlayer: View {
                             @Bindable var p = player
                             withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
                                 p.chapterListPresented = false
+                                isPlaylistPanelPresented = false
                                 p.fullScreenPresented = false
                             }
                         }
@@ -326,8 +334,13 @@ struct FullScreenPlayer: View {
                     fullscreenSwipeIsVertical = nil
                     fullscreenSwipeStartedInExpectedDirection = false
                     fullscreenSwipeHidControls = false
-                    panelScrollOffset = 0
-                    player.playerPanelAtTop = true
+                    // The playlist browser has its own scroll position. Leave the underlying
+                    // details offset alone while it stays open so changing rows cannot make the
+                    // video and browser boundary jump to the top between frames.
+                    if !isPlaylistPanelPresented {
+                        panelScrollOffset = 0
+                        player.playerPanelAtTop = true
+                    }
                     if let videoID = player.currentVideo?.id {
                         detailsModel.reset(for: videoID)
                     }
@@ -355,7 +368,7 @@ struct FullScreenPlayer: View {
                     )
                 )
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
-                // metadata column so its title and rows cannot extend underneath Chapters.
+                // metadata column so its title and rows cannot extend underneath a side panel.
                 .frame(width: surfaceWidth, alignment: .leading)
             }
             }
@@ -368,7 +381,7 @@ struct FullScreenPlayer: View {
                     onInteraction: showPlayerControls
                 )
                 .frame(
-                    width: isLandscape ? chapterPanelWidth : proxy.size.width,
+                    width: isLandscape ? sidePanelWidth : proxy.size.width,
                     height: isLandscape ? proxy.size.height : max(0, proxy.size.height - surfaceHeight)
                 )
                 .offset(y: isLandscape ? 0 : surfaceHeight)
@@ -379,6 +392,15 @@ struct FullScreenPlayer: View {
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
                 .zIndex(5)
             }
+
+            playlistPresentation(
+                size: proxy.size,
+                surfaceHeight: surfaceHeight,
+                sidePanelWidth: sidePanelWidth,
+                isLandscape: isLandscape,
+                usesPortraitFullscreen: usesPortraitFullscreen
+            )
+            .zIndex(6)
             }
         // One continuous material under EVERYTHING, including the top safe-area inset (status bar).
         // VStack content still respects safe area; only the material extends behind the inset.
@@ -439,16 +461,23 @@ struct FullScreenPlayer: View {
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
                 portraitVideoFullscreen = false
+                isPlaylistPanelPresented = false
             }
         }
+        .onChange(of: player.activePlaylist?.id) { oldID, newID in
+            if oldID != newID { isPlaylistPanelPresented = false }
+        }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
-            player.playerPresentationGestureEnabled = !isActive
+            player.playerPresentationGestureEnabled = !isActive && !isPlaylistPanelPresented
             if !isActive {
                 fullscreenSwipeTranslation = 0
                 fullscreenSwipeIsVertical = nil
                 fullscreenSwipeStartedInExpectedDirection = false
                 fullscreenSwipeHidControls = false
             }
+        }
+        .onChange(of: isPlaylistPanelPresented) { _, isPresented in
+            player.playerPresentationGestureEnabled = !portraitFullscreenActive && !isPresented
         }
         .onDisappear {
             player.playerPresentationGestureEnabled = true
@@ -463,6 +492,47 @@ struct FullScreenPlayer: View {
         }
     }
 
+    // MARK: - Playlist presentation
+
+    @ViewBuilder
+    private func playlistPresentation(
+        size: CGSize,
+        surfaceHeight: CGFloat,
+        sidePanelWidth: CGFloat,
+        isLandscape: Bool,
+        usesPortraitFullscreen: Bool
+    ) -> some View {
+        if player.activePlaylist != nil, !usesPortraitFullscreen, !player.chapterListPresented {
+            let dockHeight = 60 + PlayerLayoutMetrics.safeAreaInsets.bottom
+            PlayerPlaylistPanel(
+                isPresented: isPlaylistPanelPresented,
+                isLandscape: isLandscape,
+                usesOLEDBackground: oledPlayerBackground,
+                onOpen: {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                        player.chapterListPresented = false
+                        isPlaylistPanelPresented = true
+                    }
+                },
+                onDismiss: {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                        isPlaylistPanelPresented = false
+                    }
+                },
+                onOpenPlaylist: openPlaylist
+            )
+            .frame(
+                width: isLandscape ? (isPlaylistPanelPresented ? sidePanelWidth : 46) : size.width,
+                height: isLandscape
+                    ? (isPlaylistPanelPresented ? size.height : 46)
+                    : (isPlaylistPanelPresented ? max(0, size.height - surfaceHeight) : dockHeight)
+            )
+            .offset(y: isLandscape
+                ? (isPlaylistPanelPresented ? 0 : (size.height - 46) / 2)
+                : (isPlaylistPanelPresented ? surfaceHeight : size.height - dockHeight))
+        }
+    }
+
     // MARK: - Lower section
 
     private func toggleFullscreen() {
@@ -470,6 +540,7 @@ struct FullScreenPlayer: View {
             withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                 portraitVideoFullscreen.toggle()
                 player.chapterListPresented = false
+                isPlaylistPanelPresented = false
             }
             if portraitVideoFullscreen {
                 requestPlayerOrientation(.portrait)
@@ -595,6 +666,7 @@ struct FullScreenPlayer: View {
 
     private func enterFullscreen() {
         player.chapterListPresented = false
+        isPlaylistPanelPresented = false
         if isPortraitVideo {
             portraitVideoFullscreen = true
             requestPlayerOrientation(.portrait)
@@ -701,14 +773,15 @@ struct FullScreenPlayer: View {
                     onOpenChannel: {
                         openChannel(video.channelID)
                     },
-                    onSeek: { player.seek(to: $0) },
-                    onOpenPlaylist: openPlaylist
+                    onSeek: { player.seek(to: $0) }
                 ) {
                     playerActions(video)
                 }
             }
             .padding(.top, 6)
-            .padding(.bottom)
+            .padding(.bottom, player.activePlaylist == nil
+                ? 16
+                : 84 + PlayerLayoutMetrics.safeAreaInsets.bottom)
             // While the header is collapsing, counteract the ScrollView's own content movement.
             // Use real padding rather than a visual offset: an offset does not enlarge the
             // ScrollView's measured content and made the final comments unreachable by exactly
@@ -833,6 +906,7 @@ struct FullScreenPlayer: View {
             completionCriteria: .logicallyComplete
         ) {
             player.chapterListPresented = false
+            isPlaylistPanelPresented = false
             player.fullScreenPresented = false
         } completion: {
             navigate()

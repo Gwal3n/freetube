@@ -23,7 +23,6 @@ struct PlayerInformationPanel<Actions: View>: View {
     let onRetryDetails: () -> Void
     let onOpenChannel: () -> Void
     let onSeek: (TimeInterval) -> Void
-    let onOpenPlaylist: (String) -> Void
     let actions: Actions
 
     init(
@@ -43,7 +42,6 @@ struct PlayerInformationPanel<Actions: View>: View {
         onRetryDetails: @escaping () -> Void,
         onOpenChannel: @escaping () -> Void,
         onSeek: @escaping (TimeInterval) -> Void,
-        onOpenPlaylist: @escaping (String) -> Void,
         @ViewBuilder actions: () -> Actions
     ) {
         self.video = video
@@ -62,7 +60,6 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.onRetryDetails = onRetryDetails
         self.onOpenChannel = onOpenChannel
         self.onSeek = onSeek
-        self.onOpenPlaylist = onOpenPlaylist
         self.actions = actions()
     }
 
@@ -93,8 +90,7 @@ struct PlayerInformationPanel<Actions: View>: View {
             VStack(alignment: .leading, spacing: 8) {
                 PlayerQueueSections(
                     showsUpNext: showsUpNext,
-                    upNextInitialCount: upNextInitialCount,
-                    onOpenPlaylist: onOpenPlaylist
+                    upNextInitialCount: upNextInitialCount
                 )
 
                 if showsComments {
