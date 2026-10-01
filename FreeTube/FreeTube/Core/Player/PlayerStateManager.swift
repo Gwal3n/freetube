@@ -629,6 +629,24 @@ final class PlayerStateManager {
         log.info("Added \(video.id, privacy: .public) to manual queue")
     }
 
+    /// Plays an explicit queue choice without turning a playlist interlude into a new standalone
+    /// recommendation session. Both the Next button and a tapped queue row use this path.
+    func playManualQueueItem(_ video: Video, expandPlayer: Bool = true) {
+        guard manualQueue.contains(where: { $0.id == video.id }) else { return }
+        manualQueue.removeAll { $0.id == video.id }
+        persistManualQueue()
+        let interruptsPlaylist = activePlaylist != nil
+        if interruptsPlaylist {
+            log.info("Playing manual queue interlude; preserving playlist index=\(self.queue.currentIndex, privacy: .public)")
+        }
+        load(
+            video,
+            skipRecommendations: interruptsPlaylist,
+            expandPlayer: expandPlayer,
+            preservePlaylistPosition: interruptsPlaylist
+        )
+    }
+
     func removeFromManualQueue(videoID: String) {
         manualQueue.removeAll { $0.id == videoID }
         persistManualQueue()
@@ -807,18 +825,7 @@ final class PlayerStateManager {
             return
         }
         if let next = manualQueue.first {
-            manualQueue.removeFirst()
-            persistManualQueue()
-            let interruptsPlaylist = activePlaylist != nil
-            if interruptsPlaylist {
-                log.info("Playing manual queue interlude; preserving playlist index=\(self.queue.currentIndex, privacy: .public)")
-            }
-            load(
-                next,
-                skipRecommendations: interruptsPlaylist,
-                expandPlayer: false,
-                preservePlaylistPosition: interruptsPlaylist
-            )
+            playManualQueueItem(next, expandPlayer: false)
             return
         }
         if let next = queue.advance() {

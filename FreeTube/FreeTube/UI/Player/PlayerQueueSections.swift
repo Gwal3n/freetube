@@ -17,6 +17,9 @@ struct PlayerQueueSections: View {
     @State private var isManualQueueExpanded = true
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistExpanded = true
+    /// Anchored when a playlist opens, rather than recentered on every playback change. Keeping
+    /// the same rows mounted prevents the playlist panel from jumping as Next advances.
+    @State private var playlistWindowAnchor: Int?
     @State private var playlistItemsBefore = 20
     @State private var playlistItemsAfter = 20
 
@@ -37,6 +40,16 @@ struct PlayerQueueSections: View {
                 if showsUpNext {
                     queuePanel
                 }
+            }
+            .onChange(of: player.activePlaylist?.id, initial: true) { _, playlistID in
+                playlistWindowAnchor = playlistID == nil ? nil : player.queue.currentIndex
+                playlistItemsBefore = 20
+                playlistItemsAfter = 20
+            }
+            .onChange(of: player.queue.currentIndex) { _, newIndex in
+                guard player.activePlaylist != nil,
+                      newIndex < playlistWindowLowerBound || newIndex >= playlistWindowUpperBound else { return }
+                playlistWindowAnchor = newIndex
             }
         }
     }
@@ -97,10 +110,7 @@ struct PlayerQueueSections: View {
                             queueRow(
                                 video,
                                 preservesPlaylistContext: false,
-                                onPlay: {
-                                    player.removeFromManualQueue(videoID: video.id)
-                                    player.load(video)
-                                },
+                                onPlay: { player.playManualQueueItem(video) },
                                 onRemove: { player.removeFromManualQueueWithUndo(videoID: video.id) },
                                 showsRemoveButton: true
                             )
@@ -143,13 +153,14 @@ struct PlayerQueueSections: View {
     }
 
     private var playlistWindowLowerBound: Int {
-        min(player.queue.items.count, max(0, player.queue.currentIndex - playlistItemsBefore))
+        let anchor = playlistWindowAnchor ?? player.queue.currentIndex
+        return min(player.queue.items.count, max(0, anchor - playlistItemsBefore))
     }
 
     private var playlistWindowUpperBound: Int {
         max(
             playlistWindowLowerBound,
-            min(player.queue.items.count, player.queue.currentIndex + playlistItemsAfter + 1)
+            min(player.queue.items.count, (playlistWindowAnchor ?? player.queue.currentIndex) + playlistItemsAfter + 1)
         )
     }
 
@@ -180,11 +191,8 @@ struct PlayerQueueSections: View {
             // feed video. Capture the videos and indices together so a deferred row never
             // indexes into the *new* queue using an index from the old playlist.
             let playlistItems = player.queue.items
-            let lowerBound = min(playlistItems.count, max(0, player.queue.currentIndex - playlistItemsBefore))
-            let upperBound = max(
-                lowerBound,
-                min(playlistItems.count, player.queue.currentIndex + playlistItemsAfter + 1)
-            )
+            let lowerBound = playlistWindowLowerBound
+            let upperBound = playlistWindowUpperBound
             VStack(alignment: .leading, spacing: 8) {
                 collapsiblePanelHeader(
                     title: "Playlist",
@@ -226,7 +234,11 @@ struct PlayerQueueSections: View {
                             .listRowSeparator(.hidden)
                         } else if player.canLoadMorePlaylistItems {
                             loadMoreQueueButton(isLoading: player.isLoadingMorePlaylistVideos) {
+                                let previousCount = player.queue.items.count
                                 await player.loadMorePlaylistItems()
+                                if player.queue.items.count > previousCount {
+                                    playlistItemsAfter += 20
+                                }
                             }
                         }
                     }
@@ -311,8 +323,12 @@ struct PlayerQueueSections: View {
             .allowsHitTesting(isQueueExpanded)
         }
         .onChange(of: player.currentVideo?.id) {
-            isQueueExpanded = false
-            upNextVisibleLimit = upNextInitialCount
+            // Playlist switches should not close the lower panel and shift the entire details
+            // view while the video changes. A standalone selection still starts with a clean Up Next.
+            if player.activePlaylist == nil {
+                isQueueExpanded = false
+                upNextVisibleLimit = upNextInitialCount
+            }
         }
         .onChange(of: upNextInitialCount) { _, newValue in
             upNextVisibleLimit = newValue
@@ -495,6 +511,7 @@ struct PlayerQueueSections: View {
                         .fill(Color.accentColor.opacity(0.10))
                 }
             }
+            .animation(reduceMotion ? nil : InterfaceMotion.quick, value: player.currentVideo?.id)
         }
     }
 
