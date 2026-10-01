@@ -292,7 +292,15 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         let compatible = renditions.filter { codecPreference($0.codecs) > 0 }
         guard !compatible.isEmpty else { return nil }
         let withinCap = compatible.filter { ($0.height ?? Int.max) <= maximumHeight }
-        return (withinCap.isEmpty ? compatible : withinCap).max {
+        // If even the lowest advertised rendition exceeds the requested ceiling, use that
+        // lowest tier rather than jumping to the highest quality in the master playlist.
+        let candidates: [VideoRendition]
+        if withinCap.isEmpty, let lowestHeight = compatible.compactMap(\.height).min() {
+            candidates = compatible.filter { $0.height == lowestHeight }
+        } else {
+            candidates = withinCap.isEmpty ? compatible : withinCap
+        }
+        return candidates.max {
             let lhsHeight = $0.height ?? 0
             let rhsHeight = $1.height ?? 0
             if lhsHeight != rhsHeight { return lhsHeight < rhsHeight }

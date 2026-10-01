@@ -15,6 +15,9 @@ enum PlayerDownloadPresentationState: Equatable {
 /// component rather than acquiring playlist, clipboard, or download-manager responsibilities.
 @available(iOS 17.0, *)
 struct PlayerActionBar: View {
+    @State private var showsDownloadOptions = false
+
+    let video: Video
     let isSavedToPlaylist: Bool
     let watchURL: URL?
     let downloadedFileURL: URL?
@@ -24,6 +27,7 @@ struct PlayerActionBar: View {
     let onCopyURLAtCurrentTime: () -> Void
     let onShareDownloadedFile: () -> Void
     let onDownload: () -> Void
+    let onDownloadChoice: (VideoQuality) -> Void
 
     var body: some View {
         HStack(spacing: 4) {
@@ -69,7 +73,13 @@ struct PlayerActionBar: View {
             .foregroundStyle(.primary)
             .accessibilityLabel("Share")
 
-            Button(action: onDownload) {
+            Button {
+                if downloadState == .available {
+                    showsDownloadOptions = true
+                } else {
+                    onDownload()
+                }
+            } label: {
                 downloadLabel
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
@@ -78,6 +88,12 @@ struct PlayerActionBar: View {
             .foregroundStyle(.primary)
             .opacity(downloadState == .downloading ? 0.72 : 1)
             .accessibilityLabel(downloadAccessibilityLabel)
+            .popover(isPresented: $showsDownloadOptions, arrowEdge: .top) {
+                DownloadOptionsPopover(video: video) { quality in
+                    showsDownloadOptions = false
+                    onDownloadChoice(quality)
+                }
+            }
         }
     }
 

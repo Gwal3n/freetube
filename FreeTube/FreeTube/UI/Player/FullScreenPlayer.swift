@@ -15,7 +15,6 @@ struct FullScreenPlayer: View {
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
     @State private var saveToPlaylistVideo: Video?
-    @State private var downloadOptionsVideo: Video?
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
@@ -409,11 +408,6 @@ struct FullScreenPlayer: View {
         .sheet(item: $saveToPlaylistVideo) { video in
             AddToPlaylistSheet(video: video)
         }
-        .sheet(item: $downloadOptionsVideo) { video in
-            DownloadOptionsSheet { quality in
-                actionsModel.startDownload(video, quality: quality)
-            }
-        }
         .confirmationDialog(
             "Delete downloaded video?",
             isPresented: Binding(
@@ -735,6 +729,7 @@ struct FullScreenPlayer: View {
         let videoURL = watchURL(video)
         let downloadedFileURL = actionsModel.downloadedFile(for: video.id)
         PlayerActionBar(
+            video: video,
             isSavedToPlaylist: actionsModel.isSavedToPersonalPlaylist,
             watchURL: videoURL,
             downloadedFileURL: downloadedFileURL,
@@ -759,15 +754,10 @@ struct FullScreenPlayer: View {
                 shareFileURL = downloadedFileURL
             },
             onDownload: {
-                let state = actionsModel.downloadState(
-                    for: video.id,
-                    downloadedFileURL: actionsModel.downloadedFile(for: video.id)
-                )
-                if state == .available {
-                    downloadOptionsVideo = video
-                } else {
-                    actionsModel.cancelOrDeleteDownload(video)
-                }
+                actionsModel.cancelOrDeleteDownload(video)
+            },
+            onDownloadChoice: { quality in
+                actionsModel.startDownload(video, quality: quality)
             }
         )
     }
