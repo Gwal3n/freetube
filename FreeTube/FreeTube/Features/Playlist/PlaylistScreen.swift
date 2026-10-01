@@ -1,11 +1,9 @@
 import SwiftUI
-import Kingfisher
 
 /// Playlist detail screen. Top-down layout:
-///   1. Large playlist artwork
+///   1. Large playlist artwork with overlaid actions
 ///   2. Title + channel + video-count metadata
-///   3. Glass-pill action toolbar — Play all / Shuffle all / Download all + More menu
-///   4. List of videos
+///   3. List of videos
 ///
 /// Public YouTube playlists are read-only. Editing and reordering live exclusively in the local
 /// playlist screens, keeping this view independent from account-only mutation endpoints.
@@ -34,17 +32,15 @@ struct PlaylistScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let details = model.details {
-                    // The artwork owns the top edge and actions; metadata keeps the standard
-                    // content inset below it. The image continues beneath the transparent bar.
+                    // The image begins below the status bar but fills the navigation-bar region.
+                    // Metadata keeps the standard content inset below it.
                     VStack(alignment: .leading, spacing: 16) {
                         artworkHeader(details)
                         PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
                     }
+                    .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
                     .padding(.bottom, 16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background {
-                        blurredArtworkBackground(for: details)
-                    }
 
                     videosList(details)
                         .padding(.top, 8)
@@ -91,8 +87,6 @@ struct PlaylistScreen: View {
         .errorToast(Bindable(model).errorState)
     }
 
-    // MARK: - Blurred artwork backdrop
-
     /// Reserves the same broad geometry as the loaded artwork, metadata, and first rows. Keeping
     /// this static avoids shimmer work and prevents the whole page from jumping after resolution.
     private var playlistPlaceholder: some View {
@@ -123,68 +117,15 @@ struct PlaylistScreen: View {
         .allowsHitTesting(false)
     }
 
-    /// Heavily-blurred, dimmed copy of the playlist artwork behind the header. It extends
-    /// under the status/navigation bar and ends with the header's toolbar.
-    ///
-    /// Three layers stacked inside:
-    ///   1. The artwork itself, `.resizable().scaledToFill().blur(radius: 60)`.
-    ///   2. A dark overlay (`Color.black.opacity(0.55)`) for foreground-text contrast.
-    ///   3. A subtle bottom-edge gradient that fades into the screen background so the divider
-    ///      below doesn't look pasted on.
-    @ViewBuilder
-    private func blurredArtworkBackground(for details: PlaylistDetails) -> some View {
-        let url = details.playlist.thumbnailURL ?? details.videos.first?.thumbnailURL
-        ZStack {
-            // Heavy blur — we can downsample aggressively (200×112) since the source pixels
-            // are mostly thrown away by the 60-radius blur anyway.
-            KFImage(url)
-                .thumbnail(size: CGSize(width: 200, height: 112)) {
-                    Color.black
-                }
-                .resizable()
-                .scaledToFill()
-                .blur(radius: 60)
-            Color.black.opacity(0.55)
-            LinearGradient(
-                colors: [Color.clear, Color.clear, Color.black.opacity(0.35)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        .clipped()
-        .ignoresSafeArea(edges: .top)
-    }
-
     // MARK: - Artwork
 
-    /// Width-constrained full-bleed playlist artwork. GeometryReader keeps the image's frame
-    /// within the actual viewport instead of letting a scaled image widen the scroll content.
+    /// The same width-constrained artwork treatment used by on-device playlists.
     @ViewBuilder
     private func artworkHeader(_ details: PlaylistDetails) -> some View {
         let url = details.playlist.thumbnailURL ?? details.videos.first?.thumbnailURL
-        GeometryReader { geometry in
-            KFImage(url)
-                .thumbnail(size: CGSize(width: 500, height: 281)) {
-                    MediaStyle.placeholderFill
-                }
-                .resizable()
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
-                .overlay(alignment: .bottom) {
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.65)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 100)
-                }
-                .overlay(alignment: .bottom) {
-                    actionToolbar(details)
-                        .padding(.bottom, 12)
-                }
+        PlaylistArtworkHeader(thumbnailURL: url) {
+            actionToolbar(details)
         }
-        .aspectRatio(16 / 9, contentMode: .fit)
     }
 
     // MARK: - Glass toolbar
@@ -194,46 +135,25 @@ struct PlaylistScreen: View {
     @ViewBuilder
     private func actionToolbar(_ details: PlaylistDetails) -> some View {
         HStack(spacing: 10) {
-            glassPill(title: "Play all", systemImage: "play.fill") {
+            PlaylistHeaderActionButton(title: "Play all", systemImage: "play.fill") {
                 guard !details.videos.isEmpty else { return }
                 if let first = details.videos.first {
                     player.loadPlaylist(details, startAt: first)
                 }
             }
-            glassPill(title: "Shuffle", systemImage: "shuffle") {
+            PlaylistHeaderActionButton(title: "Shuffle", systemImage: "shuffle") {
                 guard !details.videos.isEmpty else { return }
                 if let first = details.videos.randomElement() {
                     player.loadPlaylist(details, startAt: first, shuffled: true)
                 }
             }
-            glassPill(title: "Download", systemImage: "arrow.down.circle.fill") {
+            PlaylistHeaderActionButton(title: "Download", systemImage: "arrow.down.circle.fill") {
                 enqueueAllDownloads(details.videos)
             }
             Spacer(minLength: 0)
             moreMenu(details)
         }
         .padding(.horizontal)
-    }
-
-    /// Capsule action button styled to match the "glass" look used on the full-screen player —
-    /// `.ultraThinMaterial` backdrop, hairline white stroke, white icon + label.
-    private func glassPill(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.footnote.weight(.semibold))
-                Text(title)
-                    .font(.footnote.weight(.semibold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-            .frame(minHeight: MediaStyle.actionSize)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ResponsiveButtonStyle())
     }
 
     /// "More actions" pill — same capsule chrome as the primary actions, just with an ellipsis

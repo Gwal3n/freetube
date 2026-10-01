@@ -1,5 +1,4 @@
 import SwiftUI
-import Kingfisher
 
 @available(iOS 17.0, *)
 struct LocalPlaylistScreen: View {
@@ -11,6 +10,7 @@ struct LocalPlaylistScreen: View {
     @State private var details: LocalPlaylistDetails?
     @State private var hasLoaded = false
     @State private var showsNavigationTitle = false
+    @State private var isDetailsExpanded = false
     @State private var isRestoring = false
     @State private var restoreError: String?
     @State private var showingEditor = false
@@ -73,6 +73,7 @@ struct LocalPlaylistScreen: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .ignoresSafeArea(.container, edges: details == nil ? [] : .top)
         .background(Color.black)
         .coordinateSpace(name: "playlistScroll")
         .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
@@ -83,11 +84,14 @@ struct LocalPlaylistScreen: View {
         .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle(showsNavigationTitle ? (details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .overlay {
             if let details, details.videos.isEmpty {
                 ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
+                    .allowsHitTesting(false)
             } else if hasLoaded && details == nil {
                 ContentUnavailableView("Playlist Unavailable", systemImage: "music.note.list")
+                    .allowsHitTesting(false)
             }
         }
         .task { await reload() }
@@ -113,38 +117,6 @@ struct LocalPlaylistScreen: View {
                             Image(systemName: "plus")
                         }
                         .accessibilityLabel("Add Video")
-                    }
-                    Menu {
-                        Button {
-                            showingEditor = true
-                        } label: {
-                            Label("Edit Details", systemImage: "square.and.pencil")
-                        }
-                        Button {
-                            beginEditing()
-                        } label: {
-                            Label("Edit Playlist", systemImage: "list.bullet")
-                        }
-                        if details?.playlist.isSavedFromYouTube == true {
-                            Button {
-                                showingRestoreConfirmation = true
-                            } label: {
-                                Label("Restore from YouTube", systemImage: "arrow.clockwise")
-                            }
-                            .disabled(isRestoring)
-                        }
-                        if let playlist = details?.playlist, playlist.metadataHydrationFailures > 0 {
-                            Button {
-                                Task {
-                                    await service.retryFailedMetadata(id: playlistID)
-                                    await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
-                                }
-                            } label: {
-                                Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
-                            }
-                        }
-                    } label: {
-                        if isRestoring { ProgressView() } else { Image(systemName: "ellipsis.circle") }
                     }
                 }
             }
@@ -214,72 +186,75 @@ struct LocalPlaylistScreen: View {
     }
 
     private func playlistHeader(_ local: LocalPlaylistDetails) -> some View {
-        VStack(spacing: 14) {
-            KFImage(local.playlist.thumbnailURL)
-                .thumbnail(size: CGSize(width: 400, height: 225)) {
-                    Image(systemName: "music.note.list").font(.largeTitle).foregroundStyle(.secondary)
-                }
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 10) {
-                    Text(local.playlist.title)
-                        .font(.title2.bold())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background {
-                            GeometryReader { geometry in
-                                Color.clear.preference(
-                                    key: PlaylistTitlePositionKey.self,
-                                    value: geometry.frame(in: .named("playlistScroll")).maxY
-                                )
-                            }
-                        }
-                    glassActionButton(systemImage: "play.fill", label: "Play All") {
-                        guard let first = local.videos.first else { return }
-                        player.loadPlaylist(playbackDetails(from: local), startAt: first)
-                    }
-                    glassActionButton(systemImage: "shuffle", label: "Shuffle") {
-                        guard let random = local.videos.randomElement() else { return }
-                        player.loadPlaylist(playbackDetails(from: local), startAt: random, shuffled: true)
-                    }
-                }
-                .disabled(local.videos.isEmpty)
-                Text("\(local.playlist.videoCount) \(local.playlist.videoCount == 1 ? "video" : "videos")")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if let description = local.playlist.descriptionText, !description.isEmpty {
-                    Text(description)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(4)
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            PlaylistArtworkHeader(thumbnailURL: local.playlist.thumbnailURL) {
+                localActionToolbar(local)
             }
+            PlaylistMetadataBlock(details: playbackDetails(from: local), isExpanded: $isDetailsExpanded)
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
+        .padding(.bottom, 16)
     }
 
-    private func glassActionButton(
-        systemImage: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 38, height: 38)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
-                .contentShape(Circle())
+    private func localActionToolbar(_ local: LocalPlaylistDetails) -> some View {
+        HStack(spacing: 10) {
+            PlaylistHeaderActionButton(title: "Play all", systemImage: "play.fill") {
+                guard let first = local.videos.first else { return }
+                player.loadPlaylist(playbackDetails(from: local), startAt: first)
+            }
+            .disabled(local.videos.isEmpty || editingMode != nil)
+            PlaylistHeaderActionButton(title: "Shuffle", systemImage: "shuffle") {
+                guard let random = local.videos.randomElement() else { return }
+                player.loadPlaylist(playbackDetails(from: local), startAt: random, shuffled: true)
+            }
+            .disabled(local.videos.isEmpty || editingMode != nil)
+            Spacer(minLength: 0)
+            if editingMode == nil { localMoreMenu(local) }
         }
-        .buttonStyle(ResponsiveButtonStyle())
-        .foregroundStyle(.primary)
-        .accessibilityLabel(label)
+        .padding(.horizontal)
+    }
+
+    private func localMoreMenu(_ local: LocalPlaylistDetails) -> some View {
+        Menu {
+            Button {
+                showingEditor = true
+            } label: {
+                Label("Edit Details", systemImage: "square.and.pencil")
+            }
+            Button {
+                beginEditing()
+            } label: {
+                Label("Edit Playlist", systemImage: "list.bullet")
+            }
+            if local.playlist.isSavedFromYouTube {
+                Button {
+                    showingRestoreConfirmation = true
+                } label: {
+                    Label("Restore from YouTube", systemImage: "arrow.clockwise")
+                }
+                .disabled(isRestoring)
+            }
+            if local.playlist.metadataHydrationFailures > 0 {
+                Button {
+                    Task {
+                        await service.retryFailedMetadata(id: playlistID)
+                        await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
+                    }
+                } label: {
+                    Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("More playlist actions")
     }
 
     private func restore() async {
