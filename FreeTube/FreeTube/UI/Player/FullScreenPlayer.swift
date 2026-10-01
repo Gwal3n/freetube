@@ -805,11 +805,7 @@ struct FullScreenPlayer: View {
     private func openChannel(_ channelID: String) {
         AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
             .info("Player Go to channel tapped; collapsing player")
-        @Bindable var p = player
-        p.fullScreenPresented = false
-        Task { @MainActor in
-            // Let the SwiftUI collapse animation begin before routing the tab below.
-            try? await Task.sleep(for: .milliseconds(180))
+        collapseForNavigation {
             AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
                 .info("Player posting channel navigation")
             NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
@@ -817,9 +813,7 @@ struct FullScreenPlayer: View {
     }
 
     private func openPlaylist(_ playlistID: String) {
-        player.fullScreenPresented = false
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
+        collapseForNavigation {
             if playlistID.hasPrefix("local:") {
                 NotificationCenter.default.post(
                     name: .freetubeOpenLocalPlaylist,
@@ -828,6 +822,20 @@ struct FullScreenPlayer: View {
             } else {
                 NotificationCenter.default.post(name: .freetubeOpenPlaylist, object: playlistID)
             }
+        }
+    }
+
+    /// Finish the same collapse used by the player control before pushing a destination behind it.
+    /// A fixed delay can expose that destination while the expanded player is still on screen.
+    private func collapseForNavigation(_ navigate: @escaping () -> Void) {
+        withAnimation(
+            reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08),
+            completionCriteria: .logicallyComplete
+        ) {
+            player.chapterListPresented = false
+            player.fullScreenPresented = false
+        } completion: {
+            navigate()
         }
     }
 
