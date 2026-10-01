@@ -15,11 +15,11 @@ final class DownloadsViewModel {
     private let exportService: DownloadedVideoExportService
 
     init(
-        manager: DownloadManager = .shared,
-        exportService: DownloadedVideoExportService = DownloadedVideoExportService()
+        manager: DownloadManager? = nil,
+        exportService: DownloadedVideoExportService? = nil
     ) {
-        self.manager = manager
-        self.exportService = exportService
+        self.manager = manager ?? .shared
+        self.exportService = exportService ?? DownloadedVideoExportService()
     }
 
     func saveToPhotos(fileURL: URL) async -> Bool {
