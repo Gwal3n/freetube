@@ -53,11 +53,17 @@ final class PlaylistService: PlaylistServicing {
 
     private func mapDetails(response: PlaylistInfosResponse, fallbackID: String) -> PlaylistDetails {
         let owner = response.channel.first
+        // A few playlist renderers expose their view-count label as the owner name. Prefer
+        // the actual header owner; if that is malformed, use a valid uploader from the list.
+        let headerOwnerName = Mappers.channelName(from: owner?.name)
+        let ownerName = headerOwnerName.isEmpty
+            ? (response.results.lazy.map { Mappers.video(from: $0).channelName }.first(where: { !$0.isEmpty }) ?? "")
+            : headerOwnerName
         let playlist = Playlist(
             id: response.playlistId ?? fallbackID,
             title: response.title ?? "",
             channelID: owner?.channelId,
-            channelName: owner?.name,
+            channelName: ownerName.isEmpty ? nil : ownerName,
             thumbnailURL: Mappers.bestThumbnailURL(response.thumbnails),
             videoCount: parseInteger(response.videoCount),
             viewCount: Mappers.parseAbbreviatedCount(response.viewCount),
@@ -68,7 +74,6 @@ final class PlaylistService: PlaylistServicing {
         )
         // Backfill the owning channel's name onto videos that lack one (lockup-decoded items
         // skip the channel field entirely).
-        let ownerName = owner?.name ?? ""
         let ownerID = owner?.channelId ?? ""
         let ownerThumb = Mappers.bestThumbnailURL(owner?.thumbnails ?? [])
         let videos: [Video] = response.results.map { yt in

@@ -13,12 +13,15 @@ struct PlayerPlaylistPanel: View {
     let isPresented: Bool
     let isLandscape: Bool
     let usesOLEDBackground: Bool
+    @Binding var expansionProgress: CGFloat
+    let expansionTravel: CGFloat
     let onOpen: () -> Void
     let onDismiss: () -> Void
     let onOpenPlaylist: (String) -> Void
 
     @State private var lastAutomaticPageCount: Int?
     @State private var dismissTranslation: CGFloat = 0
+    @State private var dragStartProgress: CGFloat?
 
     private var playlist: Playlist? { player.activePlaylist }
 
@@ -74,20 +77,27 @@ struct PlayerPlaylistPanel: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 52)
+                    .contentShape(Rectangle())
                 }
             }
             .buttonStyle(ResponsiveButtonStyle())
             .background {
                 if usesOLEDBackground {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous).fill(Color.black)
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .fill(Color.black)
+                        .allowsHitTesting(false)
                 } else {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous).fill(.regularMaterial)
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .fill(.regularMaterial)
+                        .allowsHitTesting(false)
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                    .allowsHitTesting(false)
             }
             .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
             .padding(.horizontal, isLandscape ? 0 : 16)
@@ -101,46 +111,48 @@ struct PlayerPlaylistPanel: View {
     private var browser: some View {
         if let playlist {
             VStack(spacing: 0) {
-                if !isLandscape {
-                    Capsule()
-                        .fill(.secondary.opacity(0.55))
-                        .frame(width: 36, height: 5)
-                        .padding(.top, 7)
-                        .accessibilityHidden(true)
+                VStack(spacing: 0) {
+                    if !isLandscape {
+                        Capsule()
+                            .fill(.secondary.opacity(0.55))
+                            .frame(width: 36, height: 5)
+                            .padding(.top, 7)
+                            .accessibilityHidden(true)
+                    }
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(playlist.title)
+                                .font(.headline)
+                                .lineLimit(1)
+                            Text("\(player.queue.items.count) videos")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 4)
+                        Button {
+                            onOpenPlaylist(playlist.id)
+                        } label: {
+                            Image(systemName: "arrow.up.right")
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .contentShape(.interaction, Rectangle().inset(by: -6))
+                        .accessibilityLabel("Open playlist page")
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark")
+                                .font(.subheadline.weight(.bold))
+                                .frame(width: 32, height: 32)
+                                .background(.quaternary, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .contentShape(.interaction, Rectangle().inset(by: -6))
+                        .accessibilityLabel("Close playlist")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(playlist.title)
-                            .font(.headline)
-                            .lineLimit(1)
-                        Text("\(player.queue.items.count) videos")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                    Button {
-                        onOpenPlaylist(playlist.id)
-                    } label: {
-                        Image(systemName: "arrow.up.right")
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(.interaction, Rectangle().inset(by: -6))
-                    .accessibilityLabel("Open playlist page")
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.subheadline.weight(.bold))
-                            .frame(width: 32, height: 32)
-                            .background(.quaternary, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(.interaction, Rectangle().inset(by: -6))
-                    .accessibilityLabel("Close playlist")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
                 .contentShape(Rectangle())
-                .simultaneousGesture(headerDismissGesture)
+                .simultaneousGesture(headerDragGesture)
 
                 Divider().opacity(0.45)
 
@@ -192,7 +204,7 @@ struct PlayerPlaylistPanel: View {
                     Rectangle().fill(.regularMaterial)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
             .overlay(alignment: isLandscape ? .leading : .top) {
                 Rectangle()
                     .fill(.white.opacity(0.12))
@@ -227,18 +239,12 @@ struct PlayerPlaylistPanel: View {
                             .font(.subheadline.weight(isCurrent ? .semibold : .regular))
                             .foregroundStyle(isCurrent ? Color.primary : Color.primary.opacity(0.9))
                             .lineLimit(2)
-                        Text(video.channelName)
+                        Text(video.channelName.isEmpty ? (playlist.channelName ?? "") : video.channelName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    if isCurrent {
-                        Image(systemName: "waveform")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .accessibilityHidden(true)
-                    }
                 }
                 .padding(.horizontal, 14)
                 .frame(height: dynamicTypeSize.isAccessibilitySize ? 96 : 72)
@@ -262,20 +268,28 @@ struct PlayerPlaylistPanel: View {
         await player.loadMorePlaylistItems()
     }
 
-    private var headerDismissGesture: some Gesture {
+    private var headerDragGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
-                guard !isLandscape, value.translation.height > 0,
+                guard !isLandscape,
                       abs(value.translation.height) > abs(value.translation.width) else { return }
-                dismissTranslation = value.translation.height
+                if dragStartProgress == nil { dragStartProgress = expansionProgress }
+                let start = dragStartProgress ?? 0
+                expansionProgress = min(1, max(0, start - value.translation.height / max(1, expansionTravel)))
+                dismissTranslation = start == 0 ? max(0, value.translation.height) : 0
             }
             .onEnded { value in
                 guard !isLandscape else { return }
-                if value.translation.height > 70, value.predictedEndTranslation.height > 70 {
+                guard let start = dragStartProgress else { return }
+                dragStartProgress = nil
+                if start == 0, value.translation.height > 70,
+                   value.predictedEndTranslation.height > 70 {
                     dismissTranslation = 0
                     onDismiss()
                 } else {
                     withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                        let projected = start - value.predictedEndTranslation.height / max(1, expansionTravel)
+                        expansionProgress = projected > 0.5 ? 1 : 0
                         dismissTranslation = 0
                     }
                 }

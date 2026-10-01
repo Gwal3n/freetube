@@ -19,6 +19,7 @@ struct FullScreenPlayer: View {
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var panelScrollOffset: CGFloat = 0
     @State private var isPlaylistPanelPresented = false
+    @State private var playlistPanelExpansion: CGFloat = 0
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
@@ -77,12 +78,9 @@ struct FullScreenPlayer: View {
                 ? 0
                 : max(0, expandedSurfaceHeight - compactSurfaceHeight)
             let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
-            // While browsing a playlist, keep the video at the existing compact height. The
-            // panel then has a useful viewport even for tall videos, and its top edge does not
-            // chase each video's expanded aspect ratio when a different row starts playing.
-            let surfaceHeight = isPlaylistPanelPresented && !isLandscape
-                ? compactSurfaceHeight
-                : expandedSurfaceHeight - consumedCollapse
+            // Opening the playlist must not resize or lift the video. The browser overlays
+            // the lower content, and can be pulled over the video when more room is needed.
+            let surfaceHeight = expandedSurfaceHeight - consumedCollapse
             let controlFrame = PlayerViewportLayout.controlFrame(
                 surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight),
                 isLandscape: isLandscape,
@@ -462,10 +460,14 @@ struct FullScreenPlayer: View {
             if !isPresented {
                 portraitVideoFullscreen = false
                 isPlaylistPanelPresented = false
+                playlistPanelExpansion = 0
             }
         }
         .onChange(of: player.activePlaylist?.id) { oldID, newID in
-            if oldID != newID { isPlaylistPanelPresented = false }
+            if oldID != newID {
+                isPlaylistPanelPresented = false
+                playlistPanelExpansion = 0
+            }
         }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
             player.playerPresentationGestureEnabled = !isActive && !isPlaylistPanelPresented
@@ -478,6 +480,7 @@ struct FullScreenPlayer: View {
         }
         .onChange(of: isPlaylistPanelPresented) { _, isPresented in
             player.playerPresentationGestureEnabled = !portraitFullscreenActive && !isPresented
+            if !isPresented { playlistPanelExpansion = 0 }
         }
         .onDisappear {
             player.playerPresentationGestureEnabled = true
@@ -504,19 +507,24 @@ struct FullScreenPlayer: View {
     ) -> some View {
         if player.activePlaylist != nil, !usesPortraitFullscreen, !player.chapterListPresented {
             let dockHeight = 60 + PlayerLayoutMetrics.safeAreaInsets.bottom
+            let browserTop = surfaceHeight * (1 - playlistPanelExpansion)
             PlayerPlaylistPanel(
                 isPresented: isPlaylistPanelPresented,
                 isLandscape: isLandscape,
                 usesOLEDBackground: oledPlayerBackground,
+                expansionProgress: $playlistPanelExpansion,
+                expansionTravel: surfaceHeight,
                 onOpen: {
                     withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                         player.chapterListPresented = false
+                        playlistPanelExpansion = 0
                         isPlaylistPanelPresented = true
                     }
                 },
                 onDismiss: {
                     withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                         isPlaylistPanelPresented = false
+                        playlistPanelExpansion = 0
                     }
                 },
                 onOpenPlaylist: openPlaylist
@@ -525,11 +533,11 @@ struct FullScreenPlayer: View {
                 width: isLandscape ? (isPlaylistPanelPresented ? sidePanelWidth : 46) : size.width,
                 height: isLandscape
                     ? (isPlaylistPanelPresented ? size.height : 46)
-                    : (isPlaylistPanelPresented ? max(0, size.height - surfaceHeight) : dockHeight)
+                    : (isPlaylistPanelPresented ? max(0, size.height - browserTop) : dockHeight)
             )
             .offset(y: isLandscape
                 ? (isPlaylistPanelPresented ? 0 : (size.height - 46) / 2)
-                : (isPlaylistPanelPresented ? surfaceHeight : size.height - dockHeight))
+                : (isPlaylistPanelPresented ? browserTop : size.height - dockHeight))
         }
     }
 

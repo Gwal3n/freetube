@@ -4,6 +4,11 @@ import XCTest
 
 @MainActor
 final class PlaylistLoadingTests: XCTestCase {
+    func testViewCountLabelIsNotUsedAsPlaylistChannel() {
+        XCTAssertEqual(Mappers.channelName(from: "21K views"), "")
+        XCTAssertEqual(Mappers.channelName(from: "Zeta Explained"), "Zeta Explained")
+    }
+
     func testFailedLoadCanRetryAndClearsItsError() async {
         let service = RetryPlaylistService(failingAttempt: 1)
         let model = PlaylistViewModel(playlistID: "playlist", service: service)

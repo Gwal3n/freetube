@@ -25,7 +25,9 @@ enum Mappers {
             id: yt.videoId,
             title: yt.title ?? "",
             channelID: yt.channel?.channelId ?? "",
-            channelName: yt.channel?.name ?? "",
+            // Some playlist lockups put a view-count label in the channel slot. Treat that
+            // as missing metadata so playlist mapping can fall back to its real owner.
+            channelName: channelName(from: yt.channel?.name),
             channelThumbnailURL: bestThumbnailURL(yt.channel?.thumbnails ?? []),
             thumbnailURL: thumb,
             duration: duration,
@@ -36,6 +38,16 @@ enum Mappers {
             isLive: yt.timeLength?.localizedCaseInsensitiveCompare("live") == .orderedSame,
             isShort: false
         )
+    }
+
+    static func channelName(from raw: String?) -> String {
+        guard let raw else { return "" }
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = name.lowercased()
+        if lower.hasSuffix(" views"), name.first?.isNumber == true {
+            return ""
+        }
+        return name
     }
 
     /// Canonical YouTube CDN thumbnail. `hqdefault` is 480×360 and is always available for any
