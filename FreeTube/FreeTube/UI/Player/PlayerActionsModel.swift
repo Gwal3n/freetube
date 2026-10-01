@@ -57,10 +57,9 @@ final class PlayerActionsModel {
         return .available
     }
 
-    func startDownload(_ video: Video) {
+    func startDownload(_ video: Video, quality: VideoQuality) {
         guard !requestedDownloadIDs.contains(video.id) else { return }
         downloadError = nil
-        let quality = UserPreferences().preferredQuality
         let token = UUID()
         downloadRequestTokens[video.id] = token
         requestedDownloadIDs.insert(video.id)
@@ -83,7 +82,7 @@ final class PlayerActionsModel {
         }
     }
 
-    func handleDownloadTap(_ video: Video) {
+    func cancelOrDeleteDownload(_ video: Video) {
         // A transfer may have written its destination before validation finishes. Do not
         // mistake that partial file for a completed download eligible for deletion.
         if downloadState(for: video.id, downloadedFileURL: nil) == .downloading {
@@ -96,11 +95,7 @@ final class PlayerActionsModel {
             }
             return
         }
-        if downloadedFile(for: video.id) != nil {
-            pendingDownloadDeletion = video
-            return
-        }
-        startDownload(video)
+        if downloadedFile(for: video.id) != nil { pendingDownloadDeletion = video }
     }
 
     func confirmDownloadDeletion(_ video: Video) {
