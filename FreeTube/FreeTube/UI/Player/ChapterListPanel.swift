@@ -7,6 +7,8 @@ import Kingfisher
 struct ChapterListPanel: View {
     private static let dismissalThreshold: CGFloat = 42
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let chapters: [VideoChapter]
     let elapsed: TimeInterval
     let isLandscape: Bool
