@@ -58,26 +58,30 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .navigationTitle(feedTitle)
-            .toolbarTitleMenu {
-                Button {
-                    Task { await model.selectGroup(nil) }
-                } label: {
-                    if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
-                    else { Text("All subscriptions") }
-                }
-                ForEach(groups.groups) { group in
-                    Button {
-                        Task { await model.selectGroup(group.id) }
-                    } label: {
-                        if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
-                        else { Text(group.name) }
+            .toolbar {
+                if !groups.groups.isEmpty {
+                    ToolbarTitleMenu {
+                        Button {
+                            Task { await model.selectGroup(nil) }
+                        } label: {
+                            if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
+                            else { Text("All subscriptions") }
+                        }
+                        ForEach(groups.groups) { group in
+                            Button {
+                                Task { await model.selectGroup(group.id) }
+                            } label: {
+                                if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
+                                else { Text(group.name) }
+                            }
+                        }
+                        Divider()
+                        Button {
+                            NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
+                        } label: {
+                            Label("Manage groups", systemImage: "square.stack.3d.up")
+                        }
                     }
-                }
-                Divider()
-                Button {
-                    NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
-                } label: {
-                    Label("Manage groups", systemImage: "square.stack.3d.up")
                 }
             }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
