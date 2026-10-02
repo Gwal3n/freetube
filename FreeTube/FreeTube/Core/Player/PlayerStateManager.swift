@@ -90,6 +90,9 @@ final class PlayerStateManager {
     var playerPanelAtTop: Bool = true
     /// Disabled while the in-place portrait fullscreen mode owns the entire viewport.
     var playerPresentationGestureEnabled: Bool = true
+    /// Only in-place portrait fullscreen may extend the player into the status-bar area.
+    /// Playlist browsing also suspends presentation gestures, but must keep the normal inset.
+    var portraitPlayerFullscreenActive: Bool = false
     /// True only after the outer SwiftUI container has accepted a downward collapse drag. The
     /// details ScrollView pauses for that gesture so its rubber band cannot move metadata faster
     /// than the player surface that contains it.
@@ -940,6 +943,7 @@ final class PlayerStateManager {
         expandedPlayerSurfaceHeight = 0
         playerPanelAtTop = true
         playerPresentationGestureEnabled = true
+        portraitPlayerFullscreenActive = false
         playerPresentationGestureActive = false
         currentVideo = nil
         loadState = .idle

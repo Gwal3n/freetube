@@ -30,7 +30,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             let transition = transitionProgress(in: proxy.size)
             let systemInsets = PlayerLayoutMetrics.safeAreaInsets
             let expandedTopInset = verticalSizeClass == .compact
-                || !player.playerPresentationGestureEnabled
+                || player.portraitPlayerFullscreenActive
                 ? 0
                 : systemInsets.top
             let miniBottomPadding = PlayerLayoutMetrics.bottomTabBarClearance

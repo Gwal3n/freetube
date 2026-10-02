@@ -6,6 +6,8 @@ import SwiftUI
 /// requested as the user reaches the end.
 @available(iOS 17.0, *)
 struct PlayerPlaylistPanel: View {
+    private static let dismissalThreshold: CGFloat = 42
+
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -22,6 +24,13 @@ struct PlayerPlaylistPanel: View {
     @State private var lastAutomaticPageCount: Int?
     @State private var dismissTranslation: CGFloat = 0
     @State private var dragStartProgress: CGFloat?
+    @State private var listScrollOffset: CGFloat = 0
+    @State private var listOverscroll: CGFloat = 0
+    @State private var listDismissOrigin: CGFloat = 0
+    @State private var listDragStartExpansion: CGFloat = 0
+    @State private var isDraggingListSheet = false
+    @State private var suppressPlaylistSelection = false
+    @State private var selectionSuppressionGeneration = 0
 
     private var playlist: Playlist? { player.activePlaylist }
 
@@ -42,6 +51,17 @@ struct PlayerPlaylistPanel: View {
         }
         .onChange(of: playlist?.id) { _, _ in
             lastAutomaticPageCount = nil
+        }
+        .onChange(of: isPresented) { _, presented in
+            guard !presented else { return }
+            dismissTranslation = 0
+            dragStartProgress = nil
+            listScrollOffset = 0
+            listOverscroll = 0
+            listDismissOrigin = 0
+            listDragStartExpansion = 0
+            isDraggingListSheet = false
+            suppressPlaylistSelection = false
         }
     }
 
@@ -157,40 +177,24 @@ struct PlayerPlaylistPanel: View {
                 Divider().opacity(0.45)
 
                 ScrollViewReader { scrollProxy in
-                    ScrollView {
-                        let items = player.queue.items
-                        LazyVStack(spacing: 2) {
-                            ForEach(items.indices, id: \.self) { index in
-                                row(items[index], index: index)
-                                    .id(index)
-                            }
-                            if player.canLoadMorePlaylistItems {
-                                Button {
-                                    Task { await player.loadMorePlaylistItems() }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        if player.isLoadingMorePlaylistVideos {
-                                            ProgressView()
-                                        } else {
-                                            Text("Load more videos")
-                                        }
-                                        Spacer()
+                    Group {
+                        if #available(iOS 18.0, *) {
+                            playlistRows
+                                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                                    geometry.contentOffset.y + geometry.contentInsets.top
+                                } action: { _, rawOffset in
+                                    listScrollOffset = max(0, rawOffset)
+                                    listOverscroll = max(0, -rawOffset)
+                                    if isDraggingListSheet, listDismissOrigin == 0,
+                                       listOverscroll <= 0.5 {
+                                        isDraggingListSheet = false
                                     }
-                                    .frame(height: 54)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(player.isLoadingMorePlaylistVideos)
-                                .task(id: items.count) {
-                                    await loadNextPageIfNeeded(after: items.count)
-                                }
-                            }
+                                .simultaneousGesture(listHandoffDismissGesture)
+                        } else {
+                            playlistRows
                         }
-                        .padding(.vertical, 6)
-                        .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom)
                     }
-                    .scrollIndicators(.visible)
-                    .scrollBounceBehavior(.always, axes: .vertical)
                     .onAppear {
                         guard player.queue.items.indices.contains(player.queue.currentIndex) else { return }
                         scrollProxy.scrollTo(player.queue.currentIndex, anchor: .center)
@@ -215,11 +219,50 @@ struct PlayerPlaylistPanel: View {
         }
     }
 
+    private var playlistRows: some View {
+        ScrollView {
+            let items = player.queue.items
+            LazyVStack(spacing: 2) {
+                ForEach(items.indices, id: \.self) { index in
+                    row(items[index], index: index)
+                        .id(index)
+                }
+                if player.canLoadMorePlaylistItems {
+                    Button {
+                        Task { await player.loadMorePlaylistItems() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if player.isLoadingMorePlaylistVideos {
+                                ProgressView()
+                            } else {
+                                Text("Load more videos")
+                            }
+                            Spacer()
+                        }
+                        .frame(height: 54)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(player.isLoadingMorePlaylistVideos)
+                    .task(id: items.count) {
+                        await loadNextPageIfNeeded(after: items.count)
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+            .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom)
+            .offset(y: isDraggingListSheet ? -listOverscroll : 0)
+        }
+        .scrollIndicators(.visible)
+        .scrollBounceBehavior(.always, axes: .vertical)
+    }
+
     private func row(_ video: Video, index: Int) -> some View {
         let isCurrent = isPlayingPlaylistItem && index == player.queue.currentIndex
         return DeArrowVideoContent(video: video) { branding in
             Button {
                 // Keep the browser mounted and its scroll offset intact while playback changes.
+                guard !suppressPlaylistSelection else { return }
                 player.load(video, skipRecommendations: true)
             } label: {
                 HStack(spacing: 12) {
@@ -266,6 +309,63 @@ struct PlayerPlaylistPanel: View {
         guard lastAutomaticPageCount != count, player.canLoadMorePlaylistItems else { return }
         lastAutomaticPageCount = count
         await player.loadMorePlaylistItems()
+    }
+
+    /// Match the chapter browser's handoff: the list scrolls normally until it reaches its
+    /// top, then the entire sheet follows a continued downward drag. The expanded detent
+    /// returns to the compact detent first; a subsequent pull dismisses it.
+    private var listHandoffDismissGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .onChanged { value in
+                guard !isLandscape, value.translation.height > 0,
+                      abs(value.translation.height) > abs(value.translation.width) else { return }
+                if !isDraggingListSheet {
+                    guard listScrollOffset <= 1 else { return }
+                    listDismissOrigin = value.translation.height
+                    listDragStartExpansion = expansionProgress
+                    isDraggingListSheet = true
+                    suppressPlaylistSelection = true
+                    selectionSuppressionGeneration &+= 1
+                }
+                let travel = max(0, value.translation.height - listDismissOrigin)
+                if listDragStartExpansion > 0 {
+                    expansionProgress = max(0, listDragStartExpansion - travel / max(1, expansionTravel))
+                } else {
+                    dismissTranslation = travel
+                }
+            }
+            .onEnded { value in
+                guard !isLandscape else { return }
+                if isDraggingListSheet {
+                    let finalTravel = max(0, value.translation.height - listDismissOrigin)
+                    let projectedTravel = max(0, value.predictedEndTranslation.height - listDismissOrigin)
+                    if listDragStartExpansion > 0 {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                            let projected = listDragStartExpansion - projectedTravel / max(1, expansionTravel)
+                            expansionProgress = projected < 0.5 ? 0 : 1
+                        }
+                    } else if finalTravel >= Self.dismissalThreshold,
+                              projectedTravel >= Self.dismissalThreshold {
+                        onDismiss()
+                    } else {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                            dismissTranslation = 0
+                        }
+                    }
+                }
+                listDismissOrigin = 0
+                if listOverscroll <= 0.5 { isDraggingListSheet = false }
+                releasePlaylistSelectionSuppression()
+            }
+    }
+
+    private func releasePlaylistSelectionSuppression() {
+        let generation = selectionSuppressionGeneration
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard generation == selectionSuppressionGeneration else { return }
+            suppressPlaylistSelection = false
+        }
     }
 
     private var headerDragGesture: some Gesture {

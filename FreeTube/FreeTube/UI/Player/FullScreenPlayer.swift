@@ -470,6 +470,7 @@ struct FullScreenPlayer: View {
             }
         }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
+            player.portraitPlayerFullscreenActive = isActive
             player.playerPresentationGestureEnabled = !isActive && !isPlaylistPanelPresented
             if !isActive {
                 fullscreenSwipeTranslation = 0
@@ -484,6 +485,7 @@ struct FullScreenPlayer: View {
         }
         .onDisappear {
             player.playerPresentationGestureEnabled = true
+            player.portraitPlayerFullscreenActive = false
         }
 
         // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
