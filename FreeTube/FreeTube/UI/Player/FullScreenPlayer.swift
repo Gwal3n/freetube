@@ -321,7 +321,16 @@ struct FullScreenPlayer: View {
                 )
                 .onAppear { showPlayerControls() }
                 .onChange(of: surfaceHeight, initial: true) { _, height in
-                    player.expandedPlayerSurfaceHeight = height
+                    player.expandedPlayerSurfaceHeight = max(
+                        0,
+                        height * (isPlaylistPanelPresented ? 1 - playlistPanelExpansion : 1)
+                    )
+                }
+                .onChange(of: playlistPanelExpansion) { _, expansion in
+                    player.expandedPlayerSurfaceHeight = max(
+                        0,
+                        surfaceHeight * (isPlaylistPanelPresented ? 1 - expansion : 1)
+                    )
                 }
                 .onDisappear { controlsVisibility.cancelAutoHide() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
@@ -475,7 +484,7 @@ struct FullScreenPlayer: View {
         }
         .onChange(of: portraitFullscreenActive, initial: true) { _, isActive in
             player.portraitPlayerFullscreenActive = isActive
-            player.playerPresentationGestureEnabled = !isActive && !isPlaylistPanelPresented
+            player.playerPresentationGestureEnabled = !isActive
             if !isActive {
                 fullscreenSwipeTranslation = 0
                 fullscreenSwipeIsVertical = nil
@@ -484,7 +493,8 @@ struct FullScreenPlayer: View {
             }
         }
         .onChange(of: isPlaylistPanelPresented) { _, isPresented in
-            player.playerPresentationGestureEnabled = !portraitFullscreenActive && !isPresented
+            player.playlistPanelPresented = isPresented
+            player.playerPresentationGestureEnabled = !portraitFullscreenActive
             if !isPresented { playlistPanelExpansion = 0 }
         }
         .onChange(of: player.chapterListPresented) { _, isPresented in
@@ -492,6 +502,7 @@ struct FullScreenPlayer: View {
         }
         .onDisappear {
             player.playerPresentationGestureEnabled = true
+            player.playlistPanelPresented = false
             player.portraitPlayerFullscreenActive = false
         }
 

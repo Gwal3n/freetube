@@ -18,6 +18,7 @@ struct SearchContent: View {
     @State private var areVideosExpanded = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @State private var progressByVideoID: [String: Double] = [:]
+    private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
@@ -103,6 +104,7 @@ struct SearchContent: View {
                                 PlaylistRow(
                                     playlist: playlist,
                                     onTap: {
+                                        navigationLog.info("Search playlist row tapped: \(playlist.id, privacy: .public)")
                                         dismissKeyboard()
                                         onOpenDestination(.playlist(playlist.id))
                                     },

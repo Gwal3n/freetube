@@ -52,18 +52,30 @@ struct HomeScreen: View {
                 case .channel(let id):
                     ChannelScreen(channelID: id)
                         .onAppear { navigationLog.info("Search channel destination appeared") }
-                case .playlist(let id): PlaylistScreen(playlistID: id)
+                case .playlist(let id):
+                    PlaylistScreen(playlistID: id)
+                        .onAppear { navigationLog.info("Search playlist destination appeared: \(id, privacy: .public)") }
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
             }
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                navigationLog.info("Search keyboard shown; presented=\(isSearchPresented, privacy: .public)")
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                navigationLog.info("Search keyboard hidden; presented=\(isSearchPresented, privacy: .public)")
                 // `.searchable(isPresented:)` does not always clear its presentation binding when
                 // UIKit dismisses the keyboard interactively. Leaving it true pins the expanded
                 // search drawer at the top even though search is no longer active.
                 isSearchPresented = false
+            }
+            .onChange(of: isSearchPresented) { _, isPresented in
+                navigationLog.info("Search presentation changed: \(isPresented, privacy: .public)")
+            }
+            .onChange(of: path) { oldPath, newPath in
+                navigationLog.info("Search path changed: \(oldPath.count, privacy: .public) → \(newPath.count, privacy: .public)")
             }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in
@@ -79,6 +91,7 @@ struct HomeScreen: View {
             }
             .onChange(of: searchActivation) { _, _ in
                 guard !MacIntegration.isRunningOnMac else { return }
+                navigationLog.info("Search tab activated; path count=\(path.count, privacy: .public)")
                 // Re-selecting Search returns from a pushed destination and focuses the native
                 // field in one action. It must not discard the current term or result set.
                 if !path.isEmpty {
@@ -96,6 +109,7 @@ struct HomeScreen: View {
     /// that layer is active can make iOS 26 reopen/focus the field and discard the destination.
     /// End search first, let that transaction settle, then perform the stack mutation.
     private func openDestination(_ destination: AppNavigationRequest.Destination) {
+        navigationLog.info("Search destination requested: \(String(describing: destination), privacy: .public)")
         isSearchPresented = false
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
@@ -105,13 +119,18 @@ struct HomeScreen: View {
         )
         Task { @MainActor in
             await Task.yield()
-            guard path.last != destination else { return }
+            guard path.last != destination else {
+                navigationLog.info("Search destination already current")
+                return
+            }
             path.append(destination)
+            navigationLog.info("Search destination appended; path count=\(path.count, privacy: .public)")
         }
     }
 
     /// Gives focus back to native `.searchable` without coupling presentation to query/results.
     private func focusSearch() async {
+        navigationLog.info("Search focus requested; presented=\(isSearchPresented, privacy: .public)")
         // Native searchable can remain logically presented after its keyboard resigns. Cycle only
         // the presentation binding on an explicit tab re-tap so it reliably regains first responder
         // without coupling ordinary keyboard dismissal to navigation-bar layout.
@@ -120,6 +139,7 @@ struct HomeScreen: View {
             await Task.yield()
         }
         isSearchPresented = true
+        navigationLog.info("Search focus applied")
     }
 
     /// Persists the trimmed query, then either opens a recognized YouTube URL or performs search.

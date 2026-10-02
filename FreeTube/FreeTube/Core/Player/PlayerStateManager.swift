@@ -83,15 +83,16 @@ final class PlayerStateManager {
     /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
     /// panel owns vertical gestures.
     var chapterListPresented: Bool = false
-    /// Current bottom edge of the video surface in the expanded player's local coordinates.
-    /// The presentation container uses this to distinguish a deliberate drag on the video from
-    /// ordinary scrolling in the metadata panel below it.
+    /// Current bottom edge of the *visible* video surface in expanded-player coordinates. A
+    /// raised playlist panel can cover part of the video; its scroll must never collapse the
+    /// player even when the gesture begins within the video's original frame.
     var expandedPlayerSurfaceHeight: CGFloat = 0
+    var playlistPanelPresented: Bool = false
     var playerPanelAtTop: Bool = true
     /// Disabled while the in-place portrait fullscreen mode owns the entire viewport.
     var playerPresentationGestureEnabled: Bool = true
     /// Only in-place portrait fullscreen may extend the player into the status-bar area.
-    /// Playlist browsing also suspends presentation gestures, but must keep the normal inset.
+    /// Playlist browsing must keep the normal inset.
     var portraitPlayerFullscreenActive: Bool = false
     /// True only after the outer SwiftUI container has accepted a downward collapse drag. The
     /// details ScrollView pauses for that gesture so its rubber band cannot move metadata faster
@@ -941,6 +942,7 @@ final class PlayerStateManager {
         fullScreenPresented = false
         chapterListPresented = false
         expandedPlayerSurfaceHeight = 0
+        playlistPanelPresented = false
         playerPanelAtTop = true
         playerPresentationGestureEnabled = true
         portraitPlayerFullscreenActive = false

@@ -164,9 +164,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 if directionWasUndetermined {
                     expandedDragStartedDown = value.translation.height > 0
                     let expandedTopInset = verticalSizeClass == .compact ? 0 : PlayerLayoutMetrics.safeAreaInsets.top
-                    let startedOnVideo = value.startLocation.y
-                        <= expandedTopInset + player.expandedPlayerSurfaceHeight
-                    expandedDragCanCollapse = startedOnVideo || player.playerPanelAtTop
+                    let startedOnVideo = value.startLocation.y >= expandedTopInset
+                        && value.startLocation.y <= expandedTopInset + player.expandedPlayerSurfaceHeight
+                    // A playlist sheet may cover the lower part of the video. Its own scrolling
+                    // and dismissal retain ownership; only a drag on the uncovered video can
+                    // collapse the player while the sheet is open.
+                    expandedDragCanCollapse = startedOnVideo
+                        || (!player.playlistPanelPresented && player.playerPanelAtTop)
                 }
                 guard expandedDragStartedDown, expandedDragCanCollapse else { return }
                 player.playerPresentationGestureActive = true
