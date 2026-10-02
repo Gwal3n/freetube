@@ -2,7 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
-    @Environment(\.dismiss) private var dismiss
+    let onClose: () -> Void
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -269,7 +269,7 @@ struct SettingsScreen: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         log.info("Settings Done requested")
-                        dismiss()
+                        onClose()
                     }
                 }
             }

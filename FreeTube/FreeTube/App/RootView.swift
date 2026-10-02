@@ -84,10 +84,13 @@ struct RootView: View {
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
         .sheet(item: $rootSheet, onDismiss: {
             log.info("Root sheet dismissed")
+            rootSheet = nil
         }) { sheet in
             switch sheet {
             case .settings:
-                SettingsScreen()
+                SettingsScreen {
+                    rootSheet = nil
+                }
                     .presentationDragIndicator(.hidden)
             case .subscriptionGroups:
                 SubscriptionGroupsScreen()
