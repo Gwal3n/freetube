@@ -14,6 +14,11 @@ struct SubscriptionFeedScreen: View {
     @State private var currentDate = Date.now
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
+    private var feedTitle: Text {
+        guard let groupName = model.selectedGroupName else { return Text("Feed") }
+        return Text("Feed") + Text(verbatim: " · \(groupName)")
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             List {
@@ -52,33 +57,27 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("Feed")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            Task { await model.selectGroup(nil) }
-                        } label: {
-                            if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
-                            else { Text("All subscriptions") }
-                        }
-                        ForEach(groups.groups) { group in
-                            Button {
-                                Task { await model.selectGroup(group.id) }
-                            } label: {
-                                if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
-                                else { Text(group.name) }
-                            }
-                        }
-                        Divider()
-                        Button {
-                            NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
-                        } label: {
-                            Label("Manage groups", systemImage: "square.stack.3d.up")
-                        }
+            .navigationTitle(feedTitle)
+            .toolbarTitleMenu {
+                Button {
+                    Task { await model.selectGroup(nil) }
+                } label: {
+                    if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
+                    else { Text("All subscriptions") }
+                }
+                ForEach(groups.groups) { group in
+                    Button {
+                        Task { await model.selectGroup(group.id) }
                     } label: {
-                        Label(model.selectedGroupName ?? "All subscriptions", systemImage: "line.3.horizontal.decrease")
+                        if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
+                        else { Text(group.name) }
                     }
+                }
+                Divider()
+                Button {
+                    NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
+                } label: {
+                    Label("Manage groups", systemImage: "square.stack.3d.up")
                 }
             }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
