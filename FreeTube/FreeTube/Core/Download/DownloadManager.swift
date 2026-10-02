@@ -936,7 +936,10 @@ final class DownloadManager: TemporaryDownloading {
     /// request that triggered it. Now driven by `DownloadsStore` over the filesystem.
     private func enforceCacheLimit() {
         let limit = UserPreferences().downloadCacheLimit.bytes
-        DownloadsStore.shared.enforceCacheLimit(limit)
+        DownloadsStore.shared.enforceCacheLimit(
+            limit,
+            protectedVideoIDs: PlaylistDownloadCoordinator.shared.protectedVideoIDs
+        )
     }
 
     private func downloadThumbnailData(url: URL?) async -> Data? {

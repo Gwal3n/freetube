@@ -195,7 +195,10 @@ final class SettingsViewModel {
             // Apply the new cap immediately so the user doesn't have to download a new video to
             // see eviction kick in. `DownloadsStore.enforceCacheLimit` no-ops on `.unlimited`
             // (nil bytes) and posts the change notification once files have been removed.
-            DownloadsStore.shared.enforceCacheLimit(newValue.bytes)
+            DownloadsStore.shared.enforceCacheLimit(
+                newValue.bytes,
+                protectedVideoIDs: PlaylistDownloadCoordinator.shared.protectedVideoIDs
+            )
         }
     }
 

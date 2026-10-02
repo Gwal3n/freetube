@@ -11,6 +11,7 @@ struct DownloadsScreen: View {
     /// the store rebuilds `entries` from the Documents root on launch and after every
     /// `DownloadsStore.didChange` notification (posted by the YouTube + URL writers).
     @State private var store = DownloadsStore.shared
+    @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
     @Environment(PlayerStateManager.self) private var player
     @State private var path: [AppNavigationRequest.Destination] = []
 
@@ -24,6 +25,7 @@ struct DownloadsScreen: View {
     @State private var showBulkDeleteConfirmation = false
     /// When non-nil, the user tapped delete on a single row — confirm before removing.
     @State private var pendingSingleDelete: SavedItem?
+    @State private var pendingPlaylistRemovalID: String?
     /// When non-nil, the user tapped "Open in…" on a row — present the system activity sheet.
     @State private var shareFileURL: URL?
     @State private var exportFileURL: URL?
@@ -42,6 +44,7 @@ struct DownloadsScreen: View {
     /// Active in-flight downloads.
     private var inProgress: [DownloadTaskSnapshot] {
         model.manager.activeTasks.filter { snapshot in
+            guard !playlistMemberIDs.contains(snapshot.videoID) else { return false }
             switch snapshot.state {
             case .queued, .downloading, .paused, .failed: return true
             case .completed: return false
@@ -53,7 +56,17 @@ struct DownloadsScreen: View {
     /// "tracked" rows (file has our metadata xattr) and "orphan" rows (file present but no
     /// xattr — surfaces with filename-as-title). We just map and apply the user's sort.
     private var savedItems: [SavedItem] {
-        sortItems(store.entries.map(SavedItem.init(from:)))
+        sortItems(store.entries
+            .filter { entry in
+                !playlistMemberIDs.contains(entry.videoID)
+            }
+            .map(SavedItem.init(from:)))
+    }
+
+    private var playlistMemberIDs: Set<String> { playlistDownloads.protectedVideoIDs }
+
+    private var downloadedVideoIDs: Set<String> {
+        Set(store.entries.map(\.videoID))
     }
 
     /// Aggregate stats shown under the title.
@@ -79,22 +92,55 @@ struct DownloadsScreen: View {
                     }
                 }
 
-                Section {
-                    if savedItems.isEmpty {
-                        ContentUnavailableView(
-                            "No Downloads",
-                            systemImage: "arrow.down.circle",
-                            description: Text("Download a video from the player or a link to watch it offline.")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .listRowBackground(Color.clear)
+                if !playlistDownloads.manifests.isEmpty {
+                    Section("Playlists") {
+                        let downloadedIDs = downloadedVideoIDs
+                        ForEach(playlistDownloads.manifests.sorted { $0.updatedAt > $1.updatedAt }) { manifest in
+                            let downloadedCount = manifest.videos.reduce(0) {
+                                $0 + (downloadedIDs.contains($1.id) ? 1 : 0)
+                            }
+                            DownloadedPlaylistRow(
+                                manifest: manifest,
+                                downloadedCount: downloadedCount,
+                                currentVideoTitle: playlistDownloads.activePlaylistID == manifest.id
+                                    ? manifest.videos.first(where: { $0.id == playlistDownloads.currentVideoID })?.title
+                                    : nil,
+                                currentVideoProgress: playlistDownloads.activePlaylistID == manifest.id
+                                    ? model.manager.progressByVideoID[playlistDownloads.currentVideoID ?? ""] ?? 0
+                                    : 0,
+                                onResume: { playlistDownloads.resume(manifest.id) },
+                                onCancel: { playlistDownloads.cancel(manifest.id) }
+                            )
+                            .disabled(isSelecting)
+                            .swipeActions {
+                                Button(role: .destructive) {
+                                    pendingPlaylistRemovalID = manifest.id
+                                } label: {
+                                    Label("Remove playlist", systemImage: "trash")
+                                }
+                            }
+                        }
                     }
-                    ForEach(savedItems) { item in
-                        savedItemRow(item)
-                            .tag(item.id)
+                }
+
+                if !savedItems.isEmpty || playlistDownloads.manifests.isEmpty {
+                    Section {
+                        if savedItems.isEmpty {
+                            ContentUnavailableView(
+                                "No Downloads",
+                                systemImage: "arrow.down.circle",
+                                description: Text("Download a video from the player or a link to watch it offline.")
+                            )
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
+                        }
+                        ForEach(savedItems) { item in
+                            savedItemRow(item)
+                                .tag(item.id)
+                        }
+                    } header: {
+                        savedHeader
                     }
-                } header: {
-                    savedHeader
                 }
             }
             .listStyle(.plain)
@@ -146,6 +192,22 @@ struct DownloadsScreen: View {
                 Button("Cancel", role: .cancel) { pendingSingleDelete = nil }
             } message: { item in
                 Text("“\(item.title)” will be permanently removed from your device.")
+            }
+            .confirmationDialog(
+                "Remove downloaded playlist?",
+                isPresented: Binding(
+                    get: { pendingPlaylistRemovalID != nil },
+                    set: { if !$0 { pendingPlaylistRemovalID = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Remove Playlist", role: .destructive) {
+                    if let id = pendingPlaylistRemovalID { playlistDownloads.remove(id) }
+                    pendingPlaylistRemovalID = nil
+                }
+                Button("Cancel", role: .cancel) { pendingPlaylistRemovalID = nil }
+            } message: {
+                Text("The playlist grouping is removed. Downloaded video files remain on this device.")
             }
             .errorToast(Bindable(model).errorState)
             .overlay(alignment: .bottom) {

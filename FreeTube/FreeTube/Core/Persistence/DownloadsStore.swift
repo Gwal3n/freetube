@@ -217,19 +217,28 @@ final class DownloadsStore {
     /// eviction sweep. `nil` limit → no-op. Runs the actual `FileManager.removeItem`
     /// calls on a `.utility` detached task because deleting tens of files can take
     /// noticeable wall-clock time and shouldn't block the main thread.
-    func enforceCacheLimit(_ limitBytes: Int64?) {
+    func enforceCacheLimit(_ limitBytes: Int64?, protectedVideoIDs: Set<String> = []) {
         guard let limitBytes else { return }
-        var total: Int64 = 0
+        // Explicitly downloaded playlist members are library content, not disposable cache.
+        // They still occupy space in the budget, but are never selected for eviction.
+        let protectedBytes = entries.reduce(Int64(0)) { total, entry in
+            guard protectedVideoIDs.contains(entry.videoID) else { return total }
+            return total + entry.fileSize
+        }
+        let remainingBudget = max(0, limitBytes - protectedBytes)
+        var retainedBytes: Int64 = 0
         var evict: [URL] = []
         // entries is already newest-first; walk and accumulate. Capture URLs only —
         // DownloadEntry isn't Sendable across the detached boundary, and we don't need
         // anything else off the entry to delete the file.
         for (index, entry) in entries.enumerated() {
-            total += entry.fileSize
+            if protectedVideoIDs.contains(entry.videoID) { continue }
             // Always keep the newest (index 0) regardless of its size — otherwise a
             // single large download with a tiny cap would immediately self-evict.
-            if index > 0 && total > limitBytes {
+            if index > 0 && retainedBytes + entry.fileSize > remainingBudget {
                 evict.append(entry.fileURL)
+            } else {
+                retainedBytes += entry.fileSize
             }
         }
         guard !evict.isEmpty else { return }
@@ -323,6 +332,9 @@ struct DownloadEntry: Identifiable, Sendable {
     let duration: TimeInterval?
 
     var id: String { fileURL.path }
+    /// Canonical YouTube files use their video ID as the filename. This fallback covers the
+    /// short interval before the asynchronous metadata xattr has been written.
+    var videoID: String { metadata?.videoID ?? fileURL.deletingPathExtension().lastPathComponent }
 
     /// Date used for the newest-first sort. Prefer metadata when available (matches the
     /// previous SwiftData behavior), fall back to file modification time for orphans.

@@ -11,6 +11,8 @@ struct LocalPlaylistsScreen: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedPlaylistIDs = Set<String>()
     @State private var showingDeleteConfirmation = false
+    @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
+    @State private var downloads = DownloadsStore.shared
     private let service = LocalPlaylistService()
 
     var body: some View {
@@ -98,11 +100,12 @@ struct LocalPlaylistsScreen: View {
     ) -> some View {
         if !items.isEmpty {
             Section(title) {
+                let availableIDs = Set(downloads.entries.map(\.videoID))
                 ForEach(items) { playlist in
                     NavigationLink {
                         LocalPlaylistScreen(playlistID: playlist.id)
                     } label: {
-                        playlistRow(playlist)
+                        playlistRow(playlist, availableIDs: availableIDs)
                     }
                 }
                 .onDelete { offsets in
@@ -124,8 +127,12 @@ struct LocalPlaylistsScreen: View {
         }
     }
 
-    private func playlistRow(_ playlist: LocalPlaylistSnapshot) -> some View {
-        HStack(spacing: 12) {
+    private func playlistRow(_ playlist: LocalPlaylistSnapshot, availableIDs: Set<String>) -> some View {
+        let downloaded = playlist.sourcePlaylistID.flatMap { playlistDownloads.manifest(for: $0) }
+        let downloadedCount = downloaded?.videos.reduce(0) {
+            $0 + (availableIDs.contains($1.id) ? 1 : 0)
+        } ?? 0
+        return HStack(spacing: 12) {
             KFImage(playlist.thumbnailURL)
                 .thumbnail(size: CGSize(width: 72, height: 44)) {
                     Image(systemName: "music.note.list").foregroundStyle(.secondary)
@@ -157,6 +164,14 @@ struct LocalPlaylistsScreen: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 }
+            }
+            Spacer(minLength: 0)
+            if let downloaded, downloadedCount > 0 {
+                Image(systemName: downloadedCount == downloaded.videos.count && downloaded.isPrepared
+                    ? "arrow.down.circle.fill" : "arrow.down.circle")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("\(downloadedCount) of \(downloaded.videos.count) downloaded")
             }
         }
     }

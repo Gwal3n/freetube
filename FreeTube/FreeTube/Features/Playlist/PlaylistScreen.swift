@@ -14,6 +14,8 @@ struct PlaylistScreen: View {
     @Environment(\.openURL) private var openURL
     @State private var isSavedLocally = false
     @State private var isSavingLocally = false
+    @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
+    @State private var downloads = DownloadsStore.shared
     private let localPlaylistService = LocalPlaylistService()
 
     /// True after the user taps "More" — expands the metadata block to show the full description
@@ -147,9 +149,11 @@ struct PlaylistScreen: View {
                     player.loadPlaylist(details, startAt: first, shuffled: true)
                 }
             }
-            PlaylistHeaderActionButton(title: "Download", systemImage: "arrow.down.circle.fill") {
-                enqueueAllDownloads(details.videos)
+            PlaylistHeaderActionButton(title: downloadActionTitle(for: details.playlist.id), systemImage: "arrow.down.circle.fill") {
+                playlistDownloads.start(details, quality: UserPreferences().preferredQuality)
             }
+            .disabled(isPlaylistDownloadActive(details.playlist.id)
+                || (details.videos.isEmpty && details.continuationToken == nil))
             Spacer(minLength: 0)
             moreMenu(details)
         }
@@ -251,22 +255,25 @@ struct PlaylistScreen: View {
 
     // MARK: - Actions
 
-    /// Fires off `ensureDownloaded` for every playlist video **in parallel**, fire-and-forget,
-    /// so each one gets added to the Downloads queue (DownloadManager.tasks) immediately and the
-    /// user sees the whole playlist appear in the Downloads tab. The actual yt-dlp work still
-    /// runs serially behind `PythonRunner`'s FIFO, but the queue list reflects everything that
-    /// needs to happen, which is what the user wants to see.
-    ///
-    /// Sequential `await`-in-a-loop (the previous implementation) only enqueued the next item
-    /// after the previous finished, so the UI made it look like the Download All button was
-    /// downloading one track and ignoring the rest.
-    private func enqueueAllDownloads(_ videos: [Video]) {
-        let quality = UserPreferences().preferredQuality
-        for video in videos {
-            Task {
-                _ = try? await DownloadManager.shared.ensureDownloaded(video: video, quality: quality)
-            }
+    private func downloadActionTitle(for playlistID: String) -> String {
+        guard let job = playlistDownloads.manifest(for: playlistID) else { return "Download" }
+        switch job.status {
+        case .queued, .preparing, .downloading: return "Downloading"
+        case .paused: return "Resume"
+        case .finished: return isFullyDownloaded(job) ? "Downloaded" : "Retry"
         }
+    }
+
+    private func isPlaylistDownloadActive(_ playlistID: String) -> Bool {
+        guard let job = playlistDownloads.manifest(for: playlistID) else { return false }
+        if [.queued, .preparing, .downloading].contains(job.status) { return true }
+        return job.status == .finished && isFullyDownloaded(job)
+    }
+
+    private func isFullyDownloaded(_ job: PlaylistDownloadManifest) -> Bool {
+        let available = Set(downloads.entries.map(\.videoID))
+        return job.isPrepared && !job.videos.isEmpty
+            && job.videos.allSatisfy { available.contains($0.id) }
     }
 
     private func toggleLocalSave(_ playlist: Playlist) async {
