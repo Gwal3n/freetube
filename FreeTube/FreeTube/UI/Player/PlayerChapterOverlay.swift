@@ -11,6 +11,8 @@ struct PlayerChapterOverlay: View {
 
     let isLandscape: Bool
     let usesOLEDBackground: Bool
+    @Binding var expansionProgress: CGFloat
+    let expansionTravel: CGFloat
     let onInteraction: () -> Void
 
     var body: some View {
@@ -19,6 +21,8 @@ struct PlayerChapterOverlay: View {
             elapsed: player.elapsed,
             isLandscape: isLandscape,
             usesOLEDBackground: usesOLEDBackground,
+            expansionProgress: $expansionProgress,
+            expansionTravel: expansionTravel,
             onSeek: { target in
                 player.seek(to: target)
                 onInteraction()

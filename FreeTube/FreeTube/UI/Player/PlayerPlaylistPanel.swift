@@ -31,6 +31,11 @@ struct PlayerPlaylistPanel: View {
     @State private var isDraggingListSheet = false
     @State private var suppressPlaylistSelection = false
     @State private var selectionSuppressionGeneration = 0
+    @State private var isSavedLocally = false
+    @State private var hasLoadedSavedState = false
+    @State private var isSavingLocally = false
+    @State private var saveError: ErrorState?
+    private let localPlaylistService = LocalPlaylistService()
 
     private var playlist: Playlist? { player.activePlaylist }
 
@@ -51,6 +56,18 @@ struct PlayerPlaylistPanel: View {
         }
         .onChange(of: playlist?.id) { _, _ in
             lastAutomaticPageCount = nil
+            isSavedLocally = false
+            hasLoadedSavedState = false
+            isSavingLocally = false
+            saveError = nil
+        }
+        .task(id: playlist?.id) {
+            guard let playlist, !playlist.id.hasPrefix("local:") else { return }
+            await refreshSavedState(for: playlist.id)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
+            guard let playlist, !playlist.id.hasPrefix("local:") else { return }
+            Task { await refreshSavedState(for: playlist.id) }
         }
         .onChange(of: isPresented) { _, presented in
             guard !presented else { return }
@@ -63,6 +80,7 @@ struct PlayerPlaylistPanel: View {
             isDraggingListSheet = false
             suppressPlaylistSelection = false
         }
+        .errorToast($saveError)
     }
 
     @ViewBuilder
@@ -158,6 +176,33 @@ struct PlayerPlaylistPanel: View {
                         .buttonStyle(.plain)
                         .contentShape(.interaction, Rectangle().inset(by: -6))
                         .accessibilityLabel("Open playlist page")
+                        if !playlist.id.hasPrefix("local:") {
+                            Button {
+                                Task { await toggleLocalSave(playlist) }
+                            } label: {
+                                Group {
+                                    if isSavingLocally || !hasLoadedSavedState {
+                                        ProgressView()
+                                    } else {
+                                        Image(systemName: isSavedLocally ? "bookmark.fill" : "bookmark")
+                                    }
+                                }
+                                .frame(width: 32, height: 32)
+                            }
+                            .buttonStyle(.plain)
+                            .contentShape(.interaction, Rectangle().inset(by: -6))
+                            .disabled(isSavingLocally || !hasLoadedSavedState)
+                            .accessibilityLabel(isSavedLocally ? "Remove saved playlist" : "Save playlist")
+                            if let url = playlist.youtubeURL {
+                                ShareLink(item: url) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .frame(width: 32, height: 32)
+                                }
+                                .buttonStyle(.plain)
+                                .contentShape(.interaction, Rectangle().inset(by: -6))
+                                .accessibilityLabel("Share playlist")
+                            }
+                        }
                         Button(action: onDismiss) {
                             Image(systemName: "xmark")
                                 .font(.subheadline.weight(.bold))
@@ -309,6 +354,32 @@ struct PlayerPlaylistPanel: View {
         guard lastAutomaticPageCount != count, player.canLoadMorePlaylistItems else { return }
         lastAutomaticPageCount = count
         await player.loadMorePlaylistItems()
+    }
+
+    private func refreshSavedState(for playlistID: String) async {
+        let saved = await localPlaylistService.isRemoteSaved(id: playlistID)
+        guard playlist?.id == playlistID else { return }
+        isSavedLocally = saved
+        hasLoadedSavedState = true
+    }
+
+    private func toggleLocalSave(_ target: Playlist) async {
+        guard hasLoadedSavedState, !isSavingLocally, playlist?.id == target.id else { return }
+        isSavingLocally = true
+        defer {
+            if playlist?.id == target.id { isSavingLocally = false }
+        }
+        if isSavedLocally {
+            await localPlaylistService.removeRemotePlaylist(id: target.id)
+            if playlist?.id == target.id { isSavedLocally = false }
+        } else {
+            do {
+                try await localPlaylistService.saveRemotePlaylist(target)
+                if playlist?.id == target.id { isSavedLocally = true }
+            } catch {
+                if playlist?.id == target.id { saveError = ErrorState(from: error) }
+            }
+        }
     }
 
     /// Match the chapter browser's handoff: the list scrolls normally until it reaches its

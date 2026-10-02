@@ -20,6 +20,7 @@ struct FullScreenPlayer: View {
     @State private var panelScrollOffset: CGFloat = 0
     @State private var isPlaylistPanelPresented = false
     @State private var playlistPanelExpansion: CGFloat = 0
+    @State private var chapterPanelExpansion: CGFloat = 0
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
@@ -373,16 +374,19 @@ struct FullScreenPlayer: View {
             .frame(width: proxy.size.width, alignment: .leading)
 
             if player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
+                let chapterTop = surfaceHeight * (1 - chapterPanelExpansion)
                 PlayerChapterOverlay(
                     isLandscape: isLandscape,
                     usesOLEDBackground: oledPlayerBackground,
+                    expansionProgress: $chapterPanelExpansion,
+                    expansionTravel: surfaceHeight,
                     onInteraction: showPlayerControls
                 )
                 .frame(
                     width: isLandscape ? sidePanelWidth : proxy.size.width,
-                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - surfaceHeight)
+                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - chapterTop)
                 )
-                .offset(y: isLandscape ? 0 : surfaceHeight)
+                .offset(y: isLandscape ? 0 : chapterTop)
                 // Moving the landscape material sidebar while simultaneously widening the player
                 // leaves a stale strip at the trailing edge for one render pass. Remove it
                 // atomically and let the underlying column resize; portrait retains its sheet
@@ -482,6 +486,9 @@ struct FullScreenPlayer: View {
         .onChange(of: isPlaylistPanelPresented) { _, isPresented in
             player.playerPresentationGestureEnabled = !portraitFullscreenActive && !isPresented
             if !isPresented { playlistPanelExpansion = 0 }
+        }
+        .onChange(of: player.chapterListPresented) { _, isPresented in
+            if !isPresented { chapterPanelExpansion = 0 }
         }
         .onDisappear {
             player.playerPresentationGestureEnabled = true

@@ -1,8 +1,8 @@
 import SwiftUI
 import Kingfisher
 
-/// Non-modal chapter browser. In portrait it covers only the feed below the player; in landscape
-/// it occupies a dedicated trailing column, leaving the video and its controls interactive.
+/// Non-modal chapter browser. In portrait it begins below the video and can be pulled up to the
+/// status bar; in landscape it occupies a dedicated trailing column beside the video.
 @available(iOS 17.0, *)
 struct ChapterListPanel: View {
     private static let dismissalThreshold: CGFloat = 42
@@ -11,13 +11,17 @@ struct ChapterListPanel: View {
     let elapsed: TimeInterval
     let isLandscape: Bool
     let usesOLEDBackground: Bool
+    @Binding var expansionProgress: CGFloat
+    let expansionTravel: CGFloat
     let onSeek: (TimeInterval) -> Void
     let onDismiss: () -> Void
     @State private var dismissTranslation: CGFloat = 0
     @State private var listScrollOffset: CGFloat = 0
     @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
+    @State private var listDragStartExpansion: CGFloat = 0
     @State private var isDraggingListSheet = false
+    @State private var headerDragStartExpansion: CGFloat?
     @State private var suppressChapterSelection = false
     @State private var selectionSuppressionGeneration = 0
 
@@ -27,37 +31,39 @@ struct ChapterListPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isLandscape {
-                Capsule()
-                    .fill(.secondary.opacity(0.55))
-                    .frame(width: 36, height: 5)
-                    .padding(.top, 7)
-                    .padding(.bottom, 1)
-                    .accessibilityHidden(true)
-            }
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Chapters")
-                        .font(.headline)
-                    Text("\(chapters.count) in this video")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                if !isLandscape {
+                    Capsule()
+                        .fill(.secondary.opacity(0.55))
+                        .frame(width: 36, height: 5)
+                        .padding(.top, 7)
+                        .padding(.bottom, 1)
+                        .accessibilityHidden(true)
                 }
-                Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.subheadline.weight(.bold))
-                        .frame(width: 30, height: 30)
-                        .background(.quaternary, in: Circle())
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Chapters")
+                            .font(.headline)
+                        Text("\(chapters.count) in this video")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.bold))
+                            .frame(width: 30, height: 30)
+                            .background(.quaternary, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(.interaction, Rectangle().inset(by: -7))
+                    .accessibilityLabel("Close chapters")
                 }
-                .buttonStyle(.plain)
-                .contentShape(.interaction, Rectangle().inset(by: -7))
-                .accessibilityLabel("Close chapters")
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
             .contentShape(Rectangle())
-            .simultaneousGesture(headerDismissGesture)
+            .simultaneousGesture(headerDragGesture)
 
             Divider().opacity(0.45)
 
@@ -76,7 +82,7 @@ struct ChapterListPanel: View {
                 Rectangle().fill(.regularMaterial)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
         .overlay(alignment: isLandscape ? .leading : .top) {
             Rectangle()
                 .fill(.white.opacity(0.12))
@@ -153,11 +159,17 @@ struct ChapterListPanel: View {
                 if !isDraggingListSheet {
                     guard listScrollOffset <= 1 else { return }
                     listDismissOrigin = value.translation.height
+                    listDragStartExpansion = expansionProgress
                     isDraggingListSheet = true
                     suppressChapterSelection = true
                     selectionSuppressionGeneration &+= 1
                 }
-                dismissTranslation = max(0, value.translation.height - listDismissOrigin)
+                let travel = max(0, value.translation.height - listDismissOrigin)
+                if listDragStartExpansion > 0 {
+                    expansionProgress = max(0, listDragStartExpansion - travel / max(1, expansionTravel))
+                } else {
+                    dismissTranslation = travel
+                }
             }
             .onEnded { value in
                 guard !isLandscape else { return }
@@ -167,8 +179,13 @@ struct ChapterListPanel: View {
                         0,
                         value.predictedEndTranslation.height - listDismissOrigin
                     )
-                    if finalPosition >= Self.dismissalThreshold,
-                       projectedPosition >= Self.dismissalThreshold {
+                    if listDragStartExpansion > 0 {
+                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                            let projected = listDragStartExpansion - projectedPosition / max(1, expansionTravel)
+                            expansionProgress = projected < 0.5 ? 0 : 1
+                        }
+                    } else if finalPosition >= Self.dismissalThreshold,
+                              projectedPosition >= Self.dismissalThreshold {
                         onDismiss()
                     } else {
                         withAnimation(.snappy(duration: 0.22)) {
@@ -197,29 +214,34 @@ struct ChapterListPanel: View {
 
     /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
     /// It also provides an explicit fallback for users who begin their pull on the grabber/title.
-    private var headerDismissGesture: some Gesture {
+    private var headerDragGesture: some Gesture {
         // Measure against the screen rather than the moving panel. A local-space gesture changes
         // its own coordinate system as `.offset` moves the sheet, producing visible oscillation.
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
                 guard !isLandscape else { return }
-                let downward = value.translation.height > 0
-                    && abs(value.translation.height) > abs(value.translation.width)
-                guard downward else { return }
-                dismissTranslation = max(0, value.translation.height)
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                if headerDragStartExpansion == nil { headerDragStartExpansion = expansionProgress }
+                let start = headerDragStartExpansion ?? 0
+                expansionProgress = min(1, max(0, start - value.translation.height / max(1, expansionTravel)))
+                dismissTranslation = start == 0 ? max(0, value.translation.height) : 0
             }
             .onEnded { value in
                 guard !isLandscape else { return }
+                guard let start = headerDragStartExpansion else { return }
+                headerDragStartExpansion = nil
                 let finalPosition = max(0, value.translation.height)
                 let projectedPosition = max(0, value.predictedEndTranslation.height)
                 // Both positions must remain beyond the threshold. An upward reversal projects
                 // back above it and therefore cancels, even if the sheet was previously pulled
                 // much farther down.
-                if finalPosition >= Self.dismissalThreshold,
+                if start == 0, finalPosition >= Self.dismissalThreshold,
                    projectedPosition >= Self.dismissalThreshold {
                     onDismiss()
                 } else {
-                    withAnimation(.snappy(duration: 0.22)) {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                        let projected = start - value.predictedEndTranslation.height / max(1, expansionTravel)
+                        expansionProgress = projected > 0.5 ? 1 : 0
                         dismissTranslation = 0
                     }
                 }

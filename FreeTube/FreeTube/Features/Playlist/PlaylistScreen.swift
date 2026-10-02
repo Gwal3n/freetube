@@ -161,7 +161,10 @@ struct PlaylistScreen: View {
     @ViewBuilder
     private func moreMenu(_ details: PlaylistDetails) -> some View {
         Menu {
-            if let url = playlistURL(details.playlist.id) {
+            if let url = details.playlist.youtubeURL {
+                ShareLink(item: url) {
+                    Label("Share playlist", systemImage: "square.and.arrow.up")
+                }
                 Button {
                     openURL(url)
                 } label: {
@@ -280,10 +283,4 @@ struct PlaylistScreen: View {
         }
     }
 
-    /// YouTube's playlist URLs use the bare playlist id, stripping the `VL` prefix YouTubeKit
-    /// adds for browse requests.
-    private func playlistURL(_ id: String) -> URL? {
-        let bare = id.hasPrefix("VL") ? String(id.dropFirst(2)) : id
-        return URL(string: "https://www.youtube.com/playlist?list=\(bare)")
-    }
 }
