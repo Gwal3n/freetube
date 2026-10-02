@@ -93,7 +93,7 @@ enum Mappers {
             thumbnailURL: bestThumbnailURL(yt.thumbnails),
             bannerURL: nil,
             subscriberCount: parseAbbreviatedCount(yt.subscriberCount),
-            videoCount: Int(yt.videoCount ?? ""),
+            videoCount: parseAbbreviatedCount(yt.videoCount),
             isSubscribed: false,
             descriptionText: nil
         )

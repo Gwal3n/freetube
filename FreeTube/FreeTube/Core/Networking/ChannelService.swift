@@ -268,7 +268,7 @@ final class ChannelService: ChannelServicing {
         let thumb = Mappers.bestThumbnailURL(response.avatarThumbnails)
         let banner = Mappers.bestThumbnailURL(response.bannerThumbnails)
         let subCount = Mappers.parseAbbreviatedCount(response.subscriberCount)
-        let videoCount = Int((response.videoCount ?? "").filter(\.isNumber))
+        let videoCount = Mappers.parseAbbreviatedCount(response.videoCount)
         // The button represents this app's device-only subscription state. Deliberately ignore
         // YouTube's account subscription flag so no signed-in state leaks into the local list.
         let isSubscribed = LocalSubscriptionStore.containsPersisted(id)
