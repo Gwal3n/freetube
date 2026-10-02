@@ -362,7 +362,7 @@ struct ChannelScreen: View {
 
     @ToolbarContentBuilder
     private var channelActionsToolbar: some ToolbarContent {
-        if model.details?.channel?.isSubscribed == true {
+        if model.details?.channel.isSubscribed == true {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showingGroupPicker = true
