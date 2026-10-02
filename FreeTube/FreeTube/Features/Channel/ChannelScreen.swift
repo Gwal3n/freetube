@@ -100,10 +100,8 @@ struct ChannelScreen: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
         .sheet(isPresented: $showingGroupPicker) {
-            if let channel = model.details?.channel {
-                ChannelGroupPickerSheet(channel: channel) {
-                    await model.toggleSubscribe()
-                }
+            if let channel = model.details?.channel, channel.isSubscribed {
+                ChannelGroupPickerSheet(channel: channel)
             }
         }
         .task(id: videoSort) {
@@ -364,7 +362,7 @@ struct ChannelScreen: View {
 
     @ToolbarContentBuilder
     private var channelActionsToolbar: some ToolbarContent {
-        if model.details?.channel != nil {
+        if model.details?.channel?.isSubscribed == true {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showingGroupPicker = true

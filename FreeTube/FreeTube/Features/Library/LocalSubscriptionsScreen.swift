@@ -52,6 +52,13 @@ struct LocalSubscriptionsScreen: View {
                                 }
                                 .id(title)
                             }
+                            Section {
+                                Button(role: .destructive) {
+                                    showingClearConfirmation = true
+                                } label: {
+                                    Label("Remove all subscriptions", systemImage: "trash")
+                                }
+                            }
                         }
                         .listStyle(.plain)
                         .refreshable {
@@ -71,22 +78,13 @@ struct LocalSubscriptionsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
-                    } label: {
-                        Label("Manage groups", systemImage: "square.stack.3d.up")
-                    }
-                    if !store.subscriptions.isEmpty {
-                        Button(role: .destructive) {
-                            showingClearConfirmation = true
-                        } label: {
-                            Label("Clear all", systemImage: "trash")
-                        }
-                    }
+                Button {
+                    NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "square.stack.3d.up")
+                        .foregroundStyle(.white)
                 }
+                .accessibilityLabel("Subscription groups")
             }
         }
         .confirmationDialog(

@@ -1,14 +1,12 @@
 import SwiftUI
 
-/// A lightweight local group picker for a channel; no network request is made.
+/// A lightweight local group picker for a subscribed channel; no network request is made.
 @available(iOS 17.0, *)
 struct ChannelGroupPickerSheet: View {
     let channel: Channel
-    let onSubscribe: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var groups = LocalSubscriptionGroupStore.shared
-    @State private var subscriptions = LocalSubscriptionStore.shared
     @State private var newGroupName = ""
 
     private var canCreateGroup: Bool {
@@ -21,20 +19,7 @@ struct ChannelGroupPickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                if !subscriptions.contains(channel.id) {
-                    Section {
-                        Button {
-                            Task { await onSubscribe() }
-                        } label: {
-                            Label("Subscribe to add to groups", systemImage: "person.badge.plus")
-                                .foregroundStyle(.primary)
-                        }
-                    } footer: {
-                        Text("Groups organize your local subscriptions. Subscribing does not use a YouTube account.")
-                    }
-                } else {
-                    groupSections
-                }
+                groupSections
             }
             .navigationTitle("Add to group")
             .navigationBarTitleDisplayMode(.inline)

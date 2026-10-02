@@ -8,6 +8,7 @@ struct SubscriptionGroupMembersScreen: View {
     @State private var store = LocalSubscriptionGroupStore.shared
     @State private var subscriptions = LocalSubscriptionStore.shared
     @State private var draftName = ""
+    @State private var showingAddChannels = false
 
     private var group: SubscriptionGroup? {
         store.groups.first(where: { $0.id == groupID })
@@ -18,6 +19,10 @@ struct SubscriptionGroupMembersScreen: View {
         return !name.isEmpty && name.count <= 60 && name != group?.name && !store.groups.contains {
             $0.id != groupID && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
         }
+    }
+
+    private var members: [LocalSubscription] {
+        subscriptions.subscriptions.filter { group?.channelIDs.contains($0.id) == true }
     }
 
     var body: some View {
@@ -34,32 +39,41 @@ struct SubscriptionGroupMembersScreen: View {
             }
 
             Section("Channels") {
-                if subscriptions.subscriptions.isEmpty {
-                    ContentUnavailableView("No subscriptions", systemImage: "person.2.slash")
+                if members.isEmpty {
+                    ContentUnavailableView(
+                        "No channels in this group",
+                        systemImage: "person.2.slash",
+                        description: Text("Add channels from your local subscriptions.")
+                    )
                 } else {
-                    ForEach(subscriptions.subscriptions) { channel in
-                        let isMember = group?.channelIDs.contains(channel.id) ?? false
-                        Button {
-                            store.setMember(channel.id, in: groupID, isMember: !isMember)
-                        } label: {
-                            HStack {
-                                Text(channel.name)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if isMember {
-                                    Image(systemName: "checkmark")
-                                        .fontWeight(.semibold)
+                    ForEach(members) { channel in
+                        ChannelRow(channel: channel.channel)
+                            .swipeActions {
+                                Button(role: .destructive) {
+                                    store.setMember(channel.id, in: groupID, isMember: false)
+                                } label: {
+                                    Label("Remove", systemImage: "minus.circle")
                                 }
                             }
-                            .contentShape(Rectangle())
-                        }
-                        .accessibilityAddTraits(isMember ? .isSelected : [])
                     }
                 }
             }
         }
         .navigationTitle(group?.name ?? "Group")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showingAddChannels) {
+            SubscriptionGroupAddChannelsScreen(groupID: groupID)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingAddChannels = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add channels")
+            }
+        }
         .onAppear { draftName = group?.name ?? "" }
     }
 
