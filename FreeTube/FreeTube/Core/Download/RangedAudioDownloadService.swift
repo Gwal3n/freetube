@@ -44,6 +44,9 @@ nonisolated enum RangedAudioDownloadService {
         defer { try? handle.close() }
         do {
             try handle.truncate(atOffset: UInt64(totalBytes))
+            // Truncation leaves the file cursor at the new end. The probe is byte range zero;
+            // without this seek it gets appended, making the file exactly 64 KB too large.
+            try handle.seek(toOffset: 0)
             try handle.write(contentsOf: firstChunk)
             var completedBytes = Int64(firstChunk.count)
             onProgress(completedBytes, totalBytes)
