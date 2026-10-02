@@ -7,6 +7,7 @@ struct ChannelScreen: View {
     @State private var model: ChannelViewModel
     @State private var selectedTab: ChannelProfileTab = .videos
     @State private var videoSort: ChannelVideoSort = .newest
+    @State private var showingGroupPicker = false
     /// Laid-out frame of each tab label, keyed by `ChannelProfileTab.id`, in the tab row's own
     /// coordinate space. The underline is positioned by interpolating between two of these, so it
     /// tracks the pager continuously rather than jumping when a swipe settles.
@@ -98,6 +99,13 @@ struct ChannelScreen: View {
         .toolbarBackground(Color.black, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
+        .sheet(isPresented: $showingGroupPicker) {
+            if let channel = model.details?.channel {
+                ChannelGroupPickerSheet(channel: channel) {
+                    await model.toggleSubscribe()
+                }
+            }
+        }
         .task(id: videoSort) {
             guard model.details != nil, videoSort != .newest else { return }
             await model.loadVideos(sort: videoSort)
@@ -356,6 +364,18 @@ struct ChannelScreen: View {
 
     @ToolbarContentBuilder
     private var channelActionsToolbar: some ToolbarContent {
+        if model.details?.channel != nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingGroupPicker = true
+                } label: {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                .accessibilityLabel("Add channel to group")
+            }
+        }
         if let channel = model.details?.channel,
            let url = channelURL(channel) {
             ToolbarItem(placement: .topBarTrailing) {

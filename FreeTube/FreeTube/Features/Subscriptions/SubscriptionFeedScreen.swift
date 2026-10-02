@@ -5,7 +5,6 @@ struct SubscriptionFeedScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var model = SubscriptionFeedViewModel()
     @State private var groups = LocalSubscriptionGroupStore.shared
-    @State private var showingGroups = false
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var handledNavigationRequestID: UUID?
     @Environment(PlayerStateManager.self) private var player
@@ -73,7 +72,7 @@ struct SubscriptionFeedScreen: View {
                         }
                         Divider()
                         Button {
-                            showingGroups = true
+                            NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
                         } label: {
                             Label("Manage groups", systemImage: "square.stack.3d.up")
                         }
@@ -132,9 +131,6 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .task { await model.load() }
-            .sheet(isPresented: $showingGroups) {
-                SubscriptionGroupsScreen()
-            }
             .onChange(of: groups.groups) { _, _ in
                 Task { await model.groupsChanged() }
             }

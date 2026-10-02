@@ -6,6 +6,7 @@ struct SubscriptionGroupsScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store = LocalSubscriptionGroupStore.shared
     @State private var name = ""
+    @State private var selectedGroup: SubscriptionGroup?
     @FocusState private var nameFocused: Bool
 
     private var canAdd: Bool {
@@ -27,7 +28,9 @@ struct SubscriptionGroupsScreen: View {
                         Button(action: addGroup) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
+                                .foregroundStyle(canAdd ? Color.white : Color.secondary)
                         }
+                        .buttonStyle(.plain)
                         .disabled(!canAdd)
                         .accessibilityLabel("Create group")
                     }
@@ -38,16 +41,22 @@ struct SubscriptionGroupsScreen: View {
                 if !store.groups.isEmpty {
                     Section("Groups") {
                         ForEach(store.groups) { group in
-                            NavigationLink {
-                                SubscriptionGroupMembersScreen(groupID: group.id)
+                            Button {
+                                selectedGroup = group
                             } label: {
                                 HStack {
                                     Text(group.name)
+                                        .foregroundStyle(.primary)
                                     Spacer()
                                     Text(group.channelIDs.count, format: .number)
                                         .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(.tertiary)
                                 }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                         }
                         .onDelete { offsets in
                             for index in offsets.sorted(by: >) where store.groups.indices.contains(index) {
@@ -59,12 +68,16 @@ struct SubscriptionGroupsScreen: View {
             }
             .navigationTitle("Subscription groups")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(item: $selectedGroup) { group in
+                SubscriptionGroupMembersScreen(groupID: group.id)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
         }
+        .tint(.white)
     }
 
     private func addGroup() {

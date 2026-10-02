@@ -21,6 +21,7 @@ struct RootView: View {
     @State private var navigationRouter = AppNavigationRouter()
     private enum RootSheet: String, Identifiable {
         case settings
+        case subscriptionGroups
 
         var id: String { rawValue }
     }
@@ -33,6 +34,8 @@ struct RootView: View {
 
     enum Tab: String, Hashable {
         case feed, search, library, downloads
+
+        static let storageKey = "com.leshko.freetube.selectedTab"
     }
 
     private var queueNoticeBottomPadding: CGFloat {
@@ -86,6 +89,9 @@ struct RootView: View {
             case .settings:
                 SettingsScreen()
                     .presentationDragIndicator(.hidden)
+            case .subscriptionGroups:
+                SubscriptionGroupsScreen()
+                    .presentationDragIndicator(.visible)
             }
         }
         // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
@@ -126,6 +132,9 @@ struct RootView: View {
             log.info("Root-owned Settings requested")
             rootSheet = .settings
         }
+        .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSubscriptionGroups)) { _ in
+            rootSheet = .subscriptionGroups
+        }
         .onChange(of: rootSheet) { previous, current in
             log.info("Root sheet binding: \(previous?.rawValue ?? "none") → \(current?.rawValue ?? "none")")
         }
@@ -155,6 +164,7 @@ struct RootView: View {
         }
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
+            UserDefaults.standard.set(tab.rawValue, forKey: Tab.storageKey)
         }
     }
 

@@ -6,7 +6,6 @@ struct LocalSubscriptionsScreen: View {
     @State private var showingClearConfirmation = false
     @State private var refreshError: String?
     @State private var isRefreshing = false
-    @State private var showingGroups = false
     private let channelService: any ChannelServicing = ChannelService()
 
     var body: some View {
@@ -74,7 +73,7 @@ struct LocalSubscriptionsScreen: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        showingGroups = true
+                        NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
                     } label: {
                         Label("Manage groups", systemImage: "square.stack.3d.up")
                     }
@@ -89,9 +88,6 @@ struct LocalSubscriptionsScreen: View {
                     Image(systemName: "ellipsis.circle")
                 }
             }
-        }
-        .sheet(isPresented: $showingGroups) {
-            SubscriptionGroupsScreen()
         }
         .confirmationDialog(
             "Remove all local subscriptions?",

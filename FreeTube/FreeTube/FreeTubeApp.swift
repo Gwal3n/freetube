@@ -15,9 +15,12 @@ import SwiftData
 @available(iOS 17.0, *)
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
-    // Process-local: preserve the user's tab while SwiftUI rebuilds the root, but start a
-    // genuinely new launch on Feed instead of restoring a UserDefaults-backed selection.
-    @State private var selectedTab: RootView.Tab = .feed
+    // Keep the live TabView selection in process-local state. Its initial value comes from the
+    // last explicit selection so a genuine relaunch (or LiveContainer scene recreation) resumes
+    // on the same tab without binding TabView directly to UserDefaults during presentations.
+    @State private var selectedTab = RootView.Tab(
+        rawValue: UserDefaults.standard.string(forKey: RootView.Tab.storageKey) ?? ""
+    ) ?? .feed
 
     var body: some Scene {
         WindowGroup {
