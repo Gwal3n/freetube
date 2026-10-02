@@ -1085,11 +1085,7 @@ final class DownloadManager: TemporaryDownloading {
         let declaredLength = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int64.init)
         let startedAt = Date()
-        let http = try await DirectFileDownloadService.download(
-            request: request,
-            to: destination,
-            expectedSizeHint: declaredLength
-        ) { [weak self] written, total in
+        let reportProgress: @Sendable (Int64, Int64) -> Void = { [weak self] written, total in
             Task { @MainActor [weak self] in
                 guard let self,
                       let snapshot = self.tasks[snapshotID],
@@ -1107,13 +1103,43 @@ final class DownloadManager: TemporaryDownloading {
                 )
             }
         }
-        guard (200..<300).contains(http.statusCode) else {
+
+        // The same signed audio URL took ~32 KB/s as one long response in device logs. Use a
+        // small Range probe and at most four concurrent chunks for native audio; if the server
+        // ignores ranges or any chunk fails, the existing single-request path remains intact.
+        var usedRanges = false
+        if sourceLabel == "native-audio", let declaredLength, declaredLength > 64 * 1024 {
+            do {
+                usedRanges = try await RangedAudioDownloadService.download(
+                    request: request, to: destination, totalBytes: declaredLength,
+                    onProgress: reportProgress
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                log.notice("[native-audio] range transfer failed; retrying as one request: \(String(describing: error), privacy: .public)")
+                try? FileManager.default.removeItem(at: destination)
+            }
+        }
+
+        let http: HTTPURLResponse?
+        if usedRanges {
+            http = nil
+        } else {
+            http = try await DirectFileDownloadService.download(
+                request: request,
+                to: destination,
+                expectedSizeHint: declaredLength,
+                onProgress: reportProgress
+            )
+        }
+        if let http, !(200..<300).contains(http.statusCode) {
             log.error("[\(sourceLabel, privacy: .public)] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
-        let expected = http.expectedContentLength
+        let expected = usedRanges ? (declaredLength ?? -1) : (http?.expectedContentLength ?? -1)
         let written = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
-        log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes in \(Date().timeIntervalSince(startedAt), privacy: .public)s to \(destination.lastPathComponent, privacy: .public)")
+        log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes in \(Date().timeIntervalSince(startedAt), privacy: .public)s mode=\(usedRanges ? "ranges" : "single", privacy: .public) to \(destination.lastPathComponent, privacy: .public)")
 
         guard written >= Self.minimumDownloadSize else {
             log.error("[\(sourceLabel, privacy: .public)] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
