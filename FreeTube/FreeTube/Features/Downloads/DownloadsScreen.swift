@@ -288,7 +288,7 @@ struct DownloadsScreen: View {
 
     @ViewBuilder
     private func savedItemRow(_ item: SavedItem) -> some View {
-        DownloadedVideoRow(
+        let row = DownloadedVideoRow(
             item: item,
             isSelecting: isSelecting,
             onPlay: { playLocal(item) },
@@ -296,55 +296,71 @@ struct DownloadsScreen: View {
         ) {
             rowMenu(item).buttonStyle(.plain)
         }
-        .listRowBackground(Color.clear)
+        if isSelecting {
+            row.listRowBackground(Color.clear)
+        } else {
+            row.contextMenu {
+                Button { playLocal(item) } label: {
+                    Label("Play downloaded video", systemImage: "play.fill")
+                }
+                rowActions(item)
+            } preview: {
+                DownloadedVideoContextPreview(item: item)
+            }
+            .listRowBackground(Color.clear)
+        }
     }
 
-    @ViewBuilder
     private func rowMenu(_ item: SavedItem) -> some View {
         Menu {
-            Button {
-                Task { await saveToPhotos(item) }
-            } label: {
-                Label("Save to Photos", systemImage: "photo.on.rectangle")
-            }
-            .disabled(model.isSavingToPhotos)
-            Button {
-                exportFileURL = item.fileURL
-            } label: {
-                Label("Save to Files", systemImage: "folder")
-            }
-            // System "Open in…" share sheet for the downloaded mp4 — opens UIActivityViewController
-            // with the local file URL so the user can send it to VLC, Files, AirDrop, etc. We use
-            // a Button + sheet rather than `ShareLink` because the latter is unreliable for
-            // `file://` URLs inside a `Menu` (it sometimes serializes them as plain text).
-            Button {
-                shareFileURL = item.fileURL
-            } label: {
-                Label("Open in…", systemImage: "square.and.arrow.up")
-            }
-            // "Show in Finder" only renders on macOS runtimes (Designed-for-iPad-on-Mac
-            // or real Catalyst). On iPhone/iPad the Files app doesn't accept "select this
-            // specific file" deeplinks, so the item is hidden there — surfacing a dead
-            // menu entry would just confuse the user.
-            if MacIntegration.isRunningOnMac {
-                Button {
-                    MacIntegration.revealInFinder(item.fileURL)
-                } label: {
-                    Label("Show in Finder", systemImage: "folder")
-                }
-            }
-            Divider()
-            Button(role: .destructive) {
-                pendingSingleDelete = item
-            } label: {
-                Label("Delete from downloaded", systemImage: "trash")
-            }
+            rowActions(item)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body)
                 .padding(.horizontal, 8)
                 .frame(minWidth: 32, minHeight: 32)
                 .contentShape(Rectangle())
+        }
+    }
+
+    @ViewBuilder
+    private func rowActions(_ item: SavedItem) -> some View {
+        Button {
+            Task { await saveToPhotos(item) }
+        } label: {
+            Label("Save to Photos", systemImage: "photo.on.rectangle")
+        }
+        .disabled(model.isSavingToPhotos)
+        Button {
+            exportFileURL = item.fileURL
+        } label: {
+            Label("Save to Files", systemImage: "folder")
+        }
+        // System "Open in…" share sheet for the downloaded mp4 — opens UIActivityViewController
+        // with the local file URL so the user can send it to VLC, Files, AirDrop, etc. We use
+        // a Button + sheet rather than `ShareLink` because the latter is unreliable for
+        // `file://` URLs inside a `Menu` (it sometimes serializes them as plain text).
+        Button {
+            shareFileURL = item.fileURL
+        } label: {
+            Label("Open in…", systemImage: "square.and.arrow.up")
+        }
+        // "Show in Finder" only renders on macOS runtimes (Designed-for-iPad-on-Mac
+        // or real Catalyst). On iPhone/iPad the Files app doesn't accept "select this
+        // specific file" deeplinks, so the item is hidden there — surfacing a dead
+        // menu entry would just confuse the user.
+        if MacIntegration.isRunningOnMac {
+            Button {
+                MacIntegration.revealInFinder(item.fileURL)
+            } label: {
+                Label("Show in Finder", systemImage: "folder")
+            }
+        }
+        Divider()
+        Button(role: .destructive) {
+            pendingSingleDelete = item
+        } label: {
+            Label("Delete from downloaded", systemImage: "trash")
         }
     }
 

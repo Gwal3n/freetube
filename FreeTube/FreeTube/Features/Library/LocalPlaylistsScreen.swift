@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import UIKit
 
 @available(iOS 17.0, *)
 struct LocalPlaylistsScreen: View {
@@ -11,6 +12,8 @@ struct LocalPlaylistsScreen: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedPlaylistIDs = Set<String>()
     @State private var showingDeleteConfirmation = false
+    @State private var editingPlaylist: LocalPlaylistSnapshot?
+    @State private var pendingContextDeletion: LocalPlaylistSnapshot?
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
     @State private var downloads = DownloadsStore.shared
     private let service = LocalPlaylistService()
@@ -75,6 +78,32 @@ struct LocalPlaylistsScreen: View {
         } message: {
             Text("This removes the selected playlists and their locally saved entries.")
         }
+        .confirmationDialog(
+            "Delete playlist?",
+            isPresented: Binding(
+                get: { pendingContextDeletion != nil },
+                set: { if !$0 { pendingContextDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Playlist", role: .destructive) {
+                guard let id = pendingContextDeletion?.id else { return }
+                pendingContextDeletion = nil
+                Task {
+                    await service.delete(id: id)
+                    await reload()
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingContextDeletion = nil }
+        } message: {
+            Text("This removes the local playlist and its saved entries.")
+        }
+        .sheet(item: $editingPlaylist) { playlist in
+            EditLocalPlaylistSheet(playlist: playlist) { title, description in
+                await service.update(id: playlist.id, title: title, descriptionText: description)
+                await reload()
+            }
+        }
     }
 
     private func reload() async {
@@ -102,11 +131,7 @@ struct LocalPlaylistsScreen: View {
             Section(title) {
                 let availableIDs = Set(downloads.entries.map(\.videoID))
                 ForEach(items) { playlist in
-                    NavigationLink {
-                        LocalPlaylistScreen(playlistID: playlist.id)
-                    } label: {
-                        playlistRow(playlist, availableIDs: availableIDs)
-                    }
+                    playlistLink(playlist, availableIDs: availableIDs)
                 }
                 .onDelete { offsets in
                     let ids = offsets.compactMap { items.indices.contains($0) ? items[$0].id : nil }
@@ -125,6 +150,62 @@ struct LocalPlaylistsScreen: View {
                 }
             }
         }
+    }
+
+    private func playlistLink(_ playlist: LocalPlaylistSnapshot, availableIDs: Set<String>) -> some View {
+        NavigationLink {
+            LocalPlaylistScreen(playlistID: playlist.id)
+        } label: {
+            playlistLabel(playlist, availableIDs: availableIDs)
+        }
+    }
+
+    @ViewBuilder
+    private func playlistLabel(_ playlist: LocalPlaylistSnapshot, availableIDs: Set<String>) -> some View {
+        if editMode.isEditing {
+            playlistRow(playlist, availableIDs: availableIDs)
+        } else {
+            playlistRow(playlist, availableIDs: availableIDs)
+                .contextMenu {
+                    Button { editingPlaylist = playlist } label: {
+                        Label("Edit details", systemImage: "pencil")
+                    }
+                    if let url = remoteURL(for: playlist) {
+                        ShareLink(item: url) {
+                            Label("Share playlist", systemImage: "square.and.arrow.up")
+                        }
+                        Button {
+                            UIPasteboard.general.url = url
+                        } label: {
+                            Label("Copy link", systemImage: "link")
+                        }
+                    }
+                    Divider()
+                    Button(role: .destructive) { pendingContextDeletion = playlist } label: {
+                        Label("Delete playlist", systemImage: "trash")
+                    }
+                } preview: {
+                    PlaylistContextPreview(playlist: Playlist(
+                        id: playlist.sourcePlaylistID ?? playlist.id,
+                        title: playlist.title,
+                        channelID: nil,
+                        channelName: nil,
+                        thumbnailURL: playlist.thumbnailURL,
+                        videoCount: playlist.videoCount,
+                        descriptionText: playlist.descriptionText,
+                        isOwnedByUser: false
+                    ))
+                }
+        }
+    }
+
+    private func remoteURL(for playlist: LocalPlaylistSnapshot) -> URL? {
+        guard let sourceID = playlist.sourcePlaylistID else { return nil }
+        return Playlist(
+            id: sourceID, title: playlist.title, channelID: nil, channelName: nil,
+            thumbnailURL: playlist.thumbnailURL, videoCount: playlist.videoCount,
+            descriptionText: playlist.descriptionText, isOwnedByUser: false
+        ).youtubeURL
     }
 
     private func playlistRow(_ playlist: LocalPlaylistSnapshot, availableIDs: Set<String>) -> some View {
