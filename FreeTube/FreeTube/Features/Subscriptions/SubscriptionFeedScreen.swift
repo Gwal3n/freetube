@@ -4,6 +4,8 @@ import SwiftUI
 struct SubscriptionFeedScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var model = SubscriptionFeedViewModel()
+    @State private var groups = LocalSubscriptionGroupStore.shared
+    @State private var showingGroups = false
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var handledNavigationRequestID: UUID?
     @Environment(PlayerStateManager.self) private var player
@@ -52,6 +54,34 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .navigationTitle("Feed")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            Task { await model.selectGroup(nil) }
+                        } label: {
+                            if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
+                            else { Text("All subscriptions") }
+                        }
+                        ForEach(groups.groups) { group in
+                            Button {
+                                Task { await model.selectGroup(group.id) }
+                            } label: {
+                                if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
+                                else { Text(group.name) }
+                            }
+                        }
+                        Divider()
+                        Button {
+                            showingGroups = true
+                        } label: {
+                            Label("Manage groups", systemImage: "square.stack.3d.up")
+                        }
+                    } label: {
+                        Label(model.selectedGroupName ?? "All subscriptions", systemImage: "line.3.horizontal.decrease")
+                    }
+                }
+            }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id):
@@ -83,17 +113,31 @@ struct SubscriptionFeedScreen: View {
                         .buttonStyle(.borderedProminent)
                     }
                 } else if model.videos.isEmpty && !model.isRefreshing {
-                    ContentUnavailableView(
-                        "Nothing new",
-                        systemImage: "rectangle.stack",
-                        description: Text("Pull down to refresh your subscriptions.")
-                    )
+                    if model.selectedGroupID != nil {
+                        ContentUnavailableView(
+                            "No videos in this group",
+                            systemImage: "rectangle.stack",
+                            description: Text("Add subscribed channels to this group or pull down to refresh.")
+                        )
+                    } else {
+                        ContentUnavailableView(
+                            "Nothing new",
+                            systemImage: "rectangle.stack",
+                            description: Text("Pull down to refresh your subscriptions.")
+                        )
+                    }
                 } else if model.videos.isEmpty && model.isRefreshing {
                     MediaListPlaceholder()
                         .padding(.top, 44)
                 }
             }
             .task { await model.load() }
+            .sheet(isPresented: $showingGroups) {
+                SubscriptionGroupsScreen()
+            }
+            .onChange(of: groups.groups) { _, _ in
+                Task { await model.groupsChanged() }
+            }
             .task {
                 while !Task.isCancelled {
                     // A single clock for the feed keeps cached upload ages current while it is open.

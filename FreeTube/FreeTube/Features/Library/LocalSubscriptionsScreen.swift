@@ -6,6 +6,7 @@ struct LocalSubscriptionsScreen: View {
     @State private var showingClearConfirmation = false
     @State private var refreshError: String?
     @State private var isRefreshing = false
+    @State private var showingGroups = false
     private let channelService: any ChannelServicing = ChannelService()
 
     var body: some View {
@@ -71,18 +72,26 @@ struct LocalSubscriptionsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if !store.subscriptions.isEmpty {
-                    Menu {
+                Menu {
+                    Button {
+                        showingGroups = true
+                    } label: {
+                        Label("Manage groups", systemImage: "square.stack.3d.up")
+                    }
+                    if !store.subscriptions.isEmpty {
                         Button(role: .destructive) {
                             showingClearConfirmation = true
                         } label: {
                             Label("Clear all", systemImage: "trash")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
                     }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+        .sheet(isPresented: $showingGroups) {
+            SubscriptionGroupsScreen()
         }
         .confirmationDialog(
             "Remove all local subscriptions?",

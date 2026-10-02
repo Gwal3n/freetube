@@ -27,7 +27,7 @@ final class AppBackupService {
         let searches = (try? context.fetch(FetchDescriptor<SearchHistoryEntry>())) ?? []
         let favoriteVideos = (try? context.fetch(FetchDescriptor<FavoriteVideo>())) ?? []
         let favoritePlaylists = (try? context.fetch(FetchDescriptor<FavoritePlaylist>())) ?? []
-        return AppBackup(
+        var backup = AppBackup(
             formatVersion: 1,
             exportedAt: .now,
             settings: exportedSettings(),
@@ -42,6 +42,8 @@ final class AppBackupService {
                 .init(playlistID: $0.playlistID, title: $0.title, channelName: $0.channelName, thumbnailURL: $0.thumbnailURL, videoCount: $0.videoCount, savedAt: $0.savedAt)
             }
         )
+        backup.subscriptionGroups = LocalSubscriptionGroupStore.shared.groups
+        return backup
     }
 
     func encode(_ backup: AppBackup) throws -> Data {
@@ -79,6 +81,10 @@ final class AppBackupService {
 
         replaceSwiftData(backup)
         LocalSubscriptionStore.shared.replaceAll(with: backup.subscriptions)
+        LocalSubscriptionGroupStore.shared.replaceAll(
+            with: backup.subscriptionGroups ?? [],
+            validChannelIDs: Set(backup.subscriptions.map(\.id))
+        )
         restoreSettings(backup.settings)
     }
 

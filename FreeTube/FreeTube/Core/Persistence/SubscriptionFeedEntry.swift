@@ -18,10 +18,10 @@ final class SubscriptionFeedEntry {
     var refreshedAt: Date
     var isLive: Bool
 
-    init(video: Video, sortDate: Date, refreshedAt: Date) {
+    init(video: Video, channelID: String, sortDate: Date, refreshedAt: Date) {
         videoID = video.id
         title = video.title
-        channelID = video.channelID
+        self.channelID = channelID
         channelName = video.channelName
         channelThumbnailURL = video.channelThumbnailURL
         thumbnailURL = video.thumbnailURL

@@ -22,10 +22,19 @@ actor PersistenceWriter {
 
     // MARK: - Subscription feed
 
-    func fetchSubscriptionFeed(limit: Int) -> [SubscriptionFeedSnapshot] {
-        var descriptor = FetchDescriptor<SubscriptionFeedEntry>(
-            sortBy: [SortDescriptor(\SubscriptionFeedEntry.sortDate, order: .reverse)]
-        )
+    func fetchSubscriptionFeed(limit: Int, channelIDs: Set<String>? = nil) -> [SubscriptionFeedSnapshot] {
+        if let channelIDs, channelIDs.isEmpty { return [] }
+        let sort = [SortDescriptor(\SubscriptionFeedEntry.sortDate, order: .reverse)]
+        var descriptor: FetchDescriptor<SubscriptionFeedEntry>
+        if let channelIDs {
+            let ids = Array(channelIDs)
+            descriptor = FetchDescriptor(
+                predicate: #Predicate<SubscriptionFeedEntry> { ids.contains($0.channelID) },
+                sortBy: sort
+            )
+        } else {
+            descriptor = FetchDescriptor(sortBy: sort)
+        }
         descriptor.fetchLimit = max(1, limit)
         return ((try? modelContext.fetch(descriptor)) ?? []).map { entry in
             SubscriptionFeedSnapshot(
@@ -49,8 +58,15 @@ actor PersistenceWriter {
         }
     }
 
-    func subscriptionFeedCount() -> Int {
-        (try? modelContext.fetchCount(FetchDescriptor<SubscriptionFeedEntry>())) ?? 0
+    func subscriptionFeedCount(channelIDs: Set<String>? = nil) -> Int {
+        if let channelIDs {
+            guard !channelIDs.isEmpty else { return 0 }
+            let ids = Array(channelIDs)
+            return (try? modelContext.fetchCount(FetchDescriptor<SubscriptionFeedEntry>(
+                predicate: #Predicate<SubscriptionFeedEntry> { ids.contains($0.channelID) }
+            ))) ?? 0
+        }
+        return (try? modelContext.fetchCount(FetchDescriptor<SubscriptionFeedEntry>())) ?? 0
     }
 
     /// Latest successful cached channel refresh, independent of video publish order.
@@ -71,6 +87,7 @@ actor PersistenceWriter {
         for (index, video) in videos.enumerated() {
             modelContext.insert(SubscriptionFeedEntry(
                 video: video,
+                channelID: channelID,
                 sortDate: Self.estimatedPublishDate(video.publishedRelative, relativeTo: refreshedAt)
                     ?? refreshedAt.addingTimeInterval(-Double(index)),
                 refreshedAt: refreshedAt

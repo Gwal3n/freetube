@@ -72,11 +72,15 @@ final class LocalSubscriptionStore {
     func remove(channelID: String) {
         let oldCount = subscriptions.count
         subscriptions.removeAll { $0.id == channelID }
-        if subscriptions.count != oldCount { persist() }
+        if subscriptions.count != oldCount {
+            LocalSubscriptionGroupStore.shared.removeChannel(channelID)
+            persist()
+        }
     }
 
     func remove(at offsets: IndexSet) {
         for index in offsets.sorted(by: >) where subscriptions.indices.contains(index) {
+            LocalSubscriptionGroupStore.shared.removeChannel(subscriptions[index].id)
             subscriptions.remove(at: index)
         }
         persist()
@@ -84,6 +88,7 @@ final class LocalSubscriptionStore {
 
     func removeAll() {
         subscriptions.removeAll()
+        LocalSubscriptionGroupStore.shared.replaceAll(with: LocalSubscriptionGroupStore.shared.groups, validChannelIDs: [])
         persist()
     }
 
