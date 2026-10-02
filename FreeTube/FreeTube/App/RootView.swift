@@ -155,7 +155,8 @@ struct RootView: View {
             routeFromPlayer(.localPlaylist(playlistID))
         }
         .onAppear {
-            log.info("Root appeared with tab=\(selectedTab.rawValue, privacy: .public)")
+            let savedTab = UserDefaults.standard.string(forKey: Tab.storageKey) ?? "none"
+            log.info("Root appeared with tab=\(selectedTab.rawValue, privacy: .public) saved=\(savedTab, privacy: .public)")
             if !showSubscriptionFeedTab, selectedTab == .feed {
                 selectedTab = .search
             }
@@ -168,36 +169,19 @@ struct RootView: View {
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
             UserDefaults.standard.set(tab.rawValue, forKey: Tab.storageKey)
+            if tab == .search, previous != .search {
+                searchActivation &+= 1
+            }
         }
     }
 
     private var tabShell: some View {
         RootTabShell(
-            selection: tabSelection,
+            selection: $selectedTab,
             showsFeed: showSubscriptionFeedTab,
             searchActivation: searchActivation
         )
         .environment(navigationRouter)
-    }
-
-    /// Re-selecting Search requests focus without a gesture recognizer on the native tab bar.
-    private var tabSelection: Binding<Tab> {
-        Binding(
-            get: { selectedTab },
-            set: { newTab in
-                log.info("Tab selection requested: \(selectedTab.rawValue, privacy: .public) → \(newTab.rawValue, privacy: .public)")
-                if newTab == .feed, !showSubscriptionFeedTab {
-                    selectedTab = .search
-                    return
-                }
-                if newTab == .search, selectedTab == .search {
-                    searchActivation &+= 1
-                }
-                if newTab != selectedTab {
-                    selectedTab = newTab
-                }
-            }
-        )
     }
 
     /// Open player/context-menu links in the current tab's existing navigation stack. Ordinary
