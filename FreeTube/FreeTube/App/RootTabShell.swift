@@ -5,7 +5,6 @@ import SwiftUI
 struct RootTabShell: View {
     @Binding var selection: RootView.Tab
     let showsFeed: Bool
-    let searchActivation: Int
 
     private let downloads = DownloadManager.shared
 
@@ -40,7 +39,7 @@ struct RootTabShell: View {
                 .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
 
                 SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: RootView.Tab.search, role: .search) {
-                    HomeScreen(searchActivation: searchActivation)
+                    HomeScreen()
                 }
             }
         } else {
@@ -58,7 +57,7 @@ struct RootTabShell: View {
                     .tag(RootView.Tab.feed)
             }
 
-            HomeScreen(searchActivation: searchActivation)
+            HomeScreen()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(RootView.Tab.search)
 

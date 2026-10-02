@@ -15,12 +15,9 @@ import SwiftData
 @available(iOS 17.0, *)
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
-    // Keep the live TabView selection in process-local state. Its initial value comes from the
-    // last explicit selection so a genuine relaunch (or LiveContainer scene recreation) resumes
-    // on the same tab without binding TabView directly to UserDefaults during presentations.
-    @State private var selectedTab = RootView.Tab(
-        rawValue: UserDefaults.standard.string(forKey: RootView.Tab.storageKey) ?? ""
-    ) ?? .feed
+    // A new app session starts on Feed. Keep selection in memory so presentations and player
+    // transitions cannot change the current tab within that session.
+    @State private var selectedTab = RootView.Tab.feed
 
     var body: some Scene {
         WindowGroup {

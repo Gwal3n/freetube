@@ -16,7 +16,6 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var selectedTab: Tab
-    @State private var searchActivation = 0
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @State private var navigationRouter = AppNavigationRouter()
     private enum RootSheet: String, Identifiable {
@@ -34,8 +33,6 @@ struct RootView: View {
 
     enum Tab: String, Hashable {
         case feed, search, library, downloads
-
-        static let storageKey = "com.leshko.freetube.selectedTab"
     }
 
     private var queueNoticeBottomPadding: CGFloat {
@@ -155,8 +152,7 @@ struct RootView: View {
             routeFromPlayer(.localPlaylist(playlistID))
         }
         .onAppear {
-            let savedTab = UserDefaults.standard.string(forKey: Tab.storageKey) ?? "none"
-            log.info("Root appeared with tab=\(selectedTab.rawValue, privacy: .public) saved=\(savedTab, privacy: .public)")
+            log.info("Root appeared with tab=\(selectedTab.rawValue, privacy: .public)")
             if !showSubscriptionFeedTab, selectedTab == .feed {
                 selectedTab = .search
             }
@@ -168,18 +164,13 @@ struct RootView: View {
         }
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
-            UserDefaults.standard.set(tab.rawValue, forKey: Tab.storageKey)
-            if tab == .search, previous != .search {
-                searchActivation &+= 1
-            }
         }
     }
 
     private var tabShell: some View {
         RootTabShell(
             selection: $selectedTab,
-            showsFeed: showSubscriptionFeedTab,
-            searchActivation: searchActivation
+            showsFeed: showSubscriptionFeedTab
         )
         .environment(navigationRouter)
     }

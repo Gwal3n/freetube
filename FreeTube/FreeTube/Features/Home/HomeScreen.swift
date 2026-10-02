@@ -9,7 +9,6 @@ import UIKit
 /// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
-    let searchActivation: Int
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var searchModel = SearchViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
@@ -89,19 +88,6 @@ struct HomeScreen: View {
                 navigationLog.info("Search received player destination")
                 openDestination(request.destination)
             }
-            .onChange(of: searchActivation) { _, _ in
-                guard !MacIntegration.isRunningOnMac else { return }
-                navigationLog.info("Search tab activated; path count=\(path.count, privacy: .public)")
-                // Re-selecting Search returns from a pushed destination and focuses the native
-                // field in one action. It must not discard the current term or result set.
-                if !path.isEmpty {
-                    path.removeAll()
-                }
-                Task { @MainActor in
-                    await Task.yield()
-                    await focusSearch()
-                }
-            }
         }
     }
 
@@ -126,20 +112,6 @@ struct HomeScreen: View {
             path.append(destination)
             navigationLog.info("Search destination appended; path count=\(path.count, privacy: .public)")
         }
-    }
-
-    /// Gives focus back to native `.searchable` without coupling presentation to query/results.
-    private func focusSearch() async {
-        navigationLog.info("Search focus requested; presented=\(isSearchPresented, privacy: .public)")
-        // Native searchable can remain logically presented after its keyboard resigns. Cycle only
-        // the presentation binding on an explicit tab re-tap so it reliably regains first responder
-        // without coupling ordinary keyboard dismissal to navigation-bar layout.
-        if isSearchPresented {
-            isSearchPresented = false
-            await Task.yield()
-        }
-        isSearchPresented = true
-        navigationLog.info("Search focus applied")
     }
 
     /// Persists the trimmed query, then either opens a recognized YouTube URL or performs search.
