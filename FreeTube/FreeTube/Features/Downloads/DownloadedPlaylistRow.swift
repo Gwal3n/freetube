@@ -8,6 +8,7 @@ struct DownloadedPlaylistRow: View {
     let downloadedCount: Int
     let currentVideoTitle: String?
     let currentVideoProgress: Double
+    let isRemoving: Bool
     let onResume: () -> Void
     let onCancel: () -> Void
 
@@ -40,7 +41,7 @@ struct DownloadedPlaylistRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        if isActive, !manifest.videos.isEmpty {
+                        if isActive, !manifest.videos.isEmpty, !isRemoving {
                             ProgressView(value: overallProgress)
                                 .tint(.white)
                         }
@@ -50,7 +51,11 @@ struct DownloadedPlaylistRow: View {
             }
             .buttonStyle(.plain)
 
-            if isActive {
+            if isRemoving {
+                ProgressView()
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .accessibilityLabel("Removing playlist")
+            } else if isActive {
                 Button(action: onCancel) {
                     Image(systemName: "xmark")
                         .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
@@ -76,6 +81,7 @@ struct DownloadedPlaylistRow: View {
     }
 
     private var statusText: String {
+        if isRemoving { return "Removing downloaded files…" }
         let count = "\(downloadedCount) of \(manifest.videos.count) videos"
         if manifest.status == .preparing { return "Preparing playlist… · \(count)" }
         if manifest.status == .queued { return "Queued · \(count)" }

@@ -12,6 +12,7 @@ final class PlaylistDownloadCoordinator {
     private(set) var manifests: [PlaylistDownloadManifest]
     private(set) var activePlaylistID: String?
     private(set) var currentVideoID: String?
+    private(set) var removingPlaylistIDs: Set<String> = []
 
     @ObservationIgnored private var workTask: Task<Void, Never>?
     @ObservationIgnored private var ownsCurrentTransfer = false
@@ -52,7 +53,8 @@ final class PlaylistDownloadCoordinator {
     /// are resolved by the worker before any video transfer begins.
     func start(_ details: PlaylistDetails, quality: VideoQuality) {
         let id = Self.canonicalID(details.playlist.id)
-        guard !id.isEmpty, !details.videos.isEmpty || details.continuationToken != nil else { return }
+        guard !id.isEmpty, !removingPlaylistIDs.contains(id),
+              !details.videos.isEmpty || details.continuationToken != nil else { return }
         if let index = manifests.firstIndex(where: { $0.id == id }) {
             if activePlaylistID == id, manifests[index].status != .paused { return }
             manifests[index].status = .queued
@@ -80,6 +82,7 @@ final class PlaylistDownloadCoordinator {
 
     func resume(_ playlistID: String) {
         let id = Self.canonicalID(playlistID)
+        guard !removingPlaylistIDs.contains(id) else { return }
         guard let index = manifests.firstIndex(where: { $0.id == id }) else { return }
         manifests[index].status = .queued
         manifests[index].lastError = nil
@@ -105,12 +108,27 @@ final class PlaylistDownloadCoordinator {
         }
     }
 
-    /// Removes grouping only; files shared with standalone downloads or other playlists stay.
-    func remove(_ playlistID: String) {
+    /// Stop this job, delete its exclusively-owned media, then remove its grouping. A file used
+    /// by another downloaded playlist is retained because there is only one file per video ID.
+    /// If any file cannot be deleted, keep the manifest so removal can be retried.
+    func remove(_ playlistID: String) async -> Bool {
         let id = Self.canonicalID(playlistID)
+        guard let manifest = manifest(for: id), removingPlaylistIDs.insert(id).inserted else { return false }
+        defer { removingPlaylistIDs.remove(id) }
+        let activeTask = activePlaylistID == id ? workTask : nil
         cancel(id)
+        await activeTask?.value
+
+        let sharedIDs = Set(manifests.filter { $0.id != id }.flatMap { $0.videos.map(\.id) })
+        let exclusiveIDs = Set(manifest.videos.map(\.id)).subtracting(sharedIDs)
+        let fileURLs = exclusiveIDs.map { DownloadManager.fileURL(for: $0) }
+        guard await DownloadsStore.shared.deleteFiles(at: fileURLs) else {
+            update(id) { $0.lastError = "Some files couldn't be removed. Try again." }
+            return false
+        }
         manifests.removeAll { $0.id == id }
         persist()
+        return true
     }
 
     private func pump() {

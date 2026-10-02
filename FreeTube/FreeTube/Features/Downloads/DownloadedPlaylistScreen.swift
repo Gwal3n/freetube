@@ -77,6 +77,7 @@ struct DownloadedPlaylistScreen: View {
         .navigationTitle(manifest?.title ?? "Playlist")
         .toolbar {
             if let manifest,
+               !coordinator.removingPlaylistIDs.contains(manifest.id),
                manifest.status == .paused || (manifest.status == .finished && availableIDs.intersection(Set(manifest.videos.map(\.id))).count < manifest.videos.count) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Resume") { coordinator.resume(manifest.id) }

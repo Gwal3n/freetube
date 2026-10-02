@@ -108,15 +108,16 @@ struct DownloadsScreen: View {
                                 currentVideoProgress: playlistDownloads.activePlaylistID == manifest.id
                                     ? model.manager.progressByVideoID[playlistDownloads.currentVideoID ?? ""] ?? 0
                                     : 0,
+                                isRemoving: playlistDownloads.removingPlaylistIDs.contains(manifest.id),
                                 onResume: { playlistDownloads.resume(manifest.id) },
                                 onCancel: { playlistDownloads.cancel(manifest.id) }
                             )
-                            .disabled(isSelecting)
+                            .disabled(isSelecting || playlistDownloads.removingPlaylistIDs.contains(manifest.id))
                             .swipeActions {
                                 Button(role: .destructive) {
                                     pendingPlaylistRemovalID = manifest.id
                                 } label: {
-                                    Label("Remove playlist", systemImage: "trash")
+                                    Label("Delete playlist and downloads", systemImage: "trash")
                                 }
                             }
                         }
@@ -201,13 +202,20 @@ struct DownloadsScreen: View {
                 ),
                 titleVisibility: .visible
             ) {
-                Button("Remove Playlist", role: .destructive) {
-                    if let id = pendingPlaylistRemovalID { playlistDownloads.remove(id) }
+                Button("Delete Playlist and Downloads", role: .destructive) {
+                    if let id = pendingPlaylistRemovalID {
+                        Task {
+                            let wasRemoved = await playlistDownloads.remove(id)
+                            if !wasRemoved {
+                                model.errorState = ErrorState(message: "Some playlist files couldn't be removed. Try again.")
+                            }
+                        }
+                    }
                     pendingPlaylistRemovalID = nil
                 }
                 Button("Cancel", role: .cancel) { pendingPlaylistRemovalID = nil }
             } message: {
-                Text("The playlist grouping is removed. Downloaded video files remain on this device.")
+                Text("Downloaded videos in this playlist will be deleted from this device. Files also used by another downloaded playlist will be kept.")
             }
             .errorToast(Bindable(model).errorState)
             .overlay(alignment: .bottom) {

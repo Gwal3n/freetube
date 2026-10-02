@@ -210,6 +210,29 @@ final class DownloadsStore {
         NotificationCenter.default.post(name: Self.didChange, object: nil)
     }
 
+    /// Delete a playlist's media as one batch, off the main actor. Missing files are already
+    /// removed; any genuine failures are reported so the playlist record can be retained for
+    /// another attempt. A single notification avoids a full directory scan per video.
+    func deleteFiles(at urls: [URL]) async -> Bool {
+        let failed = await Task.detached(priority: .utility) {
+            var failures: [String] = []
+            for url in urls {
+                guard FileManager.default.fileExists(atPath: url.path) else { continue }
+                do {
+                    try FileManager.default.removeItem(at: url)
+                } catch {
+                    failures.append(url.lastPathComponent)
+                }
+            }
+            return failures
+        }.value
+        NotificationCenter.default.post(name: Self.didChange, object: nil)
+        if !failed.isEmpty {
+            log.error("playlist deletion failed for \(failed.joined(separator: ", "), privacy: .public)")
+        }
+        return failed.isEmpty
+    }
+
     // MARK: - Cache eviction
 
     /// Drop the oldest files until total size fits under `limitBytes`. The most-recent
