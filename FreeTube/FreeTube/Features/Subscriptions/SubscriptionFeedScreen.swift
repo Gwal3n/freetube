@@ -163,20 +163,27 @@ struct SubscriptionFeedScreen: View {
                 Label("Manage groups", systemImage: "square.stack.3d.up")
             }
         } label: {
-            HStack(spacing: 5) {
-                Text("Feed")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                if let groupName = model.selectedGroupName {
-                    Text(verbatim: "· \(groupName)")
-                        .font(.subheadline)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 5) {
+                    Text("Feed")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Group {
+                    if let groupName = model.selectedGroupName {
+                        Text(verbatim: groupName)
+                    } else {
+                        Text("All subscriptions")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
+            .frame(maxWidth: 170, alignment: .leading)
             .contentShape(Rectangle())
         }
         .accessibilityLabel("Choose feed group")
