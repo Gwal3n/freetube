@@ -157,6 +157,12 @@ struct SearchContent: View {
                         Task { await model.loadMore() }
                     }
                 }
+                if player.miniPlayerVisible && !player.fullScreenPresented {
+                    Color.clear
+                        .frame(height: 96)
+                        .listRowSeparator(.hidden)
+                        .accessibilityHidden(true)
+                }
             }
             .listStyle(.plain)
             .scrollDismissesKeyboard(.interactively)
@@ -268,6 +274,12 @@ struct SearchContent: View {
                         try? modelContext.save()
                     }
                 }
+            }
+            if player.miniPlayerVisible && !player.fullScreenPresented {
+                Color.clear
+                    .frame(height: 96)
+                    .listRowSeparator(.hidden)
+                    .accessibilityHidden(true)
             }
         }
         .listStyle(.plain)

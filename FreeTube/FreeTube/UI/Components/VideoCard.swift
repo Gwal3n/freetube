@@ -97,7 +97,7 @@ struct VideoCard: View {
             .accessibilityHint("Plays video")
 
             if showsMoreMenu || branding.hasReplacement(for: video) {
-                VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
                     DeArrowToggleButton(video: video, model: branding)
                     if showsMoreMenu {
                         VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)

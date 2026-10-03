@@ -66,9 +66,9 @@ struct RootView: View {
                     }
                 }
                 .lineLimit(1)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 15)
+                .padding(.vertical, 9)
                 .fixedSize(horizontal: true, vertical: false)
                 .background(.regularMaterial, in: Capsule())
                 .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))

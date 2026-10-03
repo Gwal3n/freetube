@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Playlist context lives outside the scrolling details feed. The compact control opens a
 /// non-modal browser beneath the video (or beside it in landscape), so playback remains usable.
@@ -11,6 +12,7 @@ struct PlayerPlaylistPanel: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openURL) private var openURL
 
     let isPresented: Bool
     let isLandscape: Bool
@@ -35,6 +37,8 @@ struct PlayerPlaylistPanel: View {
     @State private var hasLoadedSavedState = false
     @State private var isSavingLocally = false
     @State private var saveError: ErrorState?
+    @State private var showsSavedNotice = false
+    @State private var savedNoticeGeneration = 0
     private let localPlaylistService = LocalPlaylistService()
 
     private var playlist: Playlist? { player.activePlaylist }
@@ -60,6 +64,8 @@ struct PlayerPlaylistPanel: View {
             hasLoadedSavedState = false
             isSavingLocally = false
             saveError = nil
+            showsSavedNotice = false
+            savedNoticeGeneration &+= 1
         }
         .task(id: playlist?.id) {
             guard let playlist, !playlist.id.hasPrefix("local:") else { return }
@@ -71,6 +77,8 @@ struct PlayerPlaylistPanel: View {
         }
         .onChange(of: isPresented) { _, presented in
             guard !presented else { return }
+            showsSavedNotice = false
+            savedNoticeGeneration &+= 1
             dismissTranslation = 0
             dragStartProgress = nil
             listScrollOffset = 0
@@ -79,6 +87,20 @@ struct PlayerPlaylistPanel: View {
             listDragStartExpansion = 0
             isDraggingListSheet = false
             suppressPlaylistSelection = false
+        }
+        .overlay(alignment: .bottom) {
+            if isPresented && showsSavedNotice {
+                Label("Playlist saved", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 9)
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+                    .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom + 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
         }
         .errorToast($saveError)
     }
@@ -157,7 +179,7 @@ struct PlayerPlaylistPanel: View {
                             .padding(.top, 7)
                             .accessibilityHidden(true)
                     }
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(playlist.title)
                                 .font(.headline)
@@ -166,52 +188,65 @@ struct PlayerPlaylistPanel: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 4)
-                        Button {
-                            onOpenPlaylist(playlist.id)
-                        } label: {
-                            Image(systemName: "arrow.up.right")
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.plain)
-                        .contentShape(.interaction, Rectangle().inset(by: -6))
-                        .accessibilityLabel("Open playlist page")
-                        if !playlist.id.hasPrefix("local:") {
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 2) {
                             Button {
-                                Task { await toggleLocalSave(playlist) }
+                                onOpenPlaylist(playlist.id)
                             } label: {
-                                Group {
-                                    if isSavingLocally || !hasLoadedSavedState {
-                                        ProgressView()
-                                    } else {
-                                        Image(systemName: isSavedLocally ? "bookmark.fill" : "bookmark")
-                                    }
-                                }
-                                .frame(width: 32, height: 32)
+                                Image(systemName: "arrow.up.right")
+                                    .frame(width: 36, height: 36)
                             }
                             .buttonStyle(.plain)
-                            .contentShape(.interaction, Rectangle().inset(by: -6))
-                            .disabled(isSavingLocally || !hasLoadedSavedState)
-                            .accessibilityLabel(isSavedLocally ? "Remove saved playlist" : "Save playlist")
-                            if let url = playlist.youtubeURL {
-                                ShareLink(item: url) {
-                                    Image(systemName: "square.and.arrow.up")
-                                        .frame(width: 32, height: 32)
+                            .accessibilityLabel("Open playlist page")
+                            if !playlist.id.hasPrefix("local:") {
+                                Button {
+                                    Task { await toggleLocalSave(playlist) }
+                                } label: {
+                                    Group {
+                                        if isSavingLocally || !hasLoadedSavedState {
+                                            ProgressView()
+                                        } else {
+                                            Image(systemName: isSavedLocally ? "bookmark.fill" : "bookmark")
+                                        }
+                                    }
+                                    .frame(width: 36, height: 36)
                                 }
                                 .buttonStyle(.plain)
-                                .contentShape(.interaction, Rectangle().inset(by: -6))
-                                .accessibilityLabel("Share playlist")
+                                .disabled(isSavingLocally || !hasLoadedSavedState)
+                                .accessibilityLabel(isSavedLocally ? "Remove saved playlist" : "Save playlist")
+                                if let url = playlist.youtubeURL {
+                                    Menu {
+                                        Button {
+                                            UIPasteboard.general.url = url
+                                        } label: {
+                                            Label("Copy link", systemImage: "link")
+                                        }
+                                        Button {
+                                            openURL(url)
+                                        } label: {
+                                            Label("Open in browser", systemImage: "safari")
+                                        }
+                                        ShareLink(item: url) {
+                                            Label("Share playlist", systemImage: "square.and.arrow.up")
+                                        }
+                                    } label: {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .frame(width: 36, height: 36)
+                                    }
+                                    .accessibilityLabel("Share playlist")
+                                }
                             }
+                            Button(action: onDismiss) {
+                                Image(systemName: "xmark")
+                                    .font(.subheadline.weight(.bold))
+                                    .frame(width: 32, height: 32)
+                                    .background(.quaternary, in: Circle())
+                                    .frame(width: 36, height: 36)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Close playlist")
                         }
-                        Button(action: onDismiss) {
-                            Image(systemName: "xmark")
-                                .font(.subheadline.weight(.bold))
-                                .frame(width: 32, height: 32)
-                                .background(.quaternary, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .contentShape(.interaction, Rectangle().inset(by: -6))
-                        .accessibilityLabel("Close playlist")
+                        .font(.system(size: 15, weight: .semibold))
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -375,9 +410,27 @@ struct PlayerPlaylistPanel: View {
         } else {
             do {
                 try await localPlaylistService.saveRemotePlaylist(target)
-                if playlist?.id == target.id { isSavedLocally = true }
+                if playlist?.id == target.id {
+                    isSavedLocally = true
+                    showSavedConfirmation()
+                }
             } catch {
                 if playlist?.id == target.id { saveError = ErrorState(from: error) }
+            }
+        }
+    }
+
+    private func showSavedConfirmation() {
+        savedNoticeGeneration &+= 1
+        let generation = savedNoticeGeneration
+        withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+            showsSavedNotice = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard savedNoticeGeneration == generation else { return }
+            withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+                showsSavedNotice = false
             }
         }
     }

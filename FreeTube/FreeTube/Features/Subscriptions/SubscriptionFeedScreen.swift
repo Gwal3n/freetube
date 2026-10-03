@@ -14,11 +14,6 @@ struct SubscriptionFeedScreen: View {
     @State private var currentDate = Date.now
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
-    private var feedTitle: Text {
-        guard let groupName = model.selectedGroupName else { return Text("Feed") }
-        return Text("Feed") + Text(verbatim: " · \(groupName)")
-    }
-
     var body: some View {
         NavigationStack(path: $path) {
             List {
@@ -51,36 +46,17 @@ struct SubscriptionFeedScreen: View {
 
                 if player.miniPlayerVisible && !player.fullScreenPresented {
                     Color.clear
-                        .frame(height: 66)
+                        .frame(height: 96)
                         .listRowSeparator(.hidden)
                         .accessibilityHidden(true)
                 }
             }
             .listStyle(.plain)
-            .navigationTitle(feedTitle)
+            .navigationTitle(groups.groups.isEmpty ? "Feed" : "")
             .toolbar {
                 if !groups.groups.isEmpty {
-                    ToolbarTitleMenu {
-                        Button {
-                            Task { await model.selectGroup(nil) }
-                        } label: {
-                            if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
-                            else { Text("All subscriptions") }
-                        }
-                        ForEach(groups.groups) { group in
-                            Button {
-                                Task { await model.selectGroup(group.id) }
-                            } label: {
-                                if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
-                                else { Text(group.name) }
-                            }
-                        }
-                        Divider()
-                        Button {
-                            NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
-                        } label: {
-                            Label("Manage groups", systemImage: "square.stack.3d.up")
-                        }
+                    ToolbarItem(placement: .topBarLeading) {
+                        groupPicker
                     }
                 }
             }
@@ -160,6 +136,50 @@ struct SubscriptionFeedScreen: View {
                 navigationRouter.feed = nil
             }
         }
+    }
+
+    /// A native toolbar menu remains reachable even after the feed has been scrolled. Keep the
+    /// extra chrome out of sight entirely until the user actually creates a group.
+    private var groupPicker: some View {
+        Menu {
+            Button {
+                Task { await model.selectGroup(nil) }
+            } label: {
+                if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
+                else { Text("All subscriptions") }
+            }
+            ForEach(groups.groups) { group in
+                Button {
+                    Task { await model.selectGroup(group.id) }
+                } label: {
+                    if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
+                    else { Text(group.name) }
+                }
+            }
+            Divider()
+            Button {
+                NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
+            } label: {
+                Label("Manage groups", systemImage: "square.stack.3d.up")
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text("Feed")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                if let groupName = model.selectedGroupName {
+                    Text(verbatim: "· \(groupName)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Choose feed group")
     }
 
     @ViewBuilder

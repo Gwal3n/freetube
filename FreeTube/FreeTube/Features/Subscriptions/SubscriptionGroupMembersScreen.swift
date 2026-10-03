@@ -54,6 +54,7 @@ struct SubscriptionGroupMembersScreen: View {
                                 } label: {
                                     Label("Remove", systemImage: "minus.circle")
                                 }
+                                .tint(.red)
                             }
                     }
                 }

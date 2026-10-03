@@ -65,7 +65,7 @@ struct VideoRow: View {
                 case .none:
                     DeArrowToggleButton(video: video, model: branding)
                 case .actions(let offersPlayNext):
-                    VStack(spacing: 0) {
+                    HStack(alignment: .top, spacing: 0) {
                         DeArrowToggleButton(video: video, model: branding)
                         VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext, onOpenChannel: onOpenChannel)
                     }
