@@ -3,15 +3,17 @@ import SwiftUI
 /// Isolates the half-second playback observation from artwork and mini-player controls.
 @available(iOS 17.0, *)
 struct MiniPlayerProgress: View {
+    static let trackHeight: CGFloat = 2
+
     @Environment(PlayerStateManager.self) private var player
 
     var body: some View {
         GeometryReader { proxy in
             Capsule()
                 .fill(Color.red)
-                .frame(width: proxy.size.width * progress, height: 2)
+                .frame(width: proxy.size.width * progress, height: Self.trackHeight)
         }
-        .frame(height: 2)
+        .frame(height: Self.trackHeight)
         .accessibilityHidden(true)
     }
 

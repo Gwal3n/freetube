@@ -90,16 +90,13 @@ struct PlayerPlaylistPanel: View {
         }
         .overlay(alignment: .bottom) {
             if isPresented && showsSavedNotice {
-                Label("Playlist saved", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 15)
-                    .padding(.vertical, 9)
-                    .background(.regularMaterial, in: Capsule())
-                    .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
-                    .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom + 16)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .allowsHitTesting(false)
+                TransientNoticePill(
+                    title: Text("Playlist saved"),
+                    systemImage: "checkmark",
+                    onUndo: nil
+                )
+                .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom + 12)
+                .allowsHitTesting(false)
             }
         }
         .errorToast($saveError)
@@ -194,7 +191,8 @@ struct PlayerPlaylistPanel: View {
                                 onOpenPlaylist(playlist.id)
                             } label: {
                                 Image(systemName: "arrow.up.right")
-                                    .frame(width: 36, height: 36)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Open playlist page")
@@ -209,7 +207,8 @@ struct PlayerPlaylistPanel: View {
                                             Image(systemName: isSavedLocally ? "bookmark.fill" : "bookmark")
                                         }
                                     }
-                                    .frame(width: 36, height: 36)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(isSavingLocally || !hasLoadedSavedState)
@@ -231,7 +230,8 @@ struct PlayerPlaylistPanel: View {
                                         }
                                     } label: {
                                         Image(systemName: "square.and.arrow.up")
-                                            .frame(width: 36, height: 36)
+                                            .frame(width: 44, height: 44)
+                                            .contentShape(Rectangle())
                                     }
                                     .accessibilityLabel("Share playlist")
                                 }
@@ -241,7 +241,8 @@ struct PlayerPlaylistPanel: View {
                                     .font(.subheadline.weight(.bold))
                                     .frame(width: 32, height: 32)
                                     .background(.quaternary, in: Circle())
-                                    .frame(width: 36, height: 36)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Close playlist")
@@ -427,7 +428,7 @@ struct PlayerPlaylistPanel: View {
             showsSavedNotice = true
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .milliseconds(1400))
             guard savedNoticeGeneration == generation else { return }
             withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
                 showsSavedNotice = false

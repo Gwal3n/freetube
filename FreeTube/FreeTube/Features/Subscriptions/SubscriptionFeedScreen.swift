@@ -43,15 +43,9 @@ struct SubscriptionFeedScreen: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-
-                if player.miniPlayerVisible && !player.fullScreenPresented {
-                    Color.clear
-                        .frame(height: 96)
-                        .listRowSeparator(.hidden)
-                        .accessibilityHidden(true)
-                }
             }
             .listStyle(.plain)
+            .modifier(MiniPlayerScrollClearance())
             .navigationTitle(groups.groups.isEmpty ? "Feed" : "")
             .toolbar {
                 if !groups.groups.isEmpty {

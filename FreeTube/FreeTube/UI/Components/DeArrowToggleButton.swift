@@ -17,7 +17,7 @@ struct DeArrowToggleButton: View {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Color.secondary.opacity(model.showsOriginal(for: video) ? 0.55 : 0.72))
-                    .frame(width: 36, height: 36)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

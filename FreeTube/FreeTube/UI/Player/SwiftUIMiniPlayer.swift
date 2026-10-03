@@ -4,6 +4,11 @@ import UIKit
 /// Compact, entirely SwiftUI player chrome displayed above the native tab bar.
 @available(iOS 17.0, *)
 struct SwiftUIMiniPlayer: View {
+    static let contentHeight: CGFloat = 56
+    /// The tab bar already reserves its own safe area. Scroll views only need enough additional
+    /// inset to lift their last row above the mini-player and its small visual gap.
+    static let scrollClearance: CGFloat = contentHeight + MiniPlayerProgress.trackHeight + 12
+
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("oledMiniPlayer") private var oledMiniPlayer = false
@@ -74,7 +79,7 @@ struct SwiftUIMiniPlayer: View {
                 .accessibilityLabel(player.hasEnded ? "Replay" : (player.isPlaying ? "Pause" : "Play"))
             }
             .padding(.horizontal, 4)
-            .frame(height: 56, alignment: .center)
+            .frame(height: Self.contentHeight, alignment: .center)
 
             MiniPlayerProgress()
         }

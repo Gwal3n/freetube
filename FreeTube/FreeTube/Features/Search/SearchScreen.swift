@@ -157,14 +157,9 @@ struct SearchContent: View {
                         Task { await model.loadMore() }
                     }
                 }
-                if player.miniPlayerVisible && !player.fullScreenPresented {
-                    Color.clear
-                        .frame(height: 96)
-                        .listRowSeparator(.hidden)
-                        .accessibilityHidden(true)
-                }
             }
             .listStyle(.plain)
+            .modifier(MiniPlayerScrollClearance())
             .scrollDismissesKeyboard(.interactively)
             .refreshable { await model.refresh() }
             .task(id: progressLookupID(for: results.videos)) {
@@ -275,14 +270,9 @@ struct SearchContent: View {
                     }
                 }
             }
-            if player.miniPlayerVisible && !player.fullScreenPresented {
-                Color.clear
-                    .frame(height: 96)
-                    .listRowSeparator(.hidden)
-                    .accessibilityHidden(true)
-            }
         }
         .listStyle(.plain)
+        .modifier(MiniPlayerScrollClearance())
         .scrollDismissesKeyboard(.interactively)
     }
 

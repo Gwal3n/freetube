@@ -49,33 +49,13 @@ struct RootView: View {
         }
         .overlay(alignment: .bottom) {
             if let notice = player.queueNotice {
-                HStack(spacing: 10) {
-                    Label {
-                        Text(notice.message)
-                    } icon: {
-                        Image(systemName: notice.offersUndo ? "arrow.uturn.backward" : "checkmark")
-                    }
-                    if notice.offersUndo {
-                        Divider()
-                            .frame(height: 18)
-                        Button("Undo") {
-                            player.undoQueueNotice()
-                        }
-                        .fontWeight(.semibold)
-                        .buttonStyle(.plain)
-                    }
-                }
-                .lineLimit(1)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 15)
-                .padding(.vertical, 9)
-                .fixedSize(horizontal: true, vertical: false)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+                TransientNoticePill(
+                    title: Text(notice.message),
+                    systemImage: notice.offersUndo ? "arrow.uturn.backward" : "checkmark",
+                    onUndo: notice.offersUndo ? { player.undoQueueNotice() } : nil
+                )
                 .padding(.bottom, queueNoticeBottomPadding)
                 .allowsHitTesting(notice.offersUndo)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
