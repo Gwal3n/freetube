@@ -12,11 +12,12 @@ struct PlaylistMoreActionsMenu: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white)
                 .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .tint(.white)
         .accessibilityLabel("More playlist actions")
     }
 }
