@@ -45,6 +45,9 @@ struct StoryboardPreview: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
             }
+            // Keep the image's lower edge fixed across wide and tall videos so the preview
+            // timestamp lines up with the player's existing time labels.
+            .frame(width: maximumPreviewWidth, height: maximumPreviewHeight, alignment: .bottom)
 
             Text(verbatim: formattedPreviewTime)
                 .font(.caption2.monospacedDigit().weight(.semibold))

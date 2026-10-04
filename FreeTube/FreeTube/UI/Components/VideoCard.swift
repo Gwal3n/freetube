@@ -9,8 +9,6 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct VideoCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @AppStorage("com.leshko.freetube.deArrowTitles") private var replaceTitles = false
-    @AppStorage("com.leshko.freetube.deArrowThumbnails") private var replaceThumbnails = false
 
     let video: Video
     var onTap: () -> Void = {}
@@ -33,7 +31,7 @@ struct VideoCard: View {
     var body: some View {
         DeArrowVideoContent(video: video) { branding in
             VStack(alignment: .leading, spacing: 8) {
-                Group {
+                ZStack(alignment: .topTrailing) {
                     Button(action: onTap) {
                         thumbnail(branding: branding)
                     }
@@ -41,6 +39,11 @@ struct VideoCard: View {
                     // The metadata control below performs the same action and carries the complete
                     // spoken label. Exposing both would make VoiceOver announce every card twice.
                     .accessibilityHidden(true)
+
+                    if branding.hasReplacement(for: video) {
+                        DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                            .padding(4)
+                    }
                 }
 
                 // Metadata row is split into its own HStack so the ellipsis Menu can live as a
@@ -99,20 +102,7 @@ struct VideoCard: View {
             .accessibilityHint("Plays video")
 
             if showsMoreMenu {
-                VStack(spacing: 0) {
-                    if replaceTitles || replaceThumbnails {
-                        if branding.hasReplacement(for: video) {
-                            DeArrowToggleButton(video: video, model: branding)
-                        } else {
-                            Color.clear
-                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
-                }
-            } else if branding.hasReplacement(for: video) {
-                DeArrowToggleButton(video: video, model: branding)
+                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)

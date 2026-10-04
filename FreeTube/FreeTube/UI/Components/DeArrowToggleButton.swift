@@ -5,6 +5,7 @@ import SwiftUI
 struct DeArrowToggleButton: View {
     let video: Video
     let model: DeArrowVideoViewModel
+    var onThumbnail = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -15,8 +16,16 @@ struct DeArrowToggleButton: View {
                 }
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Color.secondary.opacity(model.showsOriginal(for: video) ? 0.55 : 0.72))
+                    .font(.system(size: onThumbnail ? 12 : 10, weight: .semibold))
+                    .foregroundStyle(onThumbnail
+                        ? Color.white
+                        : Color.secondary.opacity(model.showsOriginal(for: video) ? 0.55 : 0.72))
+                    .frame(width: 28, height: 28)
+                    .background {
+                        if onThumbnail {
+                            Circle().fill(.black.opacity(0.66))
+                        }
+                    }
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
             }

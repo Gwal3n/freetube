@@ -294,9 +294,11 @@ struct FullScreenPlayer: View {
                                 ),
                                 y: max(
                                     58,
+                                    // Align the preview time with the elapsed/duration row;
+                                    // the image above it stays clear of the timeline.
                                     controlFrame.maxY
                                         - timelineBottomPadding
-                                        - 62
+                                        - 84.5
                                 )
                             )
                             .allowsHitTesting(false)
