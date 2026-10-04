@@ -191,6 +191,9 @@ final class PlayerStateManager {
     private var seekRequestID = 0
     private var audioModeSwitchGeneration = 0
     private var resumeAfterAudioSwitch: Bool?
+    /// AVPlayer needs an optimistic play request to load a replacement while its status is
+    /// `.unknown`. The replacement stays muted until it reaches the old playback position.
+    private var isPrimingAudioModeSwitch = false
     private var lastProgressSaveAt = Date.distantPast
     private var lastSavedProgressVideoID: String?
     private var lastSavedProgressPosition: TimeInterval = -.infinity
@@ -260,6 +263,7 @@ final class PlayerStateManager {
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
+        endAudioModePriming()
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         itemStatusObservation?.invalidate()
         itemPresentationSizeObservation?.invalidate()
@@ -318,6 +322,7 @@ final class PlayerStateManager {
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
+        endAudioModePriming()
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
@@ -421,6 +426,7 @@ final class PlayerStateManager {
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
+        endAudioModePriming()
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
@@ -611,6 +617,13 @@ final class PlayerStateManager {
             replay()
             return
         }
+        if isPrimingAudioModeSwitch {
+            // Preserve the user's intent without cancelling the muted loading request.
+            resumeAfterAudioSwitch = true
+            isPlaying = true
+            updateNowPlaying()
+            return
+        }
         log.info("play()")
         AudioSessionConfigurator.configure(
             allowMixing: preferences.allowAudioMixing,
@@ -625,6 +638,12 @@ final class PlayerStateManager {
     }
 
     func pause() {
+        if isPrimingAudioModeSwitch {
+            resumeAfterAudioSwitch = false
+            isPlaying = false
+            updateNowPlaying()
+            return
+        }
         log.info("pause()")
         player.pause()
         isPlaying = false
@@ -777,7 +796,7 @@ final class PlayerStateManager {
 
     func toggleMute() {
         isMuted.toggle()
-        player.isMuted = isMuted
+        player.isMuted = isMuted || isPrimingAudioModeSwitch
         log.info("Player muted=\(self.isMuted, privacy: .public)")
     }
 
@@ -828,6 +847,7 @@ final class PlayerStateManager {
     private func switchPlaybackSource(for video: Video, to quality: VideoQuality, generation: Int) async {
         defer {
             if audioModeSwitchGeneration == generation {
+                endAudioModePriming()
                 isSwitchingAudioMode = false
                 resumeAfterAudioSwitch = nil
                 audioModeSwitchTask = nil
@@ -859,6 +879,14 @@ final class PlayerStateManager {
         loadState = .buffering
         itemLoadStartedAt = Date()
         loadItem(replacement, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
+        // Match initial playback: request play while status is still `.unknown`. A paused
+        // AVQueuePlayer may otherwise leave this remote item unready through the full timeout.
+        // Prime it silently, then seek before exposing its audio or video.
+        isPrimingAudioModeSwitch = true
+        player.isMuted = true
+        AudioSessionConfigurator.configure(allowMixing: preferences.allowAudioMixing, activate: true)
+        player.play()
+        log.info("Audio mode switch primed candidate=\(candidate.strategy.rawValue, privacy: .public)")
         let readiness = await waitForReadiness(
             of: replacement,
             timeout: readinessTimeout(for: candidate.strategy)
@@ -869,6 +897,7 @@ final class PlayerStateManager {
 
         switch readiness {
         case .ready:
+            player.pause()
             let previousQuality = playbackQuality
             playbackQuality = quality
             if quality == .audioOnly { videoQualityBeforeAudio = previousQuality }
@@ -878,8 +907,9 @@ final class PlayerStateManager {
             guard !Task.isCancelled, currentVideo?.id == video.id,
                   player.currentItem === replacement else { return }
             pendingSeekTarget = nil
+            endAudioModePriming()
             loadState = .readyToPlay
-            if resumeAfterAudioSwitch == true { play() }
+            if resumeAfterAudioSwitch == true { play() } else { isPlaying = false }
             updateNowPlaying()
             log.info("Audio mode switch succeeded for \(video.id, privacy: .public) audioOnly=\(quality == .audioOnly, privacy: .public)")
         case .failed(let reason):
@@ -888,7 +918,7 @@ final class PlayerStateManager {
                 previousItem, videoID: video.id, position: position, size: previousSize
             )
         case .timedOut:
-            log.notice("Audio mode switch timed out for \(video.id, privacy: .public)")
+            log.notice("Audio mode switch timed out for \(video.id, privacy: .public) itemStatus=\(replacement.status.rawValue, privacy: .public) playerTimeControl=\(self.player.timeControlStatus.rawValue, privacy: .public)")
             await restoreSourceAfterFailedSwitch(
                 previousItem, videoID: video.id, position: position, size: previousSize
             )
@@ -901,15 +931,22 @@ final class PlayerStateManager {
         position: TimeInterval,
         size: CGSize
     ) async {
+        player.pause()
         loadItem(item)
         videoPresentationSize = size
         await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: item)
         guard !Task.isCancelled, currentVideo?.id == videoID,
               player.currentItem === item else { return }
         pendingSeekTarget = nil
+        endAudioModePriming()
         loadState = .readyToPlay
-        if resumeAfterAudioSwitch == true { play() }
+        if resumeAfterAudioSwitch == true { play() } else { isPlaying = false }
         updateNowPlaying()
+    }
+
+    private func endAudioModePriming() {
+        isPrimingAudioModeSwitch = false
+        player.isMuted = isMuted
     }
 
     private func seekForSourceSwitch(to seconds: TimeInterval, item: AVPlayerItem) async {
@@ -1090,6 +1127,7 @@ final class PlayerStateManager {
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
+        endAudioModePriming()
         playerPresentationTask?.cancel()
         playerPresentationTask = nil
         recommendationTask?.cancel()
@@ -1956,6 +1994,10 @@ final class PlayerStateManager {
         timeControlStatusObservation = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] _, _ in
             guard let self else { return }
             Task { @MainActor in
+                // During an audio-mode switch, transport is deliberately playing while muted
+                // solely to load the candidate. Keep the UI/remote-control state on the user's
+                // requested play/pause intent instead of that temporary transport state.
+                guard !self.isPrimingAudioModeSwitch else { return }
                 // Read the status inside the hop rather than capturing it at KVO time. Optimistic
                 // play installs and tears down items in quick succession, so a captured value can
                 // land after a later transition and leave `isPlaying` (and therefore the Now
@@ -2071,7 +2113,7 @@ final class PlayerStateManager {
 
     private func accumulateHistoryPlaybackTime() {
         let now = Date()
-        guard player.timeControlStatus == .playing else {
+        guard !isPrimingAudioModeSwitch, player.timeControlStatus == .playing else {
             lastHistoryPlaybackTick = nil
             return
         }
