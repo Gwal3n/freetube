@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import OSLog
 
@@ -35,8 +36,19 @@ final class PlaybackResolver: PlaybackResolving {
         let videoID = video.id
         log.info("resolve(\(videoID, privacy: .public)) excluded=\(strategies.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
         if !strategies.contains(.localFile), let local = downloads.localFile(for: videoID) {
-            log.info("resolve: cache hit → \(local.path, privacy: .public)")
-            return PlaybackCandidate(source: .localFile(local), strategy: .localFile)
+            // Downloads use `<videoID>.mp4` for both video and audio-only files. The name alone
+            // cannot prove this file satisfies a request to show video. Inspect only local files;
+            // a mismatch falls through to normal stream resolution without deleting the download.
+            if quality == .audioOnly {
+                log.info("resolve: cache hit → \(local.path, privacy: .public)")
+                return PlaybackCandidate(source: .localFile(local), strategy: .localFile)
+            }
+            let videoTracks = try? await AVURLAsset(url: local).loadTracks(withMediaType: .video)
+            if videoTracks?.isEmpty == false {
+                log.info("resolve: cache hit → \(local.path, privacy: .public)")
+                return PlaybackCandidate(source: .localFile(local), strategy: .localFile)
+            }
+            log.info("resolve: audio-only local file cannot satisfy video playback for \(videoID, privacy: .public)")
         }
 
         if !strategies.contains(.native) {
