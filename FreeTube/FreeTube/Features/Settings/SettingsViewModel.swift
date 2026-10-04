@@ -103,6 +103,16 @@ final class SettingsViewModel {
         set { preferences.showComments = newValue }
     }
 
+    var showDescription: Bool {
+        get { preferences.showDescription }
+        set { preferences.showDescription = newValue }
+    }
+
+    var showSearchSuggestions: Bool {
+        get { preferences.showSearchSuggestions }
+        set { preferences.showSearchSuggestions = newValue }
+    }
+
     var showFeaturedCommentPreview: Bool {
         get { preferences.showFeaturedCommentPreview }
         set { preferences.showFeaturedCommentPreview = newValue }
@@ -170,11 +180,6 @@ final class SettingsViewModel {
 
     func clearLogFiles() {
         LogFileWriter.shared.clearAllLogs()
-    }
-
-    var restrictedSearchMode: Bool {
-        get { preferences.restrictedSearchMode }
-        set { preferences.restrictedSearchMode = newValue }
     }
 
     var downloadCacheLimit: DownloadCacheLimit {

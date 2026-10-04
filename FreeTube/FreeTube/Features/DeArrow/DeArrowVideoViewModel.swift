@@ -60,8 +60,14 @@ final class DeArrowVideoViewModel {
     }
 
     func hasReplacement(for video: Video) -> Bool {
-        videoID == video.id && ((replaceTitles && branding.title != nil && branding.title != video.title)
+        videoID == video.id && (hasTitleReplacement(for: video)
             || (replaceThumbnails && branding.thumbnailData != nil))
+    }
+
+    /// True even while the user temporarily shows the original, so the player can keep the
+    /// restore control available without showing it for thumbnail-only replacement.
+    func hasTitleReplacement(for video: Video) -> Bool {
+        videoID == video.id && replaceTitles && branding.title != nil && branding.title != video.title
     }
 
     func showsOriginal(for video: Video) -> Bool { originals.videoIDs.contains(video.id) }

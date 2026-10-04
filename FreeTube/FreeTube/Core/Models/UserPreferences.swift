@@ -30,10 +30,12 @@ struct UserPreferences {
     /// Uses edge-to-edge 16:9 cards in the local subscription feed instead of compact rows.
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     @AppStorage("showComments") var showComments: Bool = true
+    @AppStorage("showDescription") var showDescription: Bool = true
     /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit
     /// cannot decode the current teaser shape, the first top-level comment is used as a fallback.
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
+    @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
     /// Fetches expanded details and the first comments page only after playback is ready. Further
     /// comment pages and replies always remain user initiated.
@@ -61,7 +63,6 @@ struct UserPreferences {
     /// next queue item right after the current video starts playing — so Next-tap is
     /// instant. Users who want to save bandwidth (or who tend not to advance through the
     /// queue) can flip this off in Settings.
-    @AppStorage("restrictedSearchMode") var restrictedSearchMode: Bool = false
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("downloadCacheLimit") var downloadCacheLimitRaw: String = DownloadCacheLimit.unlimited.rawValue
     /// `--concurrent-fragments` value passed to yt-dlp. Higher values fetch more DASH/HLS chunks

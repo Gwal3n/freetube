@@ -11,6 +11,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let video: Video
     let statsText: String
     let isDetailsExpanded: Bool
+    let showsDescription: Bool
     let canOpenChannel: Bool
     let onToggleDetails: () -> Void
     let onOpenChannel: () -> Void
@@ -21,6 +22,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         video: Video,
         statsText: String,
         isDetailsExpanded: Bool,
+        showsDescription: Bool,
         canOpenChannel: Bool,
         onToggleDetails: @escaping () -> Void,
         onOpenChannel: @escaping () -> Void,
@@ -29,6 +31,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         self.video = video
         self.statsText = statsText
         self.isDetailsExpanded = isDetailsExpanded
+        self.showsDescription = showsDescription
         self.canOpenChannel = canOpenChannel
         self.onToggleDetails = onToggleDetails
         self.onOpenChannel = onOpenChannel
@@ -38,26 +41,30 @@ struct PlayerMetadataHeader<Actions: View>: View {
     var body: some View {
         DeArrowVideoContent(video: video) { branding in
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 4) {
-                    Button(action: onToggleDetails) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(branding.title(for: video))
-                                .contentTransition(.opacity)
-                                .font(.title3.weight(.semibold))
-                                .multilineTextAlignment(.leading)
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.down")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
+                HStack(alignment: .center, spacing: 4) {
+                    if showsDescription {
+                        Button(action: onToggleDetails) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                title(branding.title(for: video))
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.down")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .accessibilityLabel(branding.title(for: video))
+                        .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
+                        .accessibilityHint("Shows or hides video details")
+                    } else {
+                        title(branding.title(for: video))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel(branding.title(for: video))
-                    .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
-                    .accessibilityHint("Shows or hides video details")
-                    DeArrowToggleButton(video: video, model: branding)
+                    if branding.hasTitleReplacement(for: video) {
+                        DeArrowToggleButton(video: video, model: branding)
+                    }
                 }
 
                 if video.isLive || !statsText.isEmpty {
@@ -92,6 +99,13 @@ struct PlayerMetadataHeader<Actions: View>: View {
             }
             .padding(.horizontal)
         }
+    }
+
+    private func title(_ value: String) -> some View {
+        Text(value)
+            .contentTransition(.opacity)
+            .font(.title3.weight(.semibold))
+            .multilineTextAlignment(.leading)
     }
 
     @ViewBuilder

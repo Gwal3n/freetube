@@ -81,10 +81,11 @@ struct PlayerQueueSections: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white)
                             .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                             .contentShape(Rectangle())
                     }
+                    .tint(.white)
                     .accessibilityLabel("Queue actions")
 
                     Button {

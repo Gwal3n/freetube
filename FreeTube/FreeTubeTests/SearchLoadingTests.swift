@@ -79,7 +79,7 @@ private final class ControlledSearchService: SearchServicing {
     private var pendingPage: CheckedContinuation<SearchResult, Error>?
     private var pageStarted: CheckedContinuation<Void, Never>?
 
-    func search(query: String, restricted: Bool) async throws -> SearchResult {
+    func search(query: String) async throws -> SearchResult {
         if failSearch { throw URLError(.notConnectedToInternet) }
         return result(query)
     }

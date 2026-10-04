@@ -30,6 +30,7 @@ struct SettingsScreen: View {
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     Toggle("Swipe vertically for fullscreen", isOn: Bindable(model).verticalSwipeFullscreen)
                     Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
+                    Toggle("Show description", isOn: Bindable(model).showDescription)
                     Toggle("Show comments", isOn: Bindable(model).showComments)
                     if model.showComments {
                         Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
@@ -53,7 +54,7 @@ struct SettingsScreen: View {
                 }
 
                 Section("Search") {
-                    Toggle("Restricted search mode", isOn: Bindable(model).restrictedSearchMode)
+                    Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
                 }
 
                 Section {

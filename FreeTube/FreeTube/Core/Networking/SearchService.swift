@@ -10,12 +10,12 @@ struct SearchResult: Sendable {
 }
 
 protocol SearchServicing: Sendable {
-    func search(query: String, restricted: Bool) async throws -> SearchResult
+    func search(query: String) async throws -> SearchResult
     func fetchMore(continuation: String) async throws -> SearchResult
     func autocomplete(query: String) async throws -> [SearchSuggestion]
 }
 
-/// Wraps `SearchResponse` (+Continuation, +Restricted) and `AutoCompletionResponse`.
+/// Wraps `SearchResponse` (+Continuation) and `AutoCompletionResponse`.
 final class SearchService: SearchServicing {
     private let client: YouTubeKitClient
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "SearchService")
@@ -24,22 +24,14 @@ final class SearchService: SearchServicing {
         self.client = client
     }
 
-    func search(query: String, restricted: Bool) async throws -> SearchResult {
-        log.info("Search query=\(query, privacy: .public) restricted=\(restricted, privacy: .public)")
+    func search(query: String) async throws -> SearchResult {
+        log.info("Search query=\(query, privacy: .public)")
         do {
-            if restricted {
-                let response = try await AppRestrictedSearchResponse.sendThrowingRequest(
-                    youtubeModel: client.model,
-                    data: [.query: query]
-                )
-                return mapResults(response.results, continuation: response.continuationToken)
-            } else {
-                let response = try await AppSearchResponse.sendThrowingRequest(
-                    youtubeModel: client.model,
-                    data: [.query: query]
-                )
-                return mapResults(response.results, continuation: response.continuationToken)
-            }
+            let response = try await AppSearchResponse.sendThrowingRequest(
+                youtubeModel: client.model,
+                data: [.query: query]
+            )
+            return mapResults(response.results, continuation: response.continuationToken)
         } catch {
             throw YouTubeServiceError.network(error)
         }
@@ -97,20 +89,6 @@ private struct AppSearchResponse: YouTubeResponse {
     static func decodeJSON(json: JSON) -> Self {
         let sections = json["contents", "twoColumnSearchResultsRenderer", "primaryContents", "sectionListRenderer", "contents"].arrayValue
         return SearchResponseDecoder.decodeSections(sections)
-    }
-}
-
-private struct AppRestrictedSearchResponse: YouTubeResponse {
-    static let headersType: HeaderTypes = .restrictedSearch
-    static let parametersValidationList: ValidationList = [.query: .existenceValidator]
-    var results: [any YTSearchResult] = []
-    var continuationToken: String?
-
-    static func decodeJSON(json: JSON) -> Self {
-        let decoded = SearchResponseDecoder.decodeSections(
-            json["contents", "twoColumnSearchResultsRenderer", "primaryContents", "sectionListRenderer", "contents"].arrayValue
-        )
-        return Self(results: decoded.results, continuationToken: decoded.continuationToken)
     }
 }
 

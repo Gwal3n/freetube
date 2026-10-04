@@ -31,7 +31,6 @@ final class AddVideoToPlaylistViewModel {
     var errorState: ErrorState?
     private let service: LocalPlaylistService
     private let searchService: any SearchServicing
-    private let preferences = UserPreferences()
     private var searchGeneration = 0
 
     init(
@@ -68,7 +67,7 @@ final class AddVideoToPlaylistViewModel {
         isSearching = true
         defer { if searchGeneration == generation { isSearching = false } }
         do {
-            let result = try await searchService.search(query: term, restricted: preferences.restrictedSearchMode)
+            let result = try await searchService.search(query: term)
             guard searchGeneration == generation else { return }
             videos = result.videos
             continuationToken = result.continuationToken

@@ -34,6 +34,7 @@ struct FullScreenPlayer: View {
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
+    @AppStorage("showDescription") private var showDescription = true
     @AppStorage("showUpNext") private var showUpNext = true
     @AppStorage("upNextInitialCount") private var upNextInitialCount = 5
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
@@ -799,6 +800,7 @@ struct FullScreenPlayer: View {
                     isDetailsExpanded: detailsModel.isExpanded,
                     isLoadingDetails: detailsModel.isLoading,
                     detailsLoadFailed: detailsModel.loadFailed,
+                    showsDescription: showDescription,
                     showsUpNext: showUpNext,
                     upNextInitialCount: upNextInitialCount,
                     showsComments: showComments,

@@ -15,6 +15,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     let isDetailsExpanded: Bool
     let isLoadingDetails: Bool
     let detailsLoadFailed: Bool
+    let showsDescription: Bool
     let showsUpNext: Bool
     let upNextInitialCount: Int
     let showsComments: Bool
@@ -34,6 +35,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         isDetailsExpanded: Bool,
         isLoadingDetails: Bool,
         detailsLoadFailed: Bool,
+        showsDescription: Bool,
         showsUpNext: Bool,
         upNextInitialCount: Int,
         showsComments: Bool,
@@ -52,6 +54,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.isDetailsExpanded = isDetailsExpanded
         self.isLoadingDetails = isLoadingDetails
         self.detailsLoadFailed = detailsLoadFailed
+        self.showsDescription = showsDescription
         self.showsUpNext = showsUpNext
         self.upNextInitialCount = upNextInitialCount
         self.showsComments = showsComments
@@ -69,6 +72,7 @@ struct PlayerInformationPanel<Actions: View>: View {
                 video: video,
                 statsText: statsText,
                 isDetailsExpanded: isDetailsExpanded,
+                showsDescription: showsDescription,
                 canOpenChannel: !video.channelID.isEmpty,
                 onToggleDetails: onToggleDetails,
                 onOpenChannel: onOpenChannel
@@ -76,16 +80,18 @@ struct PlayerInformationPanel<Actions: View>: View {
                 actions
             }
 
-            PlayerDescription(
-                text: descriptionText,
-                parts: descriptionParts,
-                isExpanded: isDetailsExpanded,
-                isLoading: isLoadingDetails,
-                loadFailed: detailsLoadFailed,
-                onSeek: onSeek,
-                onRetry: onRetryDetails,
-                onExpand: onExpandDetails
-            )
+            if showsDescription {
+                PlayerDescription(
+                    text: descriptionText,
+                    parts: descriptionParts,
+                    isExpanded: isDetailsExpanded,
+                    isLoading: isLoadingDetails,
+                    loadFailed: detailsLoadFailed,
+                    onSeek: onSeek,
+                    onRetry: onRetryDetails,
+                    onExpand: onExpandDetails
+                )
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 PlayerQueueSections(

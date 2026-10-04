@@ -115,7 +115,7 @@ final class SearchViewModel {
             }
         }
         do {
-            let result = try await service.search(query: submittedQuery, restricted: preferences.restrictedSearchMode)
+            let result = try await service.search(query: submittedQuery)
             guard searchGeneration == generation,
                   query.trimmingCharacters(in: .whitespacesAndNewlines) == submittedQuery
             else { return }
@@ -169,10 +169,7 @@ final class SearchViewModel {
         isLoading = true
         defer { if searchGeneration == generation { isLoading = false } }
         do {
-            let refreshed = try await service.search(
-                query: submittedQuery,
-                restricted: preferences.restrictedSearchMode
-            )
+            let refreshed = try await service.search(query: submittedQuery)
             guard searchGeneration == generation else { return }
             results = refreshed
         } catch {
@@ -184,6 +181,10 @@ final class SearchViewModel {
 
     private func scheduleAutocomplete() {
         autocompleteTask?.cancel()
+        guard preferences.showSearchSuggestions else {
+            suggestions = []
+            return
+        }
         let snapshot = query
         autocompleteTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
@@ -194,6 +195,10 @@ final class SearchViewModel {
 
     private func runAutocomplete(_ q: String) async {
         guard !Task.isCancelled, q == query else { return }
+        guard preferences.showSearchSuggestions else {
+            suggestions = []
+            return
+        }
         guard !q.trimmingCharacters(in: .whitespaces).isEmpty else {
             suggestions = []
             return

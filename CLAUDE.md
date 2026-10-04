@@ -132,7 +132,7 @@ Every YouTubeKit response type gets exactly one service method. Do not call `You
 |---|---|
 | `HomeScreenResponse` (+Continuation) | `HomeService.fetchHome()` / `fetchMore()` |
 | `TrendingVideosResponse` | `HomeService.fetchTrending()` |
-| `SearchResponse` (+Continuation, +Restricted) | `SearchService.search(query:restricted:)` / `fetchMore()` |
+| `SearchResponse` (+Continuation) | `SearchService.search(query:)` / `fetchMore()` |
 | `AutoCompletionResponse` | `SearchService.autocomplete(query:)` |
 | `ChannelInfosResponse` (+Videos/Shorts/Directs/Playlists +Continuations) | `ChannelService.fetchChannel(id:)` / `fetchVideos()` / `fetchShorts()` / `fetchDirects()` / `fetchPlaylists()` |
 | `PlaylistInfosResponse` (+Continuation) | `PlaylistService.fetchPlaylist(id:)` / `fetchMore()` |
