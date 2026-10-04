@@ -5,7 +5,9 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerTopControls: View {
     let controls: [PlayerTopControl]
+    let overflowControls: [PlayerTopControl]
     let playbackRate: Double
+    let playbackQuality: VideoQuality
     let isMuted: Bool
     let isLooping: Bool
     let isAutoplayEnabled: Bool
@@ -13,6 +15,7 @@ struct PlayerTopControls: View {
     let isAudioOnly: Bool
     let isSwitchingAudioMode: Bool
     let onSetPlaybackRate: (Double) -> Void
+    let onSetPlaybackQuality: (VideoQuality) -> Void
     let onToggleLoop: () -> Void
     let onToggleMute: () -> Void
     let onToggleFullscreen: () -> Void
@@ -23,6 +26,17 @@ struct PlayerTopControls: View {
         HStack(spacing: 0) {
             ForEach(controls) { control in
                 controlView(control)
+            }
+            if !overflowControls.isEmpty {
+                Menu {
+                    ForEach(overflowControls) { control in
+                        overflowItem(control)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .playerTopControl()
+                }
+                .accessibilityLabel("More player controls")
             }
         }
         .buttonStyle(.plain)
@@ -72,22 +86,65 @@ struct PlayerTopControls: View {
             .disabled(isSwitchingAudioMode)
             .accessibilityLabel("Audio-only playback")
             .accessibilityValue(isSwitchingAudioMode ? "Switching" : (isAudioOnly ? "On" : "Off"))
+        case .quality:
+            Menu {
+                qualityChoices
+            } label: {
+                Text(playbackQuality.displayName)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+            }
+            .disabled(isAudioOnly)
+            .accessibilityLabel("Quality limit")
+            .accessibilityValue(playbackQuality.displayName)
+        }
+    }
+
+    @ViewBuilder
+    private func overflowItem(_ control: PlayerTopControl) -> some View {
+        switch control {
+        case .speed:
+            Menu {
+                speedChoices
+            } label: {
+                Label("Speed: \(rateLabel(playbackRate))", systemImage: control.systemImage)
+            }
+        case .quality:
+            Menu {
+                qualityChoices
+            } label: {
+                Label("Quality limit: \(playbackQuality.displayName)", systemImage: control.systemImage)
+            }
+            .disabled(isAudioOnly)
+        case .loop:
+            Button(action: onToggleLoop) {
+                Label(isLooping ? "Turn loop off" : "Loop current video", systemImage: control.systemImage)
+            }
+        case .mute:
+            Button(action: onToggleMute) {
+                Label(isMuted ? "Unmute" : "Mute", systemImage: control.systemImage)
+            }
+        case .fullscreen:
+            Button(action: onToggleFullscreen) {
+                Label(isFullscreen ? "Exit fullscreen" : "Enter fullscreen", systemImage: control.systemImage)
+            }
+        case .autoplay:
+            Button(action: onToggleAutoplay) {
+                Label(isAutoplayEnabled ? "Turn autoplay off" : "Turn autoplay on", systemImage: control.systemImage)
+            }
+        case .audioOnly:
+            Button(action: onToggleAudioOnly) {
+                Label(isAudioOnly ? "Turn audio-only off" : "Turn audio-only on", systemImage: control.systemImage)
+            }
+            .disabled(isSwitchingAudioMode)
         }
     }
 
     private var speedMenu: some View {
         Menu {
-            ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
-                Button {
-                    onSetPlaybackRate(rate)
-                } label: {
-                    if abs(playbackRate - rate) < 0.01 {
-                        Label(rateLabel(rate), systemImage: "checkmark")
-                    } else {
-                        Text(rateLabel(rate))
-                    }
-                }
-            }
+            speedChoices
         } label: {
             Text(rateLabel(playbackRate))
                 .font(.caption.weight(.bold))
@@ -97,6 +154,36 @@ struct PlayerTopControls: View {
         }
         .accessibilityLabel("Playback speed")
         .accessibilityValue(rateLabel(playbackRate))
+    }
+
+    private var speedChoices: some View {
+        ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
+            Button {
+                onSetPlaybackRate(rate)
+            } label: {
+                if abs(playbackRate - rate) < 0.01 {
+                    Label(rateLabel(rate), systemImage: "checkmark")
+                } else {
+                    Text(rateLabel(rate))
+                }
+            }
+        }
+    }
+
+    private var qualityChoices: some View {
+        Section("Preferred maximum") {
+            ForEach(VideoQuality.allCases.filter { $0 != .audioOnly }) { quality in
+                Button {
+                    onSetPlaybackQuality(quality)
+                } label: {
+                    if playbackQuality == quality {
+                        Label(quality.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(quality.displayName)
+                    }
+                }
+            }
+        }
     }
 
     private func rateLabel(_ rate: Double) -> String {

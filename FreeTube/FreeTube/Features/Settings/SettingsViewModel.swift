@@ -24,6 +24,9 @@ final class SettingsViewModel {
     var deArrowRandomThumbnails: Bool {
         didSet { preferences.deArrowRandomThumbnails = deArrowRandomThumbnails }
     }
+    var playerControlLayout: PlayerControlLayout {
+        didSet { preferences.playerControlLayout = playerControlLayout }
+    }
 
     init() {
         let preferences = UserPreferences()
@@ -33,6 +36,7 @@ final class SettingsViewModel {
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
+        self.playerControlLayout = preferences.playerControlLayout
     }
 
     var preferredQuality: VideoQuality {
@@ -127,29 +131,14 @@ final class SettingsViewModel {
         set { preferences.oledMiniPlayer = newValue }
     }
 
-    var playerTopControls: [PlayerTopControl] {
-        get { preferences.playerTopControls }
-        set { preferences.playerTopControls = newValue }
-    }
-
-    func isPlayerTopControlVisible(_ control: PlayerTopControl) -> Bool {
-        !preferences.hiddenPlayerTopControls.contains(control)
-    }
-
-    func setPlayerTopControlVisible(_ isVisible: Bool, control: PlayerTopControl) {
-        var hidden = preferences.hiddenPlayerTopControls
-        if isVisible {
-            hidden.remove(control)
-        } else {
-            hidden.insert(control)
-        }
-        preferences.hiddenPlayerTopControls = hidden
-    }
-
-    func movePlayerTopControls(from source: IndexSet, to destination: Int) {
-        var controls = playerTopControls
-        controls.move(fromOffsets: source, toOffset: destination)
-        playerTopControls = controls
+    func movePlayerControl(
+        _ control: PlayerTopControl,
+        to section: PlayerControlLayout.Section,
+        before target: PlayerTopControl? = nil
+    ) {
+        var layout = playerControlLayout
+        layout.move(control, to: section, before: target)
+        playerControlLayout = layout
     }
 
     var sponsorBlockEnabled: Bool {

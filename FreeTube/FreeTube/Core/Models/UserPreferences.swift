@@ -51,6 +51,7 @@ struct UserPreferences {
     @AppStorage("com.leshko.freetube.deArrowRandomThumbnails") var deArrowRandomThumbnails: Bool = true
     @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
+    @AppStorage("playerControlLayout") var playerControlLayoutRaw: String = ""
     /// When true, `LogFileWriter` opens a new file under `Application Support/Logs/` on every app
     /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app
@@ -112,14 +113,15 @@ struct UserPreferences {
         nonmutating set { historyRetentionPolicyRaw = newValue.rawValue }
     }
 
-    var playerTopControls: [PlayerTopControl] {
-        get { PlayerTopControl.decodeOrder(playerTopControlOrderRaw) }
-        nonmutating set { playerTopControlOrderRaw = PlayerTopControl.encodeOrder(newValue) }
-    }
-
-    var hiddenPlayerTopControls: Set<PlayerTopControl> {
-        get { PlayerTopControl.decodeHidden(hiddenPlayerTopControlsRaw) }
-        nonmutating set { hiddenPlayerTopControlsRaw = PlayerTopControl.encodeHidden(newValue) }
+    var playerControlLayout: PlayerControlLayout {
+        get {
+            PlayerControlLayout.restored(
+                from: playerControlLayoutRaw,
+                legacyOrder: playerTopControlOrderRaw,
+                legacyHidden: hiddenPlayerTopControlsRaw
+            )
+        }
+        nonmutating set { playerControlLayoutRaw = newValue.encoded }
     }
 
     var sponsorBlockCategories: Set<SponsorBlockCategory> {

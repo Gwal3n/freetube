@@ -4,6 +4,43 @@ import CoreGraphics
 
 @MainActor
 final class PlayerPolishTests: XCTestCase {
+    func testPlayerControlLayoutKeepsEachControlInExactlyOneSection() {
+        let layout = PlayerControlLayout.restored(
+            from: "",
+            legacyOrder: "loop,mute,fullscreen,speed,audioOnly,autoplay",
+            legacyHidden: "mute"
+        )
+        let controls = layout.onPlayer + layout.moreMenu + layout.hidden
+        XCTAssertEqual(Set(controls), Set(PlayerTopControl.allCases))
+        XCTAssertEqual(controls.count, PlayerTopControl.allCases.count)
+        XCTAssertEqual(layout.hidden, [.mute])
+        XCTAssertTrue(layout.moreMenu.contains(.quality))
+        XCTAssertLessThanOrEqual(layout.onPlayer.count, PlayerControlLayout.maximumOnPlayer)
+    }
+
+    func testPlayerControlLayoutMovesAndRoundTrips() {
+        var layout = PlayerControlLayout.standard
+        layout.move(.quality, to: .onPlayer, before: .fullscreen)
+        layout.move(.audioOnly, to: .hidden)
+        let restored = PlayerControlLayout.restored(
+            from: layout.encoded,
+            legacyOrder: "",
+            legacyHidden: ""
+        )
+        XCTAssertEqual(restored, layout)
+        XCTAssertEqual(restored.onPlayer, [.quality, .fullscreen, .speed])
+        XCTAssertEqual(restored.hidden, [.audioOnly])
+    }
+
+    func testAddingFifthPlayerControlMovesPreviousLastIntoMore() {
+        var layout = PlayerControlLayout.standard
+        layout.move(.loop, to: .onPlayer)
+        layout.move(.quality, to: .onPlayer)
+        XCTAssertEqual(layout.onPlayer.count, PlayerControlLayout.maximumOnPlayer)
+        XCTAssertTrue(layout.onPlayer.contains(.quality))
+        XCTAssertTrue(layout.moreMenu.contains(.loop))
+    }
+
     func testPlaylistCountsAcceptDisplayStrings() {
         XCTAssertEqual(Mappers.parseAbbreviatedCount("123 videos"), 123)
         XCTAssertEqual(Mappers.parseAbbreviatedCount("1,234 videos"), 1_234)

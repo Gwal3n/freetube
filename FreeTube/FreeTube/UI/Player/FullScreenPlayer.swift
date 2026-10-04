@@ -39,6 +39,7 @@ struct FullScreenPlayer: View {
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
+    @AppStorage("playerControlLayout") private var playerControlLayoutRaw = ""
 
     var body: some View {
         // Single dark-blur material under EVERYTHING — status bar inset, video chrome, transport,
@@ -50,6 +51,7 @@ struct FullScreenPlayer: View {
         // wide media). Their difference becomes the first part of the lower panel's scroll range,
         // allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
+            let controlLayout = playerControlLayout
             let isLandscape = verticalSizeClass == .compact
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
             let sidePanelWidth: CGFloat = isLandscape && (player.chapterListPresented || isPlaylistPanelPresented)
@@ -204,8 +206,10 @@ struct FullScreenPlayer: View {
                         showsCollapseButton: !isLandscape && !usesPortraitFullscreen,
                         additionalTopControls: AnyView(
                             PlayerTopControls(
-                                controls: visiblePlayerTopControls,
+                                controls: controlLayout.onPlayer,
+                                overflowControls: controlLayout.moreMenu,
                                 playbackRate: player.playbackRate,
+                                playbackQuality: player.playbackQuality,
                                 isMuted: player.isMuted,
                                 isLooping: player.isLoopingCurrentVideo,
                                 isAutoplayEnabled: autoplayNext,
@@ -214,6 +218,10 @@ struct FullScreenPlayer: View {
                                 isSwitchingAudioMode: player.isSwitchingAudioMode,
                                 onSetPlaybackRate: { rate in
                                     player.setPlaybackRate(rate)
+                                    showPlayerControls()
+                                },
+                                onSetPlaybackQuality: { quality in
+                                    player.setPlaybackQuality(quality)
                                     showPlayerControls()
                                 },
                                 onToggleLoop: {
@@ -900,9 +908,12 @@ struct FullScreenPlayer: View {
         player.canPlayNext
     }
 
-    private var visiblePlayerTopControls: [PlayerTopControl] {
-        let hidden = PlayerTopControl.decodeHidden(hiddenPlayerTopControlsRaw)
-        return PlayerTopControl.decodeOrder(playerTopControlOrderRaw).filter { !hidden.contains($0) }
+    private var playerControlLayout: PlayerControlLayout {
+        PlayerControlLayout.restored(
+            from: playerControlLayoutRaw,
+            legacyOrder: playerTopControlOrderRaw,
+            legacyHidden: hiddenPlayerTopControlsRaw
+        )
     }
 
     private func watchURL(_ video: Video) -> URL? {

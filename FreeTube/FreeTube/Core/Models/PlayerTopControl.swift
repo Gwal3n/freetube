@@ -7,17 +7,19 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
     case fullscreen
     case autoplay
     case audioOnly
+    case quality
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .speed: return "Speed"
-        case .loop: return "Loop"
-        case .mute: return "Mute"
-        case .fullscreen: return "Fullscreen"
-        case .autoplay: return "Autoplay"
-        case .audioOnly: return "Audio only"
+        case .speed: return String(localized: "Speed")
+        case .loop: return String(localized: "Loop")
+        case .mute: return String(localized: "Mute")
+        case .fullscreen: return String(localized: "Fullscreen")
+        case .autoplay: return String(localized: "Autoplay")
+        case .audioOnly: return String(localized: "Audio only")
+        case .quality: return String(localized: "Quality limit")
         }
     }
 
@@ -29,6 +31,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
         case .fullscreen: return "arrow.up.left.and.arrow.down.right"
         case .autoplay: return "play.circle"
         case .audioOnly: return "headphones"
+        case .quality: return "slider.horizontal.3"
         }
     }
 
