@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A subtle trailing action, kept separate from the video's playback tap target.
+/// A subtle branding switch with a full-size touch target, kept separate from playback.
 @available(iOS 17.0, *)
 struct DeArrowToggleButton: View {
     let video: Video
@@ -16,17 +16,15 @@ struct DeArrowToggleButton: View {
                 }
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: onThumbnail ? 12 : 10, weight: .semibold))
+                    .font(.system(size: onThumbnail ? 11 : 10, weight: .semibold))
                     .foregroundStyle(onThumbnail
-                        ? Color.white
+                        ? Color.white.opacity(0.88)
                         : Color.secondary.opacity(model.showsOriginal(for: video) ? 0.55 : 0.72))
-                    .frame(width: 28, height: 28)
-                    .background {
-                        if onThumbnail {
-                            Circle().fill(.black.opacity(0.66))
-                        }
-                    }
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .shadow(color: onThumbnail ? .black.opacity(0.9) : .clear,
+                            radius: onThumbnail ? 2 : 0, y: 1)
+                    .padding(onThumbnail ? 6 : 0)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize,
+                           alignment: onThumbnail ? .topTrailing : .center)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

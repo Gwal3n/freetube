@@ -42,7 +42,6 @@ struct VideoCard: View {
 
                     if branding.hasReplacement(for: video) {
                         DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
-                            .padding(4)
                     }
                 }
 
