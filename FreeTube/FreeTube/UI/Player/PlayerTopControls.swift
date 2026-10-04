@@ -10,11 +10,14 @@ struct PlayerTopControls: View {
     let isLooping: Bool
     let isAutoplayEnabled: Bool
     let isFullscreen: Bool
+    let isAudioOnly: Bool
+    let isSwitchingAudioMode: Bool
     let onSetPlaybackRate: (Double) -> Void
     let onToggleLoop: () -> Void
     let onToggleMute: () -> Void
     let onToggleFullscreen: () -> Void
     let onToggleAutoplay: () -> Void
+    let onToggleAudioOnly: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -60,6 +63,15 @@ struct PlayerTopControls: View {
             }
             .accessibilityLabel("Autoplay next")
             .accessibilityValue(isAutoplayEnabled ? "On" : "Off")
+        case .audioOnly:
+            Button(action: onToggleAudioOnly) {
+                Image(systemName: isAudioOnly ? "headphones.circle.fill" : "headphones")
+                    .playerTopControl()
+                    .opacity(isAudioOnly ? 1 : 0.72)
+            }
+            .disabled(isSwitchingAudioMode)
+            .accessibilityLabel("Audio-only playback")
+            .accessibilityValue(isSwitchingAudioMode ? "Switching" : (isAudioOnly ? "On" : "Off"))
         }
     }
 

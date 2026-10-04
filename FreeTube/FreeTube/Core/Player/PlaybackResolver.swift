@@ -91,6 +91,12 @@ final class PlaybackResolver: PlaybackResolving {
     }
 
     private static func pickStreamURL(from info: VideoInfo, quality: VideoQuality) -> URL? {
+        if quality == .audioOnly {
+            return info.formats
+                .filter { $0.isAudioOnly && $0.url != nil }
+                .max { ($0.bitrate ?? 0) < ($1.bitrate ?? 0) }?
+                .url
+        }
         if let hls = info.streamingURL { return hls }
         return Self.pickProgressiveURL(from: info.formats, quality: quality)
     }

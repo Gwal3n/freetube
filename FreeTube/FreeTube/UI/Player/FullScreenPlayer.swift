@@ -142,7 +142,11 @@ struct FullScreenPlayer: View {
                             zoomModel.pan(translation, state: state)
                         }
                         )
-                        PlayerArtworkBackdrop(artwork: player.currentArtwork, state: player.loadState)
+                        PlayerArtworkBackdrop(
+                            artwork: player.currentArtwork,
+                            state: player.loadState,
+                            isAudioOnly: player.isAudioOnly
+                        )
                     }
                     .modifier(PlayerZoomModifier(
                         model: zoomModel,
@@ -206,6 +210,8 @@ struct FullScreenPlayer: View {
                                 isLooping: player.isLoopingCurrentVideo,
                                 isAutoplayEnabled: autoplayNext,
                                 isFullscreen: isLandscape || portraitFullscreenActive,
+                                isAudioOnly: player.isAudioOnly,
+                                isSwitchingAudioMode: player.isSwitchingAudioMode,
                                 onSetPlaybackRate: { rate in
                                     player.setPlaybackRate(rate)
                                     showPlayerControls()
@@ -221,6 +227,10 @@ struct FullScreenPlayer: View {
                                 onToggleFullscreen: toggleFullscreen,
                                 onToggleAutoplay: {
                                     autoplayNext.toggle()
+                                    showPlayerControls()
+                                },
+                                onToggleAudioOnly: {
+                                    player.toggleAudioOnly()
                                     showPlayerControls()
                                 }
                             )

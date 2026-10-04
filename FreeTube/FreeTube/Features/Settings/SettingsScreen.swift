@@ -24,7 +24,7 @@ struct SettingsScreen: View {
                 Section {
                     Picker("Preferred quality", selection: Bindable(model).preferredQuality) {
                         ForEach(VideoQuality.allCases) { quality in
-                            Text(quality.rawValue).tag(quality)
+                            Text(quality.displayName).tag(quality)
                         }
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)

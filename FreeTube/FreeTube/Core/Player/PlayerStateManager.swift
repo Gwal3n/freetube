@@ -56,6 +56,9 @@ final class PlayerStateManager {
     private(set) var duration: TimeInterval = 0
     private(set) var playbackRate: Double
     private(set) var playbackQuality: VideoQuality
+    var isAudioOnly: Bool { playbackQuality == .audioOnly }
+    private(set) var isSwitchingAudioMode = false
+    private var videoQualityBeforeAudio: VideoQuality
     private(set) var isMuted = false
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
@@ -186,6 +189,8 @@ final class PlayerStateManager {
     private var sponsorBlockNoticeTask: Task<Void, Never>?
     private var pendingSeekTarget: TimeInterval?
     private var seekRequestID = 0
+    private var audioModeSwitchGeneration = 0
+    private var resumeAfterAudioSwitch: Bool?
     private var lastProgressSaveAt = Date.distantPast
     private var lastSavedProgressVideoID: String?
     private var lastSavedProgressPosition: TimeInterval = -.infinity
@@ -209,6 +214,8 @@ final class PlayerStateManager {
         self.manualQueue = Self.restoreManualQueue()
         self.playbackRate = preferences.playbackRate
         self.playbackQuality = preferences.preferredQuality
+        self.videoQualityBeforeAudio = preferences.preferredQuality == .audioOnly
+            ? .auto : preferences.preferredQuality
         // AVQueuePlayer defaults to `.advance`, which removes the finished item before our
         // end-of-playback UI can replay or seek it. We manage queue transitions ourselves in the
         // end observer, so pause on the final frame and retain the item until that decision is
@@ -248,6 +255,11 @@ final class PlayerStateManager {
     func tearDownObservers() {
         playerPresentationTask?.cancel()
         playerPresentationTask = nil
+        audioModeSwitchTask?.cancel()
+        audioModeSwitchTask = nil
+        audioModeSwitchGeneration &+= 1
+        isSwitchingAudioMode = false
+        resumeAfterAudioSwitch = nil
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         itemStatusObservation?.invalidate()
         itemPresentationSizeObservation?.invalidate()
@@ -294,10 +306,18 @@ final class PlayerStateManager {
     /// playback state still surface through the existing UI.
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
         log.info("loadLocalFile path=\(fileURL.path, privacy: .public) title=\"\(title, privacy: .public)\"")
+        // Link downloads are independent of the YouTube quality preference. An audio file keeps
+        // its artwork visible; a video file keeps its actual frames visible.
+        playbackQuality = ["m4a", "mp3", "aac", "opus", "ogg", "wav", "flac"]
+            .contains(fileURL.pathExtension.lowercased()) ? .audioOnly : .auto
         // A YouTube resolution still in flight would otherwise keep testing candidates against a
         // player we're about to hand a local file, and its readiness wait would sit out its full
         // timeout. Cancelling settles that wait immediately.
         resolutionTask?.cancel()
+        audioModeSwitchTask?.cancel()
+        audioModeSwitchGeneration &+= 1
+        isSwitchingAudioMode = false
+        resumeAfterAudioSwitch = nil
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
@@ -384,12 +404,23 @@ final class PlayerStateManager {
                 return
             }
         }
+        // Settings can change while the player is alive. Adopt that choice for the next video,
+        // without disturbing the stream currently playing when the preference changes.
+        let preferredQuality = preferences.preferredQuality
+        if playbackQuality != preferredQuality {
+            playbackQuality = preferredQuality
+            if preferredQuality != .audioOnly { videoQualityBeforeAudio = preferredQuality }
+        }
         if manualQueue.contains(where: { $0.id == video.id }) {
             manualQueue.removeAll { $0.id == video.id }
             persistManualQueue()
         }
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
+        audioModeSwitchTask?.cancel()
+        audioModeSwitchGeneration &+= 1
+        isSwitchingAudioMode = false
+        resumeAfterAudioSwitch = nil
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
@@ -539,6 +570,7 @@ final class PlayerStateManager {
     }
 
     private var resolutionTask: Task<Void, Never>?
+    private var audioModeSwitchTask: Task<Void, Never>?
     private var recommendationTask: Task<Void, Never>?
     private var contentPrefetchTask: Task<Void, Never>?
     private var queueNoticeDismissTask: Task<Void, Never>?
@@ -586,6 +618,9 @@ final class PlayerStateManager {
         )
         player.play()
         isPlaying = true
+        if isSwitchingAudioMode, resumeAfterAudioSwitch != nil {
+            resumeAfterAudioSwitch = true
+        }
         publishNowPlayingWhenAlone()
     }
 
@@ -593,6 +628,9 @@ final class PlayerStateManager {
         log.info("pause()")
         player.pause()
         isPlaying = false
+        if isSwitchingAudioMode, resumeAfterAudioSwitch != nil {
+            resumeAfterAudioSwitch = false
+        }
         persistCurrentPlaybackProgress(force: true)
     }
 
@@ -759,10 +797,133 @@ final class PlayerStateManager {
         guard quality != playbackQuality else { return }
         log.info("setPlaybackQuality(\(quality.rawValue, privacy: .public))")
         playbackQuality = quality
+        if quality != .audioOnly { videoQualityBeforeAudio = quality }
         preferences.preferredQuality = quality
         if let item = player.currentItem {
             applyQualityCap(to: item)
         }
+    }
+
+    /// Re-resolve only the media source. The queue, active playlist, recommendations, chapters,
+    /// and current presentation all stay in place. Resolution runs while the old item keeps
+    /// playing; we replace it only once a candidate URL is available.
+    func toggleAudioOnly() {
+        guard !isSwitchingAudioMode,
+              loadState == .readyToPlay,
+              let video = currentVideo,
+              !video.id.hasPrefix("fetch-"),
+              !video.isLive,
+              !hasEnded,
+              player.currentItem != nil else { return }
+
+        let target: VideoQuality = isAudioOnly ? videoQualityBeforeAudio : .audioOnly
+        isSwitchingAudioMode = true
+        audioModeSwitchGeneration &+= 1
+        let generation = audioModeSwitchGeneration
+        audioModeSwitchTask = Task { [weak self] in
+            await self?.switchPlaybackSource(for: video, to: target, generation: generation)
+        }
+    }
+
+    private func switchPlaybackSource(for video: Video, to quality: VideoQuality, generation: Int) async {
+        defer {
+            if audioModeSwitchGeneration == generation {
+                isSwitchingAudioMode = false
+                resumeAfterAudioSwitch = nil
+                audioModeSwitchTask = nil
+            }
+        }
+        let candidate: PlaybackCandidate
+        do {
+            candidate = try await resolver.resolve(video: video, quality: quality, excluding: [])
+        } catch {
+            if !Task.isCancelled {
+                log.notice("Audio mode switch resolution failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
+            return
+        }
+        guard !Task.isCancelled,
+              currentVideo?.id == video.id,
+              let previousItem = player.currentItem else { return }
+
+        let previousSize = videoPresentationSize
+        let wasPlaying = isPlaying
+        let currentTime = player.currentTime().seconds
+        let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
+        let replacement = AVPlayerItem(url: candidate.source.url)
+        applyQualityCap(to: replacement, quality: quality)
+        pause()
+        resumeAfterAudioSwitch = wasPlaying
+        pendingSeekTarget = position
+        seekRequestID += 1
+        loadState = .buffering
+        itemLoadStartedAt = Date()
+        loadItem(replacement, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
+        let readiness = await waitForReadiness(
+            of: replacement,
+            timeout: readinessTimeout(for: candidate.strategy)
+        )
+        guard !Task.isCancelled,
+              currentVideo?.id == video.id,
+              player.currentItem === replacement else { return }
+
+        switch readiness {
+        case .ready:
+            let previousQuality = playbackQuality
+            playbackQuality = quality
+            if quality == .audioOnly { videoQualityBeforeAudio = previousQuality }
+            preferences.preferredQuality = quality
+            if quality == .audioOnly { videoPresentationSize = .zero }
+            await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: replacement)
+            guard !Task.isCancelled, currentVideo?.id == video.id,
+                  player.currentItem === replacement else { return }
+            pendingSeekTarget = nil
+            loadState = .readyToPlay
+            if resumeAfterAudioSwitch == true { play() }
+            updateNowPlaying()
+            log.info("Audio mode switch succeeded for \(video.id, privacy: .public) audioOnly=\(quality == .audioOnly, privacy: .public)")
+        case .failed(let reason):
+            log.notice("Audio mode switch rejected for \(video.id, privacy: .public): \(reason, privacy: .public)")
+            await restoreSourceAfterFailedSwitch(
+                previousItem, videoID: video.id, position: position, size: previousSize
+            )
+        case .timedOut:
+            log.notice("Audio mode switch timed out for \(video.id, privacy: .public)")
+            await restoreSourceAfterFailedSwitch(
+                previousItem, videoID: video.id, position: position, size: previousSize
+            )
+        }
+    }
+
+    private func restoreSourceAfterFailedSwitch(
+        _ item: AVPlayerItem,
+        videoID: String,
+        position: TimeInterval,
+        size: CGSize
+    ) async {
+        loadItem(item)
+        videoPresentationSize = size
+        await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: item)
+        guard !Task.isCancelled, currentVideo?.id == videoID,
+              player.currentItem === item else { return }
+        pendingSeekTarget = nil
+        loadState = .readyToPlay
+        if resumeAfterAudioSwitch == true { play() }
+        updateNowPlaying()
+    }
+
+    private func seekForSourceSwitch(to seconds: TimeInterval, item: AVPlayerItem) async {
+        let itemDuration = item.duration.seconds
+        let position = itemDuration.isFinite && itemDuration > 0
+            ? min(seconds, max(0, itemDuration - 0.25)) : seconds
+        let time = CMTime(seconds: max(0, position), preferredTimescale: 600)
+        await withCheckedContinuation { continuation in
+            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                continuation.resume()
+            }
+        }
+        guard player.currentItem === item else { return }
+        elapsed = position
     }
 
     func seek(
@@ -924,6 +1085,11 @@ final class PlayerStateManager {
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         resolutionTask = nil
+        audioModeSwitchTask?.cancel()
+        audioModeSwitchTask = nil
+        audioModeSwitchGeneration &+= 1
+        isSwitchingAudioMode = false
+        resumeAfterAudioSwitch = nil
         playerPresentationTask?.cancel()
         playerPresentationTask = nil
         recommendationTask?.cancel()
@@ -1265,7 +1431,9 @@ final class PlayerStateManager {
             guard let self else { return }
             Task { @MainActor in
                 let size = item.presentationSize
-                guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { return }
+                guard self.player.currentItem === item,
+                      size.width.isFinite, size.height.isFinite,
+                      size.width > 0, size.height > 0 else { return }
                 self.videoPresentationSize = size
             }
         }
@@ -1369,7 +1537,7 @@ final class PlayerStateManager {
                 } else {
                     candidate = try await resolver.resolve(
                         video: video,
-                        quality: preferences.preferredQuality,
+                        quality: playbackQuality,
                         excluding: excludedStrategies
                     )
                 }
@@ -1488,7 +1656,10 @@ final class PlayerStateManager {
     /// segment before reporting `.readyToPlay`. `.auto` stays uncapped so ABR can use the full
     /// ladder, and this is a no-op for progressive and local-file candidates.
     private func applyQualityCap(to item: AVPlayerItem) {
-        let quality = playbackQuality
+        applyQualityCap(to: item, quality: playbackQuality)
+    }
+
+    private func applyQualityCap(to item: AVPlayerItem, quality: VideoQuality) {
         // `.zero` means unrestricted. Reset first so moving from a capped choice back to Auto
         // takes effect on the already-playing HLS asset.
         item.preferredMaximumResolution = .zero

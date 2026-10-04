@@ -19,6 +19,7 @@ struct PlayerArtworkBackdrop: View {
 
     let artwork: UIImage?
     let state: PlayerStateManager.LoadState
+    let isAudioOnly: Bool
 
     var body: some View {
         Group {
@@ -43,7 +44,9 @@ struct PlayerArtworkBackdrop: View {
         switch state {
         case .resolving, .buffering, .downloading, .failed:
             return true
-        case .idle, .readyToPlay:
+        case .readyToPlay:
+            return isAudioOnly
+        case .idle:
             return false
         }
     }
