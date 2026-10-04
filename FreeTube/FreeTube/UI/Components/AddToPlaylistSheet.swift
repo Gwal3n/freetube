@@ -3,7 +3,8 @@ import SwiftUI
 /// Device-local playlist picker used everywhere a video exposes Save.
 @available(iOS 17.0, *)
 struct AddToPlaylistSheet: View {
-    let video: Video
+    let videos: [Video]
+    let savesQueue: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var playlists: [LocalPlaylistSnapshot] = []
     @State private var containingIDs = Set<String>()
@@ -15,6 +16,16 @@ struct AddToPlaylistSheet: View {
     @FocusState private var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
+
+    init(video: Video) {
+        videos = [video]
+        savesQueue = false
+    }
+
+    init(queueVideos: [Video]) {
+        videos = queueVideos
+        savesQueue = true
+    }
 
     var body: some View {
         NavigationStack {
@@ -60,13 +71,14 @@ struct AddToPlaylistSheet: View {
                             Label("New playlist", systemImage: "plus.circle")
                                 .foregroundStyle(.primary)
                         }
+                        .disabled(savesQueue && hasPendingWrites)
                     }
                 }
 
                 playlistSection("Personal", playlists: personalPlaylists)
             }
             .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isCreating)
-            .navigationTitle("Save to playlist")
+            .navigationTitle(savesQueue ? "Save queue" : "Save to playlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -96,12 +108,13 @@ struct AddToPlaylistSheet: View {
                     Text("No personal playlists yet.").foregroundStyle(.secondary)
                 }
                 ForEach(playlists) { playlist in
-                    Button { Task { await toggle(playlist.id) } } label: {
+                    Button { Task { await saveOrToggle(playlist.id) } } label: {
                         HStack {
                             Text(playlist.title)
                                 .foregroundStyle(.primary)
                             Spacer()
-                            Image(systemName: containingIDs.contains(playlist.id) ? "checkmark.circle.fill" : "plus.circle")
+                            Image(systemName: savesQueue ? "plus.circle" :
+                                (containingIDs.contains(playlist.id) ? "checkmark.circle.fill" : "plus.circle"))
                                 .font(.title3)
                                 .foregroundStyle(.primary)
                                 .contentTransition(.symbolEffect(.replace))
@@ -114,8 +127,9 @@ struct AddToPlaylistSheet: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(ResponsiveButtonStyle())
-                    .disabled(pendingPlaylistIDs.contains(playlist.id))
-                    .accessibilityValue(containingIDs.contains(playlist.id) ? "Saved" : "Not saved")
+                    .disabled(savesQueue ? hasPendingWrites : pendingPlaylistIDs.contains(playlist.id))
+                    .accessibilityValue(savesQueue ? "Add queue" :
+                        (containingIDs.contains(playlist.id) ? "Saved" : "Not saved"))
                 }
             }
         }
@@ -133,6 +147,7 @@ struct AddToPlaylistSheet: View {
         isLoading = true
         defer { isLoading = false }
         playlists = await service.playlists()
+        guard !savesQueue, let video = videos.first else { return }
         var ids = Set<String>()
         for playlist in playlists {
             if await service.contains(videoID: video.id, playlistID: playlist.id) {
@@ -142,7 +157,20 @@ struct AddToPlaylistSheet: View {
         containingIDs = ids
     }
 
+    private func saveOrToggle(_ playlistID: String) async {
+        if savesQueue {
+            guard !hasPendingWrites else { return }
+            pendingPlaylistIDs.insert(playlistID)
+            await service.append(videos: videos, to: playlistID)
+            pendingPlaylistIDs.remove(playlistID)
+            dismiss()
+        } else {
+            await toggle(playlistID)
+        }
+    }
+
     private func toggle(_ playlistID: String) async {
+        guard let video = videos.first else { return }
         guard !pendingPlaylistIDs.contains(playlistID) else { return }
         pendingPlaylistIDs.insert(playlistID)
         if containingIDs.contains(playlistID) {
@@ -162,11 +190,16 @@ struct AddToPlaylistSheet: View {
 
     private func createAndSave() async {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, !isSavingNewPlaylist else { return }
+        guard !title.isEmpty, !hasPendingWrites else { return }
         isSavingNewPlaylist = true
         defer { isSavingNewPlaylist = false }
         let id = await service.create(title: title)
-        await service.add(video: video, to: id)
+        if savesQueue {
+            await service.append(videos: videos, to: id)
+            dismiss()
+            return
+        }
+        if let video = videos.first { await service.add(video: video, to: id) }
         newTitle = ""
         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
             isCreating = false

@@ -254,6 +254,18 @@ actor PersistenceWriter {
         fetchWatchHistory(offset: 0, limit: max(1, watchHistoryCount()))
     }
 
+    func searchWatchHistory(_ query: String) -> [WatchHistorySnapshot] {
+        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !search.isEmpty else { return [] }
+        // Search the persisted collection, not just the pages currently displayed on screen.
+        // Filtering on the model actor preserves localized, case-insensitive matching without
+        // relying on a SwiftData predicate translation for localizedStandardContains.
+        return allWatchHistory().filter {
+            $0.title.localizedStandardContains(search)
+                || $0.channelName.localizedStandardContains(search)
+        }
+    }
+
     func replaceWatchHistory(with restored: [WatchHistorySnapshot]) {
         for entry in (try? modelContext.fetch(FetchDescriptor<WatchHistoryEntry>())) ?? [] {
             modelContext.delete(entry)

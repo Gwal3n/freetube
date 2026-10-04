@@ -15,6 +15,8 @@ struct PlayerQueueSections: View {
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
     @State private var upNextVisibleLimit = 5
+    @State private var queueToSave: [Video] = []
+    @State private var showingSaveQueue = false
 
     @AppStorage("com.leshko.freetube.deArrowTitles") private var replacesTitles = false
     @AppStorage("com.leshko.freetube.deArrowThumbnails") private var replacesThumbnails = false
@@ -26,13 +28,18 @@ struct PlayerQueueSections: View {
 
     @ViewBuilder
     var body: some View {
-        if !player.manualQueue.isEmpty || showsUpNext {
-            VStack(alignment: .leading, spacing: 8) {
-                manualQueuePanel
-                if showsUpNext {
-                    queuePanel
+        Group {
+            if !player.manualQueue.isEmpty || showsUpNext {
+                VStack(alignment: .leading, spacing: 8) {
+                    manualQueuePanel
+                    if showsUpNext {
+                        queuePanel
+                    }
                 }
             }
+        }
+        .sheet(isPresented: $showingSaveQueue) {
+            AddToPlaylistSheet(queueVideos: queueToSave)
         }
     }
 
@@ -57,17 +64,28 @@ struct PlayerQueueSections: View {
                     }
                     .buttonStyle(ResponsiveButtonStyle())
 
-                    Button {
-                        player.clearManualQueueWithUndo()
+                    Menu {
+                        Button {
+                            var seen = Set<String>()
+                            queueToSave = ([player.currentVideo].compactMap { $0 } + player.manualQueue)
+                                .filter { seen.insert($0.id).inserted }
+                            showingSaveQueue = true
+                        } label: {
+                            Label("Save queue to playlist", systemImage: "text.badge.plus")
+                        }
+                        Button(role: .destructive) {
+                            player.clearManualQueueWithUndo()
+                        } label: {
+                            Label("Clear queue", systemImage: "trash")
+                        }
                     } label: {
-                        Image(systemName: "xmark")
+                        Image(systemName: "ellipsis")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel("Clear queue")
+                    .accessibilityLabel("Queue actions")
 
                     Button {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {

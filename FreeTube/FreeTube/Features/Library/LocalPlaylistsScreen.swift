@@ -14,6 +14,7 @@ struct LocalPlaylistsScreen: View {
     @State private var showingDeleteConfirmation = false
     @State private var editingPlaylist: LocalPlaylistSnapshot?
     @State private var pendingContextDeletion: LocalPlaylistSnapshot?
+    @State private var searchText = ""
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
     @State private var downloads = DownloadsStore.shared
     private let service = LocalPlaylistService()
@@ -27,6 +28,10 @@ struct LocalPlaylistsScreen: View {
         .environment(\.editMode, $editMode)
         .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle("Local Playlists")
+        .searchable(text: $searchText, prompt: "Search playlists")
+        .onChange(of: searchText) { _, newValue in
+            if !newValue.isEmpty && editMode.isEditing { finishEditing() }
+        }
         .overlay {
             if hasLoaded && playlists.isEmpty {
                 ContentUnavailableView(
@@ -34,6 +39,8 @@ struct LocalPlaylistsScreen: View {
                     systemImage: "music.note.list",
                     description: Text("Create a playlist here or import playlists from Settings.")
                 )
+            } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             }
         }
         .toolbar {
@@ -142,6 +149,7 @@ struct LocalPlaylistsScreen: View {
                     }
                 }
                 .onMove { source, destination in
+                    guard searchText.isEmpty else { return }
                     movePlaylists(
                         in: items,
                         from: source,
@@ -259,11 +267,19 @@ struct LocalPlaylistsScreen: View {
     }
 
     private var personalPlaylists: [LocalPlaylistSnapshot] {
-        playlists.filter { !$0.isSavedFromYouTube }
+        visiblePlaylists.filter { !$0.isSavedFromYouTube }
     }
 
     private var savedPlaylists: [LocalPlaylistSnapshot] {
-        playlists.filter(\.isSavedFromYouTube)
+        visiblePlaylists.filter(\.isSavedFromYouTube)
+    }
+
+    private var visiblePlaylists: [LocalPlaylistSnapshot] {
+        guard !searchText.isEmpty else { return playlists }
+        return playlists.filter {
+            $0.title.localizedStandardContains(searchText)
+                || ($0.descriptionText?.localizedStandardContains(searchText) ?? false)
+        }
     }
 
     private func movePlaylists(

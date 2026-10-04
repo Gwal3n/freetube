@@ -8,6 +8,8 @@ struct LocalHistoryScreen: View {
     @State private var isLoading = false
     @State private var hasLoaded = false
     @State private var hasMore = true
+    @State private var searchText = ""
+    @State private var searchResults: [WatchHistorySnapshot] = []
     @State private var channelNavigation = LocalHistoryChannelNavigationModel()
     @State private var channelToOpen: String?
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
@@ -17,6 +19,8 @@ struct LocalHistoryScreen: View {
         Group {
             if !hasLoaded {
                 MediaListPlaceholder()
+            } else if !searchText.isEmpty && visibleEntries.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             } else if entries.isEmpty {
                 ContentUnavailableView(
                     "No Local History",
@@ -53,7 +57,7 @@ struct LocalHistoryScreen: View {
                                     }
                                 }
                                 .onAppear {
-                                    if entry.videoID == entries.last?.videoID {
+                                    if searchText.isEmpty && entry.videoID == entries.last?.videoID {
                                         Task { await loadMore() }
                                     }
                                 }
@@ -68,6 +72,7 @@ struct LocalHistoryScreen: View {
         }
         .navigationTitle("Local History")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search history")
         .toolbar {
             if channelNavigation.isResolving {
                 ProgressView()
@@ -81,11 +86,26 @@ struct LocalHistoryScreen: View {
         .task {
             if entries.isEmpty && hasMore { await loadMore() }
         }
+        .task(id: searchText) {
+            guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                searchResults = []
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let results = await PersistenceWriter.shared.searchWatchHistory(searchText)
+            guard !Task.isCancelled else { return }
+            searchResults = results
+        }
+    }
+
+    private var visibleEntries: [WatchHistorySnapshot] {
+        searchText.isEmpty ? entries : searchResults
     }
 
     private var dayGroups: [(day: Date, entries: [WatchHistorySnapshot])] {
         let calendar = Calendar.autoupdatingCurrent
-        return Dictionary(grouping: entries) { calendar.startOfDay(for: $0.watchedAt) }
+        return Dictionary(grouping: visibleEntries) { calendar.startOfDay(for: $0.watchedAt) }
             .map { (day: $0.key, entries: $0.value.sorted { $0.watchedAt > $1.watchedAt }) }
             .sorted { $0.day > $1.day }
     }
@@ -117,6 +137,7 @@ struct LocalHistoryScreen: View {
     private func remove(_ entry: WatchHistorySnapshot) async {
         await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID)
         entries.removeAll { $0.videoID == entry.videoID }
+        searchResults.removeAll { $0.videoID == entry.videoID }
     }
 
     private func loadMore() async {

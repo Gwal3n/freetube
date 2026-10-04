@@ -21,6 +21,9 @@ final class LocalPlaylistService: Sendable {
     func details(id: String) async -> LocalPlaylistDetails? { await writer.details(playlistID: id) }
     func create(title: String) async -> String { await writer.create(title: title) }
     func add(video: Video, to playlistID: String) async { await writer.add(video: video, to: playlistID) }
+    func append(videos: [Video], to playlistID: String) async {
+        await writer.append(videos: videos, to: playlistID)
+    }
     /// Search results already carry display metadata, so save them without a second video request.
     func addSearchedVideo(_ video: Video, to playlistID: String) async throws {
         guard !(await writer.contains(videoID: video.id, playlistID: playlistID)) else {

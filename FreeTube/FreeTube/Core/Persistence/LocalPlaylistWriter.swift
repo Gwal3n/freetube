@@ -101,6 +101,35 @@ actor LocalPlaylistWriter {
         notify()
     }
 
+    /// Append a queue snapshot in playback order, keeping existing entries in place.
+    /// A single save/notification avoids reloading the playlist for every queued video.
+    func append(videos: [Video], to playlistID: String) {
+        guard !videos.isEmpty else { return }
+        let target = playlistID
+        let playlistDescriptor = FetchDescriptor<LocalPlaylistRecord>(
+            predicate: #Predicate { $0.playlistID == target }
+        )
+        guard (try? modelContext.fetch(playlistDescriptor).first) != nil else { return }
+
+        let existing = videoRecords(playlistID: playlistID)
+        var knownIDs = Set(existing.map(\.videoID))
+        let additions = videos.filter { knownIDs.insert($0.id).inserted }
+        guard !additions.isEmpty else { return }
+
+        // Normalize first so old playlists with negative prepend positions can append safely.
+        for (index, item) in existing.enumerated() { item.position = index }
+        for (index, video) in additions.enumerated() {
+            modelContext.insert(LocalPlaylistVideoRecord(
+                playlistID: playlistID,
+                video: video,
+                position: existing.count + index
+            ))
+        }
+        touch(playlistID)
+        try? modelContext.save()
+        notify()
+    }
+
     func contains(videoID: String, playlistID: String) -> Bool {
         let membership = "\(playlistID):\(videoID)"
         let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(predicate: #Predicate { $0.membershipID == membership })

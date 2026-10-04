@@ -20,6 +20,7 @@ struct LocalPlaylistScreen: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedVideoIDs = Set<String>()
     @State private var showingVideoDeleteConfirmation = false
+    @State private var searchText = ""
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
@@ -33,7 +34,7 @@ struct LocalPlaylistScreen: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
-                ForEach(details.videos) { video in
+                ForEach(visibleVideos(in: details)) { video in
                     VideoRow(
                         video: video,
                         accessory: editingMode == nil
@@ -63,7 +64,7 @@ struct LocalPlaylistScreen: View {
                     .listRowBackground(Color.clear)
                 }
                 .onMove { source, destination in
-                    guard editingMode != nil else { return }
+                    guard editingMode != nil, searchText.isEmpty else { return }
                     Task {
                         await service.move(playlistID: playlistID, from: source, to: destination)
                         await reload()
@@ -85,10 +86,17 @@ struct LocalPlaylistScreen: View {
         .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle(showsNavigationTitle ? (details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search videos")
+        .onChange(of: searchText) { _, newValue in
+            if !newValue.isEmpty && editingMode != nil { finishEditing() }
+        }
         .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .overlay {
             if let details, details.videos.isEmpty {
                 ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
+                    .allowsHitTesting(false)
+            } else if let details, !searchText.isEmpty, visibleVideos(in: details).isEmpty {
+                ContentUnavailableView.search(text: searchText)
                     .allowsHitTesting(false)
             } else if hasLoaded && details == nil {
                 ContentUnavailableView("Playlist Unavailable", systemImage: "music.note.list")
@@ -162,6 +170,14 @@ struct LocalPlaylistScreen: View {
                 Task { await deleteSelectedVideos() }
             }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func visibleVideos(in details: LocalPlaylistDetails) -> [Video] {
+        guard !searchText.isEmpty else { return details.videos }
+        return details.videos.filter {
+            $0.title.localizedStandardContains(searchText)
+                || $0.channelName.localizedStandardContains(searchText)
         }
     }
 

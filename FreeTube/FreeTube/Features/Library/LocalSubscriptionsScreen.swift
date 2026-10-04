@@ -6,10 +6,11 @@ struct LocalSubscriptionsScreen: View {
     @State private var showingClearConfirmation = false
     @State private var refreshError: String?
     @State private var isRefreshing = false
+    @State private var searchText = ""
     private let channelService: any ChannelServicing = ChannelService()
 
     var body: some View {
-        let groups = Dictionary(grouping: store.subscriptions) { subscription in
+        let groups = Dictionary(grouping: visibleSubscriptions) { subscription in
             sectionTitle(for: subscription.name)
         }
         let titles = groups.keys.sorted { lhs, rhs in
@@ -27,6 +28,8 @@ struct LocalSubscriptionsScreen: View {
                         "Subscribe from a channel page or import a YouTube subscriptions CSV in Settings."
                     )
                 )
+            } else if visibleSubscriptions.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             } else {
                 ScrollViewReader { scrollProxy in
                     HStack(spacing: 0) {
@@ -52,11 +55,13 @@ struct LocalSubscriptionsScreen: View {
                                 }
                                 .id(title)
                             }
-                            Section {
-                                Button(role: .destructive) {
-                                    showingClearConfirmation = true
-                                } label: {
-                                    Label("Remove all subscriptions", systemImage: "trash")
+                            if searchText.isEmpty {
+                                Section {
+                                    Button(role: .destructive) {
+                                        showingClearConfirmation = true
+                                    } label: {
+                                        Label("Remove all subscriptions", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
@@ -65,7 +70,7 @@ struct LocalSubscriptionsScreen: View {
                             await refreshProfilePhotos()
                         }
 
-                        if store.subscriptions.count > 10, titles.count > 1 {
+                        if searchText.isEmpty, store.subscriptions.count > 10, titles.count > 1 {
                             SubscriptionSectionIndex(titles: titles) { title in
                                 scrollProxy.scrollTo(title, anchor: .top)
                             }
@@ -76,6 +81,7 @@ struct LocalSubscriptionsScreen: View {
         }
         .navigationTitle("Local subscriptions")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search subscriptions")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -102,6 +108,14 @@ struct LocalSubscriptionsScreen: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(refreshError ?? "")
+        }
+    }
+
+    private var visibleSubscriptions: [LocalSubscription] {
+        guard !searchText.isEmpty else { return store.subscriptions }
+        return store.subscriptions.filter {
+            $0.name.localizedStandardContains(searchText)
+                || $0.id.localizedStandardContains(searchText)
         }
     }
 
