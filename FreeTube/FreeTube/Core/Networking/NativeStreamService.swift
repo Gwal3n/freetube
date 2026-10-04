@@ -27,7 +27,8 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             return NativeStreamResult(
                 url: cached.url,
                 storyboard: cached.storyboard,
-                originalAudioLanguageCode: cached.originalAudioLanguageCode
+                originalAudioLanguageCode: cached.originalAudioLanguageCode,
+                originalTitle: cached.originalTitle
             )
         }
 
@@ -49,12 +50,16 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
                 let originalAudioLanguageCode = try? await youtube.originalAudioLanguageCode
+                // The already-fetched player response carries videoDetails.title. Browsing
+                // responses can instead contain a title translated for the device locale.
+                let originalTitle = (try? await youtube.metadata)?.title
                 await cache.set(
                     videoID: videoID,
                     formatID: cacheKey,
                     url: hls,
                     storyboard: storyboard,
-                    originalAudioLanguageCode: originalAudioLanguageCode
+                    originalAudioLanguageCode: originalAudioLanguageCode,
+                    originalTitle: originalTitle
                 )
                 log.info(
                     "Native HLS source audio language=\(originalAudioLanguageCode ?? "unknown", privacy: .public) for \(videoID, privacy: .public)"
@@ -63,7 +68,8 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 return NativeStreamResult(
                     url: hls,
                     storyboard: storyboard,
-                    originalAudioLanguageCode: originalAudioLanguageCode
+                    originalAudioLanguageCode: originalAudioLanguageCode,
+                    originalTitle: originalTitle
                 )
             }
 
@@ -85,9 +91,13 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
 
             if let selected {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
-                await cache.set(videoID: videoID, formatID: cacheKey, url: selected.url, storyboard: storyboard)
+                let originalTitle = (try? await youtube.metadata)?.title
+                await cache.set(
+                    videoID: videoID, formatID: cacheKey, url: selected.url,
+                    storyboard: storyboard, originalTitle: originalTitle
+                )
                 log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public) audioCodec=\(String(describing: selected.audioCodec), privacy: .public) bitrate=\(selected.bitrate ?? 0, privacy: .public) averageBitrate=\(selected.averageBitrate ?? 0, privacy: .public) container=\(selected.fileExtension.rawValue, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
-                return NativeStreamResult(url: selected.url, storyboard: storyboard)
+                return NativeStreamResult(url: selected.url, storyboard: storyboard, originalTitle: originalTitle)
             }
 
             log.notice("Native extractor returned no playable stream for \(videoID, privacy: .public) after \(Date().timeIntervalSince(startedAt), privacy: .public)s")

@@ -46,7 +46,8 @@ final class PlaybackResolver: PlaybackResolving {
                     source: .direct(result.url),
                     strategy: .native,
                     storyboard: result.storyboard,
-                    originalAudioLanguageCode: result.originalAudioLanguageCode
+                    originalAudioLanguageCode: result.originalAudioLanguageCode,
+                    originalTitle: result.originalTitle
                 )
             } catch is CancellationError {
                 throw CancellationError()
@@ -60,7 +61,10 @@ final class PlaybackResolver: PlaybackResolving {
                 let info = try await videoService.fetchInfo(id: videoID)
                 if let url = Self.pickStreamURL(from: info, quality: quality) {
                     log.info("resolve: produced b5i iOS candidate for \(videoID, privacy: .public)")
-                    return PlaybackCandidate(source: .direct(url), strategy: .b5iIOS, storyboard: info.storyboard)
+                    return PlaybackCandidate(
+                        source: .direct(url), strategy: .b5iIOS,
+                        storyboard: info.storyboard, originalTitle: info.video.title
+                    )
                 }
             } catch is CancellationError {
                 throw CancellationError()
@@ -72,7 +76,10 @@ final class PlaybackResolver: PlaybackResolving {
                 let info = try await videoService.fetchInfoViaTVHTML5(id: videoID)
                 if let url = Self.pickStreamURL(from: info, quality: quality) {
                     log.info("resolve: produced b5i TVHTML5 candidate for \(videoID, privacy: .public)")
-                    return PlaybackCandidate(source: .direct(url), strategy: .b5iTVHTML5, storyboard: info.storyboard)
+                    return PlaybackCandidate(
+                        source: .direct(url), strategy: .b5iTVHTML5,
+                        storyboard: info.storyboard, originalTitle: info.video.title
+                    )
                 }
             } catch is CancellationError {
                 throw CancellationError()

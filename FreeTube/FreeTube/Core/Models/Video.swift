@@ -59,6 +59,16 @@ extension Video {
 }
 
 extension Video {
+    func replacingTitle(with title: String) -> Video {
+        Video(
+            id: id, title: title, channelID: channelID, channelName: channelName,
+            channelThumbnailURL: channelThumbnailURL, thumbnailURL: thumbnailURL,
+            duration: duration, viewCount: viewCount, publishedAt: publishedAt,
+            publishedRelative: publishedRelative, descriptionSnippet: descriptionSnippet,
+            isLive: isLive, isShort: isShort
+        )
+    }
+
     /// Feed entries reconstruct an approximate upload date from the relative text received at
     /// refresh time. Render that date against the current clock so cached ages keep advancing.
     func publishedText(relativeTo now: Date) -> String? {

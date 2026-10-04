@@ -15,6 +15,7 @@ actor StreamURLCache {
         let url: URL
         let storyboard: VideoStoryboard?
         let originalAudioLanguageCode: String?
+        let originalTitle: String?
         let expiresAt: Date
     }
 
@@ -33,14 +34,14 @@ actor StreamURLCache {
     func getEntry(
         videoID: String,
         formatID: String
-    ) -> (url: URL, storyboard: VideoStoryboard?, originalAudioLanguageCode: String?)? {
+    ) -> (url: URL, storyboard: VideoStoryboard?, originalAudioLanguageCode: String?, originalTitle: String?)? {
         let key = Key(videoID: videoID, formatID: formatID)
         guard let entry = entries[key] else { return nil }
         if entry.expiresAt < .now {
             entries[key] = nil
             return nil
         }
-        return (entry.url, entry.storyboard, entry.originalAudioLanguageCode)
+        return (entry.url, entry.storyboard, entry.originalAudioLanguageCode, entry.originalTitle)
     }
 
     func set(
@@ -48,13 +49,15 @@ actor StreamURLCache {
         formatID: String,
         url: URL,
         storyboard: VideoStoryboard? = nil,
-        originalAudioLanguageCode: String? = nil
+        originalAudioLanguageCode: String? = nil,
+        originalTitle: String? = nil
     ) {
         let key = Key(videoID: videoID, formatID: formatID)
         entries[key] = Entry(
             url: url,
             storyboard: storyboard,
             originalAudioLanguageCode: originalAudioLanguageCode,
+            originalTitle: originalTitle,
             expiresAt: .now.addingTimeInterval(ttl)
         )
         log.debug("Cached stream URL for \(videoID, privacy: .public)/\(formatID, privacy: .public)")

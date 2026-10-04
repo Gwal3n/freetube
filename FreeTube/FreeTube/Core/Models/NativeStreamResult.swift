@@ -5,10 +5,12 @@ struct NativeStreamResult: Sendable {
     let url: URL
     let storyboard: VideoStoryboard?
     let originalAudioLanguageCode: String?
+    let originalTitle: String?
 
-    init(url: URL, storyboard: VideoStoryboard?, originalAudioLanguageCode: String? = nil) {
+    init(url: URL, storyboard: VideoStoryboard?, originalAudioLanguageCode: String? = nil, originalTitle: String? = nil) {
         self.url = url
         self.storyboard = storyboard
         self.originalAudioLanguageCode = originalAudioLanguageCode
+        self.originalTitle = originalTitle
     }
 }

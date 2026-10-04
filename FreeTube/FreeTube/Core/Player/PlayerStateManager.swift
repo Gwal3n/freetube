@@ -508,9 +508,12 @@ final class PlayerStateManager {
         // merge those fields without restarting playback or touching the resolved stream.
         if !info.video.title.isEmpty,
            (current.title == "YouTube video" || current.title.isEmpty || current.channelID.isEmpty) {
+            // Browse and /next titles may be translated. Once the playback response supplied
+            // videoDetails.title, a later watch-page details response must not replace it.
+            let needsTitle = current.title == "YouTube video" || current.title.isEmpty
             enrichCurrentVideo(with: Video(
                 id: current.id,
-                title: info.video.title,
+                title: needsTitle ? info.video.title : current.title,
                 channelID: info.video.channelID.isEmpty ? current.channelID : info.video.channelID,
                 channelName: info.video.channelName.isEmpty ? current.channelName : info.video.channelName,
                 channelThumbnailURL: info.video.channelThumbnailURL ?? current.channelThumbnailURL,
@@ -1420,6 +1423,12 @@ final class PlayerStateManager {
                 // comparable with builds that played only after this point.
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 loadState = .readyToPlay
+                if let title = candidate.originalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !title.isEmpty, let current = currentVideo, current.title != title {
+                    // The winning resolver already fetched this title alongside the stream.
+                    // Updating presentation/history here costs no additional network request.
+                    enrichCurrentVideo(with: current.replacingTitle(with: title))
+                }
                 if let nativeStoryboard = candidate.storyboard {
                     storyboard = nativeStoryboard
                 }
