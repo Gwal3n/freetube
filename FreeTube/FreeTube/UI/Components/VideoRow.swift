@@ -74,12 +74,8 @@ struct VideoRow: View {
             }
             .overlay(alignment: .topLeading) {
                 if showsThumbnailToggle && branding.hasReplacement(for: video) {
-                    HStack(spacing: 0) {
-                        Color.clear
-                            .frame(width: thumbnailWidth - MediaStyle.actionSize)
-                            .allowsHitTesting(false)
-                        DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
-                    }
+                    DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                        .frame(width: thumbnailWidth, height: thumbnailHeight, alignment: .topTrailing)
                 }
             }
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -111,6 +107,10 @@ struct VideoRow: View {
         dynamicTypeSize.isAccessibilitySize ? 104 : 144
     }
 
+    private var thumbnailHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
+    }
+
     private func rowAccessibilityLabel(title: String) -> String {
         [title, video.channelName, statsLine, video.durationString]
             .filter { !$0.isEmpty }
@@ -122,7 +122,7 @@ struct VideoRow: View {
             VideoThumbnail(
                 video: video,
                 size: CGSize(width: thumbnailWidth,
-                             height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81),
+                             height: thumbnailHeight),
                 progress: playbackProgress,
                 replacementData: branding.thumbnailData(for: video),
                 replacementCacheKey: branding.thumbnailCacheKey(for: video)

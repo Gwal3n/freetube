@@ -15,17 +15,21 @@ struct DeArrowToggleButton: View {
                     model.toggleOriginal(for: video)
                 }
             } label: {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: onThumbnail ? 11 : 10, weight: .semibold))
-                    .foregroundStyle(onThumbnail
-                        ? Color.white.opacity(0.88)
-                        : Color.secondary.opacity(model.showsOriginal(for: video) ? 0.55 : 0.72))
-                    .shadow(color: onThumbnail ? .black.opacity(0.9) : .clear,
-                            radius: onThumbnail ? 2 : 0, y: 1)
-                    .padding(onThumbnail ? 6 : 0)
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize,
-                           alignment: onThumbnail ? .topTrailing : .center)
-                    .contentShape(Rectangle())
+                ZStack(alignment: onThumbnail ? .topTrailing : .center) {
+                    // Fill the touch target so alignment is relative to its corner, not the
+                    // SF Symbol's intrinsic bounds. This paints no badge over the thumbnail.
+                    Color.clear
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: onThumbnail ? 11 : 10, weight: .semibold))
+                        .foregroundStyle(onThumbnail
+                            ? Color.white.opacity(0.88)
+                            : Color.secondary.opacity(model.showsOriginal(for: video) ? 0.55 : 0.72))
+                        .shadow(color: onThumbnail ? .black.opacity(0.9) : .clear,
+                                radius: onThumbnail ? 2 : 0, y: 1)
+                        .padding(onThumbnail ? 3 : 0)
+                }
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(model.showsOriginal(for: video) ? "Show DeArrow title and thumbnail" : "Show original title and thumbnail")
