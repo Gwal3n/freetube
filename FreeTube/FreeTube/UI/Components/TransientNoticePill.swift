@@ -31,6 +31,6 @@ struct TransientNoticePill: View {
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(.opacity.combined(with: .offset(y: 8)))
     }
 }

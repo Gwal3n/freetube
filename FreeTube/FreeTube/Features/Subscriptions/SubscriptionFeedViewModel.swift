@@ -8,6 +8,7 @@ final class SubscriptionFeedViewModel {
     private(set) var videos: [Video] = []
     private(set) var playbackProgress: [String: Double] = [:]
     private(set) var isRefreshing = false
+    private(set) var isLoadingMore = false
     private(set) var refreshedChannels = 0
     private(set) var refreshChannelCount = 0
     private(set) var hasLoaded = false
@@ -94,7 +95,9 @@ final class SubscriptionFeedViewModel {
     }
 
     func loadMore() async {
-        guard canLoadMore else { return }
+        guard canLoadMore, !isLoadingMore, !isRefreshing else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
         visibleLimit += pageSize
         await loadCache()
     }

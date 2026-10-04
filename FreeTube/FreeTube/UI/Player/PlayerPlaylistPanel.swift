@@ -38,6 +38,7 @@ struct PlayerPlaylistPanel: View {
     @State private var isSavingLocally = false
     @State private var saveError: ErrorState?
     @State private var showsSavedNotice = false
+    @State private var savedNoticeIsRemoval = false
     @State private var savedNoticeGeneration = 0
     private let localPlaylistService = LocalPlaylistService()
 
@@ -91,8 +92,8 @@ struct PlayerPlaylistPanel: View {
         .overlay(alignment: .bottom) {
             if isPresented && showsSavedNotice {
                 TransientNoticePill(
-                    title: Text("Playlist saved"),
-                    systemImage: "checkmark",
+                    title: savedNoticeIsRemoval ? Text("Playlist removed") : Text("Playlist saved"),
+                    systemImage: savedNoticeIsRemoval ? "bookmark.slash" : "checkmark",
                     onUndo: nil
                 )
                 .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom + 12)
@@ -230,9 +231,11 @@ struct PlayerPlaylistPanel: View {
                                         }
                                     } label: {
                                         Image(systemName: "square.and.arrow.up")
+                                            .foregroundStyle(.white)
                                             .frame(width: 44, height: 44)
                                             .contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
                                     .accessibilityLabel("Share playlist")
                                 }
                             }
@@ -407,13 +410,16 @@ struct PlayerPlaylistPanel: View {
         }
         if isSavedLocally {
             await localPlaylistService.removeRemotePlaylist(id: target.id)
-            if playlist?.id == target.id { isSavedLocally = false }
+            if playlist?.id == target.id {
+                isSavedLocally = false
+                showSavedConfirmation(isRemoval: true)
+            }
         } else {
             do {
                 try await localPlaylistService.saveRemotePlaylist(target)
                 if playlist?.id == target.id {
                     isSavedLocally = true
-                    showSavedConfirmation()
+                    showSavedConfirmation(isRemoval: false)
                 }
             } catch {
                 if playlist?.id == target.id { saveError = ErrorState(from: error) }
@@ -421,9 +427,10 @@ struct PlayerPlaylistPanel: View {
         }
     }
 
-    private func showSavedConfirmation() {
+    private func showSavedConfirmation(isRemoval: Bool) {
         savedNoticeGeneration &+= 1
         let generation = savedNoticeGeneration
+        savedNoticeIsRemoval = isRemoval
         withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
             showsSavedNotice = true
         }

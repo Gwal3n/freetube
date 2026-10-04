@@ -9,7 +9,6 @@ import UIKit
 /// Local-action rules:
 ///   - Open in browser, Copy URL: always shown
 ///   - Open in… : shown only when the video has a local downloaded file
-///   - Add to favorites / Remove from favorites: always local
 ///   - Add to playlist: always local
 ///   - Remove downloaded file: shown only when the video has a local downloaded file
 @available(iOS 17.0, *)
@@ -80,7 +79,6 @@ private struct VideoActionsContent: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
-    @Query private var favorites: [FavoriteVideo]
 
     init(
         video: Video,
@@ -98,8 +96,6 @@ private struct VideoActionsContent: View {
         self.onOpenChannel = onOpenChannel
         _shareFileURL = shareFileURL
         _addToPlaylistVideo = addToPlaylistVideo
-        let videoID = video.id
-        _favorites = Query(filter: #Predicate<FavoriteVideo> { $0.videoID == videoID })
     }
 
     @ViewBuilder
@@ -172,15 +168,6 @@ private struct VideoActionsContent: View {
         } label: {
             Label("Save to local playlist", systemImage: "bookmark")
         }
-        Button {
-            toggleFavorite()
-        } label: {
-            if isFavorite {
-                Label("Remove from favorites", systemImage: "hand.thumbsup.fill")
-            } else {
-                Label("Add to favorites", systemImage: "hand.thumbsup")
-            }
-        }
         if DownloadManager.shared.localFile(for: video.id) != nil {
             Divider()
             Button(role: .destructive) {
@@ -203,27 +190,6 @@ private struct VideoActionsContent: View {
         URL(string: "https://www.youtube.com/watch?v=\(video.id)")
     }
 
-    private var isFavorite: Bool {
-        favorites.contains { $0.videoID == video.id }
-    }
-
-    /// Toggles the device-local favorite without contacting YouTube.
-    private func toggleFavorite() {
-        let wasFavorite = isFavorite
-        if wasFavorite {
-            for existing in favorites where existing.videoID == video.id {
-                modelContext.delete(existing)
-            }
-        } else {
-            modelContext.insert(FavoriteVideo(
-                videoID: video.id,
-                title: video.title,
-                channelName: video.channelName,
-                thumbnailURL: video.thumbnailURL
-            ))
-        }
-        try? modelContext.save()
-    }
 }
 
 /// Native iOS context-menu presentation. SwiftUI owns the long-press recognizer, lift preview,

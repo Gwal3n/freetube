@@ -15,6 +15,8 @@ struct VideoRow: View {
 
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage("com.leshko.freetube.deArrowTitles") private var replaceTitles = false
+    @AppStorage("com.leshko.freetube.deArrowThumbnails") private var replaceThumbnails = false
     let video: Video
     var accessory: Accessory
     var playbackProgress: Double?
@@ -65,8 +67,16 @@ struct VideoRow: View {
                 case .none:
                     DeArrowToggleButton(video: video, model: branding)
                 case .actions(let offersPlayNext):
-                    HStack(alignment: .top, spacing: 0) {
-                        DeArrowToggleButton(video: video, model: branding)
+                    VStack(spacing: 0) {
+                        if replaceTitles || replaceThumbnails {
+                            if branding.hasReplacement(for: video) {
+                                DeArrowToggleButton(video: video, model: branding)
+                            } else {
+                                Color.clear
+                                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                         VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext, onOpenChannel: onOpenChannel)
                     }
                 case .reserved:

@@ -23,6 +23,7 @@ struct LocalPlaylistsScreen: View {
             playlistSection("Personal", items: personalPlaylists, savedFromYouTube: false)
             playlistSection("Saved from YouTube", items: savedPlaylists, savedFromYouTube: true)
         }
+        .modifier(MiniPlayerScrollClearance())
         .environment(\.editMode, $editMode)
         .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle("Local Playlists")

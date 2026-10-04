@@ -4,11 +4,13 @@ import Kingfisher
 /// Vertical "feed" video card — used in Home, Subscriptions, Channel videos.
 ///
 /// Set `showsMoreMenu: true` to render the trailing ellipsis Menu (open in browser, copy URL,
-/// favorites, add to playlist, downloads) on the metadata row. The Menu sits as a sibling of
+/// add to playlist, downloads) on the metadata row. The Menu sits as a sibling of
 /// the card's main tap target so its taps don't trigger `onTap`.
 @available(iOS 17.0, *)
 struct VideoCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage("com.leshko.freetube.deArrowTitles") private var replaceTitles = false
+    @AppStorage("com.leshko.freetube.deArrowThumbnails") private var replaceThumbnails = false
 
     let video: Video
     var onTap: () -> Void = {}
@@ -96,13 +98,21 @@ struct VideoCard: View {
             .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
             .accessibilityHint("Plays video")
 
-            if showsMoreMenu || branding.hasReplacement(for: video) {
-                HStack(alignment: .top, spacing: 0) {
-                    DeArrowToggleButton(video: video, model: branding)
-                    if showsMoreMenu {
-                        VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+            if showsMoreMenu {
+                VStack(spacing: 0) {
+                    if replaceTitles || replaceThumbnails {
+                        if branding.hasReplacement(for: video) {
+                            DeArrowToggleButton(video: video, model: branding)
+                        } else {
+                            Color.clear
+                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                .accessibilityHidden(true)
+                        }
                     }
+                    VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
                 }
+            } else if branding.hasReplacement(for: video) {
+                DeArrowToggleButton(video: video, model: branding)
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)

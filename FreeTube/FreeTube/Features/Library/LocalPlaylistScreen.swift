@@ -72,6 +72,7 @@ struct LocalPlaylistScreen: View {
             }
         }
         .listStyle(.plain)
+        .modifier(MiniPlayerScrollClearance())
         .scrollContentBackground(.hidden)
         .ignoresSafeArea(.container, edges: details == nil ? [] : .top)
         .background(Color.black)

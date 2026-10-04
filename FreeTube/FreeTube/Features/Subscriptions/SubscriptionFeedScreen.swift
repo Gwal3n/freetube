@@ -12,6 +12,7 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @State private var currentDate = Date.now
+    @State private var lastAutomaticLoadKey: String?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
@@ -45,8 +46,22 @@ struct SubscriptionFeedScreen: View {
                     Button {
                         Task { await model.loadMore() }
                     } label: {
-                        Label("Load more", systemImage: "chevron.down")
-                            .frame(maxWidth: .infinity)
+                        Group {
+                            if model.isLoadingMore {
+                                ProgressView()
+                            } else {
+                                Label("Load more", systemImage: "chevron.down")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .disabled(model.isLoadingMore || model.isRefreshing)
+                    .id(automaticLoadKey)
+                    .onAppear {
+                        guard !model.isRefreshing,
+                              lastAutomaticLoadKey != automaticLoadKey else { return }
+                        lastAutomaticLoadKey = automaticLoadKey
+                        Task { await model.loadMore() }
                     }
                 }
             }
@@ -136,6 +151,10 @@ struct SubscriptionFeedScreen: View {
                 navigationRouter.feed = nil
             }
         }
+    }
+
+    private var automaticLoadKey: String {
+        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count)"
     }
 
     /// A quiet subtitle beneath the native large title. It scrolls with the feed; the native
