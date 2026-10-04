@@ -17,6 +17,12 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
+                if !groups.groups.isEmpty {
+                    groupPicker
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
                 if model.isRefreshing || model.lastRefreshAt != nil {
                     FeedRefreshProgress(model: model, referenceDate: currentDate)
                 }
@@ -46,11 +52,11 @@ struct SubscriptionFeedScreen: View {
             }
             .listStyle(.plain)
             .modifier(MiniPlayerScrollClearance())
-            .navigationTitle(groups.groups.isEmpty ? "Feed" : "")
+            .navigationTitle("Feed")
             .toolbar {
                 if !groups.groups.isEmpty {
-                    ToolbarItem(placement: .topBarLeading) {
-                        groupPicker
+                    ToolbarTitleMenu {
+                        groupMenuActions
                     }
                 }
             }
@@ -132,40 +138,13 @@ struct SubscriptionFeedScreen: View {
         }
     }
 
-    /// A native toolbar menu remains reachable even after the feed has been scrolled. Keep the
-    /// extra chrome out of sight entirely until the user actually creates a group.
+    /// A quiet subtitle beneath the native large title. It scrolls with the feed; the native
+    /// title menu above remains available after the navigation bar collapses.
     private var groupPicker: some View {
         Menu {
-            Button {
-                Task { await model.selectGroup(nil) }
-            } label: {
-                if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
-                else { Text("All subscriptions") }
-            }
-            ForEach(groups.groups) { group in
-                Button {
-                    Task { await model.selectGroup(group.id) }
-                } label: {
-                    if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
-                    else { Text(group.name) }
-                }
-            }
-            Divider()
-            Button {
-                NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
-            } label: {
-                Label("Manage groups", systemImage: "square.stack.3d.up")
-            }
+            groupMenuActions
         } label: {
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 5) {
-                    Text("Feed")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
+            HStack(spacing: 5) {
                 Group {
                     if let groupName = model.selectedGroupName {
                         Text(verbatim: groupName)
@@ -173,14 +152,43 @@ struct SubscriptionFeedScreen: View {
                         Text("All subscriptions")
                     }
                 }
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: 170, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Choose feed group")
+        .accessibilityValue(model.selectedGroupName ?? "All subscriptions")
+    }
+
+    @ViewBuilder
+    private var groupMenuActions: some View {
+        Button {
+            Task { await model.selectGroup(nil) }
+        } label: {
+            if model.selectedGroupID == nil { Label("All subscriptions", systemImage: "checkmark") }
+            else { Text("All subscriptions") }
+        }
+        ForEach(groups.groups) { group in
+            Button {
+                Task { await model.selectGroup(group.id) }
+            } label: {
+                if model.selectedGroupID == group.id { Label(group.name, systemImage: "checkmark") }
+                else { Text(group.name) }
+            }
+        }
+        Divider()
+        Button {
+            NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
+        } label: {
+            Label("Manage groups", systemImage: "square.stack.3d.up")
+        }
     }
 
     @ViewBuilder
