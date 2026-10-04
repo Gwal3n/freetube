@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Native drag-and-drop editor for the optional controls in the video's top-right corner.
-/// The collapse button and central transport controls are fixed and cannot be hidden.
+/// System drag-and-drop editor for optional player controls. A ScrollView keeps one drag session
+/// across the three sections, while each row and section heading offers a native drop target.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
     @Bindable var model: SettingsViewModel
@@ -9,60 +9,69 @@ struct PlayerControlsSettingsScreen: View {
     @State private var targetedSection: PlayerControlLayout.Section?
 
     private let dragPrefix = "com.leshko.freetube.player-control:"
+    private let rowHeight: CGFloat = 44
 
     var body: some View {
-        List {
-            ForEach(PlayerControlLayout.Section.allCases) { section in
-                Section {
-                    ForEach(model.playerControlLayout.controls(in: section)) { control in
-                        controlRow(control, in: section)
-                    }
-                    dropAtEnd(in: section)
-                } header: {
-                    Text(verbatim: section.title)
-                } footer: {
-                    if section == .onPlayer {
-                        Text("Up to four controls appear beside the fixed player buttons. Adding another moves the last control into More.")
-                    } else if section == .moreMenu {
-                        Text("The More button appears only when this section contains controls.")
-                    } else {
-                        Text("Hidden controls can be dragged back at any time.")
-                    }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                ForEach(PlayerControlLayout.Section.allCases) { section in
+                    controlSection(section)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
         .navigationTitle("Customize controls")
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private func controlSection(_ section: PlayerControlLayout.Section) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: section.title)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(targetedSection == section ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+                .contentShape(Rectangle())
+                .dropDestination(for: String.self) { items, _ in
+                    accept(items, in: section, before: model.playerControlLayout.controls(in: section).first)
+                } isTargeted: { targeted in
+                    targetedSection = targeted ? section : nil
+                }
+
+            ForEach(model.playerControlLayout.controls(in: section)) { control in
+                controlRow(control, in: section)
+            }
+        }
+    }
+
     private func controlRow(_ control: PlayerTopControl, in section: PlayerControlLayout.Section) -> some View {
         HStack(spacing: 12) {
             Image(systemName: control.systemImage)
-                .frame(width: 24)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .frame(width: 22)
             Text(verbatim: control.displayName)
-            Spacer(minLength: 8)
+                .font(.subheadline)
+            Spacer(minLength: 0)
             Image(systemName: "line.3.horizontal")
+                .font(.caption)
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: rowHeight)
         .contentShape(Rectangle())
-        .background {
-            if targetedControl == control {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.secondary.opacity(0.16))
-            }
-        }
+        .background(targetedControl == control ? Color.primary.opacity(0.08) : Color.clear)
         .draggable(dragPrefix + control.rawValue)
-        .dropDestination(for: String.self) { items, _ in
-            accept(items, in: section, before: control)
-        } isTargeted: { isTargeted in
-            if isTargeted {
-                targetedControl = control
-            } else if targetedControl == control {
-                targetedControl = nil
+        .dropDestination(for: String.self) { items, location in
+            let controls = model.playerControlLayout.controls(in: section)
+            let next = controls.firstIndex(of: control).flatMap { index in
+                controls.indices.contains(index + 1) ? controls[index + 1] : nil
             }
+            let insertionTarget = location.y < rowHeight / 2 ? control : next
+            return accept(items, in: section, before: insertionTarget)
+        } isTargeted: { targeted in
+            targetedControl = targeted ? control : nil
         }
         .accessibilityHint("Drag to reorder or move to another section")
         .accessibilityAction(named: "Move to player") {
@@ -76,32 +85,6 @@ struct PlayerControlsSettingsScreen: View {
         }
     }
 
-    private func dropAtEnd(in section: PlayerControlLayout.Section) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "plus.circle.dashed")
-            Text("Drop here to add at end")
-        }
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .contentShape(Rectangle())
-        .background {
-            if targetedSection == section {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.secondary.opacity(0.16))
-            }
-        }
-        .dropDestination(for: String.self) { items, _ in
-            accept(items, in: section, before: nil)
-        } isTargeted: { isTargeted in
-            if isTargeted {
-                targetedSection = section
-            } else if targetedSection == section {
-                targetedSection = nil
-            }
-        }
-    }
-
     private func accept(
         _ items: [String],
         in section: PlayerControlLayout.Section,
@@ -112,9 +95,11 @@ struct PlayerControlsSettingsScreen: View {
               let control = PlayerTopControl(rawValue: String(payload.dropFirst(dragPrefix.count))) else {
             return false
         }
-        withAnimation(.snappy(duration: 0.22)) {
+        withAnimation(InterfaceMotion.quick) {
             model.movePlayerControl(control, to: section, before: target)
         }
+        targetedControl = nil
+        targetedSection = nil
         return true
     }
 }

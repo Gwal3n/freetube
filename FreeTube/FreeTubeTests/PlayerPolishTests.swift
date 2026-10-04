@@ -41,6 +41,17 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertTrue(layout.moreMenu.contains(.loop))
     }
 
+    func testPlayerControlsMoveAcrossSectionsAndPersist() {
+        var layout = PlayerControlLayout.standard
+        layout.move(.audioOnly, to: .onPlayer)
+        XCTAssertEqual(layout.onPlayer, [.fullscreen, .speed, .audioOnly])
+        layout.move(.mute, to: .hidden)
+        XCTAssertEqual(layout.hidden, [.mute])
+        layout.move(.mute, to: .moreMenu, before: .quality)
+        XCTAssertEqual(layout.moreMenu.first, .mute)
+        XCTAssertEqual(PlayerControlLayout.restored(from: layout.encoded, legacyOrder: "", legacyHidden: ""), layout)
+    }
+
     func testPlaylistCountsAcceptDisplayStrings() {
         XCTAssertEqual(Mappers.parseAbbreviatedCount("123 videos"), 123)
         XCTAssertEqual(Mappers.parseAbbreviatedCount("1,234 videos"), 1_234)
