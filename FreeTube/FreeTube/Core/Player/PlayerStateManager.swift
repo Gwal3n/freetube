@@ -850,7 +850,7 @@ final class PlayerStateManager {
         let wasPlaying = isPlaying
         let currentTime = player.currentTime().seconds
         let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
-        let replacement = makePlayerItem(for: candidate, quality: quality)
+        let replacement = makePlayerItem(for: candidate)
         applyQualityCap(to: replacement, quality: quality)
         pause()
         resumeAfterAudioSwitch = wasPlaying
@@ -1306,18 +1306,16 @@ final class PlayerStateManager {
         sponsorBlockBoundaryObservers.removeAll()
     }
 
-    /// YouTube's progressive M4A URL is an extensionless `/videoplayback` endpoint. URLSession
-    /// can download its bytes, but AVPlayer can remain `.unknown` for the remote URL even after a
-    /// play request; the downloaded local file is immediately playable. Tell AVFoundation the
-    /// known container type explicitly, without changing HLS/video or local-file handling.
-    private func makePlayerItem(for candidate: PlaybackCandidate, quality: VideoQuality) -> AVPlayerItem {
-        guard quality == .audioOnly,
-              candidate.strategy == .native,
-              case .direct(let url) = candidate.source else {
+    /// Extensionless remote audio URLs need the resolved container type. A selected HLS audio
+    /// rendition is a playlist, not an MP4; carry its MIME type with the candidate so switching
+    /// modes never makes AVPlayer parse the new source as the old format.
+    private func makePlayerItem(for candidate: PlaybackCandidate) -> AVPlayerItem {
+        guard case .direct(let url) = candidate.source,
+              let mimeType = candidate.mimeTypeOverride else {
             return AVPlayerItem(url: candidate.source.url)
         }
-        let asset = AVURLAsset(url: url, options: [AVURLAssetOverrideMIMETypeKey: "audio/mp4"])
-        log.info("Native remote audio candidate: AVURLAsset MIME set to audio/mp4")
+        let asset = AVURLAsset(url: url, options: [AVURLAssetOverrideMIMETypeKey: mimeType])
+        log.info("Remote candidate MIME override=\(mimeType, privacy: .public)")
         return AVPlayerItem(asset: asset)
     }
 
@@ -1572,7 +1570,7 @@ final class PlayerStateManager {
             }
 
             log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-            let item = makePlayerItem(for: candidate, quality: playbackQuality)
+            let item = makePlayerItem(for: candidate)
             applyQualityCap(to: item)
             itemLoadStartedAt = Date()
             loadItem(item, originalAudioLanguageCode: candidate.originalAudioLanguageCode)

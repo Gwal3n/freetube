@@ -59,7 +59,8 @@ final class PlaybackResolver: PlaybackResolving {
                     strategy: .native,
                     storyboard: result.storyboard,
                     originalAudioLanguageCode: result.originalAudioLanguageCode,
-                    originalTitle: result.originalTitle
+                    originalTitle: result.originalTitle,
+                    mimeTypeOverride: result.mimeTypeOverride
                 )
             } catch is CancellationError {
                 throw CancellationError()

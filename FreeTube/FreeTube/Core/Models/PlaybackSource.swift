@@ -31,19 +31,22 @@ struct PlaybackCandidate: Sendable {
     let storyboard: VideoStoryboard?
     let originalAudioLanguageCode: String?
     let originalTitle: String?
+    let mimeTypeOverride: String?
 
     init(
         source: PlaybackSource,
         strategy: PlaybackStrategy,
         storyboard: VideoStoryboard? = nil,
         originalAudioLanguageCode: String? = nil,
-        originalTitle: String? = nil
+        originalTitle: String? = nil,
+        mimeTypeOverride: String? = nil
     ) {
         self.source = source
         self.strategy = strategy
         self.storyboard = storyboard
         self.originalAudioLanguageCode = originalAudioLanguageCode
         self.originalTitle = originalTitle
+        self.mimeTypeOverride = mimeTypeOverride
     }
 }
 

@@ -18,6 +18,15 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         self.session = session
     }
 
+    /// Returns the preferred audio media playlist from a multivariant HLS manifest. Playback
+    /// uses the same rendition selection as downloads, but leaves segment loading to AVPlayer.
+    /// A direct media playlist or a manifest without a separate audio rendition returns nil.
+    func preferredAudioPlaylistURL(from manifestURL: URL) async throws -> URL? {
+        let text = try await fetchText(manifestURL)
+        let master = try Self.parseMaster(text, baseURL: manifestURL)
+        return Self.preferredAudio(from: master.audio, groupID: nil)?.url
+    }
+
     func download(
         manifestURL: URL,
         destination: URL,

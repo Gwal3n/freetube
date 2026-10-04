@@ -28,7 +28,8 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 url: cached.url,
                 storyboard: cached.storyboard,
                 originalAudioLanguageCode: cached.originalAudioLanguageCode,
-                originalTitle: cached.originalTitle
+                originalTitle: cached.originalTitle,
+                mimeTypeOverride: cached.mimeTypeOverride
             )
         }
 
@@ -44,8 +45,39 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             // That solver re-parses the entire ~2.5 MB player.js once per InnerTube client (twice
             // normally, three times when no progressive format turns up), which measured at ~4s of
             // the ~5.4s native resolution. In practice its output was then discarded and this very
-            // HLS URL played instead, so the whole pass was dead weight. Audio-only keeps using the
-            // progressive path below, since an HLS master playlist always carries a video track.
+            // HLS URL played instead, so the whole pass was dead weight. Audio-only cannot use the
+            // video-bearing master directly; select its separate audio rendition when available.
+            if quality == .audioOnly,
+               let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
+                do {
+                    if let audio = try await NativeHLSDownloadService().preferredAudioPlaylistURL(from: hls) {
+                        let storyboard = await storyboard(from: youtube, videoID: videoID)
+                        let originalTitle = (try? await youtube.metadata)?.title
+                        let mimeType = "application/vnd.apple.mpegurl"
+                        await cache.set(
+                            videoID: videoID,
+                            formatID: cacheKey,
+                            url: audio,
+                            storyboard: storyboard,
+                            originalTitle: originalTitle,
+                            mimeTypeOverride: mimeType
+                        )
+                        log.info("Resolved native audio HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
+                        return NativeStreamResult(
+                            url: audio,
+                            storyboard: storyboard,
+                            originalTitle: originalTitle,
+                            mimeTypeOverride: mimeType
+                        )
+                    }
+                    log.notice("Native HLS has no separate audio rendition for \(videoID, privacy: .public); trying progressive selection")
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    log.notice("Native HLS audio selection failed for \(videoID, privacy: .public); trying progressive selection")
+                }
+            }
+
             if quality != .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
@@ -92,12 +124,20 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             if let selected {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
                 let originalTitle = (try? await youtube.metadata)?.title
+                let mimeType = quality == .audioOnly && selected.fileExtension == .m4a
+                    ? "audio/mp4" : nil
                 await cache.set(
                     videoID: videoID, formatID: cacheKey, url: selected.url,
-                    storyboard: storyboard, originalTitle: originalTitle
+                    storyboard: storyboard, originalTitle: originalTitle,
+                    mimeTypeOverride: mimeType
                 )
                 log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public) audioCodec=\(String(describing: selected.audioCodec), privacy: .public) bitrate=\(selected.bitrate ?? 0, privacy: .public) averageBitrate=\(selected.averageBitrate ?? 0, privacy: .public) container=\(selected.fileExtension.rawValue, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
-                return NativeStreamResult(url: selected.url, storyboard: storyboard, originalTitle: originalTitle)
+                return NativeStreamResult(
+                    url: selected.url,
+                    storyboard: storyboard,
+                    originalTitle: originalTitle,
+                    mimeTypeOverride: mimeType
+                )
             }
 
             log.notice("Native extractor returned no playable stream for \(videoID, privacy: .public) after \(Date().timeIntervalSince(startedAt), privacy: .public)s")
