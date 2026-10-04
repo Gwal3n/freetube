@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SponsorBlockTimeline: View {
     let elapsed: TimeInterval
+    let previewElapsed: TimeInterval?
     let duration: TimeInterval
     let isLive: Bool
     let segments: [SponsorBlockSegment]
@@ -16,7 +17,7 @@ struct SponsorBlockTimeline: View {
     @State private var scrubChapterID: VideoChapter.ID?
     @State private var chapterHapticTrigger = 0
 
-    private var displayedTime: TimeInterval { dragTime ?? elapsed }
+    private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
     private var currentChapter: VideoChapter? {
         chapters.last { $0.startTime <= displayedTime }
     }
@@ -37,7 +38,9 @@ struct SponsorBlockTimeline: View {
         } else {
         VStack(spacing: 4) {
             HStack(spacing: 7) {
-                Text(verbatim: format(displayedTime))
+                // The track follows the finger, but the elapsed clock remains the real
+                // playback position until the seek is committed.
+                Text(verbatim: format(elapsed))
                 if let currentChapter {
                     Button(action: onShowChapters) {
                         HStack(spacing: 3) {

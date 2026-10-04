@@ -12,7 +12,8 @@ struct PlayerTimelineOverlay: View {
 
     var body: some View {
         SponsorBlockTimeline(
-            elapsed: previewElapsed ?? player.elapsed,
+            elapsed: player.elapsed,
+            previewElapsed: previewElapsed,
             duration: player.duration,
             isLive: player.currentVideo?.isLive == true,
             segments: player.sponsorBlockSegments,

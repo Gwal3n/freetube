@@ -283,7 +283,8 @@ struct FullScreenPlayer: View {
                        ) {
                         StoryboardPreview(
                             tile: tile,
-                            videoPresentationSize: player.videoPresentationSize
+                            videoPresentationSize: player.videoPresentationSize,
+                            previewTime: previewTime
                         )
                             .position(
                                 x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
@@ -295,7 +296,7 @@ struct FullScreenPlayer: View {
                                     58,
                                     controlFrame.maxY
                                         - timelineBottomPadding
-                                        - 68
+                                        - 62
                                 )
                             )
                             .allowsHitTesting(false)
