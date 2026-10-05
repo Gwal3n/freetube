@@ -27,6 +27,9 @@ final class SettingsViewModel {
     var deArrowRandomThumbnails: Bool {
         didSet { preferences.deArrowRandomThumbnails = deArrowRandomThumbnails }
     }
+    var sponsorBlockEnabled: Bool {
+        didSet { preferences.sponsorBlockEnabled = sponsorBlockEnabled }
+    }
     var playerControlLayout: PlayerControlLayout {
         didSet { preferences.playerControlLayout = playerControlLayout }
     }
@@ -40,6 +43,7 @@ final class SettingsViewModel {
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
+        self.sponsorBlockEnabled = preferences.sponsorBlockEnabled
         self.playerControlLayout = preferences.playerControlLayout
     }
 
@@ -153,11 +157,6 @@ final class SettingsViewModel {
         var layout = playerControlLayout
         layout.move(control, to: section, before: target)
         playerControlLayout = layout
-    }
-
-    var sponsorBlockEnabled: Bool {
-        get { preferences.sponsorBlockEnabled }
-        set { preferences.sponsorBlockEnabled = newValue }
     }
 
     func sponsorBlockBehaviorBinding(for category: SponsorBlockCategory) -> Binding<SponsorBlockBehavior> {

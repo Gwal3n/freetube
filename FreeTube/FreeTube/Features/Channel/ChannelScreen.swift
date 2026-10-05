@@ -34,6 +34,10 @@ struct ChannelScreen: View {
     /// for one frame and then shove it down, which reads as a flinch each time a channel opens.
     @State private var headerContentHeight: CGFloat = Metrics.estimatedHeaderHeight
     @State private var tabBarHeight: CGFloat = Metrics.estimatedTabBarHeight
+    @AppStorage("showChannelShortsTab") private var showShortsTab = true
+    @AppStorage("showChannelLiveTab") private var showLiveTab = true
+    @AppStorage("showChannelPlaylistsTab") private var showPlaylistsTab = true
+    @AppStorage("showChannelAboutTab") private var showAboutTab = true
 
     private static let tabRowSpace = "channelTabRow"
     private static let pagerSpace = "channelPager"
@@ -99,6 +103,14 @@ struct ChannelScreen: View {
         .toolbarBackground(Color.black, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
+        .onChange(of: currentTabs) { _, tabs in
+            guard !tabs.isEmpty else { return }
+            let destination = tabs.contains(selectedTab) ? selectedTab : .videos
+            selectedTab = destination
+            if let index = tabs.firstIndex(of: destination), pageWidth > 0 {
+                pagerOffset = CGFloat(index) * pageWidth
+            }
+        }
         .sheet(isPresented: $showingGroupPicker) {
             if let channel = model.details?.channel, channel.isSubscribed {
                 ChannelGroupPickerSheet(channel: channel)
@@ -732,11 +744,13 @@ struct ChannelScreen: View {
 
     private func availableTabs(for details: ChannelDetails) -> [ChannelProfileTab] {
         var tabs: [ChannelProfileTab] = [.videos]
-        if !details.shorts.items.isEmpty || details.shorts.continuationToken != nil {
+        if showShortsTab,
+           (!details.shorts.items.isEmpty || details.shorts.continuationToken != nil) {
             tabs.append(.shorts)
         }
-        if !details.directs.items.isEmpty { tabs.append(.live) }
-        tabs.append(contentsOf: [.playlists, .about])
+        if showLiveTab, !details.directs.items.isEmpty { tabs.append(.live) }
+        if showPlaylistsTab { tabs.append(.playlists) }
+        if showAboutTab { tabs.append(.about) }
         return tabs
     }
 

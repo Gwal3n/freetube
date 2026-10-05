@@ -1,6 +1,51 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Channel tabs" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Kanal-Tabs" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Channel tabs" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pestañas del canal" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Onglets de chaîne" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Вкладки канала" } }
+      }
+    },
+    "The Videos tab is always first. Tabs unavailable on a channel stay hidden regardless of these settings." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Videos bleibt immer der erste Tab. Tabs, die für einen Kanal nicht verfügbar sind, bleiben unabhängig von diesen Einstellungen ausgeblendet." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Videos tab is always first. Tabs unavailable on a channel stay hidden regardless of these settings." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Vídeos siempre será la primera pestaña. Las pestañas no disponibles en un canal permanecerán ocultas independientemente de estos ajustes." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vidéos reste toujours le premier onglet. Les onglets indisponibles sur une chaîne restent masqués, quels que soient ces réglages." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Видео всегда остаётся первой вкладкой. Недоступные для канала вкладки будут скрыты независимо от этих настроек." } }
+      }
+    },
+    "Community enhancements" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Community-Erweiterungen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Community enhancements" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Mejoras de la comunidad" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Améliorations communautaires" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Улучшения сообщества" } }
+      }
+    },
+    "SponsorBlock and DeArrow" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock und DeArrow" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock and DeArrow" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock y DeArrow" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock et DeArrow" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock и DeArrow" } }
+      }
+    },
+    "Optional, anonymous SponsorBlock and DeArrow features." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Optionale, anonyme Funktionen von SponsorBlock und DeArrow." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Optional, anonymous SponsorBlock and DeArrow features." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Funciones opcionales y anónimas de SponsorBlock y DeArrow." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fonctions facultatives et anonymes de SponsorBlock et DeArrow." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Необязательные анонимные функции SponsorBlock и DeArrow." } }
+      }
+    },
     "Save watch history" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Wiedergabeverlauf speichern" } },

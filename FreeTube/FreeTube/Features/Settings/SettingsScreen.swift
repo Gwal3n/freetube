@@ -66,6 +66,15 @@ struct SettingsScreen: View {
                     Text("Hiding the tab keeps your local subscriptions and cached feed on this device. Large thumbnails use spacious 16:9 cards while preserving the same playback and queue actions.")
                 }
 
+                Section("Channels") {
+                    NavigationLink {
+                        ChannelTabsSettingsScreen()
+                    } label: {
+                        navigationLabel("Channel tabs", systemImage: "rectangle.stack")
+                    }
+                    .tint(.white)
+                }
+
                 Section {
                     Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
                     Toggle("OLED mini-player", isOn: Bindable(model).oledMiniPlayer)
@@ -77,35 +86,16 @@ struct SettingsScreen: View {
 
                 Section {
                     NavigationLink {
-                        SponsorBlockSettingsScreen(model: model)
-                            .onAppear { log.info("Settings SponsorBlock destination appeared") }
+                        CommunityEnhancementsSettingsScreen(model: model)
+                            .onAppear { log.info("Settings community enhancements destination appeared") }
                     } label: {
-                        HStack {
-                            Text("Categories and behavior")
-                            Spacer()
-                            Text(model.sponsorBlockEnabled ? "On" : "Off")
-                                .foregroundStyle(.secondary)
-                        }
-                        .foregroundStyle(.primary)
-                        .contentShape(Rectangle())
+                        navigationLabel("SponsorBlock and DeArrow", systemImage: "sparkles")
                     }
                     .tint(.white)
                 } header: {
-                    Text("SponsorBlock")
+                    Text("Community enhancements")
                 } footer: {
-                    Text("Show or skip community-identified video segments without delaying playback.")
-                }
-
-                Section {
-                    Toggle("Replace video titles", isOn: Bindable(model).deArrowTitles)
-                    Toggle("Replace video thumbnails", isOn: Bindable(model).deArrowThumbnails)
-                    if model.deArrowThumbnails {
-                        Toggle("Random thumbnail when no submission exists", isOn: Bindable(model).deArrowRandomThumbnails)
-                    }
-                } header: {
-                    Text(verbatim: "DeArrow")
-                } footer: {
-                    Text("Use community titles and video frames to reduce clickbait. If no thumbnail has been submitted, a stable random frame can be requested instead. Tap the small switch on a video to see its original title and thumbnail. Originals stay saved on this device. Enabling this sends anonymous requests to DeArrow; thumbnail requests include the video ID. If the service is unavailable, the originals remain visible.")
+                    Text("Optional, anonymous SponsorBlock and DeArrow features.")
                 }
 
                 Section("Player controls") {
