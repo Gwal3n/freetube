@@ -109,7 +109,7 @@ final class SubscriptionFeedViewModel {
             groups.groups.first(where: { $0.id == id })?.channelIDs
         }
         let snapshots = await writer.fetchSubscriptionFeed(limit: visibleLimit, channelIDs: channelIDs)
-        let refreshedVideos = snapshots.map(\.video)
+        let refreshedVideos = SubscriptionFeedOrdering.diversified(snapshots, pageSize: pageSize).map(\.video)
         let totalCount = await writer.subscriptionFeedCount(channelIDs: channelIDs)
         let progress = await writer.watchProgress(videoIDs: refreshedVideos.map(\.id))
         let refreshDate = await writer.latestSubscriptionFeedRefreshDate()

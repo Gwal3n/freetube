@@ -24,7 +24,10 @@ actor PersistenceWriter {
 
     func fetchSubscriptionFeed(limit: Int, channelIDs: Set<String>? = nil) -> [SubscriptionFeedSnapshot] {
         if let channelIDs, channelIDs.isEmpty { return [] }
-        let sort = [SortDescriptor(\SubscriptionFeedEntry.sortDate, order: .reverse)]
+        let sort = [
+            SortDescriptor(\SubscriptionFeedEntry.sortDate, order: .reverse),
+            SortDescriptor(\SubscriptionFeedEntry.videoID)
+        ]
         var descriptor: FetchDescriptor<SubscriptionFeedEntry>
         if let channelIDs {
             let ids = Array(channelIDs)
