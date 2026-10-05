@@ -1532,7 +1532,7 @@ final class PlayerStateManager {
         let resolutionStartedAt = Date()
         // The model-actor read runs alongside network resolution and is consumed only after the
         // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
-        let resumeLookup = Task {
+        let resumeLookup = Task<(position: TimeInterval, duration: TimeInterval)?, Never> {
             guard preferences.saveWatchHistory else { return nil }
             return await PersistenceWriter.shared.watchProgress(videoID: video.id)
         }
