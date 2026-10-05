@@ -23,6 +23,9 @@ struct UserPreferences {
     @AppStorage("verticalSwipeFullscreen") var verticalSwipeFullscreen: Bool = true
     /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
+    /// Stops writing local watch history and playback positions when disabled. Existing entries
+    /// remain available until the user clears them explicitly.
+    @AppStorage("saveWatchHistory") var saveWatchHistory: Bool = true
     @AppStorage("historyRetentionPolicy") var historyRetentionPolicyRaw: String = HistoryRetentionPolicy.forever.rawValue
     /// Removes the local-subscription Feed destination from the tab bar when disabled. Cached
     /// entries remain on device so restoring the tab is immediate and does not force a refresh.

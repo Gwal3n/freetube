@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Save watch history" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Wiedergabeverlauf speichern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save watch history" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Guardar historial de reproducciones" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Enregistrer l’historique de visionnage" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранять историю просмотров" } }
+      }
+    },
+    "Turning this off stops recording history and playback positions. Existing history stays on this device until you clear it." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Wenn du dies deaktivierst, werden Verlauf und Wiedergabepositionen nicht mehr gespeichert. Der bisherige Verlauf bleibt auf diesem Gerät, bis du ihn löschst." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turning this off stops recording history and playback positions. Existing history stays on this device until you clear it." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Al desactivar esta opción, se dejan de guardar el historial y las posiciones de reproducción. El historial existente permanece en este dispositivo hasta que lo borres." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Désactiver cette option arrête l’enregistrement de l’historique et des positions de lecture. L’historique existant reste sur cet appareil jusqu’à ce que vous l’effaciez." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Если отключить эту настройку, история и позиции воспроизведения больше не будут сохраняться. Существующая история останется на устройстве, пока вы её не очистите." } }
+      }
+    },
     "Show description" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Beschreibung anzeigen" } },

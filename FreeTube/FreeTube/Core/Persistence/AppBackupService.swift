@@ -141,7 +141,7 @@ final class AppBackupService {
         "logToFile", "manualQueue", "oledMiniPlayer",
         "oledPlayerBackground",
         "playbackRate", "playerControlLayout", "playerTopControlOrder", "preferredQuality", "prefetchVideoDetails",
-        "recentFetchURLs", "showComments", "showDescription", "showFeaturedCommentPreview",
+        "recentFetchURLs", "saveWatchHistory", "showComments", "showDescription", "showFeaturedCommentPreview",
         "showHistoryProgressBars", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",

@@ -118,7 +118,7 @@ struct SettingsScreen: View {
                     .tint(.white)
                 }
 
-                Section("Data") {
+                Section {
                     NavigationLink {
                         ImportDataScreen()
                             .onAppear { log.info("Settings import destination appeared") }
@@ -126,16 +126,22 @@ struct SettingsScreen: View {
                         navigationLabel("Import Data", systemImage: "square.and.arrow.down")
                     }
                     .tint(.white)
+                    Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
                         }
                     }
+                    .disabled(!model.saveWatchHistory)
                     Button(role: .destructive) {
                         showingClearHistoryConfirmation = true
                     } label: {
                         Label("Clear Watch History", systemImage: "trash")
                     }
+                } header: {
+                    Text("Data")
+                } footer: {
+                    Text("Turning this off stops recording history and playback positions. Existing history stays on this device until you clear it.")
                 }
 
                 Section {

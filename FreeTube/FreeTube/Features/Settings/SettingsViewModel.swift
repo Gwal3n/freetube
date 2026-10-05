@@ -15,6 +15,9 @@ final class SettingsViewModel {
     var showUpNext: Bool {
         didSet { preferences.showUpNext = showUpNext }
     }
+    var saveWatchHistory: Bool {
+        didSet { preferences.saveWatchHistory = saveWatchHistory }
+    }
     var deArrowTitles: Bool {
         didSet { preferences.deArrowTitles = deArrowTitles }
     }
@@ -33,6 +36,7 @@ final class SettingsViewModel {
         self.preferences = preferences
         self.upNextInitialCount = preferences.upNextInitialCount
         self.showUpNext = preferences.showUpNext
+        self.saveWatchHistory = preferences.saveWatchHistory
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails

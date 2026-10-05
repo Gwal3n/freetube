@@ -516,7 +516,7 @@ final class PlayerStateManager {
             )
         }
         refreshArtwork(for: video)
-        if historyRecordedVideoID == video.id {
+        if preferences.saveWatchHistory, historyRecordedVideoID == video.id {
             Task {
                 await PersistenceWriter.shared.updateWatchHistoryMetadata(
                     videoID: video.id,
@@ -1533,7 +1533,8 @@ final class PlayerStateManager {
         // The model-actor read runs alongside network resolution and is consumed only after the
         // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
         let resumeLookup = Task {
-            await PersistenceWriter.shared.watchProgress(videoID: video.id)
+            guard preferences.saveWatchHistory else { return nil }
+            return await PersistenceWriter.shared.watchProgress(videoID: video.id)
         }
         loadState = .resolving
         var excludedStrategies = Set<PlaybackStrategy>()
@@ -2017,7 +2018,8 @@ final class PlayerStateManager {
         _ progress: (position: TimeInterval, duration: TimeInterval)?,
         for video: Video
     ) {
-        guard currentVideo?.id == video.id,
+        guard preferences.saveWatchHistory,
+              currentVideo?.id == video.id,
               let progress,
               progress.position.isFinite,
               progress.position >= 10 else { return }
@@ -2032,7 +2034,8 @@ final class PlayerStateManager {
     /// Writes at most every ten seconds during playback, plus forced lifecycle saves. Duplicate
     /// pause/dismiss/video-switch calls are suppressed when the position has not advanced.
     private func persistCurrentPlaybackProgress(force: Bool) {
-        guard let video = currentVideo,
+        guard preferences.saveWatchHistory,
+              let video = currentVideo,
               !video.id.hasPrefix("fetch-"),
               elapsed.isFinite,
               duration.isFinite,

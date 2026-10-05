@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 import Kingfisher
 
@@ -49,21 +50,61 @@ struct StoryboardPreview: View {
             // timestamp lines up with the player's existing time labels.
             .frame(width: maximumPreviewWidth, height: maximumPreviewHeight, alignment: .bottom)
 
-            Text(verbatim: formattedPreviewTime)
+            Text(verbatim: seekPreviewTimestamp(previewTime))
                 .font(.caption2.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.9), radius: 2, y: 1)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
+}
 
-    private var formattedPreviewTime: String {
-        guard previewTime.isFinite, previewTime >= 0 else { return "0:00" }
-        let total = Int(previewTime)
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-        let seconds = total % 60
-        if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
-        return String(format: "%d:%02d", minutes, seconds)
+/// Audio-only seeks keep the same compact preview geometry, but never request moving storyboard
+/// frames. The artwork is the static video thumbnail already used by the audio player surface.
+@available(iOS 17.0, *)
+struct AudioOnlySeekPreview: View {
+    let artwork: UIImage?
+    let thumbnailURL: URL?
+    let previewTime: TimeInterval
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Group {
+                if let artwork {
+                    Image(uiImage: artwork)
+                        .resizable()
+                } else if let thumbnailURL {
+                    KFImage(thumbnailURL)
+                        .resizable()
+                } else {
+                    Color.black
+                }
+            }
+            .aspectRatio(contentMode: .fill)
+            .frame(width: 116, height: 65)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(.white.opacity(0.92), lineWidth: 1.5)
+            }
+            .frame(width: 116, height: 96, alignment: .bottom)
+
+            Text(verbatim: seekPreviewTimestamp(previewTime))
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.9), radius: 2, y: 1)
+        }
+        .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
+}
+
+private func seekPreviewTimestamp(_ time: TimeInterval) -> String {
+    guard time.isFinite, time >= 0 else { return "0:00" }
+    let total = Int(time)
+    let hours = total / 3600
+    let minutes = (total % 3600) / 60
+    let seconds = total % 60
+    if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
+    return String(format: "%d:%02d", minutes, seconds)
 }

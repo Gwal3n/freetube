@@ -293,34 +293,43 @@ struct FullScreenPlayer: View {
                     if !isPreparingPlayback {
                         DownloadProgressOverlay(state: player.loadState)
                     }
-                    if let previewTime = scrubberSeekPreview,
-                       let tile = player.storyboard?.tile(
-                           at: previewTime,
-                           duration: player.duration,
-                           maximumWidth: 320,
-                           maximumHeight: 180
-                       ) {
-                        StoryboardPreview(
-                            tile: tile,
-                            videoPresentationSize: player.videoPresentationSize,
-                            previewTime: previewTime
-                        )
-                            .position(
-                                x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
-                                    time: previewTime,
-                                    duration: player.duration,
-                                    surfaceWidth: controlFrame.width
-                                ),
-                                y: max(
-                                    58,
-                                    // Align the preview time with the elapsed/duration row;
-                                    // the image above it stays clear of the timeline.
-                                    controlFrame.maxY
-                                        - timelineBottomPadding
-                                        - 84.5
+                    if let previewTime = scrubberSeekPreview {
+                        Group {
+                            if player.isAudioOnly {
+                                AudioOnlySeekPreview(
+                                    artwork: player.currentArtwork,
+                                    thumbnailURL: player.currentVideo?.thumbnailURL,
+                                    previewTime: previewTime
                                 )
+                            } else if let tile = player.storyboard?.tile(
+                                at: previewTime,
+                                duration: player.duration,
+                                maximumWidth: 320,
+                                maximumHeight: 180
+                            ) {
+                                StoryboardPreview(
+                                    tile: tile,
+                                    videoPresentationSize: player.videoPresentationSize,
+                                    previewTime: previewTime
+                                )
+                            }
+                        }
+                        .position(
+                            x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
+                                time: previewTime,
+                                duration: player.duration,
+                                surfaceWidth: controlFrame.width
+                            ),
+                            y: max(
+                                58,
+                                // Align the preview time with the elapsed/duration row;
+                                // the image above it stays clear of the timeline.
+                                controlFrame.maxY
+                                    - timelineBottomPadding
+                                    - 84.5
                             )
-                            .allowsHitTesting(false)
+                        )
+                        .allowsHitTesting(false)
                     }
                     if let notice = player.sponsorBlockNotice {
                         SponsorBlockSkipOverlay(
