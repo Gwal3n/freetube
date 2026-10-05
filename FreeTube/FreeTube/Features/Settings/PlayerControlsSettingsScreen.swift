@@ -2,41 +2,19 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// Live, cross-section reordering for optional player controls. A transient layout follows the
-/// native drag; the persisted layout changes only when the user actually drops the control.
+/// Live, cross-section reordering for optional player controls. iOS supports DropDelegate's
+/// hover callbacks but not SwiftUI's drag-session-end observer, so each visible move is retained.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
     @Bindable var model: SettingsViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draggedControl: PlayerTopControl?
-    @State private var previewLayout: PlayerControlLayout?
     @State private var targetedSection: PlayerControlLayout.Section?
 
     private let dragPrefix = "com.leshko.freetube.player-control:"
     private let rowHeight: CGFloat = 48
 
-    private var displayedLayout: PlayerControlLayout {
-        previewLayout ?? model.playerControlLayout
-    }
-
-    @ViewBuilder
     var body: some View {
-        if #available(iOS 26.0, *) {
-            editor
-                .dragConfiguration(DragConfiguration(allowMove: true))
-                .onDragSessionUpdated { session in
-                    // A completed drop clears the transient state in performDrop. Any remaining
-                    // state at session end belongs to a cancelled drag and must be discarded.
-                    if case .ended = session.phase, draggedControl != nil {
-                        cancelDrag()
-                    }
-                }
-        } else {
-            editor
-        }
-    }
-
-    private var editor: some View {
         ScrollView {
             // There are only seven controls. Keeping every row mounted avoids lazy-layout
             // handoffs while a drag moves between sections.
@@ -56,7 +34,7 @@ struct PlayerControlsSettingsScreen: View {
     }
 
     private func controlSection(_ section: PlayerControlLayout.Section) -> some View {
-        let controls = displayedLayout.controls(in: section)
+        let controls = model.playerControlLayout.controls(in: section)
 
         return VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: section.title)
@@ -69,7 +47,7 @@ struct PlayerControlsSettingsScreen: View {
                     isActive: { draggedControl != nil },
                     onEnter: { _ in
                         targetedSection = section
-                        hover(in: section, before: displayedLayout.controls(in: section).first)
+                        hover(in: section, before: model.playerControlLayout.controls(in: section).first)
                     },
                     onExit: {
                         if targetedSection == section { targetedSection = nil }
@@ -113,9 +91,7 @@ struct PlayerControlsSettingsScreen: View {
         .frame(minHeight: rowHeight)
         .padding(.horizontal, 16)
         .contentShape(Rectangle())
-        .opacity(draggedControl == control ? 0.001 : 1)
         .onDrag {
-            previewLayout = model.playerControlLayout
             draggedControl = control
             return NSItemProvider(object: NSString(string: dragPrefix + control.rawValue))
         } preview: {
@@ -147,7 +123,7 @@ struct PlayerControlsSettingsScreen: View {
 
     private func hover(over target: PlayerTopControl, in section: PlayerControlLayout.Section, at locationY: CGFloat) {
         guard let draggedControl, draggedControl != target else { return }
-        let controls = displayedLayout.controls(in: section)
+        let controls = model.playerControlLayout.controls(in: section)
         guard let targetIndex = controls.firstIndex(of: target) else { return }
         let afterTarget = controls.indices.contains(targetIndex + 1) ? controls[targetIndex + 1] : nil
         let insertionTarget: PlayerTopControl?
@@ -162,31 +138,25 @@ struct PlayerControlsSettingsScreen: View {
     }
 
     private func hover(in section: PlayerControlLayout.Section, before target: PlayerTopControl?) {
-        guard let draggedControl, var layout = previewLayout else { return }
-        layout.move(draggedControl, to: section, before: target)
-        guard layout != previewLayout else { return }
+        guard let draggedControl else { return }
         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-            previewLayout = layout
+            model.movePlayerControl(draggedControl, to: section, before: target)
         }
     }
 
     private func finishDrag() -> Bool {
-        guard draggedControl != nil, let previewLayout else { return false }
-        if previewLayout != model.playerControlLayout {
-            model.playerControlLayout = previewLayout
-        }
+        guard draggedControl != nil else { return false }
         cancelDrag()
         return true
     }
 
     private func cancelDrag() {
         draggedControl = nil
-        previewLayout = nil
         targetedSection = nil
     }
 }
 
-/// `dropEntered` is the live reorder point; `performDrop` only commits the preview layout.
+/// `dropEntered` is the live reorder point; `performDrop` only ends the drag session.
 @available(iOS 17.0, *)
 @MainActor
 private struct ControlDropDelegate: DropDelegate {

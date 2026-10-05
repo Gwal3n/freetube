@@ -154,8 +154,10 @@ final class SettingsViewModel {
         to section: PlayerControlLayout.Section,
         before target: PlayerTopControl? = nil
     ) {
-        var layout = playerControlLayout
+        let current = playerControlLayout
+        var layout = current
         layout.move(control, to: section, before: target)
+        guard layout != current else { return }
         playerControlLayout = layout
     }
 
