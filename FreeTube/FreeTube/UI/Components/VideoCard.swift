@@ -84,10 +84,10 @@ struct VideoCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(branding.title(for: video))
                             .contentTransition(.opacity)
-                            .font(MediaStyle.title)
+                            .appFont(.subheadline, weight: .semibold)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                         Text(metadataLine)
-                            .font(MediaStyle.metadata)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     }

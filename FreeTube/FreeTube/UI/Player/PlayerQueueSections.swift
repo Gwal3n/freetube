@@ -288,10 +288,10 @@ struct PlayerQueueSections: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(branding.title(for: video))
                                     .contentTransition(.opacity)
-                                    .font(.subheadline)
+                                    .appFont(.subheadline)
                                     .lineLimit(2)
                                 Text(queueRowMetadata(for: video))
-                                    .font(.caption)
+                                    .appFont(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }

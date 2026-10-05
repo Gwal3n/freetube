@@ -10,7 +10,7 @@ struct DownloadTransferRow: View {
         HStack(spacing: MediaStyle.spacing) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(snapshot.title)
-                    .font(MediaStyle.title)
+                    .appFont(.subheadline, weight: .semibold)
                     .lineLimit(2)
                 progress
             }
@@ -96,16 +96,16 @@ struct DownloadedVideoRow<MenuContent: View>: View {
                 .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
-                    .font(MediaStyle.title)
+                    .appFont(.subheadline, weight: .semibold)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 if !item.channelName.isEmpty {
                     Text(item.channelName)
-                        .font(MediaStyle.metadata)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Text(ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-                .font(MediaStyle.tertiaryMetadata)
+                .appFont(.caption2)
                 .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

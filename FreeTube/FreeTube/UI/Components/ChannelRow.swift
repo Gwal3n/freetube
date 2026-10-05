@@ -49,10 +49,10 @@ struct ChannelRow: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(channel.name).font(.subheadline.weight(.semibold))
+                Text(channel.name).appFont(.subheadline, weight: .semibold)
                 if !detailLine.isEmpty {
                     Text(detailLine)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                 }

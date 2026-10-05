@@ -477,21 +477,21 @@ struct ChannelScreen: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(channel.name)
-                        .font(.title3.weight(.bold))
+                        .appFont(.title3, weight: .bold)
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
 
                     if let handle = channel.handle, !handle.isEmpty {
                         Text(handle)
-                            .font(.subheadline)
+                            .appFont(.subheadline)
                             .foregroundStyle(.white.opacity(0.7))
                             .lineLimit(1)
                     }
 
                     if !channelStats(channel).isEmpty {
                         Text(channelStats(channel))
-                            .font(.footnote)
+                            .appFont(.footnote)
                             .foregroundStyle(.white.opacity(0.5))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -871,9 +871,9 @@ struct ChannelScreen: View {
     private func aboutSection(_ channel: Channel) -> some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("About").font(.title3.weight(.semibold))
+                Text("About").appFont(.title3, weight: .semibold)
                 Text(aboutDescription(for: channel))
-                    .font(.body)
+                    .appFont(.body)
                     .textSelection(.enabled)
             }
             Divider()

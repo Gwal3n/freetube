@@ -33,6 +33,9 @@ final class SettingsViewModel {
     var playerControlLayout: PlayerControlLayout {
         didSet { preferences.playerControlLayout = playerControlLayout }
     }
+    var appFontPreset: AppFontPreset {
+        didSet { preferences.appFontPreset = appFontPreset }
+    }
 
     init() {
         let preferences = UserPreferences()
@@ -45,6 +48,7 @@ final class SettingsViewModel {
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
         self.sponsorBlockEnabled = preferences.sponsorBlockEnabled
         self.playerControlLayout = preferences.playerControlLayout
+        self.appFontPreset = preferences.appFontPreset
     }
 
     var preferredQuality: VideoQuality {

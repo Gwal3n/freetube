@@ -1,6 +1,42 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Text font" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Textschrift" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text font" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Fuente del texto" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Police du texte" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Шрифт текста" } }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Sistema" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Système" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Системный" } }
+      }
+    },
+    "Rounded" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Abgerundet" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rounded" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Redondeada" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Arrondie" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скруглённый" } }
+      }
+    },
+    "Serif" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Serifenschrift" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Serif" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Con serifa" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Avec empattements" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "С засечками" } }
+      }
+    },
     "Sleep timer" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Einschlaftimer" } },

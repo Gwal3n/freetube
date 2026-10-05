@@ -363,11 +363,11 @@ struct PlayerPlaylistPanel: View {
                     )
                     VStack(alignment: .leading, spacing: 3) {
                         Text(branding.title(for: video))
-                            .font(.subheadline.weight(isCurrent ? .semibold : .regular))
+                            .appFont(.subheadline, weight: isCurrent ? .semibold : .regular)
                             .foregroundStyle(isCurrent ? Color.primary : Color.primary.opacity(0.9))
                             .lineLimit(2)
                         Text(video.channelName.isEmpty ? (playlist?.channelName ?? "") : video.channelName)
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }

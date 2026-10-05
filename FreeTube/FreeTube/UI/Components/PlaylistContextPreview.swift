@@ -14,12 +14,12 @@ struct PlaylistContextPreview: View {
                 .frame(width: 320, height: 180)
                 .clipped()
             VStack(alignment: .leading, spacing: 4) {
-                Text(playlist.title).font(.headline).lineLimit(2)
+                Text(playlist.title).appFont(.headline, weight: .semibold).lineLimit(2)
                 if let channel = playlist.channelName, !channel.isEmpty {
-                    Text(channel).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    Text(channel).appFont(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
                 if let count = playlist.videoCount {
-                    Text("\(count.formatted()) videos").font(.caption).foregroundStyle(.secondary)
+                    Text("\(count.formatted()) videos").appFont(.caption).foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

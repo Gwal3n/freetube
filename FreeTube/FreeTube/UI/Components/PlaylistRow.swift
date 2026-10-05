@@ -79,11 +79,11 @@ struct PlaylistRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(playlist.title)
-                    .font(MediaStyle.title)
+                    .appFont(.subheadline, weight: .semibold)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 if let channelName = playlist.channelName, !channelName.isEmpty {
                     Text(channelName)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

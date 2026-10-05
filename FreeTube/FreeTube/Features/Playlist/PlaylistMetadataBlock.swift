@@ -10,7 +10,7 @@ struct PlaylistMetadataBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(details.playlist.title)
-                .font(.title3.weight(.semibold))
+                .appFont(.title3, weight: .semibold)
                 .lineLimit(3)
                 .background {
                     GeometryReader { geometry in
@@ -23,7 +23,7 @@ struct PlaylistMetadataBlock: View {
 
             if let channelName = details.playlist.channelName, !channelName.isEmpty {
                 Text(channelName)
-                    .font(.subheadline)
+                    .appFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -82,7 +82,7 @@ struct PlaylistMetadataBlock: View {
             HStack(alignment: .top, spacing: 8) {
                 metadataLabel("Description")
                 Text(text)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(isExpanded ? nil : 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -97,7 +97,7 @@ struct PlaylistMetadataBlock: View {
             HStack(alignment: .top, spacing: 8) {
                 metadataLabel(label)
                 Text(value)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -107,7 +107,7 @@ struct PlaylistMetadataBlock: View {
 
     private func metadataLabel(_ text: String) -> some View {
         Text(text)
-            .font(.caption.weight(.medium))
+            .appFont(.caption, weight: .medium)
             .foregroundStyle(.tertiary)
             .frame(width: 84, alignment: .leading)
     }

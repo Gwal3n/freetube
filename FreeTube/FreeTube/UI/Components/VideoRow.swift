@@ -131,15 +131,15 @@ struct VideoRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(branding.title(for: video))
                     .contentTransition(.opacity)
-                    .font(MediaStyle.title)
+                    .appFont(.subheadline, weight: .semibold)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                 Text(video.channelName)
-                    .font(MediaStyle.metadata)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if !statsLine.isEmpty {
                     Text(statsLine)
-                        .font(MediaStyle.tertiaryMetadata)
+                        .appFont(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

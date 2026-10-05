@@ -16,8 +16,8 @@ struct CommentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(comment.authorName).font(.caption.weight(.semibold))
-                Text(comment.publishedRelative).font(.caption2).foregroundStyle(.secondary)
+                Text(comment.authorName).appFont(.caption, weight: .semibold)
+                Text(comment.publishedRelative).appFont(.caption2).foregroundStyle(.secondary)
             }
             SelectableCommentText(
                 text: comment.bodyText,
@@ -30,7 +30,7 @@ struct CommentRow: View {
                         isBodyExpanded.toggle()
                     }
                 }
-                .font(.caption.weight(.semibold))
+                .appFont(.caption, weight: .semibold)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
@@ -38,14 +38,14 @@ struct CommentRow: View {
             HStack(spacing: 16) {
                 Label("\(comment.likeCount)", systemImage: "hand.thumbsup")
                     .labelStyle(.titleAndIcon)
-                    .font(.caption)
+                    .appFont(.caption)
                 if let repliesTitle, let onToggleReplies {
                     Button(action: onToggleReplies) {
                         HStack(spacing: 4) {
                             Image(systemName: repliesExpanded ? "chevron.up" : "chevron.down")
                             Text(repliesTitle)
                         }
-                        .font(.caption)
+                        .appFont(.caption)
                     }
                     .foregroundStyle(.primary)
                 }
@@ -62,6 +62,7 @@ struct CommentRow: View {
 /// whole-value Copy/Share menu, while a non-editable `UITextView` provides the familiar selection
 /// handles for choosing an exact sentence. Scrolling remains owned by the surrounding player feed.
 private struct SelectableCommentText: UIViewRepresentable {
+    @Environment(\.appFontPreset) private var preset
     let text: String
     let maximumNumberOfLines: Int
 
@@ -81,7 +82,7 @@ private struct SelectableCommentText: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         if view.text != text { view.text = text }
-        view.font = .preferredFont(forTextStyle: .subheadline)
+        view.font = preset.uiFont(style: .subheadline, size: 15)
         view.textColor = .label
         view.textContainer.maximumNumberOfLines = maximumNumberOfLines
         view.textContainer.lineBreakMode = maximumNumberOfLines == 0

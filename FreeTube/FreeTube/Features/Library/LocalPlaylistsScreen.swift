@@ -233,9 +233,9 @@ struct LocalPlaylistsScreen: View {
                 .background(.quaternary)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 3) {
-                Text(playlist.title).lineLimit(1)
+                Text(playlist.title).appFont(.body).lineLimit(1)
                 Text("\(playlist.videoCount) \(playlist.videoCount == 1 ? "video" : "videos")")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .appFont(.caption).foregroundStyle(.secondary)
                 if playlist.isHydratingMetadata {
                     ProgressView(
                         value: Double(playlist.metadataHydrationProcessed),

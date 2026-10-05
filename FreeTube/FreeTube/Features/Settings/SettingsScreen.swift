@@ -76,6 +76,13 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    Picker("Text font", selection: Bindable(model).appFontPreset) {
+                        ForEach(AppFontPreset.allCases) { preset in
+                            preset.label
+                                .font(preset.font(.body))
+                                .tag(preset)
+                        }
+                    }
                     Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
                     Toggle("OLED mini-player", isOn: Bindable(model).oledMiniPlayer)
                 } header: {

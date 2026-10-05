@@ -17,6 +17,7 @@ struct SearchSuggestionList: View {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(.secondary)
                             Text(suggestion.text)
+                                .appFont(.body)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                             Spacer(minLength: 8)

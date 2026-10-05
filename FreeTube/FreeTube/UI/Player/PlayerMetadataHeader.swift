@@ -79,7 +79,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                         }
                         if !statsText.isEmpty {
                             Text(statsText)
-                                .font(.caption)
+                                .appFont(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -104,7 +104,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     private func title(_ value: String) -> some View {
         Text(value)
             .contentTransition(.opacity)
-            .font(.title3.weight(.semibold))
+            .appFont(.title3, weight: .semibold)
             .multilineTextAlignment(.leading)
     }
 
@@ -133,7 +133,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                 .clipShape(Circle())
 
             Text(video.channelName)
-                .font(.subheadline.weight(.medium))
+                .appFont(.subheadline, weight: .medium)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
         }
         .frame(minHeight: 44)

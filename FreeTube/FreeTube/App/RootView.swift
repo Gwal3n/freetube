@@ -17,6 +17,7 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var selectedTab: Tab
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
+    @AppStorage("appFontPreset") private var appFontPresetRaw = AppFontPreset.system.rawValue
     @State private var navigationRouter = AppNavigationRouter()
     private enum RootSheet: String, Identifiable {
         case settings
@@ -145,6 +146,7 @@ struct RootView: View {
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
+        .environment(\.appFontPreset, AppFontPreset(rawValue: appFontPresetRaw) ?? .system)
     }
 
     private var tabShell: some View {

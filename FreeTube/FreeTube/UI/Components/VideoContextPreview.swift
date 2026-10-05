@@ -31,12 +31,12 @@ struct VideoContextPreview: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(branding.title(for: video))
                         .contentTransition(.opacity)
-                        .font(.headline)
+                        .appFont(.headline, weight: .semibold)
                         .lineLimit(2)
 
                     if !metadata.isEmpty {
                         Text(metadata)
-                            .font(.subheadline)
+                            .appFont(.subheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }

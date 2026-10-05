@@ -18,7 +18,7 @@ struct PlayerDescription: View {
             if isExpanded {
                 if let text {
                     RichDescriptionText(parts: parts, fallback: text, onSeek: onSeek)
-                        .font(.subheadline)
+                        .appFont(.subheadline)
                         .foregroundStyle(.primary)
                         .transition(.opacity)
                 } else if isLoading {
@@ -26,7 +26,7 @@ struct PlayerDescription: View {
                         .transition(.opacity)
                 } else if loadFailed {
                     HStack(spacing: 8) {
-                        Text("Description unavailable").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Description unavailable").appFont(.subheadline).foregroundStyle(.secondary)
                         Button("Retry", action: onRetry)
                             .font(.caption.weight(.semibold))
                             .buttonStyle(.bordered)
@@ -35,7 +35,7 @@ struct PlayerDescription: View {
             } else if let text {
                 Button(action: onExpand) {
                     Text(text)
-                        .font(.subheadline)
+                        .appFont(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)

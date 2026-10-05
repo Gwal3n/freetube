@@ -18,11 +18,11 @@ struct ChannelContextPreview: View {
                     .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 4) {
                     Text(verbatim: details.name)
-                        .font(.headline)
+                        .appFont(.headline, weight: .semibold)
                         .lineLimit(2)
                     if let handle = details.handle, !handle.isEmpty {
                         Text(verbatim: handle)
-                            .font(.subheadline)
+                            .appFont(.subheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -42,7 +42,7 @@ struct ChannelContextPreview: View {
                         Text("\(count.formatted()) videos")
                     }
                 }
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
@@ -55,7 +55,7 @@ struct ChannelContextPreview: View {
             if let description = details.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines),
                !description.isEmpty {
                 Text(verbatim: description)
-                    .font(.footnote)
+                    .appFont(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
             }

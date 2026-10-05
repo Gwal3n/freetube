@@ -10,11 +10,11 @@ struct PlayerSectionHeading: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.headline)
+                .appFont(.headline, weight: .semibold)
                 .lineLimit(1)
             if let detail, !detail.isEmpty {
                 Text(detail)
-                    .font(.subheadline)
+                    .appFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .layoutPriority(-1)

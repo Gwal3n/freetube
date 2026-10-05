@@ -67,6 +67,7 @@ struct UserPreferences {
     /// instant. Users who want to save bandwidth (or who tend not to advance through the
     /// queue) can flip this off in Settings.
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.system.rawValue
+    @AppStorage("appFontPreset") var appFontPresetRaw: String = AppFontPreset.system.rawValue
     @AppStorage("downloadCacheLimit") var downloadCacheLimitRaw: String = DownloadCacheLimit.unlimited.rawValue
     /// `--concurrent-fragments` value passed to yt-dlp. Higher values fetch more DASH/HLS chunks
     /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
@@ -115,6 +116,11 @@ struct UserPreferences {
     var historyRetentionPolicy: HistoryRetentionPolicy {
         get { HistoryRetentionPolicy(rawValue: historyRetentionPolicyRaw) ?? .forever }
         nonmutating set { historyRetentionPolicyRaw = newValue.rawValue }
+    }
+
+    var appFontPreset: AppFontPreset {
+        get { AppFontPreset(rawValue: appFontPresetRaw) ?? .system }
+        nonmutating set { appFontPresetRaw = newValue.rawValue }
     }
 
     var playerControlLayout: PlayerControlLayout {
