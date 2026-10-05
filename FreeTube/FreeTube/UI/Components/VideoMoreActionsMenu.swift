@@ -162,6 +162,17 @@ private struct VideoActionsContent: View {
         } label: {
             Label("Copy URL", systemImage: "link")
         }
+        // Do not read the live playback clock while constructing the menu: re-evaluating it
+        // every tick can reset an open native menu. Capture the time only when tapped.
+        if player.currentVideo?.id == video.id {
+            Button {
+                if let url = video.youtubeShareURL(at: player.elapsed) {
+                    UIPasteboard.general.string = url.absoluteString
+                }
+            } label: {
+                Label("Copy URL at current time", systemImage: "clock")
+            }
+        }
         Divider()
         Button {
             addToPlaylistVideo = video

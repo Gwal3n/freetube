@@ -14,6 +14,7 @@ struct PlayerTopControls: View {
     let isFullscreen: Bool
     let isAudioOnly: Bool
     let isSwitchingAudioMode: Bool
+    let sleepTimerOption: SleepTimerOption
     let onSetPlaybackRate: (Double) -> Void
     let onSetPlaybackQuality: (VideoQuality) -> Void
     let onToggleLoop: () -> Void
@@ -21,23 +22,24 @@ struct PlayerTopControls: View {
     let onToggleFullscreen: () -> Void
     let onToggleAutoplay: () -> Void
     let onToggleAudioOnly: () -> Void
+    let onSetSleepTimer: (SleepTimerOption) -> Void
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(controls) { control in
                 controlView(control)
             }
-            if !overflowControls.isEmpty {
-                Menu {
-                    ForEach(overflowControls) { control in
-                        overflowItem(control)
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .playerTopControl()
+            Menu {
+                ForEach(overflowControls) { control in
+                    overflowItem(control)
                 }
-                .accessibilityLabel("More player controls")
+                if !overflowControls.isEmpty { Divider() }
+                sleepTimerMenu
+            } label: {
+                Image(systemName: "ellipsis")
+                    .playerTopControl()
             }
+            .accessibilityLabel("More player controls")
         }
         .buttonStyle(.plain)
     }
@@ -154,6 +156,30 @@ struct PlayerTopControls: View {
         }
         .accessibilityLabel("Playback speed")
         .accessibilityValue(rateLabel(playbackRate))
+    }
+
+    private var sleepTimerMenu: some View {
+        Menu {
+            sleepTimerChoice(.off, title: "Off")
+            sleepTimerChoice(.fifteenMinutes, title: "15 minutes")
+            sleepTimerChoice(.thirtyMinutes, title: "30 minutes")
+            sleepTimerChoice(.oneHour, title: "1 hour")
+            sleepTimerChoice(.endOfVideo, title: "End of current video")
+        } label: {
+            Label("Sleep timer", systemImage: "moon.zzz")
+        }
+    }
+
+    private func sleepTimerChoice(_ option: SleepTimerOption, title: LocalizedStringKey) -> some View {
+        Button {
+            onSetSleepTimer(option)
+        } label: {
+            if sleepTimerOption == option {
+                Label(title, systemImage: "checkmark")
+            } else {
+                Text(title)
+            }
+        }
     }
 
     private var speedChoices: some View {

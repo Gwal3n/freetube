@@ -56,6 +56,7 @@ final class PlayerStateManager {
     private(set) var duration: TimeInterval = 0
     private(set) var playbackRate: Double
     private(set) var playbackQuality: VideoQuality
+    private(set) var sleepTimerOption: SleepTimerOption = .off
     var isAudioOnly: Bool { playbackQuality == .audioOnly }
     private(set) var isSwitchingAudioMode = false
     private var videoQualityBeforeAudio: VideoQuality
@@ -191,6 +192,7 @@ final class PlayerStateManager {
     private var seekRequestID = 0
     private var audioModeSwitchGeneration = 0
     private var resumeAfterAudioSwitch: Bool?
+    private var sleepTimerTask: Task<Void, Never>?
     private var lastProgressSaveAt = Date.distantPast
     private var lastSavedProgressVideoID: String?
     private var lastSavedProgressPosition: TimeInterval = -.infinity
@@ -253,6 +255,7 @@ final class PlayerStateManager {
     /// Tear-down hook for tests / app lifecycle. Call before releasing the manager. We avoid `deinit`
     /// here so we don't have to reach into main-actor-isolated state from a nonisolated context.
     func tearDownObservers() {
+        setSleepTimer(.off)
         playerPresentationTask?.cancel()
         playerPresentationTask = nil
         audioModeSwitchTask?.cancel()
@@ -306,6 +309,7 @@ final class PlayerStateManager {
     /// playback state still surface through the existing UI.
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
         log.info("loadLocalFile path=\(fileURL.path, privacy: .public) title=\"\(title, privacy: .public)\"")
+        if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
         // Link downloads are independent of the YouTube quality preference. An audio file keeps
         // its artwork visible; a video file keeps its actual frames visible.
         playbackQuality = ["m4a", "mp3", "aac", "opus", "ogg", "wav", "flac"]
@@ -404,6 +408,7 @@ final class PlayerStateManager {
                 return
             }
         }
+        if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
         // Settings can change while the player is alive. Adopt that choice for the next video,
         // without disturbing the stream currently playing when the preference changes.
         let preferredQuality = preferences.preferredQuality
@@ -790,6 +795,22 @@ final class PlayerStateManager {
         log.info("Loop current video=\(self.queue.repeatMode == .one, privacy: .public)")
     }
 
+    /// Stops playback once after a duration or at the selected video's natural end. Timed
+    /// choices survive video changes; end-of-video is cancelled when that video is replaced.
+    /// Neither choice survives player dismissal or app relaunch.
+    func setSleepTimer(_ option: SleepTimerOption) {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        sleepTimerOption = currentVideo == nil ? .off : option
+        guard let duration = sleepTimerOption.duration else { return }
+        sleepTimerTask = Task { [weak self] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled, let self, self.sleepTimerOption == option else { return }
+            self.pause()
+            self.setSleepTimer(.off)
+        }
+    }
+
     /// Updates the HLS adaptive-quality ceiling in place and persists it for future resolutions.
     /// Fixed progressive/local assets cannot switch representation after loading, but retain the
     /// new preference for the next video without disrupting current playback.
@@ -1082,6 +1103,7 @@ final class PlayerStateManager {
 
     func dismiss() {
         log.info("dismiss()")
+        setSleepTimer(.off)
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         resolutionTask = nil
@@ -1934,6 +1956,13 @@ final class PlayerStateManager {
                 self.elapsed = self.duration
                 self.persistCurrentPlaybackProgress(force: true)
                 self.updateNowPlaying()
+
+                // Stop-before-autoplay is essential: pausing alone would still let the ordinary
+                // end observer advance to the next recommendation or repeat the current item.
+                if self.sleepTimerOption == .endOfVideo {
+                    self.setSleepTimer(.off)
+                    return
+                }
 
                 // Loop-one is an explicit playback instruction and therefore remains active even
                 // when general autoplay is disabled. Any successful transition resets `hasEnded`

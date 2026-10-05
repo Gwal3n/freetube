@@ -1,6 +1,60 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Sleep timer" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einschlaftimer" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sleep timer" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Temporizador de apagado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Minuteur de sommeil" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Таймер сна" } }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Aus" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Off" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Desactivado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Désactivé" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Выключено" } }
+      }
+    },
+    "15 minutes" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "15 Minuten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "15 minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "15 минут" } }
+      }
+    },
+    "30 minutes" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "30 Minuten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "30 minutes" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "30 minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "30 minutes" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "30 минут" } }
+      }
+    },
+    "1 hour" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "1 Stunde" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "1 hour" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "1 hora" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "1 heure" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "1 час" } }
+      }
+    },
+    "End of current video" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ende des aktuellen Videos" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "End of current video" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Al terminar el vídeo actual" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "À la fin de la vidéo en cours" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "После текущего видео" } }
+      }
+    },
     "Channel tabs" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Kanal-Tabs" } },

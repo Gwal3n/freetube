@@ -217,6 +217,7 @@ struct FullScreenPlayer: View {
                                 isFullscreen: isLandscape || portraitFullscreenActive,
                                 isAudioOnly: player.isAudioOnly,
                                 isSwitchingAudioMode: player.isSwitchingAudioMode,
+                                sleepTimerOption: player.sleepTimerOption,
                                 onSetPlaybackRate: { rate in
                                     player.setPlaybackRate(rate)
                                     showPlayerControls()
@@ -240,6 +241,10 @@ struct FullScreenPlayer: View {
                                 },
                                 onToggleAudioOnly: {
                                     player.toggleAudioOnly()
+                                    showPlayerControls()
+                                },
+                                onSetSleepTimer: { option in
+                                    player.setSleepTimer(option)
                                     showPlayerControls()
                                 }
                             )
@@ -931,11 +936,8 @@ struct FullScreenPlayer: View {
         URL(string: "https://www.youtube.com/watch?v=\(video.id)")
     }
 
-    /// `youtu.be/<id>?t=<seconds>` is the canonical share-with-timestamp URL YouTube understands.
     private func watchURLAtCurrentTime(_ video: Video) -> URL? {
-        let seconds = Int(player.elapsed)
-        return URL(string: "https://youtu.be/\(video.id)?t=\(seconds)")
-            ?? URL(string: "https://youtu.be/\(video.id)")
+        video.youtubeShareURL(at: player.elapsed)
     }
 
     private func openChannel(_ channelID: String) {

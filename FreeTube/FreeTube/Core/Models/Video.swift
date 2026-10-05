@@ -59,6 +59,14 @@ extension Video {
 }
 
 extension Video {
+    /// Public timestamp link only. Never share or persist the signed playback stream URL.
+    func youtubeShareURL(at time: TimeInterval) -> URL? {
+        guard YouTubeVideoLink.videoID(from: id, allowBareID: true) != nil,
+              time.isFinite else { return nil }
+        let seconds = Int(min(max(0, time), Double(Int32.max)))
+        return URL(string: "https://youtu.be/\(id)?t=\(seconds)")
+    }
+
     func replacingTitle(with title: String) -> Video {
         Video(
             id: id, title: title, channelID: channelID, channelName: channelName,

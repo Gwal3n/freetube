@@ -4,6 +4,14 @@ import CoreGraphics
 
 @MainActor
 final class PlayerPolishTests: XCTestCase {
+    func testSleepTimerOptionsHaveOnlyTimedDurationsWhereExpected() {
+        XCTAssertNil(SleepTimerOption.off.duration)
+        XCTAssertNil(SleepTimerOption.endOfVideo.duration)
+        XCTAssertEqual(SleepTimerOption.fifteenMinutes.duration, Duration.seconds(15 * 60))
+        XCTAssertEqual(SleepTimerOption.thirtyMinutes.duration, Duration.seconds(30 * 60))
+        XCTAssertEqual(SleepTimerOption.oneHour.duration, Duration.seconds(60 * 60))
+    }
+
     func testPlayerControlLayoutKeepsEachControlInExactlyOneSection() {
         let layout = PlayerControlLayout.restored(
             from: "",
