@@ -19,6 +19,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var expandedDragStartedDown = false
     @State private var expandedDragCanCollapse = false
     @State private var suppressMiniPlayerTap = false
+    @State private var transitionMonitor = PlayerTransitionFrameMonitor()
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
         self.thumbnail = thumbnail
@@ -114,8 +115,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             // `fullScreenPresented` behind the container's back. Use the exact same coordinated
             // path as a direct tap on the miniplayer.
             guard player.miniPlayerVisible, !player.fullScreenPresented else { return }
-            expandPlayer()
+            expandPlayer(source: "video-selection")
         }
+        .onDisappear { transitionMonitor.stop() }
     }
 
     private func transitionProgress(in size: CGSize) -> CGFloat {
@@ -173,6 +175,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         || (!player.playlistPanelPresented && player.playerPanelAtTop)
                 }
                 guard expandedDragStartedDown, expandedDragCanCollapse else { return }
+                if !transitionMonitor.isActive {
+                    transitionMonitor.begin("expanded-drag")
+                }
                 player.playerPresentationGestureActive = true
                 // A small amount of initial resistance preserves the pleasant top-edge rubber
                 // band before the whole player begins following the finger.
@@ -189,6 +194,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                       dragIsVertical == true,
                       expandedDragStartedDown,
                       expandedDragCanCollapse else {
+                    transitionMonitor.stop()
                     presentationTranslation = 0
                     return
                 }
@@ -199,6 +205,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     presentationTranslation > 110
                     || value.predictedEndTranslation.height > 230
                 )
+                transitionMonitor.settle(shouldCollapse ? "collapse" : "return")
                 withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
                     presentationTranslation = 0
                     if shouldCollapse {
@@ -214,8 +221,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             .onChanged { value in
                 guard !player.fullScreenPresented else { return }
                 suppressMiniPlayerTap = true
+                let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
+                if directionWasUndetermined {
+                    transitionMonitor.begin("mini-drag")
+                }
                 if value.translation.height < 0 {
                     presentationTranslation = value.translation.height
                     miniDismissTranslation = 0
@@ -233,6 +244,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     }
                 }
                 guard !player.fullScreenPresented, dragIsVertical == true else {
+                    transitionMonitor.stop()
                     presentationTranslation = 0
                     miniDismissTranslation = 0
                     return
@@ -240,6 +252,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
                 let predicted = value.predictedEndTranslation.height
                 if miniDismissTranslation > 0, value.velocity.height < -180 {
+                    transitionMonitor.settle("return")
                     // A downward dismiss drag that turns back up returns to rest, rather than
                     // finishing from its earlier distance or accidentally opening the player.
                     withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.82)) {
@@ -247,8 +260,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         miniDismissTranslation = 0
                     }
                 } else if presentationTranslation < -90 || predicted < -190 {
-                    expandPlayer()
+                    transitionMonitor.settle("expand")
+                    expandPlayer(source: "mini-swipe")
                 } else if miniDismissTranslation > 70 || predicted > 170 {
+                    transitionMonitor.settle("dismiss")
                     let occlusionTravel = miniPlayerOcclusionTravel
                     if miniDismissTranslation >= occlusionTravel {
                         finishMiniPlayerDismissal()
@@ -263,6 +278,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         finishMiniPlayerDismissal()
                     }
                 } else {
+                    transitionMonitor.settle("return")
                     withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.82)) {
                         presentationTranslation = 0
                         miniDismissTranslation = 0
@@ -277,7 +293,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         dragIsVertical = abs(translation.height) > abs(translation.width) * 1.1
     }
 
-    private func expandPlayer() {
+    private func expandPlayer(source: String) {
+        if !transitionMonitor.isActive {
+            transitionMonitor.begin(source)
+            transitionMonitor.settle("expand")
+        }
         withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.88)) {
             presentationTranslation = 0
             miniDismissTranslation = 0
@@ -288,7 +308,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     private func expandPlayerFromTap() {
         guard !suppressMiniPlayerTap else { return }
-        expandPlayer()
+        expandPlayer(source: "mini-tap")
     }
 
     /// The miniplayer sits immediately above the tab bar. Moving it by its own rendered height
