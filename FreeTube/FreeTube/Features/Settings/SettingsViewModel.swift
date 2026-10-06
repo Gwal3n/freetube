@@ -181,6 +181,17 @@ final class SettingsViewModel {
         playerControlLayout = layout
     }
 
+    func reorderPlayerControls(
+        in section: PlayerControlLayout.Section,
+        fromOffsets offsets: IndexSet,
+        toOffset destination: Int
+    ) {
+        var layout = playerControlLayout
+        layout.reorder(in: section, fromOffsets: offsets, toOffset: destination)
+        guard layout != playerControlLayout else { return }
+        playerControlLayout = layout
+    }
+
     func sponsorBlockBehaviorBinding(for category: SponsorBlockCategory) -> Binding<SponsorBlockBehavior> {
         Binding(
             get: { self.preferences.sponsorBlockBehavior(for: category) },

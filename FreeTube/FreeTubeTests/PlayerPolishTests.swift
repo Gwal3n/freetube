@@ -61,6 +61,30 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(PlayerControlLayout.restored(from: layout.encoded, legacyOrder: "", legacyHidden: ""), layout)
     }
 
+    func testNativeListReordersOnlyItsOwnSection() {
+        var layout = PlayerControlLayout.standard
+        let originalMore = layout.moreMenu
+
+        layout.reorder(in: .onPlayer, fromOffsets: IndexSet(integer: 0), toOffset: 3)
+
+        XCTAssertEqual(layout.onPlayer, [.fullscreen, .speed, .audioOnly])
+        XCTAssertEqual(layout.moreMenu, originalMore)
+        XCTAssertEqual(layout.hidden, [])
+        XCTAssertEqual(
+            PlayerControlLayout.restored(from: layout.encoded, legacyOrder: "", legacyHidden: ""),
+            layout
+        )
+    }
+
+    func testInvalidReorderDoesNotChangeLayout() {
+        var layout = PlayerControlLayout.standard
+        let original = layout
+
+        layout.reorder(in: .onPlayer, fromOffsets: IndexSet(integer: 99), toOffset: 0)
+
+        XCTAssertEqual(layout, original)
+    }
+
     func testPlaylistCountsAcceptDisplayStrings() {
         XCTAssertEqual(Mappers.parseAbbreviatedCount("123 videos"), 123)
         XCTAssertEqual(Mappers.parseAbbreviatedCount("1,234 videos"), 1_234)

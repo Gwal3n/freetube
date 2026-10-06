@@ -74,6 +74,28 @@ struct PlayerControlLayout: Equatable {
         }
     }
 
+    /// Reorder within one section using the offsets supplied by SwiftUI's native List editing.
+    /// Cross-section placement remains a separate, explicit menu action.
+    mutating func reorder(in section: Section, fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        let current = controls(in: section)
+        guard !offsets.isEmpty,
+              offsets.allSatisfy({ current.indices.contains($0) }),
+              (0...current.count).contains(destination) else { return }
+
+        let moving = offsets.sorted().map { current[$0] }
+        var remaining = current.enumerated()
+            .filter { !offsets.contains($0.offset) }
+            .map { $0.element }
+        let insertion = destination - offsets.filter { $0 < destination }.count
+        remaining.insert(contentsOf: moving, at: insertion)
+
+        switch section {
+        case .onPlayer: onPlayer = remaining
+        case .moreMenu: moreMenu = remaining
+        case .hidden: hidden = remaining
+        }
+    }
+
     /// Compact, human-readable UserDefaults value. Empty sections are retained between pipes.
     var encoded: String {
         [onPlayer, moreMenu, hidden]
