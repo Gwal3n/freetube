@@ -5,7 +5,7 @@ import Foundation
 final class SubscriptionFeedService: SubscriptionFeedServicing {
     private enum ChannelResult: Sendable {
         case success(channelID: String, videos: [Video])
-        case failure
+        case failure(LocalSubscription)
     }
     private let channelService: any ChannelServicing
     private let writer: PersistenceWriter
@@ -22,7 +22,7 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
         await onProgress(0, subscriptions.count)
         await writer.pruneSubscriptionFeed(validChannelIDs: Set(subscriptions.map(\.id)))
         var succeeded = 0
-        var failed = 0
+        var failedChannels: [LocalSubscription] = []
 
         // Four requests at a time is responsive without creating a burst for large CSV imports.
         for batchStart in stride(from: 0, to: subscriptions.count, by: 4) {
@@ -36,7 +36,7 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
                                 videos: try await channelService.fetchLatestVideos(channelID: subscription.id)
                             )
                         } catch {
-                            return .failure
+                            return .failure(subscription)
                         }
                     }
                 }
@@ -45,13 +45,18 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
                     case .success(let channelID, let videos):
                         await writer.replaceSubscriptionFeedChannel(channelID: channelID, videos: videos, refreshedAt: .now)
                         succeeded += 1
-                    case .failure:
-                        failed += 1
+                    case .failure(let subscription):
+                        failedChannels.append(subscription)
                     }
-                    await onProgress(succeeded + failed, subscriptions.count)
+                    await onProgress(succeeded + failedChannels.count, subscriptions.count)
                 }
             }
         }
-        return SubscriptionFeedRefresh(succeeded: succeeded, failed: failed)
+        return SubscriptionFeedRefresh(
+            succeeded: succeeded,
+            failedChannels: failedChannels.sorted {
+                $0.name.localizedStandardCompare($1.name) == .orderedAscending
+            }
+        )
     }
 }

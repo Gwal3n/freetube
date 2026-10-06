@@ -8,6 +8,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
     case autoplay
     case audioOnly
     case quality
+    case sleepTimer
 
     var id: String { rawValue }
 
@@ -20,6 +21,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
         case .autoplay: return String(localized: "Autoplay")
         case .audioOnly: return String(localized: "Audio only")
         case .quality: return String(localized: "Quality limit")
+        case .sleepTimer: return String(localized: "Sleep timer")
         }
     }
 
@@ -32,6 +34,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
         case .autoplay: return "play.circle"
         case .audioOnly: return "headphones"
         case .quality: return "slider.horizontal.3"
+        case .sleepTimer: return "moon.zzz"
         }
     }
 

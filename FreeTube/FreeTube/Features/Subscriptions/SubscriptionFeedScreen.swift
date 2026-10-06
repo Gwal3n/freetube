@@ -13,6 +13,7 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @State private var currentDate = Date.now
     @State private var lastAutomaticLoadKey: String?
+    @State private var failedChannelsExpanded = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
@@ -27,14 +28,9 @@ struct SubscriptionFeedScreen: View {
                 if model.isRefreshing || model.lastRefreshAt != nil {
                     FeedRefreshProgress(model: model, referenceDate: currentDate)
                 }
-                if model.failedChannelCount > 0 {
+                if model.failedChannelCount > 0 && !model.isRefreshWarningDismissed {
                     Section {
-                        Label(
-                            "\(model.failedChannelCount) \(model.failedChannelCount == 1 ? "channel" : "channels") couldn’t be refreshed. Cached videos were kept.",
-                            systemImage: "exclamationmark.arrow.triangle.2.circlepath"
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        refreshWarning
                     }
                 }
 
@@ -98,7 +94,13 @@ struct SubscriptionFeedScreen: View {
                     ContentUnavailableView {
                         Label("Unable to Refresh", systemImage: "wifi.exclamationmark")
                     } description: {
-                        Text("Your subscriptions couldn’t be refreshed. Check your connection and try again.")
+                        VStack(spacing: 6) {
+                            Text("Your subscriptions couldn’t be refreshed. Check your connection and try again.")
+                            Text(verbatim: model.failedChannels.map(\.name).joined(separator: ", "))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
                     } actions: {
                         Button("Try Again") {
                             Task { await model.refresh() }
@@ -128,6 +130,9 @@ struct SubscriptionFeedScreen: View {
             .onChange(of: groups.groups) { _, _ in
                 Task { await model.groupsChanged() }
             }
+            .onChange(of: model.failedChannels) { _, _ in
+                failedChannelsExpanded = false
+            }
             .task {
                 while !Task.isCancelled {
                     // A single clock for the feed keeps cached upload ages current while it is open.
@@ -155,6 +160,44 @@ struct SubscriptionFeedScreen: View {
 
     private var automaticLoadKey: String {
         "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count)"
+    }
+
+    private var refreshWarning: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("\(model.failedChannelCount) \(model.failedChannelCount == 1 ? "channel" : "channels") couldn’t be refreshed. Cached videos were kept.")
+                    .appFont(.footnote)
+                if model.failedChannelCount == 1, let channel = model.failedChannels.first {
+                    Text(verbatim: channel.name)
+                        .appFont(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if model.failedChannelCount > 1 {
+                    DisclosureGroup("Affected channels", isExpanded: $failedChannelsExpanded) {
+                        ForEach(model.failedChannels) { channel in
+                            Text(verbatim: channel.name)
+                                .appFont(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .appFont(.footnote)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                model.dismissRefreshWarning()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.vertical, 4)
     }
 
     /// A quiet subtitle beneath the native large title. It scrolls with the feed; the native

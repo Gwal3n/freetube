@@ -12,7 +12,8 @@ final class SubscriptionFeedViewModel {
     private(set) var refreshedChannels = 0
     private(set) var refreshChannelCount = 0
     private(set) var hasLoaded = false
-    private(set) var failedChannelCount = 0
+    private(set) var failedChannels: [LocalSubscription] = []
+    private(set) var isRefreshWarningDismissed = false
     private(set) var canLoadMore = false
     private(set) var lastRefreshAt: Date?
     private(set) var selectedGroupID: UUID?
@@ -39,6 +40,7 @@ final class SubscriptionFeedViewModel {
     }
 
     var hasSubscriptions: Bool { !subscriptions.subscriptions.isEmpty }
+    var failedChannelCount: Int { failedChannels.count }
     var selectedGroupName: String? {
         guard let selectedGroupID else { return nil }
         return groups.groups.first(where: { $0.id == selectedGroupID })?.name
@@ -78,15 +80,21 @@ final class SubscriptionFeedViewModel {
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
+        failedChannels = []
+        isRefreshWarningDismissed = false
         refreshedChannels = 0
         refreshChannelCount = subscriptions.subscriptions.count
         let result = await service.refresh(subscriptions: subscriptions.subscriptions) { [weak self] completed, total in
             await self?.updateRefreshProgress(completed: completed, total: total)
         }
-        failedChannelCount = result.failed
+        failedChannels = result.failedChannels
         visibleLimit = pageSize
         await loadCache()
         isRefreshing = false
+    }
+
+    func dismissRefreshWarning() {
+        isRefreshWarningDismissed = true
     }
 
     private func updateRefreshProgress(completed: Int, total: Int) {

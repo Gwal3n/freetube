@@ -29,17 +29,17 @@ struct PlayerTopControls: View {
             ForEach(controls) { control in
                 controlView(control)
             }
-            Menu {
-                ForEach(overflowControls) { control in
-                    overflowItem(control)
+            if !overflowControls.isEmpty {
+                Menu {
+                    ForEach(overflowControls) { control in
+                        overflowItem(control)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .playerTopControl()
                 }
-                if !overflowControls.isEmpty { Divider() }
-                sleepTimerMenu
-            } label: {
-                Image(systemName: "ellipsis")
-                    .playerTopControl()
+                .accessibilityLabel("More player controls")
             }
-            .accessibilityLabel("More player controls")
         }
         .buttonStyle(.plain)
     }
@@ -101,6 +101,16 @@ struct PlayerTopControls: View {
             .disabled(isAudioOnly)
             .accessibilityLabel("Quality limit")
             .accessibilityValue(playbackQuality.displayName)
+        case .sleepTimer:
+            Menu {
+                sleepTimerChoices
+            } label: {
+                Image(systemName: "moon.zzz")
+                    .playerTopControl()
+                    .opacity(sleepTimerOption == .off ? 0.72 : 1)
+            }
+            .accessibilityLabel("Sleep timer")
+            .accessibilityValue(sleepTimerOption == .off ? "Off" : "On")
         }
     }
 
@@ -141,6 +151,8 @@ struct PlayerTopControls: View {
                 Label(isAudioOnly ? "Turn audio-only off" : "Turn audio-only on", systemImage: control.systemImage)
             }
             .disabled(isSwitchingAudioMode)
+        case .sleepTimer:
+            sleepTimerMenu
         }
     }
 
@@ -160,14 +172,19 @@ struct PlayerTopControls: View {
 
     private var sleepTimerMenu: some View {
         Menu {
-            sleepTimerChoice(.off, title: "Off")
-            sleepTimerChoice(.fifteenMinutes, title: "15 minutes")
-            sleepTimerChoice(.thirtyMinutes, title: "30 minutes")
-            sleepTimerChoice(.oneHour, title: "1 hour")
-            sleepTimerChoice(.endOfVideo, title: "End of current video")
+            sleepTimerChoices
         } label: {
             Label("Sleep timer", systemImage: "moon.zzz")
         }
+    }
+
+    @ViewBuilder
+    private var sleepTimerChoices: some View {
+        sleepTimerChoice(.off, title: "Off")
+        sleepTimerChoice(.fifteenMinutes, title: "15 minutes")
+        sleepTimerChoice(.thirtyMinutes, title: "30 minutes")
+        sleepTimerChoice(.oneHour, title: "1 hour")
+        sleepTimerChoice(.endOfVideo, title: "End of current video")
     }
 
     private func sleepTimerChoice(_ option: SleepTimerOption, title: LocalizedStringKey) -> some View {

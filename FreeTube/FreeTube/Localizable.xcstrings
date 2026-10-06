@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Affected channels" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Betroffene Kanäle" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Affected channels" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Canales afectados" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chaînes concernées" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Затронутые каналы" } }
+      }
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Schließen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dismiss" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cerrar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fermer" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Закрыть" } }
+      }
+    },
     "Text font" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Textschrift" } },

@@ -25,7 +25,7 @@ struct PlayerControlLayout: Equatable {
 
     static let standard = PlayerControlLayout(
         onPlayer: [.audioOnly, .fullscreen, .speed],
-        moreMenu: [.quality, .autoplay, .loop, .mute],
+        moreMenu: [.quality, .autoplay, .loop, .mute, .sleepTimer],
         hidden: []
     )
 

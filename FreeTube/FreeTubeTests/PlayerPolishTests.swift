@@ -23,6 +23,7 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(controls.count, PlayerTopControl.allCases.count)
         XCTAssertEqual(layout.hidden, [.mute])
         XCTAssertTrue(layout.moreMenu.contains(.quality))
+        XCTAssertTrue(layout.moreMenu.contains(.sleepTimer))
         XCTAssertLessThanOrEqual(layout.onPlayer.count, PlayerControlLayout.maximumOnPlayer)
     }
 
