@@ -69,13 +69,13 @@ final class PlayerCaptionsModel {
         cues = []
         hasCueError = false
         isLoadingCues = false
-        guard let track else { return }
+        guard let track, let videoID else { return }
 
         isLoadingCues = true
         cueTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let loaded = try await videoService.fetchCaptionCues(track: track)
+                let loaded = try await videoService.fetchCaptionCues(videoID: videoID, track: track)
                 guard !Task.isCancelled, selectedTrackID == track.id else { return }
                 cues = loaded
             } catch {
