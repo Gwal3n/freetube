@@ -29,6 +29,7 @@ struct PlaybackCandidate: Sendable {
     let source: PlaybackSource
     let strategy: PlaybackStrategy
     let storyboard: VideoStoryboard?
+    let captionTracks: [VideoCaptionTrack]
     let originalAudioLanguageCode: String?
     let originalTitle: String?
     let mimeTypeOverride: String?
@@ -37,6 +38,7 @@ struct PlaybackCandidate: Sendable {
         source: PlaybackSource,
         strategy: PlaybackStrategy,
         storyboard: VideoStoryboard? = nil,
+        captionTracks: [VideoCaptionTrack] = [],
         originalAudioLanguageCode: String? = nil,
         originalTitle: String? = nil,
         mimeTypeOverride: String? = nil
@@ -44,6 +46,7 @@ struct PlaybackCandidate: Sendable {
         self.source = source
         self.strategy = strategy
         self.storyboard = storyboard
+        self.captionTracks = captionTracks
         self.originalAudioLanguageCode = originalAudioLanguageCode
         self.originalTitle = originalTitle
         self.mimeTypeOverride = mimeTypeOverride

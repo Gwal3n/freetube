@@ -65,6 +65,8 @@ final class PlayerStateManager {
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     private(set) var chapters: [VideoChapter] = []
     private(set) var storyboard: VideoStoryboard?
+    /// Source tracks from the accepted playback response; signed URLs remain memory-only.
+    private(set) var captionTracks: [VideoCaptionTrack] = []
     private(set) var commentsCountText: String?
     private(set) var isLoadingMoreRecommendations = false
     private(set) var activePlaylist: Playlist?
@@ -278,6 +280,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        captionTracks = []
         commentsCountText = nil
         recommendationBacklog = []
         recommendationContinuationToken = nil
@@ -327,6 +330,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        captionTracks = []
         commentsCountText = nil
         recommendationBacklog = []
         recommendationContinuationToken = nil
@@ -431,6 +435,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        captionTracks = []
         commentsCountText = nil
         recommendationBacklog = []
         recommendationContinuationToken = nil
@@ -1121,6 +1126,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
+        captionTracks = []
         recommendationBacklog = []
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
@@ -1626,6 +1632,7 @@ final class PlayerStateManager {
                 // `total` still measures resolve → `.readyToPlay`, unchanged, so the number stays
                 // comparable with builds that played only after this point.
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
+                captionTracks = candidate.captionTracks
                 loadState = .readyToPlay
                 if let title = candidate.originalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !title.isEmpty, let current = currentVideo, current.title != title {

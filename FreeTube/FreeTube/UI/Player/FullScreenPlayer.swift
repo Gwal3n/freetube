@@ -513,10 +513,12 @@ struct FullScreenPlayer: View {
         .onChange(of: player.currentVideo?.id, initial: true) { _, videoID in
             captionsModel.reset(for: videoID)
         }
-        .task(id: player.fullScreenPresented ? player.currentVideo?.id : nil) {
-            guard player.fullScreenPresented, let videoID = player.currentVideo?.id else { return }
+        .task(id: player.fullScreenPresented && player.loadState == .readyToPlay ? player.currentVideo?.id : nil) {
+            guard player.fullScreenPresented,
+                  player.loadState == .readyToPlay,
+                  let videoID = player.currentVideo?.id else { return }
             captionsModel.reset(for: videoID)
-            await captionsModel.loadTracks(for: videoID)
+            await captionsModel.loadTracks(for: videoID, preferredTracks: player.captionTracks)
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task {

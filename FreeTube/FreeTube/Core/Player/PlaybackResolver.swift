@@ -58,6 +58,7 @@ final class PlaybackResolver: PlaybackResolving {
                     source: .direct(result.url),
                     strategy: .native,
                     storyboard: result.storyboard,
+                    captionTracks: result.captionTracks,
                     originalAudioLanguageCode: result.originalAudioLanguageCode,
                     originalTitle: result.originalTitle,
                     mimeTypeOverride: result.mimeTypeOverride

@@ -27,6 +27,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             return NativeStreamResult(
                 url: cached.url,
                 storyboard: cached.storyboard,
+                captionTracks: cached.captionTracks,
                 originalAudioLanguageCode: cached.originalAudioLanguageCode,
                 originalTitle: cached.originalTitle,
                 mimeTypeOverride: cached.mimeTypeOverride
@@ -52,6 +53,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 do {
                     if let audio = try await NativeHLSDownloadService().preferredAudioPlaylistURL(from: hls) {
                         let storyboard = await storyboard(from: youtube, videoID: videoID)
+                        let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
                         let originalTitle = (try? await youtube.metadata)?.title
                         let mimeType = "application/vnd.apple.mpegurl"
                         await cache.set(
@@ -59,6 +61,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                             formatID: cacheKey,
                             url: audio,
                             storyboard: storyboard,
+                            captionTracks: captionTracks,
                             originalTitle: originalTitle,
                             mimeTypeOverride: mimeType
                         )
@@ -66,6 +69,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                         return NativeStreamResult(
                             url: audio,
                             storyboard: storyboard,
+                            captionTracks: captionTracks,
                             originalTitle: originalTitle,
                             mimeTypeOverride: mimeType
                         )
@@ -81,6 +85,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             if quality != .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
+                let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
                 let originalAudioLanguageCode = try? await youtube.originalAudioLanguageCode
                 // The already-fetched player response carries videoDetails.title. Browsing
                 // responses can instead contain a title translated for the device locale.
@@ -90,6 +95,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                     formatID: cacheKey,
                     url: hls,
                     storyboard: storyboard,
+                    captionTracks: captionTracks,
                     originalAudioLanguageCode: originalAudioLanguageCode,
                     originalTitle: originalTitle
                 )
@@ -100,6 +106,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 return NativeStreamResult(
                     url: hls,
                     storyboard: storyboard,
+                    captionTracks: captionTracks,
                     originalAudioLanguageCode: originalAudioLanguageCode,
                     originalTitle: originalTitle
                 )
@@ -123,18 +130,21 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
 
             if let selected {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
+                let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
                 let originalTitle = (try? await youtube.metadata)?.title
                 let mimeType = quality == .audioOnly && selected.fileExtension == .m4a
                     ? "audio/mp4" : nil
                 await cache.set(
                     videoID: videoID, formatID: cacheKey, url: selected.url,
-                    storyboard: storyboard, originalTitle: originalTitle,
+                    storyboard: storyboard, captionTracks: captionTracks,
+                    originalTitle: originalTitle,
                     mimeTypeOverride: mimeType
                 )
                 log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public) audioCodec=\(String(describing: selected.audioCodec), privacy: .public) bitrate=\(selected.bitrate ?? 0, privacy: .public) averageBitrate=\(selected.averageBitrate ?? 0, privacy: .public) container=\(selected.fileExtension.rawValue, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 return NativeStreamResult(
                     url: selected.url,
                     storyboard: storyboard,
+                    captionTracks: captionTracks,
                     originalTitle: originalTitle,
                     mimeTypeOverride: mimeType
                 )
@@ -147,6 +157,27 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         } catch {
             log.notice("Native extraction failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
+        }
+    }
+
+    private func sourceCaptionTracks(from youtube: YouTube, videoID: String) async -> [VideoCaptionTrack] {
+        do {
+            let sourceTracks = try await youtube.captionTracks
+            let tracks = sourceTracks.map { track in
+                VideoCaptionTrack(
+                    id: track.identifier,
+                    languageCode: track.languageCode,
+                    languageName: track.languageName,
+                    url: track.url,
+                    isAutoGenerated: track.isAutoGenerated
+                )
+            }
+            log.info("Native VISIONOS response has \(tracks.count, privacy: .public) source caption tracks for \(videoID, privacy: .public)")
+            return tracks
+        } catch {
+            let nsError = error as NSError
+            log.notice("Native captions unavailable for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
+            return []
         }
     }
 

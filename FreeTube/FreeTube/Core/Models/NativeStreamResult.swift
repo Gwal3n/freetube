@@ -4,14 +4,16 @@ import Foundation
 struct NativeStreamResult: Sendable {
     let url: URL
     let storyboard: VideoStoryboard?
+    let captionTracks: [VideoCaptionTrack]
     let originalAudioLanguageCode: String?
     let originalTitle: String?
     /// Format hint for extensionless media URLs. Nil lets AVPlayer inspect the source itself.
     let mimeTypeOverride: String?
 
-    init(url: URL, storyboard: VideoStoryboard?, originalAudioLanguageCode: String? = nil, originalTitle: String? = nil, mimeTypeOverride: String? = nil) {
+    init(url: URL, storyboard: VideoStoryboard?, captionTracks: [VideoCaptionTrack] = [], originalAudioLanguageCode: String? = nil, originalTitle: String? = nil, mimeTypeOverride: String? = nil) {
         self.url = url
         self.storyboard = storyboard
+        self.captionTracks = captionTracks
         self.originalAudioLanguageCode = originalAudioLanguageCode
         self.originalTitle = originalTitle
         self.mimeTypeOverride = mimeTypeOverride

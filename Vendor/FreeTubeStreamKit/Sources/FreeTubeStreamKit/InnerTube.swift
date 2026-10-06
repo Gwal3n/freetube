@@ -186,6 +186,22 @@ class InnerTube {
         let streamingData: StreamingData?
         let videoDetails: VideoDetails?
         let storyboards: Storyboards?
+        let captions: Captions?
+
+        private enum CodingKeys: String, CodingKey {
+            case playabilityStatus, streamingData, videoDetails, storyboards, captions
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            playabilityStatus = try values.decodeIfPresent(PlayabilityStatus.self, forKey: .playabilityStatus)
+            streamingData = try values.decodeIfPresent(StreamingData.self, forKey: .streamingData)
+            videoDetails = try values.decodeIfPresent(VideoDetails.self, forKey: .videoDetails)
+            storyboards = try values.decodeIfPresent(Storyboards.self, forKey: .storyboards)
+            // Captions are ancillary: an unfamiliar track shape must never make a playable
+            // player response fail to decode.
+            captions = try? values.decodeIfPresent(Captions.self, forKey: .captions)
+        }
 
         struct PlayabilityStatus: Decodable {
             let status: String?
@@ -215,6 +231,48 @@ class InnerTube {
             struct PlayerStoryboardSpecRenderer: Decodable {
                 let spec: String?
                 let recommendedLevel: Int?
+            }
+        }
+
+        struct Captions: Decodable {
+            let playerCaptionsTracklistRenderer: TracklistRenderer?
+
+            struct TracklistRenderer: Decodable {
+                let captionTracks: [CaptionTrack]?
+
+                struct CaptionTrack: Decodable {
+                    let baseUrl: String?
+                    let languageCode: String?
+                    let vssId: String?
+                    let kind: String?
+                    let name: Name?
+
+                    private enum CodingKeys: String, CodingKey {
+                        case baseUrl, languageCode, vssId, kind, name
+                    }
+
+                    init(from decoder: Decoder) throws {
+                        let values = try decoder.container(keyedBy: CodingKeys.self)
+                        baseUrl = try? values.decodeIfPresent(String.self, forKey: .baseUrl)
+                        languageCode = try? values.decodeIfPresent(String.self, forKey: .languageCode)
+                        vssId = try? values.decodeIfPresent(String.self, forKey: .vssId)
+                        kind = try? values.decodeIfPresent(String.self, forKey: .kind)
+                        name = try? values.decodeIfPresent(Name.self, forKey: .name)
+                    }
+
+                    struct Name: Decodable {
+                        let simpleText: String?
+                        let runs: [Run]?
+
+                        struct Run: Decodable {
+                            let text: String?
+                        }
+
+                        var text: String? {
+                            simpleText ?? runs?.compactMap(\.text).joined()
+                        }
+                    }
+                }
             }
         }
     }
