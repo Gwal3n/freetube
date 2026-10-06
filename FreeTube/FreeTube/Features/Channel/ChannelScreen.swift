@@ -43,6 +43,7 @@ struct ChannelScreen: View {
     private static let pagerSpace = "channelPager"
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let prefetchLookahead = 5
 
@@ -432,12 +433,12 @@ struct ChannelScreen: View {
         static let estimatedTabBarHeight: CGFloat = 44
     }
 
-    /// Mirrors the loaded header's geometry so the screen doesn't jump when content arrives.
+    /// Reserves the loaded header, tabs, and first video rows without starting any page scrolling
+    /// or pagination. The banner uses the same layout as real artwork, including its extension
+    /// behind the navigation and status areas, so the loading-to-content handoff stays still.
     private var channelHeaderPlaceholder: some View {
         VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color(white: 0.14))
-                .frame(height: Metrics.bannerHeight)
+            banner(nil)
 
             HStack(alignment: .center, spacing: Metrics.headerRowSpacing) {
                 Circle()
@@ -445,16 +446,82 @@ struct ChannelScreen: View {
                     .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
 
                 VStack(alignment: .leading, spacing: 7) {
-                    RoundedRectangle(cornerRadius: 4).fill(Color(white: 0.2)).frame(width: 160, height: 18)
-                    RoundedRectangle(cornerRadius: 3).fill(Color(white: 0.16)).frame(width: 110, height: 12)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(white: 0.2))
+                        .frame(maxWidth: 160)
+                        .frame(height: 18)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color(white: 0.16))
+                        .frame(maxWidth: 110)
+                        .frame(height: 12)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color(white: 0.16))
+                        .frame(maxWidth: 135)
+                        .frame(height: 11)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 12)
+                Capsule()
+                    .fill(Color(white: 0.16))
+                    .frame(width: 92, height: 34)
             }
             .padding(.horizontal, Metrics.headerRowInset)
             .padding(.top, 16)
             .padding(.bottom, 18)
+
+            HStack(spacing: 26) {
+                ForEach([CGFloat(54), 48, 62, 47], id: \.self) { width in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color(white: 0.18))
+                        .frame(width: width, height: 12)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 17)
+            .padding(.bottom, 20)
+
+            HStack {
+                Spacer()
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color(white: 0.16))
+                    .frame(width: 82, height: 13)
+            }
+            .padding(.horizontal, 32)
+            .padding(.vertical, 16)
+
+            LazyVStack(spacing: 16) {
+                ForEach(0..<4, id: \.self) { _ in
+                    HStack(spacing: MediaStyle.spacing) {
+                        RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
+                            .fill(Color(white: 0.16))
+                            .frame(
+                                width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
+                                height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
+                            )
+                        VStack(alignment: .leading, spacing: 8) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(white: 0.2))
+                                .frame(maxWidth: 170)
+                                .frame(height: 12)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(white: 0.16))
+                                .frame(maxWidth: 115)
+                                .frame(height: 11)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(white: 0.16))
+                                .frame(width: 72, height: 10)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Color.clear
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    }
+                    .padding(.horizontal, 28)
+                }
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .modifier(ChannelSkeletonPulse(reduceMotion: reduceMotion))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading channel")
         .allowsHitTesting(false)
@@ -546,7 +613,7 @@ struct ChannelScreen: View {
     /// widening this view. The previous version let a `scaledToFill` image size the container with
     /// only a height to go on; a 6:1 banner asked to be 178pt tall reports itself roughly 1075pt
     /// wide, and every ancestor inherited that.
-    private func banner(_ channel: Channel) -> some View {
+    private func banner(_ channel: Channel?) -> some View {
         GeometryReader { geometry in
             // `headerOffset` cancels the header's own upward translation while it collapses,
             // keeping the artwork's extra height stable instead of resizing it during scroll.
@@ -556,7 +623,7 @@ struct ChannelScreen: View {
             Color.clear
                 .frame(width: geometry.size.width, height: artworkHeight)
                 .overlay {
-                    if let bannerURL = channel.bannerURL {
+                    if let bannerURL = channel?.bannerURL {
                         KFImage(bannerURL)
                             .thumbnail(size: CGSize(width: 900, height: 300)) {
                                 bannerPlaceholder
