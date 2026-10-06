@@ -112,7 +112,26 @@ struct DownloadsScreen: View {
                                 onResume: { playlistDownloads.resume(manifest.id) },
                                 onCancel: { playlistDownloads.cancel(manifest.id) }
                             )
-                            .disabled(isSelecting || playlistDownloads.removingPlaylistIDs.contains(manifest.id))
+                            .contextMenu {
+                                if [.queued, .preparing, .downloading].contains(manifest.status) {
+                                    Button {
+                                        playlistDownloads.cancel(manifest.id)
+                                    } label: {
+                                        Label("Cancel playlist download", systemImage: "xmark.circle")
+                                    }
+                                } else if downloadedCount < manifest.videos.count || !manifest.isPrepared {
+                                    Button {
+                                        playlistDownloads.resume(manifest.id)
+                                    } label: {
+                                        Label("Resume playlist download", systemImage: "arrow.clockwise")
+                                    }
+                                }
+                                Button(role: .destructive) {
+                                    pendingPlaylistRemovalID = manifest.id
+                                } label: {
+                                    Label("Delete playlist and downloads", systemImage: "trash")
+                                }
+                            }
                             .swipeActions {
                                 Button(role: .destructive) {
                                     pendingPlaylistRemovalID = manifest.id
@@ -120,6 +139,7 @@ struct DownloadsScreen: View {
                                     Label("Delete playlist and downloads", systemImage: "trash")
                                 }
                             }
+                            .disabled(isSelecting || playlistDownloads.removingPlaylistIDs.contains(manifest.id))
                         }
                     }
                 }
