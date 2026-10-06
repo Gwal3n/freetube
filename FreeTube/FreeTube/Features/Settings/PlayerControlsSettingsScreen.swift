@@ -2,17 +2,23 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// Live, cross-section reordering for optional player controls. iOS supports DropDelegate's
-/// hover callbacks but not SwiftUI's drag-session-end observer, so each visible move is retained.
+/// Live, cross-section reordering for optional player controls. Hover changes are kept in a local
+/// draft so dragging does not write UserDefaults and rebuild the player on every crossed row.
+/// SwiftUI has no reliable drag-session-end callback here, so the visible draft is also committed
+/// on navigation away if the drag ended outside a drop target.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
     @Bindable var model: SettingsViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draggedControl: PlayerTopControl?
-    @State private var targetedSection: PlayerControlLayout.Section?
+    @State private var draftLayout: PlayerControlLayout?
 
     private let dragPrefix = "com.leshko.freetube.player-control:"
     private let rowHeight: CGFloat = 48
+
+    private var displayedLayout: PlayerControlLayout {
+        draftLayout ?? model.playerControlLayout
+    }
 
     var body: some View {
         ScrollView {
@@ -30,28 +36,25 @@ struct PlayerControlsSettingsScreen: View {
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Customize controls")
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear { cancelDrag() }
+        .onDisappear { endDrag() }
     }
 
     private func controlSection(_ section: PlayerControlLayout.Section) -> some View {
-        let controls = model.playerControlLayout.controls(in: section)
+        let controls = displayedLayout.controls(in: section)
 
         return VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: section.title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(targetedSection == section ? Color.primary : Color.secondary)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
                 .padding(.horizontal, 16)
                 .contentShape(Rectangle())
                 .onDrop(of: [.plainText], delegate: ControlDropDelegate(
                     isActive: { draggedControl != nil },
                     onEnter: { _ in
-                        targetedSection = section
-                        hover(in: section, before: model.playerControlLayout.controls(in: section).first)
+                        hover(in: section, before: displayedLayout.controls(in: section).first)
                     },
-                    onExit: {
-                        if targetedSection == section { targetedSection = nil }
-                    },
+                    onExit: {},
                     onDrop: { finishDrag() }
                 ))
 
@@ -92,6 +95,7 @@ struct PlayerControlsSettingsScreen: View {
         .padding(.horizontal, 16)
         .contentShape(Rectangle())
         .onDrag {
+            if draftLayout == nil { draftLayout = model.playerControlLayout }
             draggedControl = control
             return NSItemProvider(object: NSString(string: dragPrefix + control.rawValue))
         } preview: {
@@ -111,19 +115,26 @@ struct PlayerControlsSettingsScreen: View {
         ))
         .accessibilityHint("Drag to reorder or move to another section")
         .accessibilityAction(named: "Move to player") {
-            model.movePlayerControl(control, to: .onPlayer)
+            moveImmediately(control, to: .onPlayer)
         }
         .accessibilityAction(named: "Move to More menu") {
-            model.movePlayerControl(control, to: .moreMenu)
+            moveImmediately(control, to: .moreMenu)
         }
         .accessibilityAction(named: "Hide control") {
-            model.movePlayerControl(control, to: .hidden)
+            moveImmediately(control, to: .hidden)
         }
+    }
+
+    private func moveImmediately(_ control: PlayerTopControl, to section: PlayerControlLayout.Section) {
+        // Accessibility actions are discrete moves; finish any visible draft first so a later
+        // drag dismissal cannot overwrite the VoiceOver user's choice.
+        endDrag()
+        model.movePlayerControl(control, to: section)
     }
 
     private func hover(over target: PlayerTopControl, in section: PlayerControlLayout.Section, at locationY: CGFloat) {
         guard let draggedControl, draggedControl != target else { return }
-        let controls = model.playerControlLayout.controls(in: section)
+        let controls = displayedLayout.controls(in: section)
         guard let targetIndex = controls.firstIndex(of: target) else { return }
         let afterTarget = controls.indices.contains(targetIndex + 1) ? controls[targetIndex + 1] : nil
         let insertionTarget: PlayerTopControl?
@@ -139,20 +150,26 @@ struct PlayerControlsSettingsScreen: View {
 
     private func hover(in section: PlayerControlLayout.Section, before target: PlayerTopControl?) {
         guard let draggedControl else { return }
+        var layout = displayedLayout
+        layout.move(draggedControl, to: section, before: target)
+        guard layout != displayedLayout else { return }
         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-            model.movePlayerControl(draggedControl, to: section, before: target)
+            draftLayout = layout
         }
     }
 
     private func finishDrag() -> Bool {
         guard draggedControl != nil else { return false }
-        cancelDrag()
+        endDrag()
         return true
     }
 
-    private func cancelDrag() {
+    private func endDrag() {
+        if let draftLayout, draftLayout != model.playerControlLayout {
+            model.playerControlLayout = draftLayout
+        }
+        draftLayout = nil
         draggedControl = nil
-        targetedSection = nil
     }
 }
 
