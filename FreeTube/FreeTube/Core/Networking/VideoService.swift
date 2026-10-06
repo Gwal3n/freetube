@@ -118,13 +118,19 @@ final class VideoService: VideoServicing {
     func fetchMoreInfo(id: String) async throws -> VideoInfo {
         log.info("Fetching more video info \(id, privacy: .public)")
         do {
-            let response = try await MoreVideoInfosResponse.sendThrowingRequest(
+            let rawResponse = try await MoreVideoInfosWithRawDescriptionResponse.sendThrowingRequest(
                 youtubeModel: client.model,
                 data: [.query: id]
             )
+            let response = rawResponse.info
             let recommended = response.recommendedVideos.compactMap { $0 as? YTVideo }.map(Mappers.video(from:))
-            let descriptionText = response.videoDescription?.compactMap(\.text).joined()
-            let descriptionParts = Self.descriptionParts(from: response.videoDescription ?? [])
+            let extractedDescription = rawResponse.description
+            let descriptionText = extractedDescription?.text
+                ?? response.videoDescription?.compactMap(\.text).joined()
+            let descriptionParts = extractedDescription?.parts
+                ?? Self.descriptionParts(from: response.videoDescription ?? [])
+            let linkedPartCount = descriptionParts.filter { $0.action != nil }.count
+            log.info("Description parsed id=\(id, privacy: .public) raw=\(extractedDescription != nil, privacy: .public) linkedParts=\(linkedPartCount, privacy: .public)")
             let video = Video(
                 id: id,
                 title: response.videoTitle ?? "",
@@ -246,11 +252,11 @@ final class VideoService: VideoServicing {
         for part in parts {
             guard let text = part.text, !text.isEmpty else { continue }
             let action: VideoDescriptionPart.Action?
-            if let seconds = Self.timestampSeconds(from: text) {
+            if let seconds = VideoDescriptionExtractor.timestampSeconds(from: text) {
                 action = .seek(seconds)
             } else {
                 switch part.role {
-                case .link(let url): action = .externalURL(Self.unwrappedRedirect(url))
+                case .link(let url): action = .externalURL(VideoDescriptionExtractor.unwrappedRedirect(url))
                 case .chapter(let seconds): action = .seek(TimeInterval(seconds))
                 case .video(let id): action = .video(id)
                 case .channel(let id): action = .channel(id)
@@ -286,7 +292,7 @@ final class VideoService: VideoServicing {
             }
 
             let combinedText = String(trailingDigits) + part.text
-            guard let seconds = timestampSeconds(from: combinedText) else {
+            guard let seconds = VideoDescriptionExtractor.timestampSeconds(from: combinedText) else {
                 repaired.append(part)
                 continue
             }
@@ -299,22 +305,6 @@ final class VideoService: VideoServicing {
             repaired.append(VideoDescriptionPart(text: combinedText, action: .seek(seconds)))
         }
         return repaired
-    }
-
-    /// YouTube sometimes describes a timestamp as a video link instead of a chapter action. Its
-    /// visible `m:ss`/`h:mm:ss` text remains stable, so recognize that form before inspecting role.
-    private static func timestampSeconds(from text: String) -> TimeInterval? {
-        let components = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
-        guard components.count == 2 || components.count == 3,
-              components.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
-              let seconds = components.last.flatMap({ Int($0) }), seconds < 60 else { return nil }
-        if components.count == 2 {
-            guard let minutes = Int(components[0]) else { return nil }
-            return TimeInterval(minutes * 60 + seconds)
-        }
-        guard let hours = Int(components[0]),
-              let minutes = Int(components[1]), minutes < 60 else { return nil }
-        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
     }
 
     /// YouTube commonly returns compact counts (`48K`, `1.2M`) rather than integer strings.
@@ -339,19 +329,6 @@ final class VideoService: VideoServicing {
         }
         guard let number = Double(numberText), number >= 0 else { return nil }
         return Int((number * multiplier).rounded())
-    }
-
-    /// MoreVideoInfos uses YouTube's tracking redirect for many ordinary links. Opening its `q`
-    /// destination directly avoids a browser flash and preserves the creator's actual URL.
-    private static func unwrappedRedirect(_ url: URL) -> URL {
-        guard let host = url.host?.lowercased(),
-              host == "youtube.com" || host.hasSuffix(".youtube.com"),
-              url.path == "/redirect",
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let target = components.queryItems?
-                .first(where: { $0.name == "q" || $0.name == "url" })?.value,
-              let destination = URL(string: target) else { return url }
-        return destination
     }
 
     private static func storyboard(from storyboard: YTStoryboard) -> VideoStoryboard {
