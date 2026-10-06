@@ -195,17 +195,19 @@ final class VideoService: VideoServicing {
     func fetchCaptionCues(track: VideoCaptionTrack) async throws -> [VideoCaptionCue] {
         await client.ensureVisitorData()
         var urls = [track.url]
+        var jsonURL: URL?
         if var components = URLComponents(url: track.url, resolvingAgainstBaseURL: false) {
             var queryItems = components.queryItems ?? []
             queryItems.removeAll { $0.name == "fmt" }
             queryItems.append(URLQueryItem(name: "fmt", value: "json3"))
             components.queryItems = queryItems
-            if let jsonURL = components.url, jsonURL != track.url {
-                urls.insert(jsonURL, at: 0)
+            if let formattedURL = components.url, formattedURL != track.url {
+                jsonURL = formattedURL
+                urls.insert(formattedURL, at: 0)
             }
         }
 
-        for url in urls {
+        for (index, url) in urls.enumerated() {
             try Task.checkCancellation()
             do {
                 let response = try await VideoCaptionsResponse.sendThrowingRequest(
@@ -217,10 +219,46 @@ final class VideoService: VideoServicing {
                     log.info("Loaded \(cues.count, privacy: .public) caption cues for \(track.id, privacy: .public)")
                     return cues
                 }
+                log.notice("Caption format \(index, privacy: .public) returned \(response.captionParts.count, privacy: .public) parts for \(track.id, privacy: .public)")
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                log.notice("Caption format failed for track \(track.id, privacy: .public): \(String(describing: error), privacy: .public)")
+                let nsError = error as NSError
+                log.notice("Caption format \(index, privacy: .public) failed for \(track.id, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
+            }
+        }
+        // YouTubeKit decodes an empty timedtext body as a valid response with zero parts. One
+        // uncached, cookie-free request distinguishes that case from a parser/header mismatch,
+        // and can recover cues when the library's request headers are the problem. Do not log
+        // the signed caption URL or body.
+        if let jsonURL {
+            try Task.checkCancellation()
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.httpShouldSetCookies = false
+            configuration.urlCache = nil
+            let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
+            var request = URLRequest(url: jsonURL)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 12
+            do {
+                let (data, response) = try await session.data(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                log.notice("Direct caption response status=\(status, privacy: .public) bytes=\(data.count, privacy: .public) for \(track.id, privacy: .public)")
+                if (200..<300).contains(status), !data.isEmpty {
+                    let decoded = try VideoCaptionsResponse.decodeData(data: data)
+                    let cues = Self.captionCues(from: decoded.captionParts)
+                    if !cues.isEmpty {
+                        log.info("Loaded \(cues.count, privacy: .public) direct caption cues for \(track.id, privacy: .public)")
+                        return cues
+                    }
+                    log.notice("Direct caption body decoded to \(decoded.captionParts.count, privacy: .public) parts for \(track.id, privacy: .public)")
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let nsError = error as NSError
+                log.notice("Direct caption request failed for \(track.id, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
             }
         }
         log.notice("No usable caption cues for track \(track.id, privacy: .public)")
