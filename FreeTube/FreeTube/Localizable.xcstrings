@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "More menu separators" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Trennlinien im Mehr-Menü" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "More menu separators" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Separadores del menú Más" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Séparateurs du menu Plus" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Разделители меню «Ещё»" } }
+      }
+    },
+    "Divider above" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Trennlinie darüber" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Divider above" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Separador encima" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Séparateur au-dessus" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Разделитель сверху" } }
+      }
+    },
     "Affected channels" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Betroffene Kanäle" } },

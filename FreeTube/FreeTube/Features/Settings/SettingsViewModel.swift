@@ -33,6 +33,9 @@ final class SettingsViewModel {
     var playerControlLayout: PlayerControlLayout {
         didSet { preferences.playerControlLayout = playerControlLayout }
     }
+    var playerMoreMenuDividers: Set<PlayerTopControl> {
+        didSet { preferences.playerMoreMenuDividers = playerMoreMenuDividers }
+    }
     var appFontPreset: AppFontPreset {
         didSet { preferences.appFontPreset = appFontPreset }
     }
@@ -48,6 +51,7 @@ final class SettingsViewModel {
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
         self.sponsorBlockEnabled = preferences.sponsorBlockEnabled
         self.playerControlLayout = preferences.playerControlLayout
+        self.playerMoreMenuDividers = preferences.playerMoreMenuDividers
         self.appFontPreset = preferences.appFontPreset
     }
 

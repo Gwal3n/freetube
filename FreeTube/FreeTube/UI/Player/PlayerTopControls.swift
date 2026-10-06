@@ -4,6 +4,8 @@ import SwiftUI
 /// presentation; playback, orientation, and preference mutations stay with `FullScreenPlayer`.
 @available(iOS 17.0, *)
 struct PlayerTopControls: View {
+    @AppStorage("playerMoreMenuDividers") private var moreMenuDividersRaw = ""
+
     let controls: [PlayerTopControl]
     let overflowControls: [PlayerTopControl]
     let playbackRate: Double
@@ -32,6 +34,10 @@ struct PlayerTopControls: View {
             if !overflowControls.isEmpty {
                 Menu {
                     ForEach(overflowControls) { control in
+                        if control != overflowControls.first,
+                           dividerAnchors.contains(control) {
+                            Divider()
+                        }
                         overflowItem(control)
                     }
                 } label: {
@@ -42,6 +48,10 @@ struct PlayerTopControls: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var dividerAnchors: Set<PlayerTopControl> {
+        PlayerTopControl.decodeMenuDividers(moreMenuDividersRaw)
     }
 
     @ViewBuilder

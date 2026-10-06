@@ -28,6 +28,9 @@ struct PlayerControlsSettingsScreen: View {
                 ForEach(PlayerControlLayout.Section.allCases) { section in
                     controlSection(section)
                 }
+                if displayedLayout.moreMenu.count > 1 {
+                    menuDividerSection
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -123,6 +126,58 @@ struct PlayerControlsSettingsScreen: View {
         .accessibilityAction(named: "Hide control") {
             moveImmediately(control, to: .hidden)
         }
+    }
+
+    private var menuDividerSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("More menu separators")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                .padding(.horizontal, 16)
+
+            VStack(spacing: 0) {
+                ForEach(Array(displayedLayout.moreMenu.dropFirst())) { control in
+                    Toggle(isOn: dividerBinding(before: control)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: control.displayName)
+                                .font(.subheadline)
+                            Text("Divider above")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(Color(uiColor: .label))
+                    .frame(minHeight: rowHeight)
+                    .padding(.horizontal, 16)
+
+                    if control != displayedLayout.moreMenu.last {
+                        Divider()
+                            .padding(.leading, 16)
+                    }
+                }
+            }
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    private func dividerBinding(before control: PlayerTopControl) -> Binding<Bool> {
+        Binding(
+            get: { model.playerMoreMenuDividers.contains(control) },
+            set: { isEnabled in
+                var anchors = model.playerMoreMenuDividers
+                if isEnabled {
+                    anchors.insert(control)
+                } else {
+                    anchors.remove(control)
+                }
+                model.playerMoreMenuDividers = anchors
+            }
+        )
     }
 
     private func moveImmediately(_ control: PlayerTopControl, to section: PlayerControlLayout.Section) {

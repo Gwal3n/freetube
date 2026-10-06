@@ -57,6 +57,7 @@ struct UserPreferences {
     @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     @AppStorage("playerControlLayout") var playerControlLayoutRaw: String = ""
+    @AppStorage("playerMoreMenuDividers") var playerMoreMenuDividersRaw: String = ""
     /// When true, `LogFileWriter` opens a new file under `Application Support/Logs/` on every app
     /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app
@@ -132,6 +133,11 @@ struct UserPreferences {
             )
         }
         nonmutating set { playerControlLayoutRaw = newValue.encoded }
+    }
+
+    var playerMoreMenuDividers: Set<PlayerTopControl> {
+        get { PlayerTopControl.decodeMenuDividers(playerMoreMenuDividersRaw) }
+        nonmutating set { playerMoreMenuDividersRaw = PlayerTopControl.encodeMenuDividers(newValue) }
     }
 
     var sponsorBlockCategories: Set<SponsorBlockCategory> {

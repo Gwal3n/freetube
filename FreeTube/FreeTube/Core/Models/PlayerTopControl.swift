@@ -62,4 +62,14 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
     static func encodeHidden(_ controls: Set<PlayerTopControl>) -> String {
         controls.map(\.rawValue).sorted().joined(separator: ",")
     }
+
+    /// A divider belongs to the control immediately below it, so moving that control within
+    /// the More menu keeps the grouping intentional. First/hidden controls simply omit it.
+    static func decodeMenuDividers(_ rawValue: String) -> Set<PlayerTopControl> {
+        Set(rawValue.split(separator: ",").compactMap { PlayerTopControl(rawValue: String($0)) })
+    }
+
+    static func encodeMenuDividers(_ controls: Set<PlayerTopControl>) -> String {
+        controls.map(\.rawValue).sorted().joined(separator: ",")
+    }
 }
