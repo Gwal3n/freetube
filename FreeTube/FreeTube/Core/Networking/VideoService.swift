@@ -221,12 +221,19 @@ final class VideoService: VideoServicing {
                 let cues: [VideoCaptionCue]
                 if format == "json3" {
                     let decoded = try VideoCaptionsResponse.decodeData(data: data)
-                    cues = Self.captionCues(from: decoded.captionParts)
+                    let plainCues = Self.captionCues(from: decoded.captionParts)
+                    cues = Self.captionCues(
+                        plainCues,
+                        applyingStylesFrom: CaptionJSON3Parser.parse(data)
+                    )
                 } else {
                     cues = CaptionTTMLParser.parse(data)
                 }
                 if !cues.isEmpty {
-                    log.info("Loaded \(cues.count, privacy: .public) \(format, privacy: .public) caption cues for \(track.id, privacy: .public)")
+                    let styledCount = cues.filter {
+                        $0.runs.contains(where: { $0.isItalic || $0.colorRGB != nil })
+                    }.count
+                    log.info("Loaded \(cues.count, privacy: .public) \(format, privacy: .public) caption cues, styled=\(styledCount, privacy: .public) for \(track.id, privacy: .public)")
                     return cues
                 }
                 log.notice("Caption \(format, privacy: .public) body had no usable cues for \(track.id, privacy: .public)")
@@ -315,6 +322,28 @@ final class VideoService: VideoServicing {
                 startTime: part.startTime,
                 endTime: min(part.startTime + duration, max(nextStart, part.startTime + 0.1)),
                 text: text
+            )
+        }
+    }
+
+    private static func captionCues(
+        _ plainCues: [VideoCaptionCue],
+        applyingStylesFrom styledCues: [VideoCaptionCue]
+    ) -> [VideoCaptionCue] {
+        // Keep b5i's known-working timing and text. Style only matching JSON3 cues, so a
+        // changed or unfamiliar event shape cannot silently alter caption playback.
+        guard plainCues.count == styledCues.count else { return plainCues }
+        return zip(plainCues, styledCues).map { plain, styled in
+            guard abs(plain.startTime - styled.startTime) < 0.05,
+                  plain.text == styled.text,
+                  styled.runs.contains(where: { $0.isItalic || $0.colorRGB != nil }) else {
+                return plain
+            }
+            return VideoCaptionCue(
+                startTime: plain.startTime,
+                endTime: plain.endTime,
+                text: plain.text,
+                runs: styled.runs
             )
         }
     }

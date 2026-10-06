@@ -109,7 +109,7 @@ struct FullScreenPlayer: View {
                     : 0
             )
             let captionBottomPadding = controlsVisibility.isVisible
-                ? timelineBottomPadding + 50
+                ? timelineBottomPadding + 44
                 : isLandscape || usesPortraitFullscreen
                     ? PlayerLayoutMetrics.safeAreaInsets.bottom + 18
                     : 14

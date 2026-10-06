@@ -23,7 +23,7 @@ struct PlayerCaptionOverlay: View {
                 VStack {
                     Spacer(minLength: 0)
                     if time.isFinite, let cue = currentCue(at: time) {
-                        Text(verbatim: cue.text)
+                        captionText(for: cue)
                             .font(isLandscape ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.white)
@@ -60,5 +60,23 @@ struct PlayerCaptionOverlay: View {
         guard lower > 0 else { return nil }
         let cue = cues[lower - 1]
         return time < cue.endTime ? cue : nil
+    }
+
+    private func captionText(for cue: VideoCaptionCue) -> Text {
+        guard !cue.runs.isEmpty else { return Text(verbatim: cue.text) }
+        var styled = AttributedString()
+        for run in cue.runs {
+            var piece = AttributedString(run.text)
+            if run.isItalic { piece.inlinePresentationIntent = .emphasized }
+            if let rgb = run.colorRGB {
+                piece.foregroundColor = Color(
+                    red: Double((rgb >> 16) & 0xFF) / 255,
+                    green: Double((rgb >> 8) & 0xFF) / 255,
+                    blue: Double(rgb & 0xFF) / 255
+                )
+            }
+            styled.append(piece)
+        }
+        return Text(styled)
     }
 }
