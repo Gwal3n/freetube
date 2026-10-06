@@ -6,9 +6,11 @@ import UIKit
 @available(iOS 17.0, *)
 struct FullScreenPlayer: View {
     let captionPresentationReady: Bool
+    let chromePresentationReady: Bool
 
-    init(captionPresentationReady: Bool) {
+    init(captionPresentationReady: Bool, chromePresentationReady: Bool = true) {
         self.captionPresentationReady = captionPresentationReady
+        self.chromePresentationReady = chromePresentationReady
     }
 
     @Environment(PlayerStateManager.self) private var player
@@ -63,31 +65,32 @@ struct FullScreenPlayer: View {
         // allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let controlLayout = playerControlLayout
+            let isFloating = !player.fullScreenPresented
             let isLandscape = verticalSizeClass == .compact
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
-            let sidePanelWidth: CGFloat = isLandscape && (player.chapterListPresented || isPlaylistPanelPresented)
+            let sidePanelWidth: CGFloat = !isFloating && isLandscape && (player.chapterListPresented || isPlaylistPanelPresented)
                 ? min(360, proxy.size.width * 0.38)
                 : 0
             let surfaceWidth = proxy.size.width - sidePanelWidth
             // Landscape controls occupy the available viewport instead of insisting on a 16:9
             // frame taller than a modern phone's safe height. AVPlayer aspect-fits the video in
             // that region, preventing the timeline and bottom edge from being cropped.
-            let compactSurfaceHeight = isLandscape
+            let compactSurfaceHeight = isFloating || isLandscape
                 ? proxy.size.height
                 : PlayerViewportLayout.compactSurfaceHeight(
                     width: surfaceWidth,
                     presentationSize: player.videoPresentationSize
                 )
-            let expandedSurfaceHeight = usesPortraitFullscreen
+            let expandedSurfaceHeight = isFloating || usesPortraitFullscreen
                 ? proxy.size.height
                 : isLandscape
                     ? compactSurfaceHeight
                     : PlayerViewportLayout.expandedSurfaceHeight(
-                    width: surfaceWidth,
-                    viewportHeight: proxy.size.height,
-                    isLandscape: isLandscape,
-                    presentationSize: player.videoPresentationSize
-                )
+                        width: surfaceWidth,
+                        viewportHeight: proxy.size.height,
+                        isLandscape: isLandscape,
+                        presentationSize: player.videoPresentationSize
+                    )
             let collapseRange = usesPortraitFullscreen
                 ? 0
                 : max(0, expandedSurfaceHeight - compactSurfaceHeight)
@@ -202,7 +205,7 @@ struct FullScreenPlayer: View {
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
                     Color.black
-                        .opacity(controlsVisibility.isVisible ? 0.28 : 0)
+                        .opacity(!isFloating && controlsVisibility.isVisible ? 0.28 : 0)
                         // Dim the stable player surface rather than AVPlayer's presentation rect.
                         // The latter changes from unknown/full-size to the decoded aspect ratio
                         // as a new item becomes ready, which made non-16:9 videos flash unevenly.
@@ -227,6 +230,7 @@ struct FullScreenPlayer: View {
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: captionPresentationReady)
                         .zIndex(2)
                     }
+                    if !isFloating {
                     PlayerTransportOverlay(
                         isVisible: controlsVisibility.isVisible,
                         isPreparing: isPreparingPlayback,
@@ -325,14 +329,17 @@ struct FullScreenPlayer: View {
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
                     .position(x: controlFrame.midX, y: controlFrame.midY)
+                    .opacity(chromePresentationReady ? 1 : 0)
+                    .allowsHitTesting(chromePresentationReady)
                     .zIndex(3)
+                    }
                     // Long-running fallback downloads and failures retain their explanatory
                     // overlay. Brief startup waits replace the centre transport glyph instead,
                     // keeping the surrounding player chrome stable and avoiding a dark badge.
-                    if !isPreparingPlayback {
+                    if !isFloating && !isPreparingPlayback {
                         DownloadProgressOverlay(state: player.loadState)
                     }
-                    if let previewTime = scrubberSeekPreview {
+                    if !isFloating, let previewTime = scrubberSeekPreview {
                         Group {
                             if player.isAudioOnly {
                                 AudioOnlySeekPreview(
@@ -371,7 +378,7 @@ struct FullScreenPlayer: View {
                         .allowsHitTesting(false)
                         .zIndex(4)
                     }
-                    if let notice = player.sponsorBlockNotice {
+                    if !isFloating, let notice = player.sponsorBlockNotice {
                         SponsorBlockSkipOverlay(
                             notice: notice,
                             onUndo: { player.undoSponsorBlockSkip() },
@@ -392,12 +399,14 @@ struct FullScreenPlayer: View {
                 )
                 .onAppear { showPlayerControls() }
                 .onChange(of: surfaceHeight, initial: true) { _, height in
+                    guard !isFloating else { return }
                     player.expandedPlayerSurfaceHeight = max(
                         0,
                         height * (isPlaylistPanelPresented ? 1 - playlistPanelExpansion : 1)
                     )
                 }
                 .onChange(of: playlistPanelExpansion) { _, expansion in
+                    guard !isFloating else { return }
                     player.expandedPlayerSurfaceHeight = max(
                         0,
                         surfaceHeight * (isPlaylistPanelPresented ? 1 - expansion : 1)
@@ -437,7 +446,7 @@ struct FullScreenPlayer: View {
                           let video = player.currentVideo else { return }
                     detailsModel.loadIfNeeded(for: video, player: player)
             }
-            if let video = player.currentVideo, !usesPortraitFullscreen {
+            if !isFloating, let video = player.currentVideo, !usesPortraitFullscreen {
                 panel(
                     video,
                     collapseRange: collapseRange,
@@ -453,7 +462,7 @@ struct FullScreenPlayer: View {
             }
             .frame(width: proxy.size.width, alignment: .leading)
 
-            if player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
+            if !isFloating, player.chapterListPresented, !player.chapters.isEmpty, !usesPortraitFullscreen {
                 let chapterTop = surfaceHeight * (1 - chapterPanelExpansion)
                 PlayerChapterOverlay(
                     isLandscape: isLandscape,
@@ -475,6 +484,7 @@ struct FullScreenPlayer: View {
                 .zIndex(5)
             }
 
+            if !isFloating {
             playlistPresentation(
                 size: proxy.size,
                 surfaceHeight: surfaceHeight,
@@ -483,6 +493,7 @@ struct FullScreenPlayer: View {
                 usesPortraitFullscreen: usesPortraitFullscreen
             )
             .zIndex(6)
+            }
             }
         // One continuous material under EVERYTHING, including the top safe-area inset (status bar).
         // VStack content still respects safe area; only the material extends behind the inset.

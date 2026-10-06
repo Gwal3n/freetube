@@ -1,8 +1,7 @@
 import SwiftUI
-import Kingfisher
 import UIKit
 
-/// Top-level tabbed shell. CLAUDE.md §8: mini-player sits above the tab bar and persists across tabs.
+/// Top-level tabbed shell. The in-app floating player persists across tabs.
 ///
 /// Tab layout: Feed, Library, Downloads, and Search (a separate system button on iOS 26).
 /// - Feed (latest cached videos from local subscriptions)
@@ -27,9 +26,6 @@ struct RootView: View {
     }
 
     @State private var rootSheet: RootSheet?
-    /// Cached thumbnail for the current video so the mini-player bar shows the actual preview instead
-    /// of a placeholder icon. Loaded via Kingfisher's cache when `currentVideo` changes.
-    @State private var thumbnail: UIImage?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     enum Tab: String, Hashable {
@@ -40,12 +36,13 @@ struct RootView: View {
         if player.fullScreenPresented {
             return PlayerLayoutMetrics.safeAreaInsets.bottom + 12
         }
-        let miniPlayerClearance: CGFloat = player.miniPlayerVisible ? 68 : 8
+        let miniPlayerClearance: CGFloat = player.miniPlayerVisible
+            ? FloatingMiniPlayerChrome.scrollClearance : 8
         return PlayerLayoutMetrics.bottomTabBarClearance + miniPlayerClearance
     }
 
     var body: some View {
-        SwiftUIPlayerContainer(thumbnail: thumbnail) {
+        SwiftUIPlayerContainer {
             tabShell
         }
         .overlay(alignment: .bottom) {
@@ -74,11 +71,6 @@ struct RootView: View {
                 SubscriptionGroupsScreen()
                     .presentationDragIndicator(.visible)
             }
-        }
-        // Refresh the cached thumbnail whenever the user picks a new video so the SwiftUI
-        // mini-player can show the actual preview.
-        .onChange(of: player.currentVideo?.id, initial: true) {
-            loadThumbnailForCurrentVideo()
         }
         // Force light status-bar glyphs while the dark expanded player is visible, then restore
         // the app's normal appearance when it returns to the mini-player.
@@ -181,49 +173,6 @@ struct RootView: View {
             ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first
         window?.overrideUserInterfaceStyle = open ? .dark : .unspecified
-    }
-
-    /// Refreshes `thumbnail` whenever the current video changes. Tries three sources in order:
-    ///  1. Kingfisher's in-memory cache for the video's `thumbnailURL` (synchronous → no flash).
-    ///  2. `DownloadsStore`'s xattr-stored compressed thumbnail (for videos played from the Downloads tab,
-    ///     where the `Video` object the screen built has `thumbnailURL == nil`).
-    ///  3. Async Kingfisher fetch from disk/network if neither of the above hit.
-    /// Clears `thumbnail` immediately first so we don't show the previous video's preview while
-    /// the new one is loading.
-    private func loadThumbnailForCurrentVideo() {
-        thumbnail = nil
-
-        guard let video = player.currentVideo else { return }
-
-        // 1. Synchronous in-memory cache for the thumbnail URL.
-        if let url = video.thumbnailURL,
-           let cached = ImageCache.default.retrieveImageInMemoryCache(forKey: url.cacheKey) {
-            thumbnail = cached
-            return
-        }
-
-        // 2. Xattr-stored thumbnail for downloaded videos. `DownloadsStore` keeps the
-        // current snapshot in memory, so the lookup is synchronous and the compressed JPEG
-        // bytes decode straight to a `UIImage`.
-        let videoID = video.id
-        if let data = DownloadsStore.shared.thumbnail(forVideoID: videoID),
-           let image = UIImage(data: data) {
-            self.thumbnail = image
-            return
-        }
-
-        // 3. Async network/disk-cache fetch (in parallel with the xattr lookup above —
-        // whichever completes first and matches the current video wins).
-        guard let url = video.thumbnailURL else { return }
-        KingfisherManager.shared.retrieveImage(with: url) { [videoID = video.id] result in
-            guard case .success(let value) = result else { return }
-            Task { @MainActor in
-                // Guard against a race: if the user has already switched to another video while
-                // this fetch was inflight, don't stomp the new thumbnail with the stale one.
-                guard self.player.currentVideo?.id == videoID else { return }
-                self.thumbnail = value.image
-            }
-        }
     }
 
 }

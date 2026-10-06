@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Reserves the mini-player's actual chrome height inside a scrolling screen's safe area. The
-/// native tab bar already contributes its own inset, so only the mini-player and its visual gap
-/// belong here. Keep this active while the player is expanded too: changing it mid-collapse
+/// Reserves the floating player's resting height inside a scrolling screen's safe area. The
+/// native tab bar already contributes its own inset. Keep this active while expanded too:
+/// changing it mid-collapse
 /// would make the underlying list jump during the interactive handoff.
 @available(iOS 17.0, *)
 struct MiniPlayerScrollClearance: ViewModifier {
@@ -12,7 +12,7 @@ struct MiniPlayerScrollClearance: ViewModifier {
         content.safeAreaInset(edge: .bottom, spacing: 0) {
             if player.miniPlayerVisible {
                 Color.clear
-                    .frame(height: SwiftUIMiniPlayer.scrollClearance)
+                    .frame(height: FloatingMiniPlayerChrome.scrollClearance)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }

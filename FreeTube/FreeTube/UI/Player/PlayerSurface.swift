@@ -58,9 +58,9 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsVideoFrameAnalysis = false
-        // SwiftUI's `.allowsHitTesting(false)` does not always propagate through an offset
-        // UIViewControllerRepresentable. Disable the native root as well so the off-screen,
-        // still-mounted player cannot cancel NavigationLink/Menu taps beneath the miniplayer.
+        // SwiftUI's `.allowsHitTesting(false)` does not always propagate through a
+        // UIViewControllerRepresentable. Disable the native root in floating mode too, so
+        // only its SwiftUI chrome accepts touches and navigation beneath remains responsive.
         controller.view.isUserInteractionEnabled = isInteractionEnabled
         controller.view.accessibilityElementsHidden = !isInteractionEnabled
         context.coordinator.isZoomEnabled = isZoomEnabled
