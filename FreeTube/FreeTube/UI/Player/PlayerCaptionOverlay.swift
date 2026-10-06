@@ -5,30 +5,43 @@ import SwiftUI
 /// It samples the AVPlayer item's actual time, including pauses and seeks, every tenth of a second.
 @available(iOS 17.0, *)
 struct PlayerCaptionOverlay: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let player: AVPlayer
     let cues: [VideoCaptionCue]
     let bottomPadding: CGFloat
+    let isLandscape: Bool
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.1)) { _ in
-            let time = player.currentTime().seconds
-            VStack {
-                Spacer(minLength: 0)
-                if time.isFinite, let cue = currentCue(at: time) {
-                    Text(verbatim: cue.text)
-                        .font(.headline.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                        .lineLimit(3)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 6))
-                        .padding(.horizontal, 20)
+        GeometryReader { geometry in
+            TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                let time = player.currentTime().seconds
+                let maximumWidth = min(
+                    geometry.size.width * (isLandscape ? 0.66 : 0.72),
+                    isLandscape ? 560 : 290
+                )
+                VStack {
+                    Spacer(minLength: 0)
+                    if time.isFinite, let cue = currentCue(at: time) {
+                        Text(verbatim: cue.text)
+                            .font(isLandscape ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white)
+                            .lineLimit(3)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 6))
+                            .frame(maxWidth: maximumWidth)
+                    }
                 }
+                .frame(
+                    width: geometry.size.width,
+                    height: max(0, geometry.size.height - bottomPadding),
+                    alignment: .bottom
+                )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, bottomPadding)
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: bottomPadding)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

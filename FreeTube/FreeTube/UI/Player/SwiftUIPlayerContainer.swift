@@ -19,6 +19,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var expandedDragStartedDown = false
     @State private var expandedDragCanCollapse = false
     @State private var suppressMiniPlayerTap = false
+    @State private var captionPresentationReady = true
 
     init(thumbnail: UIImage?, @ViewBuilder content: () -> Content) {
         self.thumbnail = thumbnail
@@ -46,7 +47,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .zIndex(1)
                         .transition(.opacity)
 
-                    FullScreenPlayer()
+                    FullScreenPlayer(captionPresentationReady: captionPresentationReady)
                         .frame(
                             width: proxy.size.width,
                             height: max(0, proxy.size.height - expandedTopInset)
@@ -115,6 +116,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             // path as a direct tap on the miniplayer.
             guard player.miniPlayerVisible, !player.fullScreenPresented else { return }
             expandPlayer()
+        }
+        .onChange(of: player.fullScreenPresented) { _, isPresented in
+            if !isPresented { captionPresentationReady = true }
         }
     }
 
@@ -278,10 +282,21 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func expandPlayer() {
-        withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.88)) {
+        // Timeline-driven captions can otherwise appear at their final screen position before
+        // the mini-to-full player host has completed its upward handoff.
+        captionPresentationReady = false
+        withAnimation(
+            reduceMotion ? nil : .interactiveSpring(response: 0.4, dampingFraction: 0.88),
+            completionCriteria: .logicallyComplete
+        ) {
             presentationTranslation = 0
             miniDismissTranslation = 0
             player.fullScreenPresented = true
+        } completion: {
+            guard player.fullScreenPresented else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+                captionPresentationReady = true
+            }
         }
         player.requestInlinePlaybackRestoration()
     }

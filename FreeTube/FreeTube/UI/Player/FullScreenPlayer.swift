@@ -5,6 +5,12 @@ import UIKit
 /// surface, transport controls, metadata, and independently collapsible sections below.
 @available(iOS 17.0, *)
 struct FullScreenPlayer: View {
+    let captionPresentationReady: Bool
+
+    init(captionPresentationReady: Bool) {
+        self.captionPresentationReady = captionPresentationReady
+    }
+
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -102,6 +108,11 @@ struct FullScreenPlayer: View {
                     ? PlayerLayoutMetrics.safeAreaInsets.bottom + 14
                     : 0
             )
+            let captionBottomPadding = controlsVisibility.isVisible
+                ? timelineBottomPadding + 50
+                : isLandscape || usesPortraitFullscreen
+                    ? PlayerLayoutMetrics.safeAreaInsets.bottom + 18
+                    : 14
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 // Pinning the ZStack to width × width*9/16 keeps the surface a stable height
@@ -201,10 +212,13 @@ struct FullScreenPlayer: View {
                         PlayerCaptionOverlay(
                             player: player.player,
                             cues: captionsModel.cues,
-                            bottomPadding: timelineBottomPadding + 68
+                            bottomPadding: captionBottomPadding,
+                            isLandscape: isLandscape
                         )
                         .frame(width: controlFrame.width, height: controlFrame.height)
                         .position(x: controlFrame.midX, y: controlFrame.midY)
+                        .opacity(captionPresentationReady ? 1 : 0)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: captionPresentationReady)
                         .zIndex(2)
                     }
                     PlayerTransportOverlay(
