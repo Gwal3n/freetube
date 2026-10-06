@@ -17,6 +17,7 @@ struct PlayerTopControls: View {
     let isAudioOnly: Bool
     let isSwitchingAudioMode: Bool
     let sleepTimerOption: SleepTimerOption
+    let captionsModel: PlayerCaptionsModel
     let onSetPlaybackRate: (Double) -> Void
     let onSetPlaybackQuality: (VideoQuality) -> Void
     let onToggleLoop: () -> Void
@@ -111,6 +112,8 @@ struct PlayerTopControls: View {
             .disabled(isAudioOnly)
             .accessibilityLabel("Quality limit")
             .accessibilityValue(playbackQuality.displayName)
+        case .captions:
+            captionsMenu(onPlayer: true)
         case .sleepTimer:
             Menu {
                 sleepTimerChoices
@@ -163,6 +166,74 @@ struct PlayerTopControls: View {
             .disabled(isSwitchingAudioMode)
         case .sleepTimer:
             sleepTimerMenu
+        case .captions:
+            captionsMenu(onPlayer: false)
+        }
+    }
+
+    private func captionsMenu(onPlayer: Bool) -> some View {
+        Menu {
+            captionChoices
+        } label: {
+            if onPlayer {
+                Image(systemName: captionsModel.selectedTrackID == nil
+                    ? "captions.bubble" : "captions.bubble.fill")
+                    .playerTopControl()
+            } else {
+                Label("Captions", systemImage: "captions.bubble")
+            }
+        }
+        .accessibilityLabel("Captions")
+    }
+
+    @ViewBuilder
+    private var captionChoices: some View {
+        Button {
+            captionsModel.select(nil)
+        } label: {
+            if captionsModel.selectedTrackID == nil {
+                Label("Off", systemImage: "checkmark")
+            } else {
+                Text("Off")
+            }
+        }
+
+        if captionsModel.isLoadingTracks {
+            Button {} label: {
+                Label("Loading captions…", systemImage: "hourglass")
+            }
+            .disabled(true)
+        } else if captionsModel.hasTrackError {
+            Button("Retry captions") { captionsModel.retryTracks() }
+        } else if !captionsModel.hasLoadedTracks {
+            Button("Load captions") { captionsModel.retryTracks() }
+        } else if captionsModel.tracks.isEmpty {
+            Button("No captions available") {}
+                .disabled(true)
+        } else {
+            ForEach(captionsModel.tracks) { track in
+                Button {
+                    captionsModel.select(track)
+                } label: {
+                    if captionsModel.selectedTrackID == track.id {
+                        Label {
+                            Text(verbatim: track.displayName)
+                        } icon: {
+                            Image(systemName: "checkmark")
+                        }
+                    } else {
+                        Text(verbatim: track.displayName)
+                    }
+                }
+            }
+        }
+        if captionsModel.isLoadingCues {
+            Button {} label: {
+                Label("Loading captions…", systemImage: "hourglass")
+            }
+            .disabled(true)
+        } else if captionsModel.hasCueError {
+            Button("Retry captions") { captionsModel.retrySelectedTrack() }
         }
     }
 

@@ -11,6 +11,7 @@ struct FullScreenPlayer: View {
     @State private var detailsModel = PlayerDetailsModel()
     @State private var controlsVisibility = PlayerControlsVisibilityModel()
     @State private var actionsModel = PlayerActionsModel()
+    @State private var captionsModel = PlayerCaptionsModel()
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
@@ -194,6 +195,18 @@ struct FullScreenPlayer: View {
                         // Letterbox pixels are already black, so covering them has no visible cost.
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
+                    if player.fullScreenPresented,
+                       captionsModel.selectedTrackID != nil,
+                       !captionsModel.cues.isEmpty {
+                        PlayerCaptionOverlay(
+                            player: player.player,
+                            cues: captionsModel.cues,
+                            bottomPadding: timelineBottomPadding + 68
+                        )
+                        .frame(width: controlFrame.width, height: controlFrame.height)
+                        .position(x: controlFrame.midX, y: controlFrame.midY)
+                        .zIndex(2)
+                    }
                     PlayerTransportOverlay(
                         isVisible: controlsVisibility.isVisible,
                         isPreparing: isPreparingPlayback,
@@ -218,6 +231,7 @@ struct FullScreenPlayer: View {
                                 isAudioOnly: player.isAudioOnly,
                                 isSwitchingAudioMode: player.isSwitchingAudioMode,
                                 sleepTimerOption: player.sleepTimerOption,
+                                captionsModel: captionsModel,
                                 onSetPlaybackRate: { rate in
                                     player.setPlaybackRate(rate)
                                     showPlayerControls()
@@ -495,6 +509,14 @@ struct FullScreenPlayer: View {
         }
         .task(id: player.currentVideo?.id) {
             await actionsModel.refreshPlaylistMembership(for: player.currentVideo?.id)
+        }
+        .onChange(of: player.currentVideo?.id, initial: true) { _, videoID in
+            captionsModel.reset(for: videoID)
+        }
+        .task(id: player.fullScreenPresented ? player.currentVideo?.id : nil) {
+            guard player.fullScreenPresented, let videoID = player.currentVideo?.id else { return }
+            captionsModel.reset(for: videoID)
+            await captionsModel.loadTracks(for: videoID)
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task {

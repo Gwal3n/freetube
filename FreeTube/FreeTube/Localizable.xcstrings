@@ -1,6 +1,60 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Captions" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Untertitel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Captions" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Subtítulos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Sous-titres" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Субтитры" } }
+      }
+    },
+    "Auto-generated" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Automatisch erstellt" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto-generated" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Generados automáticamente" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Générés automatiquement" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Созданы автоматически" } }
+      }
+    },
+    "Loading captions…" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Untertitel werden geladen…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading captions…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cargando subtítulos…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chargement des sous-titres…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Загрузка субтитров…" } }
+      }
+    },
+    "Load captions" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Untertitel laden" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Load captions" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cargar subtítulos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Charger les sous-titres" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Загрузить субтитры" } }
+      }
+    },
+    "Retry captions" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Untertitel erneut laden" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Retry captions" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reintentar subtítulos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réessayer les sous-titres" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Повторить загрузку субтитров" } }
+      }
+    },
+    "No captions available" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Keine Untertitel verfügbar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No captions available" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay subtítulos disponibles" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun sous-titre disponible" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Субтитры недоступны" } }
+      }
+    },
     "More menu separators" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Trennlinien im Mehr-Menü" } },

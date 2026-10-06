@@ -14,6 +14,7 @@ struct VideoInfo: Sendable {
     let viewCountText: String?
     let uploadDateText: String?
     let chapters: [VideoChapter]
+    let captionTracks: [VideoCaptionTrack]
     let storyboard: VideoStoryboard?
     /// Initial token and availability extracted from the same MoreVideoInfosResponse as details.
     /// Keeping them here lets background prefetch avoid issuing that response twice.
@@ -47,6 +48,7 @@ protocol VideoServicing: Sendable {
     func fetchInfo(id: String) async throws -> VideoInfo
     func fetchInfoWithFormats(id: String) async throws -> VideoInfoWithFormats
     func fetchMoreInfo(id: String) async throws -> VideoInfo
+    func fetchCaptionCues(track: VideoCaptionTrack) async throws -> [VideoCaptionCue]
     func fetchRecommendedVideos(continuation: String) async throws -> RecommendedVideosPage
     /// Alternate fetch using the `TVHTML5_SIMPLY_EMBEDDED_PLAYER` client — same response shape
     /// as `fetchInfo`, but the returned per-format URLs aren't PoT-protected. Used by the resolver
@@ -74,7 +76,7 @@ final class VideoService: VideoServicing {
                 data: [.query: id]
             )
             let info = Self.videoInfo(from: response, id: id, recommended: [])
-            log.info("fetchInfo[IOS] ok id=\(id, privacy: .public) hls=\(info.streamingURL != nil, privacy: .public) formats=\(info.formats.count, privacy: .public)")
+            log.info("fetchInfo[IOS] ok id=\(id, privacy: .public) hls=\(info.streamingURL != nil, privacy: .public) formats=\(info.formats.count, privacy: .public) captions=\(info.captionTracks.count, privacy: .public)")
             return info
         } catch {
             log.error("fetchInfo[IOS] FAILED id=\(id, privacy: .public): \(String(describing: error), privacy: .public)")
@@ -159,6 +161,7 @@ final class VideoService: VideoServicing {
                 viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
                 uploadDateText: response.timePosted.postedDate ?? response.timePosted.relativePostedDate,
                 chapters: Self.chapters(from: response.chapters ?? []),
+                captionTracks: [],
                 storyboard: nil,
                 commentsContinuationToken: response.commentsContinuationToken,
                 commentsCountText: response.commentsCount,
@@ -185,6 +188,43 @@ final class VideoService: VideoServicing {
         } catch {
             throw YouTubeServiceError.network(error)
         }
+    }
+
+    /// Fetches a selected source caption track independently of stream resolution. JSON3 avoids
+    /// XML entity escaping; the original URL is tried once if that format returns no cues.
+    func fetchCaptionCues(track: VideoCaptionTrack) async throws -> [VideoCaptionCue] {
+        await client.ensureVisitorData()
+        var urls = [track.url]
+        if var components = URLComponents(url: track.url, resolvingAgainstBaseURL: false) {
+            var queryItems = components.queryItems ?? []
+            queryItems.removeAll { $0.name == "fmt" }
+            queryItems.append(URLQueryItem(name: "fmt", value: "json3"))
+            components.queryItems = queryItems
+            if let jsonURL = components.url, jsonURL != track.url {
+                urls.insert(jsonURL, at: 0)
+            }
+        }
+
+        for url in urls {
+            try Task.checkCancellation()
+            do {
+                let response = try await VideoCaptionsResponse.sendThrowingRequest(
+                    youtubeModel: client.model,
+                    data: [.customURL: url.absoluteString]
+                )
+                let cues = Self.captionCues(from: response.captionParts)
+                if !cues.isEmpty {
+                    log.info("Loaded \(cues.count, privacy: .public) caption cues for \(track.id, privacy: .public)")
+                    return cues
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                log.notice("Caption format failed for track \(track.id, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
+        }
+        log.notice("No usable caption cues for track \(track.id, privacy: .public)")
+        throw YouTubeServiceError.streamExtractionFailed
     }
 
     // MARK: - Mapping helpers
@@ -217,6 +257,7 @@ final class VideoService: VideoServicing {
             viewCountText: nil,
             uploadDateText: nil,
             chapters: [],
+            captionTracks: Self.captionTracks(from: response.captions),
             storyboard: response.storyboard.map(Self.storyboard(from:)),
             commentsContinuationToken: nil,
             commentsCountText: nil,
@@ -225,6 +266,54 @@ final class VideoService: VideoServicing {
             streamingURL: response.streamingURL,
             formats: formats
         )
+    }
+
+    private static func captionTracks(from captions: [YTCaption]) -> [VideoCaptionTrack] {
+        var seen = Set<String>()
+        return captions.compactMap { caption in
+            guard !caption.isTranslated,
+                  seen.insert(caption.id).inserted else { return nil }
+            return VideoCaptionTrack(
+                id: caption.id,
+                languageName: caption.languageName,
+                url: caption.url,
+                isAutoGenerated: caption.isAutoGenerated
+            )
+        }
+    }
+
+    private static func captionCues(
+        from parts: [VideoCaptionsResponse.CaptionPart]
+    ) -> [VideoCaptionCue] {
+        let sorted = parts
+            .filter { $0.startTime.isFinite && $0.startTime >= 0 }
+            .sorted { $0.startTime < $1.startTime }
+
+        return sorted.enumerated().compactMap { index, part in
+            let text = captionText(part.text)
+            guard !text.isEmpty else { return nil }
+            let nextStart = sorted.indices.contains(index + 1)
+                ? sorted[index + 1].startTime : part.startTime + 3
+            let duration = part.duration.isFinite && part.duration > 0
+                ? part.duration : max(0.1, nextStart - part.startTime)
+            return VideoCaptionCue(
+                startTime: part.startTime,
+                endTime: min(part.startTime + duration, max(nextStart, part.startTime + 0.1)),
+                text: text
+            )
+        }
+    }
+
+    private static func captionText(_ raw: String) -> String {
+        // b5i's JSON3 path is already plain UTF-8. Its XML fallback may still carry common
+        // entities on iOS, so decode them without invoking the expensive HTML importer.
+        raw.replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func chapters(from chapters: [MoreVideoInfosResponse.Chapter]) -> [VideoChapter] {
