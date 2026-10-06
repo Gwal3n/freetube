@@ -21,12 +21,19 @@ struct PlayerControlsSettingsScreen: View {
     }
 
     var body: some View {
-        List {
-            ForEach(PlayerControlLayout.Section.allCases) { section in
-                controlSection(section)
+        ScrollView {
+            // There are only seven controls. Keeping every row mounted avoids lazy-layout
+            // handoffs while a drag moves between sections.
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(PlayerControlLayout.Section.allCases) { section in
+                    controlSection(section)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
-        .listStyle(.insetGrouped)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Customize controls")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { endDrag() }
@@ -35,27 +42,12 @@ struct PlayerControlsSettingsScreen: View {
     private func controlSection(_ section: PlayerControlLayout.Section) -> some View {
         let controls = displayedLayout.controls(in: section)
 
-        return Section {
-            if controls.isEmpty {
-                Label("Drag controls here", systemImage: "plus")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onDrop(of: [.plainText], delegate: ControlDropDelegate(
-                        isActive: { draggedControl != nil },
-                        onEnter: { _ in hover(in: section, before: nil) },
-                        onExit: {},
-                        onDrop: { finishDrag() }
-                    ))
-            } else {
-                ForEach(controls) { control in
-                    controlRow(control, in: section)
-                }
-            }
-        } header: {
+        return VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: section.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                .padding(.horizontal, 16)
                 .contentShape(Rectangle())
                 .onDrop(of: [.plainText], delegate: ControlDropDelegate(
                     isActive: { draggedControl != nil },
@@ -65,6 +57,23 @@ struct PlayerControlsSettingsScreen: View {
                     onExit: {},
                     onDrop: { finishDrag() }
                 ))
+
+            if !controls.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(controls) { control in
+                        controlRow(control, in: section)
+                        if control != controls.last {
+                            Divider()
+                                .padding(.leading, 50)
+                        }
+                    }
+                }
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
         }
     }
 
@@ -83,11 +92,18 @@ struct PlayerControlsSettingsScreen: View {
                 .accessibilityHidden(true)
         }
         .frame(minHeight: rowHeight)
+        .padding(.horizontal, 16)
         .contentShape(Rectangle())
         .onDrag {
             if draftLayout == nil { draftLayout = model.playerControlLayout }
             draggedControl = control
             return NSItemProvider(object: NSString(string: dragPrefix + control.rawValue))
+        } preview: {
+            Label(control.displayName, systemImage: control.systemImage)
+                .font(.subheadline)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .onDrop(of: [.plainText], delegate: ControlDropDelegate(
             isActive: { draggedControl != nil },

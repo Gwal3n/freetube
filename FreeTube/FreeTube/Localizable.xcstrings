@@ -1,15 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Drag controls here" : {
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Steuerelemente hierher ziehen" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag controls here" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Arrastra los controles aquí" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Glissez les commandes ici" } },
-        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перетащите элементы управления сюда" } }
-      }
-    },
     "Affected channels" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Betroffene Kanäle" } },
