@@ -367,6 +367,7 @@ final class DownloadManager: TemporaryDownloading {
         log.info("ensureDownloaded(\(video.id, privacy: .public)) — title=\"\(video.title, privacy: .public)\" quality=\(quality.rawValue, privacy: .public) priority=\(String(describing: priority), privacy: .public)")
         if let existing = localFile(for: video.id) {
             log.info("ensureDownloaded(\(video.id, privacy: .public)): cache hit, skipping yt-dlp")
+            Task { await OfflineCaptionStore.shared.downloadAvailableTracks(for: video.id) }
             return existing
         }
 
@@ -929,6 +930,8 @@ final class DownloadManager: TemporaryDownloading {
         )
         log.info("persistDownloaded(\(video.id, privacy: .public)) wrote xattr size=\(size, privacy: .public) bytes")
         enforceCacheLimit()
+        // Caption sidecars are optional and never hold up a completed media download.
+        Task { await OfflineCaptionStore.shared.downloadAvailableTracks(for: video.id) }
     }
 
     /// Runs the LRU eviction sweep against the user's current cache-size preference. The newest

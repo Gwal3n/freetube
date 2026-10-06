@@ -43,4 +43,23 @@ final class CaptionFormattingTests: XCTestCase {
         XCTAssertEqual(cues.first?.runs.first?.colorRGB, 0xFFCC00)
         XCTAssertEqual(cues.first?.runs.last?.isItalic, false)
     }
+
+    func testOfflineCueRoundTripRetainsTimingAndFormatting() throws {
+        let original = [VideoCaptionCue(
+            startTime: 1.25,
+            endTime: 3.5,
+            text: "Gold text",
+            runs: [
+                VideoCaptionRun(text: "Gold", isItalic: true, colorRGB: 0xFFCC00),
+                VideoCaptionRun(text: " text", isItalic: false, colorRGB: nil)
+            ]
+        )]
+
+        let restored = try JSONDecoder().decode(
+            [VideoCaptionCue].self,
+            from: JSONEncoder().encode(original)
+        )
+
+        XCTAssertEqual(restored, original)
+    }
 }

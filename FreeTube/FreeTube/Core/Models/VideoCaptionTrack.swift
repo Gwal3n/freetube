@@ -1,7 +1,7 @@
 import Foundation
 
 /// A source caption track from YouTube. The URL may be short-lived and stays in memory only.
-struct VideoCaptionTrack: Identifiable, Sendable, Hashable {
+nonisolated struct VideoCaptionTrack: Identifiable, Sendable, Hashable {
     let id: String
     let languageCode: String
     let languageName: String

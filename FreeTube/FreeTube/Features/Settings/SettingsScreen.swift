@@ -53,6 +53,22 @@ struct SettingsScreen: View {
                     Text("Video quality is a preferred maximum, not a guaranteed resolution. It can adjust an adaptive stream during playback; fixed files use the preference on the next video.\n\nThe featured preview shows YouTube’s own comment excerpt while Comments is collapsed. Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
                 }
 
+                Section("Captions") {
+                    Toggle("Dark caption background", isOn: Bindable(model).captionBackgroundEnabled)
+                    Toggle("Use source formatting", isOn: Bindable(model).formattedCaptions)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Caption text size")
+                            Spacer()
+                            Text(verbatim: "\(Int((model.captionTextScale * 100).rounded()))%")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: Bindable(model).captionTextScale, in: 0.8...1.5, step: 0.1)
+                            .accessibilityLabel("Caption text size")
+                    }
+                }
+
                 Section("Search") {
                     Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
                 }

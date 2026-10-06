@@ -203,6 +203,10 @@ final class DownloadsStore {
     func delete(at fileURL: URL) {
         do {
             try FileManager.default.removeItem(at: fileURL)
+            if fileURL.pathExtension.lowercased() == "mp4" {
+                let videoID = fileURL.deletingPathExtension().lastPathComponent
+                Task { await OfflineCaptionStore.shared.delete(for: videoID) }
+            }
             log.info("deleted \(fileURL.lastPathComponent, privacy: .public)")
         } catch {
             log.error("delete failed for \(fileURL.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
@@ -226,6 +230,9 @@ final class DownloadsStore {
             }
             return failures
         }.value
+        for url in urls where !FileManager.default.fileExists(atPath: url.path) && url.pathExtension.lowercased() == "mp4" {
+            await OfflineCaptionStore.shared.delete(for: url.deletingPathExtension().lastPathComponent)
+        }
         NotificationCenter.default.post(name: Self.didChange, object: nil)
         if !failed.isEmpty {
             log.error("playlist deletion failed for \(failed.joined(separator: ", "), privacy: .public)")
@@ -272,6 +279,9 @@ final class DownloadsStore {
                 try? FileManager.default.removeItem(at: url)
             }
             await MainActor.run {
+                for url in urls where !FileManager.default.fileExists(atPath: url.path) && url.pathExtension.lowercased() == "mp4" {
+                    Task { await OfflineCaptionStore.shared.delete(for: url.deletingPathExtension().lastPathComponent) }
+                }
                 NotificationCenter.default.post(name: Self.didChange, object: nil)
             }
         }

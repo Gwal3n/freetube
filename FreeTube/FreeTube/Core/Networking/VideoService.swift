@@ -194,6 +194,9 @@ final class VideoService: VideoServicing {
     /// the cookie-free session never persists it. JSON3 is compact; TTML matches NewPipe's
     /// preferred subtitle format when JSON3 is unavailable.
     func fetchCaptionCues(track: VideoCaptionTrack) async throws -> [VideoCaptionCue] {
+        if track.url.isFileURL {
+            return try await OfflineCaptionStore.shared.cues(at: track.url)
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil

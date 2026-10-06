@@ -2,7 +2,7 @@ import Foundation
 
 /// One span of source caption text. Positioning and other YouTube pen attributes are intentionally
 /// omitted until the renderer has a safe video-relative layout for them.
-struct VideoCaptionRun: Sendable, Equatable {
+nonisolated struct VideoCaptionRun: Sendable, Equatable, Codable {
     let text: String
     let isItalic: Bool
     let colorRGB: UInt32?

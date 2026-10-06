@@ -6,11 +6,16 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerCaptionOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .subheadline) private var portraitFontSize: CGFloat = 15
+    @ScaledMetric(relativeTo: .headline) private var landscapeFontSize: CGFloat = 17
 
     let player: AVPlayer
     let cues: [VideoCaptionCue]
     let bottomPadding: CGFloat
     let isLandscape: Bool
+    let showsBackground: Bool
+    let textScale: Double
+    let usesSourceFormatting: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -24,13 +29,14 @@ struct PlayerCaptionOverlay: View {
                     Spacer(minLength: 0)
                     if time.isFinite, let cue = currentCue(at: time) {
                         captionText(for: cue)
-                            .font(isLandscape ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
+                            .font(.system(size: (isLandscape ? landscapeFontSize : portraitFontSize) * CGFloat(min(max(textScale, 0.8), 1.5)), weight: .semibold))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.white)
+                            .shadow(color: showsBackground ? Color.clear : Color.black.opacity(0.9), radius: 3)
                             .lineLimit(3)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 6))
+                            .background(Color.black.opacity(showsBackground ? 0.72 : 0), in: RoundedRectangle(cornerRadius: 6))
                             .frame(maxWidth: maximumWidth)
                     }
                 }
@@ -63,7 +69,7 @@ struct PlayerCaptionOverlay: View {
     }
 
     private func captionText(for cue: VideoCaptionCue) -> Text {
-        guard !cue.runs.isEmpty else { return Text(verbatim: cue.text) }
+        guard usesSourceFormatting, !cue.runs.isEmpty else { return Text(verbatim: cue.text) }
         var styled = AttributedString()
         for run in cue.runs {
             var piece = AttributedString(run.text)

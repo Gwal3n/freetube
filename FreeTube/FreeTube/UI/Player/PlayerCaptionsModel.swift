@@ -68,6 +68,13 @@ final class PlayerCaptionsModel {
         defer {
             if self.videoID == videoID { isLoadingTracks = false }
         }
+        let offlineTracks = await OfflineCaptionStore.shared.tracks(for: videoID)
+        guard !Task.isCancelled, self.videoID == videoID, !hasLoadedTracks else { return }
+        if !offlineTracks.isEmpty {
+            tracks = offlineTracks
+            hasLoadedTracks = true
+            return
+        }
         do {
             let info = try await videoService.fetchInfo(id: videoID)
             guard !Task.isCancelled, self.videoID == videoID, !hasLoadedTracks else { return }

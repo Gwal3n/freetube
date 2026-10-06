@@ -45,6 +45,9 @@ struct FullScreenPlayer: View {
     @AppStorage("showUpNext") private var showUpNext = true
     @AppStorage("upNextInitialCount") private var upNextInitialCount = 5
     @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
+    @AppStorage("captionBackgroundEnabled") private var captionBackgroundEnabled = true
+    @AppStorage("captionTextScale") private var captionTextScale = 1.0
+    @AppStorage("formattedCaptions") private var formattedCaptions = true
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
     @AppStorage("playerControlLayout") private var playerControlLayoutRaw = ""
@@ -109,7 +112,7 @@ struct FullScreenPlayer: View {
                     : 0
             )
             let captionBottomPadding = controlsVisibility.isVisible
-                ? timelineBottomPadding + 44
+                ? timelineBottomPadding + 28
                 : isLandscape || usesPortraitFullscreen
                     ? PlayerLayoutMetrics.safeAreaInsets.bottom + 18
                     : 14
@@ -213,7 +216,10 @@ struct FullScreenPlayer: View {
                             player: player.player,
                             cues: captionsModel.cues,
                             bottomPadding: captionBottomPadding,
-                            isLandscape: isLandscape
+                            isLandscape: isLandscape,
+                            showsBackground: captionBackgroundEnabled,
+                            textScale: captionTextScale,
+                            usesSourceFormatting: formattedCaptions
                         )
                         .frame(width: controlFrame.width, height: controlFrame.height)
                         .position(x: controlFrame.midX, y: controlFrame.midY)
@@ -363,6 +369,7 @@ struct FullScreenPlayer: View {
                             )
                         )
                         .allowsHitTesting(false)
+                        .zIndex(4)
                     }
                     if let notice = player.sponsorBlockNotice {
                         SponsorBlockSkipOverlay(

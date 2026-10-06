@@ -39,6 +39,15 @@ final class SettingsViewModel {
     var appFontPreset: AppFontPreset {
         didSet { preferences.appFontPreset = appFontPreset }
     }
+    var captionBackgroundEnabled: Bool {
+        didSet { preferences.captionBackgroundEnabled = captionBackgroundEnabled }
+    }
+    var captionTextScale: Double {
+        didSet { preferences.captionTextScale = captionTextScale }
+    }
+    var formattedCaptions: Bool {
+        didSet { preferences.formattedCaptions = formattedCaptions }
+    }
 
     init() {
         let preferences = UserPreferences()
@@ -53,6 +62,9 @@ final class SettingsViewModel {
         self.playerControlLayout = preferences.playerControlLayout
         self.playerMoreMenuDividers = preferences.playerMoreMenuDividers
         self.appFontPreset = preferences.appFontPreset
+        self.captionBackgroundEnabled = preferences.captionBackgroundEnabled
+        self.captionTextScale = preferences.captionTextScale
+        self.formattedCaptions = preferences.formattedCaptions
     }
 
     var preferredQuality: VideoQuality {
