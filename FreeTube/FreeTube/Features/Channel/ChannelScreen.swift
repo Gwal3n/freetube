@@ -521,7 +521,7 @@ struct ChannelScreen: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .modifier(ChannelSkeletonPulse(reduceMotion: reduceMotion))
+        .modifier(SkeletonPulse())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading channel")
         .allowsHitTesting(false)

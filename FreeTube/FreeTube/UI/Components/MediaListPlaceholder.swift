@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Static placeholders preserve the shape of a browsing list without continuous shimmer work.
+/// Loading rows retain the final browsing-list geometry; only their opacity gently pulses.
+@available(iOS 17.0, *)
 struct MediaListPlaceholder: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -33,9 +34,12 @@ struct MediaListPlaceholder: View {
                         .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                 }
                 .mediaListRow()
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .modifier(SkeletonPulse())
         .scrollDisabled(true)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)

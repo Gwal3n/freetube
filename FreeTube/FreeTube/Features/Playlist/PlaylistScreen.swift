@@ -12,6 +12,7 @@ struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isSavedLocally = false
     @State private var isSavingLocally = false
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
@@ -90,31 +91,67 @@ struct PlaylistScreen: View {
         .errorToast(Bindable(model).errorState)
     }
 
-    /// Reserves the same broad geometry as the loaded artwork, metadata, and first rows. Keeping
-    /// this static avoids shimmer work and prevents the whole page from jumping after resolution.
+    /// Reserves the loaded artwork, action row, metadata, and first video rows. Only opacity
+    /// changes while loading, so the eventual content does not appear to slide into place.
     private var playlistPlaceholder: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Rectangle()
                 .fill(MediaStyle.placeholderFill)
                 .aspectRatio(16 / 9, contentMode: .fit)
-            VStack(alignment: .leading, spacing: 14) {
-                RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(height: 20)
+                .overlay(alignment: .bottom) {
+                    HStack(spacing: 10) {
+                        ForEach([CGFloat(76), 72, 98], id: \.self) { width in
+                            Capsule()
+                                .fill(.quaternary)
+                                .frame(maxWidth: width)
+                                .frame(height: 36)
+                        }
+                        Spacer(minLength: 0)
+                        Circle()
+                            .fill(.quaternary)
+                            .frame(width: 36, height: 36)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                }
+
+            VStack(alignment: .leading, spacing: 10) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(.quaternary)
+                    .frame(maxWidth: 240)
+                    .frame(height: 20)
                 RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 150, height: 11)
+                RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 110, height: 10)
+                RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 135, height: 10)
+            }
+            .padding(.horizontal, 16)
+
+            VStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { _ in
                     HStack(spacing: MediaStyle.spacing) {
                         RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                             .fill(.quaternary)
-                            .frame(width: 144, height: 81)
+                            .frame(
+                                width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
+                                height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
+                            )
                         VStack(alignment: .leading, spacing: 9) {
-                            RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(height: 12)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(.quaternary)
+                                .frame(maxWidth: 170)
+                                .frame(height: 12)
                             RoundedRectangle(cornerRadius: 3).fill(.quaternary).frame(width: 90, height: 9)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Color.clear
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     }
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.top, 8)
         }
-        .padding(.top, 12)
+        .modifier(SkeletonPulse())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading playlist")
         .allowsHitTesting(false)
