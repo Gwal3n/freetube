@@ -8,7 +8,9 @@ import Kingfisher
 /// the card's main tap target so its taps don't trigger `onTap`.
 @available(iOS 17.0, *)
 struct VideoCard: View {
+    @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var launchAnchor = VideoLaunchAnchor()
 
     let video: Video
     var onTap: () -> Void = {}
@@ -32,7 +34,7 @@ struct VideoCard: View {
         DeArrowVideoContent(video: video) { branding in
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .topTrailing) {
-                    Button(action: onTap) {
+                    Button(action: openVideo) {
                         thumbnail(branding: branding)
                     }
                     .buttonStyle(ResponsiveButtonStyle())
@@ -66,11 +68,16 @@ struct VideoCard: View {
             )
         }
         .aspectRatio(16 / 9, contentMode: .fit)
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            launchAnchor.frame = frame
+        }
     }
 
     private func metadataRow(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Button(action: onTap) {
+            Button(action: openVideo) {
                 HStack(alignment: .top, spacing: 12) {
                     KFImage(video.channelThumbnailURL)
                         .thumbnail(size: CGSize(width: 36, height: 36)) {
@@ -111,5 +118,10 @@ struct VideoCard: View {
         [title, metadataLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
+    }
+
+    private func openVideo() {
+        player.prepareLaunch(for: video.id, from: launchAnchor.frame)
+        onTap()
     }
 }

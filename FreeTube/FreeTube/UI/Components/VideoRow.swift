@@ -15,6 +15,7 @@ struct VideoRow: View {
 
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var launchAnchor = VideoLaunchAnchor()
     let video: Video
     var accessory: Accessory
     var playbackProgress: Double?
@@ -53,7 +54,7 @@ struct VideoRow: View {
         DeArrowVideoContent(video: video) { branding in
             HStack(spacing: 0) {
                 Group {
-                    Button(action: onTap) {
+                    Button(action: openVideo) {
                         content(branding: branding)
                     }
                     .buttonStyle(ResponsiveButtonStyle())
@@ -117,6 +118,11 @@ struct VideoRow: View {
             .joined(separator: ", ")
     }
 
+    private func openVideo() {
+        player.prepareLaunch(for: video.id, from: launchAnchor.frame)
+        onTap()
+    }
+
     private func content(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: MediaStyle.spacing) {
             VideoThumbnail(
@@ -127,6 +133,11 @@ struct VideoRow: View {
                 replacementData: branding.thumbnailData(for: video),
                 replacementCacheKey: branding.thumbnailCacheKey(for: video)
             )
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { frame in
+                launchAnchor.frame = frame
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(branding.title(for: video))

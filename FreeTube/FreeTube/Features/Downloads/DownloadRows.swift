@@ -58,7 +58,9 @@ struct DownloadTransferRow: View {
 
 @available(iOS 17.0, *)
 struct DownloadedVideoRow<MenuContent: View>: View {
+    @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var launchAnchor = VideoLaunchAnchor()
     let item: SavedItem
     let isSelecting: Bool
     let onPlay: () -> Void
@@ -94,6 +96,11 @@ struct DownloadedVideoRow<MenuContent: View>: View {
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: .global)
+                } action: { frame in
+                    launchAnchor.frame = frame
+                }
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .appFont(.subheadline, weight: .semibold)
@@ -113,7 +120,10 @@ struct DownloadedVideoRow<MenuContent: View>: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if !isSelecting { onPlay() }
+            if !isSelecting {
+                player.prepareLaunch(for: item.videoID, from: launchAnchor.frame)
+                onPlay()
+            }
         }
         .swipeActions {
             if !isSelecting {

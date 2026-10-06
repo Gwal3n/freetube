@@ -84,6 +84,10 @@ final class PlayerStateManager {
     /// expansion instead of setting presentation state directly, giving the container a chance to
     /// stage its SwiftUI artwork before the UIKit video surface begins moving.
     private(set) var playerExpansionRequest = 0
+    /// The visible thumbnail that initiated the next explicit expansion, in screen coordinates.
+    /// This is presentation-only state; it never changes playback or persists with a video.
+    private(set) var launchSourceFrame: CGRect?
+    @ObservationIgnored private var pendingLaunchSource: (videoID: String, frame: CGRect)?
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
     /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
@@ -587,20 +591,45 @@ final class PlayerStateManager {
     private var queueNoticeUndoAction: (() -> Void)?
     private var playerPresentationTask: Task<Void, Never>?
 
-    /// Mounts the complete player in its settled mini position before expanding it for a first
-    /// launch. `AVPlayerViewController` does not reliably participate in a SwiftUI insertion
-    /// transition; staging one frame makes the initial opening use the same proven offset path as
-    /// tapping an existing mini-player, so the video surface and surrounding chrome travel as one.
+    /// Called by a tapped video row before `load` so the player can grow from that thumbnail.
+    /// A video ID guards against a stale row gesture launching a different queued item.
+    func prepareLaunch(for videoID: String, from frame: CGRect) {
+        guard frame.width > 20, frame.height > 20,
+              frame.width.isFinite, frame.height.isFinite,
+              frame.origin.x.isFinite, frame.origin.y.isFinite else {
+            pendingLaunchSource = nil
+            return
+        }
+        pendingLaunchSource = (videoID, frame)
+    }
+
+    func finishLaunchPresentation() {
+        launchSourceFrame = nil
+    }
+
+    /// Stages one frame at the tapped thumbnail before expansion. `AVPlayerViewController` does
+    /// not reliably participate in a SwiftUI insertion transition; the mounted surface must have
+    /// a real starting frame. Actions without a thumbnail retain the floating-window fallback.
     private func presentPlayer(for videoID: String, expanded: Bool) {
         playerPresentationTask?.cancel()
+        let source = pendingLaunchSource?.videoID == videoID ? pendingLaunchSource?.frame : nil
+        pendingLaunchSource = nil
         let wasVisible = miniPlayerVisible
         miniPlayerVisible = true
-        guard expanded else { return }
+        guard expanded else {
+            launchSourceFrame = nil
+            return
+        }
 
         // Already expanded: changing the current item must not replay the presentation animation.
-        guard !fullScreenPresented else { return }
+        guard !fullScreenPresented else {
+            launchSourceFrame = nil
+            return
+        }
 
-        if wasVisible {
+        launchSourceFrame = source
+
+        if wasVisible && source == nil {
             playerExpansionRequest &+= 1
             return
         }
@@ -1119,6 +1148,8 @@ final class PlayerStateManager {
         resumeAfterAudioSwitch = nil
         playerPresentationTask?.cancel()
         playerPresentationTask = nil
+        pendingLaunchSource = nil
+        launchSourceFrame = nil
         recommendationTask?.cancel()
         recommendationTask = nil
         contentPrefetchTask?.cancel()

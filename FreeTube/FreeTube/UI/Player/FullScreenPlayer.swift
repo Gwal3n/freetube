@@ -458,6 +458,8 @@ struct FullScreenPlayer: View {
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
                 // metadata column so its title and rows cannot extend underneath a side panel.
                 .frame(width: surfaceWidth, alignment: .leading)
+                .opacity(chromePresentationReady ? 1 : 0)
+                .transition(.opacity)
             }
             }
             .frame(width: proxy.size.width, alignment: .leading)
@@ -498,13 +500,20 @@ struct FullScreenPlayer: View {
         // One continuous material under EVERYTHING, including the top safe-area inset (status bar).
         // VStack content still respects safe area; only the material extends behind the inset.
         .background {
-            if oledPlayerBackground {
-                Color.black.ignoresSafeArea()
-            } else {
-                Rectangle()
-                    .fill(.thinMaterial)
-                    .ignoresSafeArea()
+            Group {
+                if oledPlayerBackground {
+                    Color.black.ignoresSafeArea()
+                } else {
+                    Rectangle()
+                        .fill(.thinMaterial)
+                        .ignoresSafeArea()
+                }
             }
+            // In floating mode the moving host should contain only the video. The expanded
+            // details canvas fades away instead of travelling down as a miniature sheet.
+            .opacity(player.fullScreenPresented && chromePresentationReady ? 1 : 0)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: player.fullScreenPresented)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromePresentationReady)
         }
         // Ensure the system status bar stays visible with light glyphs against the dark material.
         .preferredColorScheme(.dark)

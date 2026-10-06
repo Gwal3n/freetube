@@ -51,6 +51,16 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 x: floatingBase.x + floatingDragTranslation.width + floatingDismissTranslation.width,
                 y: floatingBase.y + floatingDragTranslation.height + floatingDismissTranslation.height
             )
+            let containerOrigin = proxy.frame(in: .global).origin
+            let launchFrame = player.launchSourceFrame?.offsetBy(
+                dx: -containerOrigin.x,
+                dy: -containerOrigin.y
+            )
+            let compactSize = launchFrame?.size ?? floatingSize
+            let compactPosition = launchFrame.map {
+                CGPoint(x: $0.midX, y: $0.midY)
+            } ?? floatingPosition
+            let isLaunchingFromThumbnail = launchFrame != nil && !player.fullScreenPresented
 
             ZStack(alignment: .bottom) {
                 content
@@ -68,21 +78,20 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         chromePresentationReady: chromePresentationReady
                     )
                         .frame(
-                            width: player.fullScreenPresented ? proxy.size.width : floatingSize.width,
+                            width: player.fullScreenPresented ? proxy.size.width : compactSize.width,
                             height: player.fullScreenPresented
                                 ? max(0, proxy.size.height - expandedTopInset)
-                                : floatingSize.height
+                                : compactSize.height
                         )
                         // Keep the player's existing viewport and controls below the status
                         // area, but make its clipping host edge-to-edge. Only the scaled media
                         // can then extend into that top inset during an upward fullscreen drag.
                         .padding(.top, player.fullScreenPresented ? expandedTopInset : 0)
                         .frame(
-                            width: player.fullScreenPresented ? proxy.size.width : floatingSize.width,
-                            height: player.fullScreenPresented ? proxy.size.height : floatingSize.height,
+                            width: player.fullScreenPresented ? proxy.size.width : compactSize.width,
+                            height: player.fullScreenPresented ? proxy.size.height : compactSize.height,
                             alignment: .top
                         )
-                        .background(Color.black)
                         .clipShape(
                             RoundedRectangle(
                                 cornerRadius: player.fullScreenPresented
@@ -99,14 +108,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // AVPlayerViewController inside can commit a frame ahead of an `.offset`
                         // animation, exposing video at the destination while the chrome moves.
                         .position(
-                            x: player.fullScreenPresented ? proxy.size.width / 2 : floatingPosition.x,
+                            x: player.fullScreenPresented ? proxy.size.width / 2 : compactPosition.x,
                             y: player.fullScreenPresented
                                 ? expandedPlayerCenterY(transition: transition, in: proxy.size)
-                                : floatingPosition.y
+                                : compactPosition.y
                         )
                         .opacity(floatingIsDismissing && floatingShouldFade ? 0 : 1)
                         .zIndex(2)
-                        .transition(.opacity)
                         // The UIKit-backed player stays mounted as its host moves between the
                         // expanded viewport and the floating window. The mini host is not a
                         // touch target: only the compact SwiftUI chrome accepts gestures.
@@ -116,22 +124,22 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .allowsHitTesting(player.fullScreenPresented)
 
                     FloatingMiniPlayerChrome(
-                        actionsEnabled: !floatingActionsSuppressed && !floatingIsDismissing,
+                        actionsEnabled: !floatingActionsSuppressed && !floatingIsDismissing
+                            && !isLaunchingFromThumbnail,
                         onExpand: expandPlayer,
                         onDismiss: dismissFloatingPlayer
                     )
                         .frame(width: floatingSize.width, height: floatingSize.height)
                         .position(floatingPosition)
-                        .opacity(player.fullScreenPresented || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
+                        .opacity(player.fullScreenPresented || isLaunchingFromThumbnail
+                            || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
                         .zIndex(3)
                         .simultaneousGesture(floatingGesture(in: proxy.size, window: floatingSize, base: floatingBase))
-                        .allowsHitTesting(!player.fullScreenPresented && !floatingIsDismissing)
+                        .allowsHitTesting(!player.fullScreenPresented && !isLaunchingFromThumbnail
+                            && !floatingIsDismissing)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            // Expansion and collapse already supply their own interactive springs. A second
-            // animation bound to this Bool can reanimate the mini glass after it reappears.
-            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: player.miniPlayerVisible)
         }
         // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
         // FullScreenPlayer itself is inset below the portrait status area.
@@ -144,19 +152,31 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             expandPlayer()
         }
         .onChange(of: player.fullScreenPresented) { _, isPresented in
-            if !isPresented {
+            if isPresented {
+                // A later collapse should always land in the bottom-trailing resting place,
+                // even if the previous floating window was dragged to another corner.
+                floatingCorner = .bottomTrailing
+            } else {
+                player.finishLaunchPresentation()
                 captionPresentationReady = true
                 chromePresentationReady = true
             }
         }
         .onChange(of: player.miniPlayerVisible) { _, visible in
-            if !visible {
-                floatingDragTranslation = .zero
-                floatingDismissTranslation = .zero
+            if visible {
                 floatingIsDismissing = false
                 floatingShouldFade = false
+            } else {
+                floatingDragTranslation = .zero
+                floatingDismissTranslation = .zero
                 floatingGestureActive = false
                 floatingActionsSuppressed = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(100))
+                    guard !player.miniPlayerVisible else { return }
+                    floatingIsDismissing = false
+                    floatingShouldFade = false
+                }
             }
         }
     }
@@ -257,19 +277,22 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     x: base.x + value.predictedEndTranslation.width,
                     y: base.y + value.predictedEndTranslation.height
                 )
-                let speed = hypot(value.velocity.width, value.velocity.height)
-                let movedOffscreen = actual.x < -window.width * 0.2
-                    || actual.x > size.width + window.width * 0.2
-                    || actual.y < -window.height * 0.2
-                    || actual.y > size.height + window.height * 0.2
-                let flickedOffscreen = speed > 650 && (
-                    projected.x < -window.width * 0.3
-                    || projected.x > size.width + window.width * 0.3
-                    || projected.y < -window.height * 0.3
-                    || projected.y > size.height + window.height * 0.3
+                let outwardDrag = floatingCorner.isTop
+                    ? -value.translation.height : value.translation.height
+                let outwardVelocity = floatingCorner.isTop
+                    ? -value.velocity.height : value.velocity.height
+                let verticalIntent = outwardDrag > 90
+                    && abs(value.translation.height) > abs(value.translation.width) * 1.2
+                let movedBeyondEdge = floatingCorner.isTop
+                    ? actual.y < -window.height * 0.15
+                    : actual.y > size.height + window.height * 0.15
+                let flickedBeyondEdge = outwardVelocity > 900 && (
+                    floatingCorner.isTop
+                        ? projected.y < -window.height * 0.3
+                        : projected.y > size.height + window.height * 0.3
                 )
-                if movedOffscreen || flickedOffscreen {
-                    dismissFloatingPlayer(toward: projected, in: size, from: actual)
+                if verticalIntent && (movedBeyondEdge || flickedBeyondEdge) {
+                    dismissFloatingPlayer(in: size, window: window, from: actual)
                     return
                 }
 
@@ -308,6 +331,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             player.fullScreenPresented = true
         } completion: {
             guard player.fullScreenPresented else { return }
+            player.finishLaunchPresentation()
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                 captionPresentationReady = true
                 chromePresentationReady = true
@@ -333,23 +357,17 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         }
     }
 
-    private func dismissFloatingPlayer(toward projected: CGPoint, in size: CGSize, from actual: CGPoint) {
+    private func dismissFloatingPlayer(in size: CGSize, window: CGSize, from actual: CGPoint) {
         floatingActionsSuppressed = true
-        let horizontal = abs(projected.x - actual.x) >= abs(projected.y - actual.y)
-        let target = CGPoint(
-            x: horizontal
-                ? (projected.x < actual.x ? -150 : size.width + 150) : actual.x,
-            y: horizontal
-                ? actual.y : (projected.y < actual.y ? -100 : size.height + 100)
-        )
+        let targetY = floatingCorner.isTop ? -window.height : size.height + window.height
         guard !reduceMotion else {
             finishFloatingDismissal()
             return
         }
         withAnimation(.smooth(duration: 0.2), completionCriteria: .logicallyComplete) {
             floatingDismissTranslation = CGSize(
-                width: target.x - actual.x,
-                height: target.y - actual.y
+                width: 0,
+                height: targetY - actual.y
             )
             floatingIsDismissing = true
             floatingShouldFade = false
@@ -359,12 +377,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func finishFloatingDismissal() {
-        player.dismiss()
+        // The close fade has already finished. Remove the renderer without another insertion/
+        // removal transition; otherwise its reset to an empty AVPlayer can flash black.
+        withTransaction(Transaction(animation: nil)) {
+            player.dismiss()
+        }
         presentationTranslation = 0
         floatingDragTranslation = .zero
         floatingDismissTranslation = .zero
-        floatingIsDismissing = false
-        floatingShouldFade = false
         floatingGestureActive = false
         floatingActionsSuppressed = false
     }
@@ -375,6 +395,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 @available(iOS 17.0, *)
 private enum FloatingCorner {
     case topLeading, topTrailing, bottomLeading, bottomTrailing
+
+    var isTop: Bool {
+        switch self {
+        case .topLeading, .topTrailing: return true
+        case .bottomLeading, .bottomTrailing: return false
+        }
+    }
 
     func center(in viewport: CGSize, window: CGSize, topInset: CGFloat, bottomInset: CGFloat) -> CGPoint {
         let margin: CGFloat = 14
