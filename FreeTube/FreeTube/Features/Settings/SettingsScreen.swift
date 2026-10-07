@@ -50,7 +50,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("Video quality is a preferred maximum, not a guaranteed resolution. It can adjust an adaptive stream during playback; fixed files use the preference on the next video.\n\nThe featured preview shows YouTube’s own comment excerpt while Comments is collapsed. Prefetching starts only after playback is ready and loads the description plus the first comments page when comments are enabled. Further comments and replies remain on demand.\n\nAllowing audio from other apps lets FreeTube play alongside music, podcasts, and other active audio. The app that owns lock-screen controls can depend on which one started first.")
+                    Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback.")
                 }
 
                 Section("Captions") {
@@ -79,7 +79,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Feed")
                 } footer: {
-                    Text("Hiding the tab keeps your local subscriptions and cached feed on this device. Large thumbnails use spacious 16:9 cards while preserving the same playback and queue actions.")
+                    Text("Hiding Feed does not remove your subscriptions. Large thumbnails change only the layout.")
                 }
 
                 Section("Channels") {
@@ -104,7 +104,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Appearance")
                 } footer: {
-                    Text("The expanded-player option uses true black for video information, Up Next, and comments. The mini-player option replaces its default Liquid Glass with true black.")
+                    Text("OLED uses true black instead of the usual translucent background.")
                 }
 
                 Section {
@@ -117,8 +117,6 @@ struct SettingsScreen: View {
                     .tint(.white)
                 } header: {
                     Text("Community enhancements")
-                } footer: {
-                    Text("Optional, anonymous SponsorBlock and DeArrow features.")
                 }
 
                 Section("Player controls") {
@@ -217,7 +215,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text(verbatim: "yt-dlp")
                 } footer: {
-                    Text("yt-dlp is the engine that resolves YouTube stream URLs. FreeTube auto-refreshes it every 7 days from the official GitHub release. Tap Update now if a video stops playing — newer versions often fix breakage caused by YouTube's API changes.")
+                    Text("Playback does not use yt-dlp. Downloads may fall back to it; FreeTube checks for updates about once a week.")
                 }
 
                 Section {
@@ -257,7 +255,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Diagnostics")
                 } footer: {
-                    Text("When enabled, every app launch creates a private diagnostic log that can be exported with Share. Each file starts with the app version, build, iOS version, and device model, followed by timestamped entries from FreeTube's subsystem. Sensitive URL query strings are excluded.")
+                    Text("Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries.")
                 }
 
                 Section {
@@ -274,7 +272,7 @@ struct SettingsScreen: View {
                             .font(.body.monospaced())
                             .textSelection(.enabled)
                     }
-                    Text("FreeTube is a personal, account-free YouTube client. It uses anonymous YouTubeKit requests without a Google API key, plus yt-dlp for downloads. YouTube can change its internal API at any time — please be patient when things break.")
+                    Text("An account-free YouTube client for personal use. Playback and downloads may break when YouTube changes its internal APIs.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } header: {

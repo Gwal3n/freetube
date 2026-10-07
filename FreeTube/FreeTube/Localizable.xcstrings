@@ -1,6 +1,69 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Qualität ist bei adaptiven Streams eine Obergrenze, keine garantierte Auflösung. Das Vorladen lädt nach Wiedergabestart Details und die erste Kommentarseite. Wenn Audio anderer Apps erlaubt ist, kann eine andere App die Sperrbildschirm-Steuerung behalten." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "La calidad es un máximo para los flujos adaptativos, no una resolución garantizada. La precarga obtiene los detalles y la primera página de comentarios después de iniciar la reproducción. Al permitir el audio de otras apps, otra app puede conservar los controles de la pantalla de bloqueo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La qualité est un plafond pour les flux adaptatifs, pas une résolution garantie. Le préchargement récupère les détails et la première page de commentaires après le début de la lecture. Si l’audio d’autres apps est autorisé, une autre app peut conserver les commandes de l’écran verrouillé." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Качество задаёт верхний предел для адаптивных потоков, но не гарантирует разрешение. Предзагрузка получает сведения и первую страницу комментариев после начала воспроизведения. Если разрешён звук других приложений, управление на экране блокировки может остаться у другого приложения." } }
+      }
+    },
+    "Hiding Feed does not remove your subscriptions. Large thumbnails change only the layout." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Das Ausblenden des Feeds entfernt keine Abonnements. Große Vorschaubilder ändern nur das Layout." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hiding Feed does not remove your subscriptions. Large thumbnails change only the layout." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ocultar el feed no elimina tus suscripciones. Las miniaturas grandes solo cambian el diseño." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Masquer le fil ne supprime pas vos abonnements. Les grandes miniatures ne changent que la présentation." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скрытие ленты не удаляет подписки. Крупные миниатюры меняют только оформление." } }
+      }
+    },
+    "OLED uses true black instead of the usual translucent background." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "OLED verwendet echtes Schwarz statt des üblichen durchscheinenden Hintergrunds." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OLED uses true black instead of the usual translucent background." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "OLED usa negro puro en lugar del fondo translúcido habitual." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "OLED utilise un noir profond à la place du fond translucide habituel." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Режим OLED использует настоящий чёрный цвет вместо обычного полупрозрачного фона." } }
+      }
+    },
+    "Playback does not use yt-dlp. Downloads may fall back to it; FreeTube checks for updates about once a week." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Wiedergabe nutzt yt-dlp nicht. Downloads können darauf zurückgreifen; FreeTube prüft etwa einmal pro Woche auf Updates." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback does not use yt-dlp. Downloads may fall back to it; FreeTube checks for updates about once a week." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "La reproducción no usa yt-dlp. Las descargas pueden recurrir a él; FreeTube busca actualizaciones aproximadamente una vez por semana." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "La lecture n’utilise pas yt-dlp. Les téléchargements peuvent y recourir ; FreeTube vérifie les mises à jour environ une fois par semaine." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Воспроизведение не использует yt-dlp. Загрузки могут применять его как запасной вариант; FreeTube проверяет обновления примерно раз в неделю." } }
+      }
+    },
+    "Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Beim Start wird eine neue Protokolldatei zur Fehlerdiagnose erstellt. Sie enthält App- und Gerätedaten, aber keine sensiblen URL-Abfragen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Al guardar registros se crea un archivo nuevo al iniciar la app para diagnosticar problemas. Incluye datos de la app y del dispositivo, pero omite los parámetros sensibles de las URL." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’enregistrement des journaux crée un nouveau fichier au lancement pour le dépannage. Ils incluent des informations sur l’app et l’appareil, mais omettent les paramètres d’URL sensibles." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "При запуске создаётся новый файл журнала для диагностики. Он содержит сведения о приложении и устройстве, но не включает конфиденциальные параметры URL." } }
+      }
+    },
+    "An account-free YouTube client for personal use. Playback and downloads may break when YouTube changes its internal APIs." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ein YouTube-Client ohne Konto für den persönlichen Gebrauch. Wiedergabe und Downloads können ausfallen, wenn YouTube seine internen APIs ändert." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "An account-free YouTube client for personal use. Playback and downloads may break when YouTube changes its internal APIs." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Un cliente de YouTube sin cuenta para uso personal. La reproducción y las descargas pueden fallar si YouTube cambia sus API internas." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Un client YouTube sans compte pour un usage personnel. La lecture et les téléchargements peuvent cesser de fonctionner si YouTube modifie ses API internes." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Клиент YouTube без учётной записи для личного использования. Воспроизведение и загрузки могут перестать работать, если YouTube изменит внутренние API." } }
+      }
+    },
+    "Using %@. Oldest downloads are removed when the cache limit is reached. Playback does not save a copy. More parallel fragments may speed up downloads but can trigger rate limits." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Belegt: %@. Bei Erreichen des Cache-Limits werden die ältesten Downloads entfernt. Die Wiedergabe speichert keine Kopie. Mehr parallele Fragmente können Downloads beschleunigen, aber Ratenbegrenzungen auslösen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Using %@. Oldest downloads are removed when the cache limit is reached. Playback does not save a copy. More parallel fragments may speed up downloads but can trigger rate limits." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "En uso: %@. Al alcanzar el límite de caché se eliminan las descargas más antiguas. La reproducción no guarda una copia. Más fragmentos paralelos pueden acelerar las descargas, pero provocar límites de solicitudes." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Espace utilisé : %@. Les téléchargements les plus anciens sont supprimés lorsque la limite du cache est atteinte. La lecture n’enregistre pas de copie. Plus de fragments parallèles peuvent accélérer les téléchargements, mais provoquer des limitations de débit." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Использовано: %@. При достижении лимита кеша удаляются самые старые загрузки. Воспроизведение не сохраняет копию. Большее число параллельных фрагментов может ускорить загрузку, но вызвать ограничения частоты запросов." } }
+      }
+    },
     "Captions" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Untertitel" } },
