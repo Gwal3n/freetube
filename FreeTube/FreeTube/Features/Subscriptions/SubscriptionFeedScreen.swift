@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SubscriptionFeedScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
+    @Environment(AppVisitState.self) private var appVisitState
     @State private var model = SubscriptionFeedViewModel()
     @State private var groups = LocalSubscriptionGroupStore.shared
     @State private var path: [AppNavigationRequest.Destination] = []
@@ -161,6 +162,14 @@ struct SubscriptionFeedScreen: View {
         "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count)"
     }
 
+    /// A feed-only, best-effort marker. YouTube supplies relative upload ages rather than an
+    /// exact timestamp, so rows without an estimated publish date remain unmarked.
+    private func isNewSinceLastVisit(_ video: Video) -> Bool {
+        guard let previousVisitAt = appVisitState.previousVisitAt,
+              let publishedAt = video.publishedAt else { return false }
+        return publishedAt > previousVisitAt && publishedAt <= currentDate
+    }
+
     private var refreshWarning: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
@@ -261,6 +270,7 @@ struct SubscriptionFeedScreen: View {
                 showsMoreMenu: true,
                 offersPlayNext: true,
                 playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil,
+                isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             )
             .padding(.top, 4)
@@ -280,6 +290,7 @@ struct SubscriptionFeedScreen: View {
                 video: video,
                 accessory: .actions(offersPlayNext: true),
                 playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil,
+                isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             ) {
                 player.load(video)

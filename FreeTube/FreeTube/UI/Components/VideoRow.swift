@@ -19,6 +19,7 @@ struct VideoRow: View {
     let video: Video
     var accessory: Accessory
     var playbackProgress: Double?
+    var isNewSinceLastVisit = false
     var relativeDateReference: Date?
     var onOpenChannel: (() -> Void)?
     var onTap: () -> Void
@@ -29,6 +30,7 @@ struct VideoRow: View {
         video: Video,
         accessory: Accessory = .none,
         playbackProgress: Double? = nil,
+        isNewSinceLastVisit: Bool = false,
         relativeDateReference: Date? = nil,
         onOpenChannel: (() -> Void)? = nil,
         onTap: @escaping () -> Void = {}
@@ -36,6 +38,7 @@ struct VideoRow: View {
         self.video = video
         self.accessory = accessory
         self.playbackProgress = playbackProgress
+        self.isNewSinceLastVisit = isNewSinceLastVisit
         self.relativeDateReference = relativeDateReference
         self.onOpenChannel = onOpenChannel
         self.onTap = onTap
@@ -113,7 +116,8 @@ struct VideoRow: View {
     }
 
     private func rowAccessibilityLabel(title: String) -> String {
-        [title, video.channelName, statsLine, video.durationString]
+        [isNewSinceLastVisit ? String(localized: "New since last visit") : "",
+         title, video.channelName, statsLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }
@@ -149,10 +153,24 @@ struct VideoRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if !statsLine.isEmpty {
-                    Text(statsLine)
-                        .appFont(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        if isNewSinceLastVisit {
+                            Text("New")
+                                .appFont(.caption2, weight: .semibold)
+                                .foregroundStyle(.primary)
+                                .fixedSize()
+                                .accessibilityHidden(true)
+                        }
+                        Text(statsLine)
+                            .appFont(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                } else if isNewSinceLastVisit {
+                    Text("New")
+                        .appFont(.caption2, weight: .semibold)
+                        .foregroundStyle(.primary)
+                        .accessibilityHidden(true)
                 }
             }
         }

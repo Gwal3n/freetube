@@ -12,6 +12,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(AppVisitState.self) private var appVisitState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var selectedTab: Tab
@@ -86,6 +87,7 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             log.info("Scene phase changed: \(String(describing: phase))")
+            appVisitState.scenePhaseChanged(phase)
             // Reopening the app from an automatic PiP session may leave the popup binding true,
             // so there is no false→true popup transition to observe. Foreground activation is
             // the second explicit signal that the same video should return inline.

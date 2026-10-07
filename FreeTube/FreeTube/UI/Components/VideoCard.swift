@@ -17,6 +17,7 @@ struct VideoCard: View {
     var showsMoreMenu: Bool = false
     var offersPlayNext = false
     var playbackProgress: Double? = nil
+    var isNewSinceLastVisit = false
     var relativeDateReference: Date? = nil
 
     /// Channel name plus the playback count and relative upload date. Joined by middle dots so
@@ -93,10 +94,19 @@ struct VideoCard: View {
                             .contentTransition(.opacity)
                             .appFont(.subheadline, weight: .semibold)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
-                        Text(metadataLine)
-                            .appFont(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        HStack(spacing: 6) {
+                            if isNewSinceLastVisit {
+                                Text("New")
+                                    .appFont(.caption, weight: .semibold)
+                                    .foregroundStyle(.primary)
+                                    .fixedSize()
+                                    .accessibilityHidden(true)
+                            }
+                            Text(metadataLine)
+                                .appFont(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        }
                     }
 
                     Spacer(minLength: 0)
@@ -115,7 +125,8 @@ struct VideoCard: View {
     }
 
     private func cardAccessibilityLabel(title: String) -> String {
-        [title, metadataLine, video.durationString]
+        [isNewSinceLastVisit ? String(localized: "New since last visit") : "",
+         title, metadataLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }

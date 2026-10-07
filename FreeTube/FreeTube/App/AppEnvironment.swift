@@ -7,6 +7,7 @@ import OSLog
 @MainActor
 final class AppEnvironment {
     let playerStateManager = PlayerStateManager()
+    let appVisitState = AppVisitState()
 
     init() {
         SecurityHardening.configureAtLaunch()

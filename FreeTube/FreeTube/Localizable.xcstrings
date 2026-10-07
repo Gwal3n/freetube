@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "New" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Neu" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Nuevo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nouveau" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Новое" } }
+      }
+    },
+    "New since last visit" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Neu seit dem letzten Besuch" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New since last visit" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Nuevo desde la última visita" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nouveau depuis la dernière visite" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Новое с прошлого посещения" } }
+      }
+    },
     "Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback." : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Qualität ist bei adaptiven Streams eine Obergrenze, keine garantierte Auflösung. Das Vorladen lädt nach Wiedergabestart Details und die erste Kommentarseite. Wenn Audio anderer Apps erlaubt ist, kann eine andere App die Sperrbildschirm-Steuerung behalten." } },
