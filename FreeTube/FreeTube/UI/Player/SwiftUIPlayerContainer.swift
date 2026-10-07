@@ -19,6 +19,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var captionPresentationReady = true
     @State private var chromePresentationReady = true
     @State private var floatingCorner: FloatingCorner = .bottomTrailing
+    @State private var floatingIsStashed = false
     @State private var floatingDragTranslation: CGSize = .zero
     @State private var floatingDismissTranslation: CGSize = .zero
     @State private var floatingGestureActive = false
@@ -58,8 +59,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 topInset: systemInsets.top,
                 bottomInset: miniBottomPadding
             )
+            let stashedX = floatingCorner.isLeading
+                ? -floatingSize.width / 2 + 22
+                : proxy.size.width + floatingSize.width / 2 - 22
             let floatingPosition = CGPoint(
-                x: floatingBase.x + floatingDragTranslation.width + floatingDismissTranslation.width,
+                x: (floatingIsStashed ? stashedX : floatingBase.x + floatingDragTranslation.width)
+                    + floatingDismissTranslation.width,
                 y: floatingBase.y + floatingDragTranslation.height + floatingDismissTranslation.height
             )
             let containerOrigin = proxy.frame(in: .global).origin
@@ -161,7 +166,20 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             bottomInset: miniBottomPadding
                         ))
                         .allowsHitTesting(!player.fullScreenPresented && !isLaunchingFromThumbnail
-                            && !floatingIsDismissing)
+                            && !floatingIsDismissing && !floatingIsStashed)
+
+                    if floatingIsStashed && !player.fullScreenPresented && !isLaunchingFromThumbnail {
+                        FloatingMiniPlayerStashTab(
+                            isLeading: floatingCorner.isLeading,
+                            onRestore: restoreFloatingPlayer
+                        )
+                        .position(
+                            x: floatingCorner.isLeading ? 22 : proxy.size.width - 22,
+                            y: floatingBase.y
+                        )
+                        .zIndex(4)
+                        .transition(.opacity)
+                    }
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -186,6 +204,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 // A later collapse should always land in the bottom-trailing resting place,
                 // even if the previous floating window was dragged to another corner.
                 floatingCorner = .bottomTrailing
+                floatingIsStashed = false
                 floatingPinchActive = false
                 floatingPinchSuppressesDrag = false
                 floatingPinchStartWidth = nil
@@ -202,6 +221,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             } else {
                 floatingDragTranslation = .zero
                 floatingDismissTranslation = .zero
+                floatingIsStashed = false
                 floatingGestureActive = false
                 floatingPinchActive = false
                 floatingPinchSuppressesDrag = false
@@ -326,14 +346,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
                 guard !player.fullScreenPresented, !floatingIsDismissing,
-                      !floatingPinchSuppressesDrag else { return }
+                      !floatingPinchSuppressesDrag, !floatingIsStashed else { return }
                 floatingGestureActive = true
                 floatingActionsSuppressed = true
                 floatingDragTranslation = value.translation
             }
             .onEnded { value in
                 guard !player.fullScreenPresented, !floatingIsDismissing,
-                      !floatingPinchSuppressesDrag else {
+                      !floatingPinchSuppressesDrag, !floatingIsStashed else {
                     floatingGestureActive = false
                     return
                 }
@@ -365,6 +385,21 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     return
                 }
 
+                // Crossing a side edge is deliberate; a projected flick alone must not hide
+                // the window while the user is merely moving it between visible corners.
+                let horizontalIntent = abs(value.translation.width) > 100
+                    && abs(value.translation.width) > abs(value.translation.height) * 1.25
+                let crossedSideEdge = actual.x < -12 || actual.x > size.width + 12
+                if horizontalIntent && crossedSideEdge {
+                    withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.86)) {
+                        floatingCorner = FloatingCorner.nearest(to: actual, in: size)
+                        floatingDragTranslation = .zero
+                        floatingIsStashed = true
+                    }
+                    floatingActionsSuppressed = false
+                    return
+                }
+
                 let nextCorner = FloatingCorner.nearest(to: projected, in: size)
                 withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.82)) {
                     floatingCorner = nextCorner
@@ -388,7 +423,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     ) -> some Gesture {
         MagnifyGesture(minimumScaleDelta: 0.02)
             .onChanged { value in
-                guard !player.fullScreenPresented, !floatingIsDismissing else { return }
+                guard !player.fullScreenPresented, !floatingIsDismissing,
+                      !floatingIsStashed else { return }
                 if floatingPinchStartWidth == nil {
                     floatingPinchStartWidth = min(
                         widthRange.upperBound,
@@ -458,6 +494,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             presentationTranslation = 0
             floatingDragTranslation = .zero
             floatingDismissTranslation = .zero
+            floatingIsStashed = false
             floatingGestureActive = false
             floatingPinchActive = false
             floatingPinchSuppressesDrag = false
@@ -492,6 +529,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         }
     }
 
+    private func restoreFloatingPlayer() {
+        guard floatingIsStashed else { return }
+        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.38, dampingFraction: 0.84)) {
+            floatingIsStashed = false
+        }
+    }
+
     private func dismissFloatingPlayer(in size: CGSize, window: CGSize, from actual: CGPoint) {
         floatingActionsSuppressed = true
         let targetY = floatingCorner.isTop ? -window.height : size.height + window.height
@@ -520,6 +564,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         presentationTranslation = 0
         floatingDragTranslation = .zero
         floatingDismissTranslation = .zero
+        floatingIsStashed = false
         floatingGestureActive = false
         floatingActionsSuppressed = false
     }
@@ -535,6 +580,13 @@ private enum FloatingCorner {
         switch self {
         case .topLeading, .topTrailing: return true
         case .bottomLeading, .bottomTrailing: return false
+        }
+    }
+
+    var isLeading: Bool {
+        switch self {
+        case .topLeading, .bottomLeading: return true
+        case .topTrailing, .bottomTrailing: return false
         }
     }
 
