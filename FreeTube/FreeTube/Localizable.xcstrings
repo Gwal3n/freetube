@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Mark new uploads" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Neue Uploads markieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Mark new uploads" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Marcar vídeos nuevos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Signaler les nouvelles vidéos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отмечать новые видео" } }
+      }
+    },
     "New" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Neu" } },

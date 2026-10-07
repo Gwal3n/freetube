@@ -32,6 +32,8 @@ struct UserPreferences {
     @AppStorage("showSubscriptionFeedTab") var showSubscriptionFeedTab: Bool = true
     /// Uses edge-to-edge 16:9 cards in the local subscription feed instead of compact rows.
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
+    /// Shows a quiet New label for subscription uploads estimated after the previous app visit.
+    @AppStorage("showNewSubscriptionUploads") var showNewSubscriptionUploads: Bool = true
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showDescription") var showDescription: Bool = true
     /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit

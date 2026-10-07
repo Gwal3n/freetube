@@ -126,6 +126,11 @@ final class SettingsViewModel {
         set { preferences.largeSubscriptionFeedThumbnails = newValue }
     }
 
+    var showNewSubscriptionUploads: Bool {
+        get { preferences.showNewSubscriptionUploads }
+        set { preferences.showNewSubscriptionUploads = newValue }
+    }
+
     var showComments: Bool {
         get { preferences.showComments }
         set { preferences.showComments = newValue }

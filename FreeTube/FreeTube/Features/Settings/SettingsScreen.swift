@@ -76,6 +76,7 @@ struct SettingsScreen: View {
                 Section {
                     Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
                     Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
+                    Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
                 } header: {
                     Text("Feed")
                 } footer: {

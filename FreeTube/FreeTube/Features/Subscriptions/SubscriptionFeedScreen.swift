@@ -12,6 +12,7 @@ struct SubscriptionFeedScreen: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
+    @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
     @State private var currentDate = Date.now
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
@@ -165,7 +166,8 @@ struct SubscriptionFeedScreen: View {
     /// A feed-only, best-effort marker. YouTube supplies relative upload ages rather than an
     /// exact timestamp, so rows without an estimated publish date remain unmarked.
     private func isNewSinceLastVisit(_ video: Video) -> Bool {
-        guard let previousVisitAt = appVisitState.previousVisitAt,
+        guard showNewSubscriptionUploads,
+              let previousVisitAt = appVisitState.previousVisitAt,
               let publishedAt = video.publishedAt else { return false }
         return publishedAt > previousVisitAt && publishedAt <= currentDate
     }
