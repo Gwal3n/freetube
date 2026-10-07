@@ -86,6 +86,8 @@ final class PlayerStateManager {
     private(set) var playerExpansionRequest = 0
     /// Allows the fixed collapse control to use the container's video-only shrinking transition.
     private(set) var playerCollapseRequest = 0
+    /// Session-wide width of the in-app floating video; the view constrains it to the viewport.
+    private(set) var floatingMiniPlayerWidth: CGFloat = 216
     /// The visible thumbnail that initiated the next explicit expansion, in screen coordinates.
     /// This is presentation-only state; it never changes playback or persists with a video.
     private(set) var launchSourceFrame: CGRect?
@@ -611,6 +613,11 @@ final class PlayerStateManager {
 
     func requestPlayerCollapse() {
         playerCollapseRequest &+= 1
+    }
+
+    func resizeFloatingMiniPlayer(to width: CGFloat) {
+        guard width.isFinite else { return }
+        floatingMiniPlayerWidth = width
     }
 
     /// Stages one frame at the tapped thumbnail before expansion. `AVPlayerViewController` does

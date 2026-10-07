@@ -4,8 +4,6 @@ import SwiftUI
 /// large expand target; corner buttons remain visible without obscuring the picture.
 @available(iOS 17.0, *)
 struct FloatingMiniPlayerChrome: View {
-    static let scrollClearance: CGFloat = 216 * 9 / 16 + 26
-
     @Environment(PlayerStateManager.self) private var player
 
     let actionsEnabled: Bool

@@ -37,7 +37,7 @@ struct RootView: View {
             return PlayerLayoutMetrics.safeAreaInsets.bottom + 12
         }
         let miniPlayerClearance: CGFloat = player.miniPlayerVisible
-            ? FloatingMiniPlayerChrome.scrollClearance : 8
+            ? player.floatingMiniPlayerWidth * 9 / 16 + 26 : 8
         return PlayerLayoutMetrics.bottomTabBarClearance + miniPlayerClearance
     }
 

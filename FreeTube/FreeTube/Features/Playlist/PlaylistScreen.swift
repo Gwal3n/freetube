@@ -64,7 +64,6 @@ struct PlaylistScreen: View {
                 }
             }
         }
-        .modifier(MiniPlayerScrollClearance())
         .ignoresSafeArea(.container, edges: model.details == nil ? [] : .top)
         .background(Color.black)
         .coordinateSpace(name: "playlistScroll")

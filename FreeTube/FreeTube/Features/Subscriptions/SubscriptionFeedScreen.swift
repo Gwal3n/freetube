@@ -62,7 +62,6 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .listStyle(.plain)
-            .modifier(MiniPlayerScrollClearance())
             .navigationTitle("Feed")
             .toolbar {
                 if !groups.groups.isEmpty {

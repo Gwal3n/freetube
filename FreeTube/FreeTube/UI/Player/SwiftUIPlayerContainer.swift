@@ -22,6 +22,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var floatingDragTranslation: CGSize = .zero
     @State private var floatingDismissTranslation: CGSize = .zero
     @State private var floatingGestureActive = false
+    @State private var floatingPinchActive = false
+    @State private var floatingPinchSuppressesDrag = false
+    @State private var floatingPinchStartWidth: CGFloat?
     @State private var floatingActionsSuppressed = false
     @State private var floatingIsDismissing = false
     @State private var floatingShouldFade = false
@@ -39,7 +42,15 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 ? 0
                 : systemInsets.top
             let miniBottomPadding = PlayerLayoutMetrics.bottomTabBarClearance
-            let floatingWidth = min(216, max(160, proxy.size.width - 36))
+            let floatingWidthRange = floatingWidthBounds(
+                in: proxy.size,
+                topInset: systemInsets.top,
+                bottomInset: miniBottomPadding
+            )
+            let floatingWidth = min(
+                floatingWidthRange.upperBound,
+                max(floatingWidthRange.lowerBound, player.floatingMiniPlayerWidth)
+            )
             let floatingSize = CGSize(width: floatingWidth, height: floatingWidth * 9 / 16)
             let floatingBase = floatingCorner.center(
                 in: proxy.size,
@@ -143,6 +154,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
                         .zIndex(3)
                         .simultaneousGesture(floatingGesture(in: proxy.size, window: floatingSize, base: floatingBase))
+                        .simultaneousGesture(floatingPinchGesture(
+                            in: floatingWidthRange,
+                            viewport: proxy.size,
+                            topInset: systemInsets.top,
+                            bottomInset: miniBottomPadding
+                        ))
                         .allowsHitTesting(!player.fullScreenPresented && !isLaunchingFromThumbnail
                             && !floatingIsDismissing)
                 }
@@ -169,6 +186,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 // A later collapse should always land in the bottom-trailing resting place,
                 // even if the previous floating window was dragged to another corner.
                 floatingCorner = .bottomTrailing
+                floatingPinchActive = false
+                floatingPinchSuppressesDrag = false
+                floatingPinchStartWidth = nil
             } else {
                 player.finishLaunchPresentation()
                 captionPresentationReady = true
@@ -183,6 +203,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 floatingDragTranslation = .zero
                 floatingDismissTranslation = .zero
                 floatingGestureActive = false
+                floatingPinchActive = false
+                floatingPinchSuppressesDrag = false
+                floatingPinchStartWidth = nil
                 floatingActionsSuppressed = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(100))
@@ -203,6 +226,16 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     private func collapseTravel(in size: CGSize) -> CGFloat {
         max(380, min(500, size.height * 0.55))
+    }
+
+    private func floatingWidthBounds(
+        in size: CGSize,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        let availableHeight = max(90, size.height - topInset - bottomInset - 28)
+        let maximum = max(120, min(420, min(size.width - 28, availableHeight * 16 / 9)))
+        return min(160, maximum)...maximum
     }
 
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {
@@ -292,13 +325,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     private func floatingGesture(in size: CGSize, window: CGSize, base: CGPoint) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
-                guard !player.fullScreenPresented, !floatingIsDismissing else { return }
+                guard !player.fullScreenPresented, !floatingIsDismissing,
+                      !floatingPinchSuppressesDrag else { return }
                 floatingGestureActive = true
                 floatingActionsSuppressed = true
                 floatingDragTranslation = value.translation
             }
             .onEnded { value in
-                guard !player.fullScreenPresented, !floatingIsDismissing else { return }
+                guard !player.fullScreenPresented, !floatingIsDismissing,
+                      !floatingPinchSuppressesDrag else {
+                    floatingGestureActive = false
+                    return
+                }
                 floatingGestureActive = false
                 let actual = CGPoint(
                     x: base.x + value.translation.width,
@@ -334,7 +372,70 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(180))
-                    if !floatingGestureActive { floatingActionsSuppressed = false }
+                    if !floatingGestureActive && !floatingPinchActive
+                        && !floatingPinchSuppressesDrag {
+                        floatingActionsSuppressed = false
+                    }
+                }
+            }
+    }
+
+    private func floatingPinchGesture(
+        in widthRange: ClosedRange<CGFloat>,
+        viewport: CGSize,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0.02)
+            .onChanged { value in
+                guard !player.fullScreenPresented, !floatingIsDismissing else { return }
+                if floatingPinchStartWidth == nil {
+                    floatingPinchStartWidth = min(
+                        widthRange.upperBound,
+                        max(widthRange.lowerBound, player.floatingMiniPlayerWidth)
+                    )
+                    floatingPinchActive = true
+                    floatingPinchSuppressesDrag = true
+                    floatingActionsSuppressed = true
+                    floatingGestureActive = false
+                }
+                guard let startWidth = floatingPinchStartWidth else { return }
+                player.resizeFloatingMiniPlayer(
+                    to: min(widthRange.upperBound, max(widthRange.lowerBound,
+                        startWidth * value.magnification))
+                )
+            }
+            .onEnded { value in
+                guard let startWidth = floatingPinchStartWidth else { return }
+                player.resizeFloatingMiniPlayer(
+                    to: min(widthRange.upperBound, max(widthRange.lowerBound,
+                        startWidth * value.magnification))
+                )
+                floatingPinchStartWidth = nil
+                floatingPinchActive = false
+                let width = player.floatingMiniPlayerWidth
+                let window = CGSize(width: width, height: width * 9 / 16)
+                let base = floatingCorner.center(
+                    in: viewport,
+                    window: window,
+                    topInset: topInset,
+                    bottomInset: bottomInset
+                )
+                let current = CGPoint(
+                    x: base.x + floatingDragTranslation.width,
+                    y: base.y + floatingDragTranslation.height
+                )
+                withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.34, dampingFraction: 0.84)) {
+                    floatingCorner = FloatingCorner.nearest(to: current, in: viewport)
+                    floatingDragTranslation = .zero
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(180))
+                    guard !floatingPinchActive else { return }
+                    floatingPinchSuppressesDrag = false
+                    if !floatingGestureActive {
+                        floatingActionsSuppressed = false
+                    }
                 }
             }
     }
@@ -358,6 +459,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             floatingDragTranslation = .zero
             floatingDismissTranslation = .zero
             floatingGestureActive = false
+            floatingPinchActive = false
+            floatingPinchSuppressesDrag = false
+            floatingPinchStartWidth = nil
             floatingActionsSuppressed = false
             player.fullScreenPresented = true
         } completion: {

@@ -159,7 +159,6 @@ struct SearchContent: View {
                 }
             }
             .listStyle(.plain)
-            .modifier(MiniPlayerScrollClearance())
             .scrollDismissesKeyboard(.interactively)
             .refreshable { await model.refresh() }
             .task(id: progressLookupID(for: results.videos)) {
@@ -272,7 +271,6 @@ struct SearchContent: View {
             }
         }
         .listStyle(.plain)
-        .modifier(MiniPlayerScrollClearance())
         .scrollDismissesKeyboard(.interactively)
     }
 
