@@ -90,6 +90,19 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 y: floatingBase.y + (floatingIsStashed ? floatingStashDragY
                     : floatingDragTranslation.height) + floatingDismissTranslation.height
             )
+            // Pinch still transforms the video surface directly for one-to-one tracking. Lay
+            // out its SwiftUI controls at the same *visual* bounds instead of scaling their
+            // glyphs and hit targets, which made them grow then snap back on release.
+            let floatingChromeSize = CGSize(
+                width: floatingSize.width * floatingPinchScale,
+                height: floatingSize.height * floatingPinchScale
+            )
+            let floatingChromePosition = CGPoint(
+                x: floatingPosition.x
+                    + (0.5 - floatingPinchAnchor.x) * (floatingChromeSize.width - floatingSize.width),
+                y: floatingPosition.y
+                    + (0.5 - floatingPinchAnchor.y) * (floatingChromeSize.height - floatingSize.height)
+            )
             let containerOrigin = proxy.frame(in: .global).origin
             let launchFrame = player.launchSourceFrame?.offsetBy(
                 dx: -containerOrigin.x,
@@ -189,13 +202,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         onExpand: expandPlayer,
                         onDismiss: dismissFloatingPlayer
                     )
-                        .frame(width: floatingSize.width, height: floatingSize.height)
-                        .scaleEffect(floatingPinchScale, anchor: floatingPinchAnchor)
+                        .frame(width: floatingChromeSize.width, height: floatingChromeSize.height)
                         .modifier(FloatingTabBarOcclusion(
                             tabBarTop: tabBarTop,
                             isEnabled: true
                         ))
-                        .position(floatingPosition)
+                        .position(floatingChromePosition)
                         .opacity(player.fullScreenPresented || isLaunchingFromThumbnail
                             || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
                         .zIndex(3)
