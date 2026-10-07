@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Native List editing handles order; a row menu handles placement. Keeping those decisions
-/// separate avoids custom drop targets and makes moving a control to an empty section possible.
+/// Native List editing handles order within each section. A separate row action changes placement,
+/// including moves into empty sections, without making the entire row compete with drag handles.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
+    @Environment(\.editMode) private var editMode
     @Bindable var model: SettingsViewModel
+    @State private var showsMenuSeparators = false
 
     var body: some View {
         List {
@@ -35,7 +37,7 @@ struct PlayerControlsSettingsScreen: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(controls) { control in
-                    placementMenu(for: control, in: section)
+                    controlRow(for: control, in: section)
                 }
                 .onMove { offsets, destination in
                     model.reorderPlayerControls(
@@ -54,6 +56,27 @@ struct PlayerControlsSettingsScreen: View {
         }
     }
 
+    private func controlRow(
+        for control: PlayerTopControl,
+        in currentSection: PlayerControlLayout.Section
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: control.systemImage)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            Text(verbatim: control.displayName)
+                .foregroundStyle(.primary)
+            Spacer(minLength: 0)
+
+            if editMode?.wrappedValue.isEditing != true {
+                placementMenu(for: control, in: currentSection)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+    }
+
     private func placementMenu(
         for control: PlayerTopControl,
         in currentSection: PlayerControlLayout.Section
@@ -70,35 +93,26 @@ struct PlayerControlsSettingsScreen: View {
                 }
             }
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: control.systemImage)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24)
-                Text(verbatim: control.displayName)
-                    .foregroundStyle(.primary)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .contentShape(Rectangle())
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
-        .accessibilityLabel(Text(verbatim: control.displayName))
-        .accessibilityHint("Choose whether this control appears on the player, in More menu, or is hidden")
+        .accessibilityLabel(Text("Change placement for \(control.displayName)"))
     }
 
     private var menuDividerSection: some View {
-        Section("More menu separators") {
-            ForEach(Array(model.playerControlLayout.moreMenu.dropFirst())) { control in
-                Toggle(isOn: dividerBinding(before: control)) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: control.displayName)
-                        Text("Divider above")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+        Section {
+            DisclosureGroup("More menu separators", isExpanded: $showsMenuSeparators) {
+                ForEach(Array(model.playerControlLayout.moreMenu.dropFirst())) { control in
+                    Toggle(isOn: dividerBinding(before: control)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: control.displayName)
+                            Text("Divider above")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

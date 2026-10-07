@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Change placement for %@" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Platzierung für %@ ändern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Change placement for %@" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cambiar la ubicación de %@" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Modifier l’emplacement de %@" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Изменить расположение: %@" } }
+      }
+    },
     "Mark new uploads" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Neue Uploads markieren" } },
