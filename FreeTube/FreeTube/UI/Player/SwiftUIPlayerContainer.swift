@@ -20,12 +20,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var chromePresentationReady = true
     @State private var floatingCorner: FloatingCorner = .bottomTrailing
     @State private var floatingIsStashed = false
+    @State private var floatingRestingY: CGFloat?
+    @State private var floatingStashPullX: CGFloat = 0
+    @State private var floatingStashDragY: CGFloat = 0
     @State private var floatingDragTranslation: CGSize = .zero
     @State private var floatingDismissTranslation: CGSize = .zero
     @State private var floatingGestureActive = false
     @State private var floatingPinchActive = false
     @State private var floatingPinchSuppressesDrag = false
     @State private var floatingPinchStartWidth: CGFloat?
+    @State private var floatingPinchScale: CGFloat = 1
+    @State private var floatingPinchAnchor: UnitPoint = .center
+    @State private var floatingPinchGeneration = 0
     @State private var floatingActionsSuppressed = false
     @State private var floatingIsDismissing = false
     @State private var floatingShouldFade = false
@@ -53,19 +59,32 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 max(floatingWidthRange.lowerBound, player.floatingMiniPlayerWidth)
             )
             let floatingSize = CGSize(width: floatingWidth, height: floatingWidth * 9 / 16)
-            let floatingBase = floatingCorner.center(
+            let cornerBase = floatingCorner.center(
                 in: proxy.size,
                 window: floatingSize,
                 topInset: systemInsets.top,
                 bottomInset: miniBottomPadding
             )
+            let floatingYRange = floatingYBounds(
+                in: proxy.size,
+                window: floatingSize,
+                topInset: systemInsets.top,
+                bottomInset: miniBottomPadding
+            )
+            let floatingBase = CGPoint(
+                x: cornerBase.x,
+                y: min(floatingYRange.upperBound, max(floatingYRange.lowerBound,
+                    floatingRestingY ?? cornerBase.y))
+            )
             let stashedX = floatingCorner.isLeading
                 ? -floatingSize.width / 2 + 22
                 : proxy.size.width + floatingSize.width / 2 - 22
             let floatingPosition = CGPoint(
-                x: (floatingIsStashed ? stashedX : floatingBase.x + floatingDragTranslation.width)
+                x: (floatingIsStashed ? stashedX + floatingStashPullX
+                    : floatingBase.x + floatingDragTranslation.width)
                     + floatingDismissTranslation.width,
-                y: floatingBase.y + floatingDragTranslation.height + floatingDismissTranslation.height
+                y: floatingBase.y + (floatingIsStashed ? floatingStashDragY
+                    : floatingDragTranslation.height) + floatingDismissTranslation.height
             )
             let containerOrigin = proxy.frame(in: .global).origin
             let launchFrame = player.launchSourceFrame?.offsetBy(
@@ -133,6 +152,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             radius: 14 * (player.fullScreenPresented ? transition : 1),
                             y: 5 * (player.fullScreenPresented ? transition : 1)
                         )
+                        // Transform the mounted video instead of asking AVPlayerViewController
+                        // to relayout on every pinch sample. The source frame is committed once
+                        // the fingers lift, so the image tracks the gesture without lag.
+                        .scaleEffect(floatingPinchScale, anchor: floatingPinchAnchor)
                         // Position the hosting view itself, not just its SwiftUI drawing. The
                         // AVPlayerViewController inside can commit a frame ahead of an `.offset`
                         // animation, exposing video at the destination while the chrome moves.
@@ -154,6 +177,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         onDismiss: dismissFloatingPlayer
                     )
                         .frame(width: floatingSize.width, height: floatingSize.height)
+                        .scaleEffect(floatingPinchScale, anchor: floatingPinchAnchor)
                         .position(floatingPosition)
                         .opacity(player.fullScreenPresented || isLaunchingFromThumbnail
                             || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
@@ -163,19 +187,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             in: floatingWidthRange,
                             viewport: proxy.size,
                             topInset: systemInsets.top,
-                            bottomInset: miniBottomPadding
+                            bottomInset: miniBottomPadding,
+                            base: floatingBase
                         ))
                         .allowsHitTesting(!player.fullScreenPresented && !isLaunchingFromThumbnail
                             && !floatingIsDismissing && !floatingIsStashed)
 
                     if floatingIsStashed && !player.fullScreenPresented && !isLaunchingFromThumbnail {
-                        FloatingMiniPlayerStashTab(
-                            isLeading: floatingCorner.isLeading,
-                            onRestore: restoreFloatingPlayer
-                        )
-                        .position(
-                            x: floatingCorner.isLeading ? 22 : proxy.size.width - 22,
-                            y: floatingBase.y
+                        floatingStashTab(
+                            in: proxy.size, window: floatingSize,
+                            base: floatingBase, position: floatingPosition,
+                            stashedX: stashedX, topInset: systemInsets.top,
+                            bottomInset: miniBottomPadding
                         )
                         .zIndex(4)
                         .transition(.opacity)
@@ -201,13 +224,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         }
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if isPresented {
+                floatingPinchGeneration &+= 1
                 // A later collapse should always land in the bottom-trailing resting place,
                 // even if the previous floating window was dragged to another corner.
                 floatingCorner = .bottomTrailing
                 floatingIsStashed = false
+                floatingRestingY = nil
+                floatingStashPullX = 0
+                floatingStashDragY = 0
                 floatingPinchActive = false
                 floatingPinchSuppressesDrag = false
                 floatingPinchStartWidth = nil
+                floatingPinchScale = 1
             } else {
                 player.finishLaunchPresentation()
                 captionPresentationReady = true
@@ -219,13 +247,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 floatingIsDismissing = false
                 floatingShouldFade = false
             } else {
+                floatingPinchGeneration &+= 1
                 floatingDragTranslation = .zero
                 floatingDismissTranslation = .zero
                 floatingIsStashed = false
+                floatingRestingY = nil
+                floatingStashPullX = 0
+                floatingStashDragY = 0
                 floatingGestureActive = false
                 floatingPinchActive = false
                 floatingPinchSuppressesDrag = false
                 floatingPinchStartWidth = nil
+                floatingPinchScale = 1
                 floatingActionsSuppressed = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(100))
@@ -256,6 +289,50 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         let availableHeight = max(90, size.height - topInset - bottomInset - 28)
         let maximum = max(120, min(420, min(size.width - 28, availableHeight * 16 / 9)))
         return min(160, maximum)...maximum
+    }
+
+    private func floatingYBounds(
+        in size: CGSize,
+        window: CGSize,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        let top = topInset + 14 + window.height / 2
+        let bottom = max(top, size.height - bottomInset - 14 - window.height / 2)
+        return top...bottom
+    }
+
+    private func floatingStashTab(
+        in viewport: CGSize,
+        window: CGSize,
+        base: CGPoint,
+        position: CGPoint,
+        stashedX: CGFloat,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> some View {
+        FloatingMiniPlayerStashTab(
+            isLeading: floatingCorner.isLeading,
+            height: window.height,
+            onRestore: restoreFloatingPlayer,
+            onDragChanged: { translation in
+                updateStashedPlayerDrag(translation, in: viewport,
+                    window: window, base: base,
+                    topInset: topInset, bottomInset: bottomInset)
+            },
+            onDragEnded: { translation, predicted in
+                endStashedPlayerDrag(translation, predicted: predicted,
+                    in: viewport, window: window,
+                    base: base, topInset: topInset, bottomInset: bottomInset)
+            }
+        )
+        .position(
+            x: (floatingCorner.isLeading ? 22 : viewport.width - 22)
+                + floatingStashPullX,
+            y: position.y
+        )
+        .opacity(max(0, 1 - abs(floatingStashPullX)
+            / max(1, abs(stashedX - base.x))))
     }
 
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {
@@ -393,7 +470,17 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 if horizontalIntent && crossedSideEdge {
                     withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.86)) {
                         floatingCorner = FloatingCorner.nearest(to: actual, in: size)
+                        let yBounds = floatingYBounds(
+                            in: size,
+                            window: window,
+                            topInset: PlayerLayoutMetrics.safeAreaInsets.top,
+                            bottomInset: PlayerLayoutMetrics.bottomTabBarClearance
+                        )
+                        floatingRestingY = min(yBounds.upperBound,
+                            max(yBounds.lowerBound, actual.y))
                         floatingDragTranslation = .zero
+                        floatingStashPullX = 0
+                        floatingStashDragY = 0
                         floatingIsStashed = true
                     }
                     floatingActionsSuppressed = false
@@ -403,6 +490,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 let nextCorner = FloatingCorner.nearest(to: projected, in: size)
                 withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.82)) {
                     floatingCorner = nextCorner
+                    floatingRestingY = nil
                     floatingDragTranslation = .zero
                 }
                 Task { @MainActor in
@@ -419,13 +507,15 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         in widthRange: ClosedRange<CGFloat>,
         viewport: CGSize,
         topInset: CGFloat,
-        bottomInset: CGFloat
+        bottomInset: CGFloat,
+        base: CGPoint
     ) -> some Gesture {
-        MagnifyGesture(minimumScaleDelta: 0.02)
+        MagnifyGesture(minimumScaleDelta: 0.005)
             .onChanged { value in
                 guard !player.fullScreenPresented, !floatingIsDismissing,
                       !floatingIsStashed else { return }
                 if floatingPinchStartWidth == nil {
+                    floatingPinchGeneration &+= 1
                     floatingPinchStartWidth = min(
                         widthRange.upperBound,
                         max(widthRange.lowerBound, player.floatingMiniPlayerWidth)
@@ -434,40 +524,65 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     floatingPinchSuppressesDrag = true
                     floatingActionsSuppressed = true
                     floatingGestureActive = false
+                    floatingPinchAnchor = value.startAnchor
                 }
                 guard let startWidth = floatingPinchStartWidth else { return }
-                player.resizeFloatingMiniPlayer(
-                    to: min(widthRange.upperBound, max(widthRange.lowerBound,
-                        startWidth * value.magnification))
-                )
+                let width = min(widthRange.upperBound,
+                    max(widthRange.lowerBound, startWidth * value.magnification))
+                withTransaction(Transaction(animation: nil)) {
+                    floatingPinchScale = width / startWidth
+                }
             }
             .onEnded { value in
                 guard let startWidth = floatingPinchStartWidth else { return }
-                player.resizeFloatingMiniPlayer(
-                    to: min(widthRange.upperBound, max(widthRange.lowerBound,
-                        startWidth * value.magnification))
+                let width = min(widthRange.upperBound,
+                    max(widthRange.lowerBound, startWidth * value.magnification))
+                let window = CGSize(width: width, height: width * 9 / 16)
+                let widthChange = width - startWidth
+                let visualCenter = CGPoint(
+                    x: base.x + floatingDragTranslation.width
+                        + (0.5 - floatingPinchAnchor.x) * widthChange,
+                    y: base.y + floatingDragTranslation.height
+                        + (0.5 - floatingPinchAnchor.y) * widthChange * 9 / 16
                 )
+                let cornerBase = floatingCorner.center(
+                    in: viewport, window: window,
+                    topInset: topInset, bottomInset: bottomInset
+                )
+                let yBounds = floatingYBounds(
+                    in: viewport, window: window,
+                    topInset: topInset, bottomInset: bottomInset
+                )
+                let newBase = CGPoint(
+                    x: cornerBase.x,
+                    y: min(yBounds.upperBound, max(yBounds.lowerBound,
+                        floatingRestingY ?? cornerBase.y))
+                )
+                // Replace the temporary transform with the real frame at the same visual
+                // center, then let the window settle back within its resting bounds.
+                withTransaction(Transaction(animation: nil)) {
+                    player.resizeFloatingMiniPlayer(to: width)
+                    floatingPinchScale = 1
+                    floatingDragTranslation = CGSize(
+                        width: visualCenter.x - newBase.x,
+                        height: visualCenter.y - newBase.y
+                    )
+                }
                 floatingPinchStartWidth = nil
                 floatingPinchActive = false
-                let width = player.floatingMiniPlayerWidth
-                let window = CGSize(width: width, height: width * 9 / 16)
-                let base = floatingCorner.center(
-                    in: viewport,
-                    window: window,
-                    topInset: topInset,
-                    bottomInset: bottomInset
-                )
-                let current = CGPoint(
-                    x: base.x + floatingDragTranslation.width,
-                    y: base.y + floatingDragTranslation.height
-                )
-                withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.34, dampingFraction: 0.84)) {
-                    floatingCorner = FloatingCorner.nearest(to: current, in: viewport)
-                    floatingDragTranslation = .zero
-                }
+                let generation = floatingPinchGeneration
                 Task { @MainActor in
+                    // Give the no-animation frame handoff one display tick before settling.
+                    // Coalescing the two writes would make the video jump at pinch release.
+                    try? await Task.sleep(for: .milliseconds(16))
+                    guard generation == floatingPinchGeneration,
+                          !floatingPinchActive, !player.fullScreenPresented else { return }
+                    withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.34, dampingFraction: 0.84)) {
+                        floatingDragTranslation = .zero
+                    }
                     try? await Task.sleep(for: .milliseconds(180))
-                    guard !floatingPinchActive else { return }
+                    guard generation == floatingPinchGeneration,
+                          !floatingPinchActive else { return }
                     floatingPinchSuppressesDrag = false
                     if !floatingGestureActive {
                         floatingActionsSuppressed = false
@@ -495,10 +610,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             floatingDragTranslation = .zero
             floatingDismissTranslation = .zero
             floatingIsStashed = false
+            floatingRestingY = nil
+            floatingStashPullX = 0
+            floatingStashDragY = 0
             floatingGestureActive = false
             floatingPinchActive = false
             floatingPinchSuppressesDrag = false
             floatingPinchStartWidth = nil
+            floatingPinchScale = 1
             floatingActionsSuppressed = false
             player.fullScreenPresented = true
         } completion: {
@@ -533,6 +652,65 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         guard floatingIsStashed else { return }
         withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.38, dampingFraction: 0.84)) {
             floatingIsStashed = false
+            floatingStashPullX = 0
+            floatingStashDragY = 0
+        }
+    }
+
+    private func updateStashedPlayerDrag(
+        _ translation: CGSize,
+        in viewport: CGSize,
+        window: CGSize,
+        base: CGPoint,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) {
+        guard floatingIsStashed else { return }
+        let yBounds = floatingYBounds(
+            in: viewport, window: window,
+            topInset: topInset, bottomInset: bottomInset
+        )
+        floatingStashDragY = min(yBounds.upperBound,
+            max(yBounds.lowerBound, base.y + translation.height)) - base.y
+
+        let stashedX = floatingCorner.isLeading
+            ? -window.width / 2 + 22
+            : viewport.width + window.width / 2 - 22
+        let travel = abs(base.x - stashedX)
+        floatingStashPullX = floatingCorner.isLeading
+            ? min(travel, max(0, translation.width))
+            : max(-travel, min(0, translation.width))
+    }
+
+    private func endStashedPlayerDrag(
+        _ translation: CGSize,
+        predicted: CGSize,
+        in viewport: CGSize,
+        window: CGSize,
+        base: CGPoint,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) {
+        guard floatingIsStashed else { return }
+        let yBounds = floatingYBounds(
+            in: viewport, window: window,
+            topInset: topInset, bottomInset: bottomInset
+        )
+        withTransaction(Transaction(animation: nil)) {
+            floatingRestingY = min(yBounds.upperBound,
+                max(yBounds.lowerBound, base.y + translation.height))
+            floatingStashDragY = 0
+        }
+
+        let inward = floatingCorner.isLeading ? translation.width : -translation.width
+        let projectedInward = floatingCorner.isLeading
+            ? predicted.width : -predicted.width
+        if inward > 72 || (inward > 30 && projectedInward > 120) {
+            restoreFloatingPlayer()
+        } else {
+            withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
+                floatingStashPullX = 0
+            }
         }
     }
 
@@ -565,7 +743,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         floatingDragTranslation = .zero
         floatingDismissTranslation = .zero
         floatingIsStashed = false
+        floatingRestingY = nil
+        floatingStashPullX = 0
+        floatingStashDragY = 0
         floatingGestureActive = false
+        floatingPinchActive = false
+        floatingPinchSuppressesDrag = false
+        floatingPinchStartWidth = nil
+        floatingPinchScale = 1
         floatingActionsSuppressed = false
     }
 }
