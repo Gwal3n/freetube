@@ -57,6 +57,7 @@ struct CustomPlayerControls: View {
                         .accessibilityElement(children: .combine)
                     }
                     additionalTopControls
+                        .layoutPriority(showsCollapseButton ? 1 : 0)
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8 + topControlsSafeAreaPadding)

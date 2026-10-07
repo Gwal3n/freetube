@@ -19,10 +19,6 @@ struct PlayerControlLayout: Equatable {
         }
     }
 
-    /// Four controls plus the overflow button leave room for the fixed collapse button on small
-    /// phones, while landscape still has space for its one-line title.
-    static let maximumOnPlayer = 4
-
     static let standard = PlayerControlLayout(
         onPlayer: [.audioOnly, .fullscreen, .speed],
         moreMenu: [.quality, .captions, .autoplay, .loop, .mute, .sleepTimer],
@@ -39,10 +35,6 @@ struct PlayerControlLayout: Equatable {
         self.moreMenu = moreMenu.filter { seen.insert($0).inserted }
         self.hidden = hidden.filter { seen.insert($0).inserted }
         self.moreMenu += PlayerTopControl.allCases.filter { seen.insert($0).inserted }
-        if self.onPlayer.count > Self.maximumOnPlayer {
-            self.moreMenu.insert(contentsOf: self.onPlayer.dropFirst(Self.maximumOnPlayer), at: 0)
-            self.onPlayer = Array(self.onPlayer.prefix(Self.maximumOnPlayer))
-        }
     }
 
     func controls(in section: Section) -> [PlayerTopControl] {
@@ -63,10 +55,6 @@ struct PlayerControlLayout: Equatable {
         switch section {
         case .onPlayer:
             onPlayer.insert(control, at: target.flatMap { onPlayer.firstIndex(of: $0) } ?? onPlayer.endIndex)
-            if onPlayer.count > Self.maximumOnPlayer,
-               let displacedIndex = onPlayer.lastIndex(where: { $0 != control }) {
-                moreMenu.insert(onPlayer.remove(at: displacedIndex), at: 0)
-            }
         case .moreMenu:
             moreMenu.insert(control, at: target.flatMap { moreMenu.firstIndex(of: $0) } ?? moreMenu.endIndex)
         case .hidden:

@@ -24,7 +24,7 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(layout.hidden, [.mute])
         XCTAssertTrue(layout.moreMenu.contains(.quality))
         XCTAssertTrue(layout.moreMenu.contains(.sleepTimer))
-        XCTAssertLessThanOrEqual(layout.onPlayer.count, PlayerControlLayout.maximumOnPlayer)
+        XCTAssertEqual(layout.onPlayer, [.loop, .fullscreen, .speed, .audioOnly, .autoplay])
     }
 
     func testPlayerControlLayoutMovesAndRoundTrips() {
@@ -41,13 +41,17 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(restored.hidden, [.audioOnly])
     }
 
-    func testAddingFifthPlayerControlMovesPreviousLastIntoMore() {
+    func testMoreThanFourPlayerControlsStayOnPlayerAndRoundTrip() {
         var layout = PlayerControlLayout.standard
         layout.move(.loop, to: .onPlayer)
         layout.move(.quality, to: .onPlayer)
-        XCTAssertEqual(layout.onPlayer.count, PlayerControlLayout.maximumOnPlayer)
-        XCTAssertTrue(layout.onPlayer.contains(.quality))
-        XCTAssertTrue(layout.moreMenu.contains(.loop))
+        XCTAssertEqual(layout.onPlayer, [.audioOnly, .fullscreen, .speed, .loop, .quality])
+        layout.move(.captions, to: .onPlayer)
+        XCTAssertEqual(layout.onPlayer, [.audioOnly, .fullscreen, .speed, .loop, .quality, .captions])
+        XCTAssertEqual(
+            PlayerControlLayout.restored(from: layout.encoded, legacyOrder: "", legacyHidden: ""),
+            layout
+        )
     }
 
     func testPlayerControlsMoveAcrossSectionsAndPersist() {

@@ -4,8 +4,8 @@ import SwiftUI
 /// including moves into empty sections, without making the entire row compete with drag handles.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
-    @Environment(\.editMode) private var editMode
     @Bindable var model: SettingsViewModel
+    @State private var editMode = EditMode.active
     @State private var showsMenuSeparators = false
 
     var body: some View {
@@ -19,13 +19,9 @@ struct PlayerControlsSettingsScreen: View {
         }
         .listStyle(.insetGrouped)
         .tint(Color.primary)
+        .environment(\.editMode, $editMode)
         .navigationTitle("Customize controls")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-            }
-        }
     }
 
     private func controlSection(_ section: PlayerControlLayout.Section) -> some View {
@@ -38,6 +34,7 @@ struct PlayerControlsSettingsScreen: View {
             } else {
                 ForEach(controls) { control in
                     controlRow(for: control, in: section)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 8))
                 }
                 .onMove { offsets, destination in
                     model.reorderPlayerControls(
@@ -49,10 +46,6 @@ struct PlayerControlsSettingsScreen: View {
             }
         } header: {
             Text(verbatim: section.title)
-        } footer: {
-            if section == .onPlayer {
-                Text("Up to four controls can appear on the player. Moving a fifth here moves the last control to More menu.")
-            }
         }
     }
 
@@ -70,11 +63,9 @@ struct PlayerControlsSettingsScreen: View {
                 .foregroundStyle(.primary)
             Spacer(minLength: 0)
 
-            if editMode?.wrappedValue.isEditing != true {
-                placementMenu(for: control, in: currentSection)
-            }
+            placementMenu(for: control, in: currentSection)
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func placementMenu(

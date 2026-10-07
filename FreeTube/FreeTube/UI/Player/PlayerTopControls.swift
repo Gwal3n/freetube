@@ -28,6 +28,21 @@ struct PlayerTopControls: View {
     let onSetSleepTimer: (SleepTimerOption) -> Void
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            controlsRow
+            ScrollView(.horizontal) {
+                controlsRow
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .scrollIndicators(.hidden)
+            .defaultScrollAnchor(.trailing)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Keep the familiar single row when it fits. With more controls than a narrow video can
+    /// show, the same ordered row scrolls rather than clipping controls or rewriting preferences.
+    private var controlsRow: some View {
         HStack(spacing: 0) {
             ForEach(controls) { control in
                 controlView(control)
@@ -48,7 +63,6 @@ struct PlayerTopControls: View {
                 .accessibilityLabel("More player controls")
             }
         }
-        .buttonStyle(.plain)
     }
 
     private var dividerAnchors: Set<PlayerTopControl> {
