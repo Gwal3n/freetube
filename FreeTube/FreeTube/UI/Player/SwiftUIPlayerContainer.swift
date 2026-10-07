@@ -199,13 +199,26 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             && !floatingIsDismissing && !floatingIsStashed)
 
                     if floatingIsStashed && !player.fullScreenPresented && !isLaunchingFromThumbnail {
-                        floatingStashTab(
+                        // Cover the entire video with the same shape and position. Only its
+                        // on-screen edge is visible, but it remains seamless as it is pulled out.
+                        FloatingMiniPlayerStashOverlay(
+                            isLeading: floatingCorner.isLeading,
+                            size: floatingSize
+                        )
+                        .position(floatingPosition)
+                        .opacity(max(0, 1 - abs(floatingStashPullX)
+                            / max(1, abs(stashedX - floatingBase.x))))
+                        .allowsHitTesting(false)
+                        .zIndex(4)
+                        .transition(.opacity)
+
+                        floatingStashHitTarget(
                             in: proxy.size, window: floatingSize,
                             base: floatingBase, position: floatingPosition,
-                            stashedX: stashedX, topInset: systemInsets.top,
+                            topInset: systemInsets.top,
                             bottomInset: miniBottomPadding
                         )
-                        .zIndex(4)
+                        .zIndex(5)
                         .transition(.opacity)
                     }
                 }
@@ -307,37 +320,41 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         return top...bottom
     }
 
-    private func floatingStashTab(
+    private func floatingStashHitTarget(
         in viewport: CGSize,
         window: CGSize,
         base: CGPoint,
         position: CGPoint,
-        stashedX: CGFloat,
         topInset: CGFloat,
         bottomInset: CGFloat
     ) -> some View {
-        FloatingMiniPlayerStashTab(
-            isLeading: floatingCorner.isLeading,
-            height: window.height,
-            onRestore: restoreFloatingPlayer,
-            onDragChanged: { translation in
-                updateStashedPlayerDrag(translation, in: viewport,
-                    window: window, base: base,
-                    topInset: topInset, bottomInset: bottomInset)
-            },
-            onDragEnded: { translation, predicted in
-                endStashedPlayerDrag(translation, predicted: predicted,
-                    in: viewport, window: window,
-                    base: base, topInset: topInset, bottomInset: bottomInset)
-            }
-        )
-        .position(
-            x: (floatingCorner.isLeading ? 22 : viewport.width - 22)
-                + floatingStashPullX,
-            y: position.y
-        )
-        .opacity(max(0, 1 - abs(floatingStashPullX)
-            / max(1, abs(stashedX - base.x))))
+        Color.clear
+            .frame(width: 44, height: window.height)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: restoreFloatingPlayer)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                    .onChanged { value in
+                        updateStashedPlayerDrag(value.translation, in: viewport,
+                            window: window, base: base,
+                            topInset: topInset, bottomInset: bottomInset)
+                    }
+                    .onEnded { value in
+                        endStashedPlayerDrag(value.translation,
+                            predicted: value.predictedEndTranslation,
+                            in: viewport, window: window, base: base,
+                            topInset: topInset, bottomInset: bottomInset)
+                    }
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Show floating video")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { restoreFloatingPlayer() }
+            .position(
+                x: (floatingCorner.isLeading ? 22 : viewport.width - 22)
+                    + floatingStashPullX,
+                y: position.y
+            )
     }
 
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {
