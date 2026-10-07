@@ -4,6 +4,8 @@ import SwiftUI
 /// large expand target; corner buttons remain visible without obscuring the picture.
 @available(iOS 17.0, *)
 struct FloatingMiniPlayerChrome: View {
+    static let cornerRadius: CGFloat = 14
+
     @Environment(PlayerStateManager.self) private var player
 
     let actionsEnabled: Bool
@@ -41,8 +43,8 @@ struct FloatingMiniPlayerChrome: View {
                     .background(.black.opacity(0.45))
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
     }
 
     private func cornerButton(

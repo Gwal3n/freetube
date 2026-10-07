@@ -143,14 +143,19 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         )
                         .clipShape(
                             RoundedRectangle(
-                                cornerRadius: player.fullScreenPresented ? 14 * transition : 14,
+                                cornerRadius: player.fullScreenPresented
+                                    ? FloatingMiniPlayerChrome.cornerRadius * transition
+                                    : FloatingMiniPlayerChrome.cornerRadius,
                                 style: .continuous
                             )
                         )
                         .shadow(
-                            color: .black.opacity(0.32 * (player.fullScreenPresented ? transition : 1)),
-                            radius: 14 * (player.fullScreenPresented ? transition : 1),
-                            y: 5 * (player.fullScreenPresented ? transition : 1)
+                            color: .black.opacity(floatingIsStashed ? 0
+                                : 0.32 * (player.fullScreenPresented ? transition : 1)),
+                            radius: floatingIsStashed ? 0
+                                : 14 * (player.fullScreenPresented ? transition : 1),
+                            y: floatingIsStashed ? 0
+                                : 5 * (player.fullScreenPresented ? transition : 1)
                         )
                         // Transform the mounted video instead of asking AVPlayerViewController
                         // to relayout on every pinch sample. The source frame is committed once
@@ -487,10 +492,28 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     return
                 }
 
-                let nextCorner = FloatingCorner.nearest(to: projected, in: size)
+                let yBounds = floatingYBounds(
+                    in: size,
+                    window: window,
+                    topInset: PlayerLayoutMetrics.safeAreaInsets.top,
+                    bottomInset: PlayerLayoutMetrics.bottomTabBarClearance
+                )
+                let releaseY = min(yBounds.upperBound, max(yBounds.lowerBound, actual.y))
+                let projectedY = min(yBounds.upperBound, max(yBounds.lowerBound, projected.y))
+                let restingY = abs(value.velocity.height) > 450 ? projectedY : releaseY
+                let topDistance = restingY - yBounds.lowerBound
+                let bottomDistance = yBounds.upperBound - restingY
+                let cornerSnapDistance = max(46, min(76, window.height * 0.55))
+                let snapsToCorner = min(topDistance, bottomDistance) <= cornerSnapDistance
+                let destinationY = snapsToCorner
+                    ? (topDistance <= bottomDistance ? yBounds.lowerBound : yBounds.upperBound)
+                    : restingY
+                let nextCorner = FloatingCorner.nearest(
+                    to: CGPoint(x: projected.x, y: destinationY), in: size
+                )
                 withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.82)) {
                     floatingCorner = nextCorner
-                    floatingRestingY = nil
+                    floatingRestingY = snapsToCorner ? nil : destinationY
                     floatingDragTranslation = .zero
                 }
                 Task { @MainActor in

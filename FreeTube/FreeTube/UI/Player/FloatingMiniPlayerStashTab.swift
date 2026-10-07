@@ -20,10 +20,16 @@ struct FloatingMiniPlayerStashTab: View {
             .frame(width: 44, height: height,
                 alignment: isLeading ? .leading : .trailing)
             .background {
-                Capsule()
+                RoundedRectangle(
+                    cornerRadius: FloatingMiniPlayerChrome.cornerRadius,
+                    style: .continuous
+                )
                     .fill(.regularMaterial)
                     .overlay {
-                        Capsule()
+                        RoundedRectangle(
+                            cornerRadius: FloatingMiniPlayerChrome.cornerRadius,
+                            style: .continuous
+                        )
                             .fill(.black.opacity(oledMiniPlayer ? 0.3 : 0.08))
                     }
                     .frame(width: 44, height: height)
