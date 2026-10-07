@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Export Subscriptions CSV" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Abonnements als CSV exportieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Subscriptions CSV" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportar suscripciones en CSV" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Exporter les abonnements en CSV" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Экспортировать подписки в CSV" } }
+      }
+    },
     "Change placement for %@" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Platzierung für %@ ändern" } },

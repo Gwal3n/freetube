@@ -137,6 +137,27 @@ final class LocalSubscriptionStore {
         return imported
     }
 
+    /// Exports the same three-column CSV accepted by Import Subscriptions, including titles
+    /// containing commas, quotes, or line breaks. The full JSON backup retains richer metadata.
+    func exportCSV() -> Data {
+        let header = "Channel Id,Channel Url,Channel Title\r\n"
+        let rows = subscriptions.map { subscription in
+            let url = subscription.channelURL?.absoluteString
+                ?? "https://www.youtube.com/channel/\(subscription.id)"
+            return [subscription.id, url, subscription.name]
+                .map(Self.escapedCSVField)
+                .joined(separator: ",")
+        }
+        return Data((header + rows.joined(separator: "\r\n") + (rows.isEmpty ? "" : "\r\n")).utf8)
+    }
+
+    nonisolated private static func escapedCSVField(_ value: String) -> String {
+        guard value.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) else {
+            return value
+        }
+        return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+    }
+
     private func upsert(_ item: LocalSubscription, persistImmediately: Bool = true) {
         if let index = subscriptions.firstIndex(where: { $0.id == item.id }) {
             var merged = item

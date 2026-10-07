@@ -59,9 +59,11 @@ struct ImportDataScreen: View {
     @State private var importKind: ImportKind = .backup
     @State private var showingImporter = false
     @State private var showingBackupExporter = false
+    @State private var showingSubscriptionsExporter = false
     @State private var confirmsBackupRestore = false
     @State private var pendingBackup: AppBackup?
     @State private var exportDocument = AppBackupDocument(data: Data())
+    @State private var subscriptionsDocument = CSVDocument(data: Data())
     @State private var activeOperation: DataOperation?
     @State private var resultMessage: String?
     @State private var errorMessage: String?
@@ -91,6 +93,13 @@ struct ImportDataScreen: View {
             }
 
             Section {
+                Button {
+                    subscriptionsDocument = CSVDocument(data: LocalSubscriptionStore.shared.exportCSV())
+                    showingSubscriptionsExporter = true
+                } label: {
+                    Label("Export Subscriptions CSV", systemImage: "square.and.arrow.up")
+                }
+                .disabled(isWorking || LocalSubscriptionStore.shared.subscriptions.isEmpty)
                 Button {
                     presentImporter(.subscriptions)
                 } label: {
@@ -139,6 +148,14 @@ struct ImportDataScreen: View {
             document: exportDocument,
             contentType: .json,
             defaultFilename: "FreeTube Backup"
+        ) { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+        .fileExporter(
+            isPresented: $showingSubscriptionsExporter,
+            document: subscriptionsDocument,
+            contentType: .commaSeparatedText,
+            defaultFilename: "FreeTube Subscriptions"
         ) { result in
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
         }

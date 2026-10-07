@@ -20,6 +20,7 @@ struct VideoMoreActionsMenu: View {
 
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
+    @State private var downloadModel: PlayerActionsModel?
 
     init(video: Video, offersPlayNext: Bool = false, onRemoveFromUpNext: (() -> Void)? = nil, onOpenChannel: (() -> Void)? = nil) {
         self.video = video
@@ -36,6 +37,7 @@ struct VideoMoreActionsMenu: View {
                 offersPlayNext: offersPlayNext,
                 onRemoveFromUpNext: onRemoveFromUpNext,
                 onOpenChannel: onOpenChannel,
+                onDownload: startDownload,
                 shareFileURL: $shareFileURL,
                 addToPlaylistVideo: $addToPlaylistVideo
             )
@@ -62,6 +64,16 @@ struct VideoMoreActionsMenu: View {
         .sheet(item: $addToPlaylistVideo) { video in
             AddToPlaylistSheet(video: video)
         }
+        .errorToast(Binding(
+            get: { downloadModel?.downloadError },
+            set: { downloadModel?.downloadError = $0 }
+        ))
+    }
+
+    private func startDownload(_ quality: VideoQuality) {
+        let model = downloadModel ?? PlayerActionsModel()
+        downloadModel = model
+        model.startDownload(video, quality: quality)
     }
 
 }
@@ -74,6 +86,7 @@ private struct VideoActionsContent: View {
     let offersPlayNext: Bool
     let onRemoveFromUpNext: (() -> Void)?
     let onOpenChannel: (() -> Void)?
+    let onDownload: (VideoQuality) -> Void
     @Binding var shareFileURL: URL?
     @Binding var addToPlaylistVideo: Video?
 
@@ -86,6 +99,7 @@ private struct VideoActionsContent: View {
         offersPlayNext: Bool,
         onRemoveFromUpNext: (() -> Void)?,
         onOpenChannel: (() -> Void)?,
+        onDownload: @escaping (VideoQuality) -> Void,
         shareFileURL: Binding<URL?>,
         addToPlaylistVideo: Binding<Video?>
     ) {
@@ -94,6 +108,7 @@ private struct VideoActionsContent: View {
         self.offersPlayNext = offersPlayNext
         self.onRemoveFromUpNext = onRemoveFromUpNext
         self.onOpenChannel = onOpenChannel
+        self.onDownload = onDownload
         _shareFileURL = shareFileURL
         _addToPlaylistVideo = addToPlaylistVideo
     }
@@ -174,6 +189,11 @@ private struct VideoActionsContent: View {
             }
         }
         Divider()
+        Menu {
+            DownloadOptionsContent(video: video, onSelect: onDownload)
+        } label: {
+            Label("Download", systemImage: "arrow.down.circle")
+        }
         Button {
             addToPlaylistVideo = video
         } label: {
@@ -214,6 +234,7 @@ private struct VideoContextMenuModifier: ViewModifier {
 
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
+    @State private var downloadModel: PlayerActionsModel?
 
     func body(content: Content) -> some View {
         content
@@ -224,6 +245,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                     offersPlayNext: offersPlayNext,
                     onRemoveFromUpNext: onRemoveFromUpNext,
                     onOpenChannel: onOpenChannel,
+                    onDownload: startDownload,
                     shareFileURL: $shareFileURL,
                     addToPlaylistVideo: $addToPlaylistVideo
                 )
@@ -241,6 +263,16 @@ private struct VideoContextMenuModifier: ViewModifier {
             .sheet(item: $addToPlaylistVideo) { video in
                 AddToPlaylistSheet(video: video)
             }
+            .errorToast(Binding(
+                get: { downloadModel?.downloadError },
+                set: { downloadModel?.downloadError = $0 }
+            ))
+    }
+
+    private func startDownload(_ quality: VideoQuality) {
+        let model = downloadModel ?? PlayerActionsModel()
+        downloadModel = model
+        model.startDownload(video, quality: quality)
     }
 }
 

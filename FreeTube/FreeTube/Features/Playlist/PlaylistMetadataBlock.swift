@@ -85,6 +85,7 @@ struct PlaylistMetadataBlock: View {
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(isExpanded ? nil : 2)
+                    .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }

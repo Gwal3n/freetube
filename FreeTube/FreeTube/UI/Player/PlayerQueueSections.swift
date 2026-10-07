@@ -18,12 +18,8 @@ struct PlayerQueueSections: View {
     @State private var queueToSave: [Video] = []
     @State private var showingSaveQueue = false
 
-    @AppStorage("com.leshko.freetube.deArrowTitles") private var replacesTitles = false
-    @AppStorage("com.leshko.freetube.deArrowThumbnails") private var replacesThumbnails = false
-
-    // Reserve the trailing action column before branding arrives, so loading it never moves
-    // neighboring rows or makes the fixed-height queue List clip its controls.
-    private var queueRowHeight: CGFloat { replacesTitles || replacesThumbnails ? 76 : 56 }
+    // The DeArrow switch overlays the thumbnail, so it never changes row height as branding loads.
+    private let queueRowHeight: CGFloat = 56
     private var queueRowFootprint: CGFloat { queueRowHeight + 8 }
 
     @ViewBuilder
@@ -320,7 +316,6 @@ struct PlayerQueueSections: View {
                 }
 
                 VStack(spacing: 0) {
-                    DeArrowToggleButton(video: video, model: branding)
                     VideoMoreActionsMenu(
                         video: video,
                         offersPlayNext: true,
@@ -328,6 +323,17 @@ struct PlayerQueueSections: View {
                     )
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if branding.hasReplacement(for: video) {
+                    DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                        .frame(width: 80, height: queueRowHeight, alignment: .topTrailing)
+                }
+            }
+            .videoContextMenu(
+                video: video,
+                offersPlayNext: true,
+                onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
+            )
         }
     }
 

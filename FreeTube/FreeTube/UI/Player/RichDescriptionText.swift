@@ -11,6 +11,7 @@ struct RichDescriptionText: View {
     var body: some View {
         Text(attributedDescription)
             .tint(.blue)
+            .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
                 guard url.scheme == "freetube-seek",
                       let seconds = TimeInterval(url.host ?? "") else { return .systemAction }
