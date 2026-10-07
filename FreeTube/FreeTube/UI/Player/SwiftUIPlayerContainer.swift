@@ -61,6 +61,20 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 CGPoint(x: $0.midX, y: $0.midY)
             } ?? floatingPosition
             let isLaunchingFromThumbnail = launchFrame != nil && !player.fullScreenPresented
+            let presentedSize = player.fullScreenPresented
+                ? CGSize(
+                    width: proxy.size.width + (floatingSize.width - proxy.size.width) * transition,
+                    height: proxy.size.height + (floatingSize.height - proxy.size.height) * transition
+                )
+                : compactSize
+            let presentedTopInset = player.fullScreenPresented
+                ? expandedTopInset * (1 - transition) : 0
+            let presentedPosition = player.fullScreenPresented
+                ? CGPoint(
+                    x: proxy.size.width / 2 + (floatingBase.x - proxy.size.width / 2) * transition,
+                    y: proxy.size.height / 2 + (floatingBase.y - proxy.size.height / 2) * transition
+                )
+                : compactPosition
 
             ZStack(alignment: .bottom) {
                 content
@@ -75,44 +89,38 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
                     FullScreenPlayer(
                         captionPresentationReady: captionPresentationReady,
-                        chromePresentationReady: chromePresentationReady
+                        chromePresentationReady: chromePresentationReady,
+                        collapseProgress: player.fullScreenPresented ? transition : 0,
+                        expandedViewportHeight: max(0, proxy.size.height - expandedTopInset)
                     )
                         .frame(
-                            width: player.fullScreenPresented ? proxy.size.width : compactSize.width,
-                            height: player.fullScreenPresented
-                                ? max(0, proxy.size.height - expandedTopInset)
-                                : compactSize.height
+                            width: presentedSize.width,
+                            height: max(0, presentedSize.height - presentedTopInset)
                         )
                         // Keep the player's existing viewport and controls below the status
                         // area, but make its clipping host edge-to-edge. Only the scaled media
                         // can then extend into that top inset during an upward fullscreen drag.
-                        .padding(.top, player.fullScreenPresented ? expandedTopInset : 0)
+                        .padding(.top, presentedTopInset)
                         .frame(
-                            width: player.fullScreenPresented ? proxy.size.width : compactSize.width,
-                            height: player.fullScreenPresented ? proxy.size.height : compactSize.height,
+                            width: presentedSize.width,
+                            height: presentedSize.height,
                             alignment: .top
                         )
                         .clipShape(
                             RoundedRectangle(
-                                cornerRadius: player.fullScreenPresented
-                                    ? 26 * sqrt(max(0, transition)) : 14,
+                                cornerRadius: player.fullScreenPresented ? 14 * transition : 14,
                                 style: .continuous
                             )
                         )
                         .shadow(
-                            color: player.fullScreenPresented ? .clear : .black.opacity(0.32),
-                            radius: player.fullScreenPresented ? 0 : 14,
-                            y: player.fullScreenPresented ? 0 : 5
+                            color: .black.opacity(0.32 * (player.fullScreenPresented ? transition : 1)),
+                            radius: 14 * (player.fullScreenPresented ? transition : 1),
+                            y: 5 * (player.fullScreenPresented ? transition : 1)
                         )
                         // Position the hosting view itself, not just its SwiftUI drawing. The
                         // AVPlayerViewController inside can commit a frame ahead of an `.offset`
                         // animation, exposing video at the destination while the chrome moves.
-                        .position(
-                            x: player.fullScreenPresented ? proxy.size.width / 2 : compactPosition.x,
-                            y: player.fullScreenPresented
-                                ? expandedPlayerCenterY(transition: transition, in: proxy.size)
-                                : compactPosition.y
-                        )
+                        .position(presentedPosition)
                         .opacity(floatingIsDismissing && floatingShouldFade ? 0 : 1)
                         .zIndex(2)
                         // The UIKit-backed player stays mounted as its host moves between the
@@ -140,6 +148,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .onChange(of: player.playerCollapseRequest) { _, _ in
+                guard player.fullScreenPresented else { return }
+                // The collapse control follows the same geometry path as a released drag.
+                animateCollapse(in: proxy.size)
+            }
         }
         // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
         // FullScreenPlayer itself is inset below the portrait status area.
@@ -183,21 +196,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     private func transitionProgress(in size: CGSize) -> CGFloat {
         if player.fullScreenPresented {
-            let fullTravel = size.height + 28
-            return min(1, max(0, presentationTranslation / fullTravel))
+            return min(1, max(0, presentationTranslation / collapseTravel(in: size)))
         }
-        let distance = max(280, min(420, size.height * 0.46))
-        return min(1, max(0, 1 + presentationTranslation / distance))
+        return 1
     }
 
-    /// During a downward drag the sheet moves one point for every point travelled by the finger.
-    /// Settled and mini-to-expanded transitions still animate across the complete viewport.
-    private func expandedPlayerCenterY(transition: CGFloat, in size: CGSize) -> CGFloat {
-        let settledCenter = size.height / 2
-        if player.fullScreenPresented, presentationTranslation > 0 {
-            return settledCenter + presentationTranslation
-        }
-        return settledCenter + transition * (size.height + 28)
+    private func collapseTravel(in size: CGSize) -> CGFloat {
+        max(380, min(500, size.height * 0.55))
     }
 
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {
@@ -248,14 +253,40 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     presentationTranslation > 110
                     || value.predictedEndTranslation.height > 230
                 )
-                withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
-                    presentationTranslation = 0
-                    if shouldCollapse {
-                        player.chapterListPresented = false
-                        player.fullScreenPresented = false
+                if shouldCollapse {
+                    animateCollapse(in: size)
+                } else {
+                    withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
+                        presentationTranslation = 0
                     }
                 }
             }
+    }
+
+    private func animateCollapse(in size: CGSize) {
+        player.chapterListPresented = false
+        guard !reduceMotion else {
+            player.fullScreenPresented = false
+            presentationTranslation = 0
+            return
+        }
+        withAnimation(
+            .spring(duration: 0.42, bounce: 0.08),
+            completionCriteria: .logicallyComplete
+        ) {
+            presentationTranslation = collapseTravel(in: size)
+        } completion: {
+            guard player.fullScreenPresented else {
+                presentationTranslation = 0
+                return
+            }
+            // At progress 1 the live video already has the floating window's exact frame.
+            // Swap the presentation mode without a second animation or a return to full size.
+            withTransaction(Transaction(animation: nil)) {
+                player.fullScreenPresented = false
+                presentationTranslation = 0
+            }
+        }
     }
 
     private func floatingGesture(in size: CGSize, window: CGSize, base: CGPoint) -> some Gesture {

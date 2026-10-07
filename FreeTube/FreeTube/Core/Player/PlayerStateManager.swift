@@ -84,6 +84,8 @@ final class PlayerStateManager {
     /// expansion instead of setting presentation state directly, giving the container a chance to
     /// stage its SwiftUI artwork before the UIKit video surface begins moving.
     private(set) var playerExpansionRequest = 0
+    /// Allows the fixed collapse control to use the container's video-only shrinking transition.
+    private(set) var playerCollapseRequest = 0
     /// The visible thumbnail that initiated the next explicit expansion, in screen coordinates.
     /// This is presentation-only state; it never changes playback or persists with a video.
     private(set) var launchSourceFrame: CGRect?
@@ -605,6 +607,10 @@ final class PlayerStateManager {
 
     func finishLaunchPresentation() {
         launchSourceFrame = nil
+    }
+
+    func requestPlayerCollapse() {
+        playerCollapseRequest &+= 1
     }
 
     /// Stages one frame at the tapped thumbnail before expansion. `AVPlayerViewController` does

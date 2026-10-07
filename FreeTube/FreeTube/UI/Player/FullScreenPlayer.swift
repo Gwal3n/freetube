@@ -7,10 +7,19 @@ import UIKit
 struct FullScreenPlayer: View {
     let captionPresentationReady: Bool
     let chromePresentationReady: Bool
+    let collapseProgress: CGFloat
+    let expandedViewportHeight: CGFloat
 
-    init(captionPresentationReady: Bool, chromePresentationReady: Bool = true) {
+    init(
+        captionPresentationReady: Bool,
+        chromePresentationReady: Bool = true,
+        collapseProgress: CGFloat = 0,
+        expandedViewportHeight: CGFloat
+    ) {
         self.captionPresentationReady = captionPresentationReady
         self.chromePresentationReady = chromePresentationReady
+        self.collapseProgress = collapseProgress
+        self.expandedViewportHeight = expandedViewportHeight
     }
 
     @Environment(PlayerStateManager.self) private var player
@@ -87,7 +96,7 @@ struct FullScreenPlayer: View {
                     ? compactSurfaceHeight
                     : PlayerViewportLayout.expandedSurfaceHeight(
                         width: surfaceWidth,
-                        viewportHeight: proxy.size.height,
+                        viewportHeight: max(proxy.size.height, expandedViewportHeight),
                         isLandscape: isLandscape,
                         presentationSize: player.videoPresentationSize
                     )
@@ -97,7 +106,13 @@ struct FullScreenPlayer: View {
             let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
             // Opening the playlist must not resize or lift the video. The browser overlays
             // the lower content, and can be pulled over the video when more room is needed.
-            let surfaceHeight = expandedSurfaceHeight - consumedCollapse
+            let uncollapsedSurfaceHeight = expandedSurfaceHeight - consumedCollapse
+            let floatingAspectHeight = surfaceWidth * 9 / 16
+            let floatingAspectMix = min(1, max(0, (collapseProgress - 0.65) / 0.35))
+            let desiredSurfaceHeight = uncollapsedSurfaceHeight
+                + (floatingAspectHeight - uncollapsedSurfaceHeight) * floatingAspectMix
+            let surfaceHeight = collapseProgress > 0
+                ? min(desiredSurfaceHeight, proxy.size.height) : desiredSurfaceHeight
             let controlFrame = PlayerViewportLayout.controlFrame(
                 surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight),
                 isLandscape: isLandscape,
@@ -226,7 +241,7 @@ struct FullScreenPlayer: View {
                         )
                         .frame(width: controlFrame.width, height: controlFrame.height)
                         .position(x: controlFrame.midX, y: controlFrame.midY)
-                        .opacity(captionPresentationReady ? 1 : 0)
+                        .opacity(captionPresentationReady ? max(0, 1 - collapseProgress * 2) : 0)
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: captionPresentationReady)
                         .zIndex(2)
                     }
@@ -319,18 +334,14 @@ struct FullScreenPlayer: View {
                             showPlayerControls()
                         },
                         onCollapse: {
-                            @Bindable var p = player
-                            withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
-                                p.chapterListPresented = false
-                                isPlaylistPanelPresented = false
-                                p.fullScreenPresented = false
-                            }
+                            isPlaylistPanelPresented = false
+                            player.requestPlayerCollapse()
                         }
                     )
                     .frame(width: controlFrame.width, height: controlFrame.height)
                     .position(x: controlFrame.midX, y: controlFrame.midY)
-                    .opacity(chromePresentationReady ? 1 : 0)
-                    .allowsHitTesting(chromePresentationReady)
+                    .opacity(chromePresentationReady ? max(0, 1 - collapseProgress * 3) : 0)
+                    .allowsHitTesting(chromePresentationReady && collapseProgress < 0.05)
                     .zIndex(3)
                     }
                     // Long-running fallback downloads and failures retain their explanatory
@@ -338,6 +349,7 @@ struct FullScreenPlayer: View {
                     // keeping the surrounding player chrome stable and avoiding a dark badge.
                     if !isFloating && !isPreparingPlayback {
                         DownloadProgressOverlay(state: player.loadState)
+                            .opacity(max(0, 1 - collapseProgress * 2.5))
                     }
                     if !isFloating, let previewTime = scrubberSeekPreview {
                         Group {
@@ -388,6 +400,7 @@ struct FullScreenPlayer: View {
                         )
                         .frame(width: controlFrame.width, height: controlFrame.height)
                         .position(x: controlFrame.midX, y: controlFrame.midY)
+                        .opacity(max(0, 1 - collapseProgress * 2.5))
                     }
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
@@ -399,14 +412,14 @@ struct FullScreenPlayer: View {
                 )
                 .onAppear { showPlayerControls() }
                 .onChange(of: surfaceHeight, initial: true) { _, height in
-                    guard !isFloating else { return }
+                    guard !isFloating, collapseProgress == 0 else { return }
                     player.expandedPlayerSurfaceHeight = max(
                         0,
                         height * (isPlaylistPanelPresented ? 1 - playlistPanelExpansion : 1)
                     )
                 }
                 .onChange(of: playlistPanelExpansion) { _, expansion in
-                    guard !isFloating else { return }
+                    guard !isFloating, collapseProgress == 0 else { return }
                     player.expandedPlayerSurfaceHeight = max(
                         0,
                         surfaceHeight * (isPlaylistPanelPresented ? 1 - expansion : 1)
@@ -458,7 +471,7 @@ struct FullScreenPlayer: View {
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
                 // metadata column so its title and rows cannot extend underneath a side panel.
                 .frame(width: surfaceWidth, alignment: .leading)
-                .opacity(chromePresentationReady ? 1 : 0)
+                .opacity(chromePresentationReady ? max(0, 1 - collapseProgress * 2.5) : 0)
                 .transition(.opacity)
             }
             }
@@ -494,6 +507,8 @@ struct FullScreenPlayer: View {
                 isLandscape: isLandscape,
                 usesPortraitFullscreen: usesPortraitFullscreen
             )
+            .opacity(max(0, 1 - collapseProgress * 2.5))
+            .allowsHitTesting(collapseProgress < 0.05)
             .zIndex(6)
             }
             }
@@ -511,7 +526,8 @@ struct FullScreenPlayer: View {
             }
             // In floating mode the moving host should contain only the video. The expanded
             // details canvas fades away instead of travelling down as a miniature sheet.
-            .opacity(player.fullScreenPresented && chromePresentationReady ? 1 : 0)
+            .opacity(player.fullScreenPresented && chromePresentationReady
+                ? max(0, 1 - collapseProgress * 2.5) : 0)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: player.fullScreenPresented)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromePresentationReady)
         }
