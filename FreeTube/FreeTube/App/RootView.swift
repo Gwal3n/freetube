@@ -6,7 +6,7 @@ import UIKit
 /// Tab layout: Feed, Library, Downloads, and Search (a separate system button on iOS 26).
 /// - Feed (latest cached videos from local subscriptions)
 /// - Library (device-local history, subscriptions, and playlists)
-/// - Downloads (saved videos, transfer queue, and yt-dlp link downloads)
+/// - Downloads (saved videos and transfer queue)
 /// - Search (search field, suggestions, results, and local recent searches)
 /// Settings opens from Library's toolbar.
 @available(iOS 17.0, *)

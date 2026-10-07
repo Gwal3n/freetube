@@ -11,19 +11,19 @@ import Foundation
 /// the file system at read time, so we don't duplicate them in the xattr — saves bytes
 /// and avoids drift when the file is moved.
 struct DownloadMetadata: Codable, Sendable {
-    /// YouTube videoID for YouTube downloads; the pasted URL string for Link-tab items.
+    /// YouTube videoID for YouTube downloads; the pasted URL string for legacy Link items.
     /// Whatever uniquely identifies the *source* (filename can't, because URL items
     /// sanitise the title into the filename).
     let videoID: String
     let title: String
     /// "YouTube channel name" for YouTube, or the extractor name ("Instagram", "Vimeo")
-    /// for Link items. Shown as the row subtitle in the Downloads list.
+    /// for legacy Link items. Shown as the row subtitle in the Downloads list.
     let channelName: String
-    /// `"ytdl"` for YouTube, `"url-fetch"` for Link tab. Lets the Downloads UI branch
+    /// `"ytdl"` for YouTube, `"url-fetch"` for legacy Link downloads. Lets the Downloads UI branch
     /// playback behavior without re-checking `originalURL`.
     let formatID: String
     let downloadedAt: Date
-    /// Original pasted URL for Link-tab items; `nil` for YouTube (the canonical URL is
+    /// Original pasted URL for legacy Link items; `nil` for YouTube (the canonical URL is
     /// recoverable from videoID). Drives the "Open in browser" target.
     let originalURL: String?
     /// Compressed JPEG bytes of the source thumbnail, ~10KB. Inline so the file is fully

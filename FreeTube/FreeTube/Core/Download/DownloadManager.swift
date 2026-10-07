@@ -1581,24 +1581,6 @@ final class DownloadManager: TemporaryDownloading {
         publishSnapshots()
     }
 
-    /// Publish a snapshot owned by a different downloader (currently just `URLDownloadManager`)
-    /// into the shared transfer-queue. The convention is that **external snapshots use an
-    /// `id` prefixed with `"fetch-"`** so cancel-routing in `DownloadsViewModel.cancel` knows
-    /// to delegate back to the originating manager. Removal is handled by the publisher —
-    /// when an external download finishes, it calls `removeExternalSnapshot(id:)` after the
-    /// usual 2-second auto-dismiss delay (matching the YouTube flow's UX).
-    func publishExternal(snapshot: DownloadTaskSnapshot) {
-        publish(snapshot: snapshot)
-    }
-
-    /// Remove a previously-published external snapshot. Called by the originating downloader
-    /// once it's decided the row should disappear from the transfer queue. No-op if the id
-    /// is unknown (terminal snapshots may have already been swept).
-    func removeExternalSnapshot(id: String) {
-        tasks[id] = nil
-        publishSnapshots()
-    }
-
     private func publishSnapshots() {
         activeTasks = Array(tasks.values).sorted { $0.createdAt > $1.createdAt }
         log.debug("publishSnapshots: \(self.activeTasks.count, privacy: .public) entries")

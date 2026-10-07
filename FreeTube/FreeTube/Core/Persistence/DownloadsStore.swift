@@ -154,7 +154,7 @@ final class DownloadsStore {
     /// Encode + write the metadata xattr to the file, then notify. The caller is
     /// responsible for having already moved the bytes to `fileURL`. **All heavy work
     /// happens on a detached `.utility` task** so the calling actor (typically main, via
-    /// `DownloadManager.persistDownloaded` / `URLDownloadManager.persistCompletion`) isn't
+    /// `DownloadManager.persistDownloaded`) isn't
     /// blocked by:
     ///   - JPEG decode + downscale + re-encode for the thumbnail (`UIGraphicsImageRenderer`
     ///     is documented thread-safe since iOS 10)

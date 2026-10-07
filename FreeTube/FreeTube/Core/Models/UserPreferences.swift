@@ -108,12 +108,6 @@ struct UserPreferences {
     /// "use whatever's on disk" (the package's first-run download set it up).
     @AppStorage("lastYtDlpUpdate") var lastYtDlpUpdateRaw: Double = 0
 
-    /// JSON-encoded `[RecentFetchURL]` for the "From URL" tab's recents list. Kept as JSON
-    /// in `@AppStorage` instead of a SwiftData `@Model` because (a) it's a small bounded
-    /// list (capped at 20), (b) the UI only ever reads the whole array, never queries it,
-    /// and (c) keeping it in `UserDefaults` matches the rest of this struct's conventions.
-    @AppStorage("recentFetchURLs") var recentFetchURLsJSON: String = "[]"
-
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
@@ -188,51 +182,6 @@ struct UserPreferences {
         get { lastYtDlpUpdateRaw > 0 ? Date(timeIntervalSince1970: lastYtDlpUpdateRaw) : nil }
         nonmutating set { lastYtDlpUpdateRaw = newValue?.timeIntervalSince1970 ?? 0 }
     }
-
-    /// Decodes the JSON-backed recent URLs list. Returns an empty array if the stored JSON is
-    /// malformed (defensive — corruption shouldn't take down the tab).
-    var recentFetchURLs: [RecentFetchURL] {
-        get {
-            guard let data = recentFetchURLsJSON.data(using: .utf8) else { return [] }
-            return (try? JSONDecoder().decode([RecentFetchURL].self, from: data)) ?? []
-        }
-        nonmutating set {
-            let trimmed = Array(newValue.prefix(20))
-            if let data = try? JSONEncoder().encode(trimmed), let str = String(data: data, encoding: .utf8) {
-                recentFetchURLsJSON = str
-            }
-        }
-    }
-}
-
-/// One entry in the recent-URLs list shown on the "From URL" tab. Stored as JSON inside
-/// `UserPreferences.recentFetchURLsJSON`. We cap the list at 20 entries — anything older
-/// gets dropped on insert.
-///
-/// **State the row needs to render across app launches:** URL, title, extractor, remote
-/// thumbnail URL (Kingfisher caches the bitmap on disk), and the local file path of any
-/// completed download. The `URLDownloadManager.jobs` dict is in-memory only, so any
-/// completed download we want to preserve across launches has to write its file path here.
-struct RecentFetchURL: Codable, Hashable, Identifiable, Sendable {
-    /// The URL string the user typed/pasted, unmodified. Used as identity so re-fetching the
-    /// same URL bubbles its entry to the top instead of creating a duplicate.
-    let url: String
-    /// Title from the last successful probe of this URL. Optional — the entry exists from
-    /// the moment the URL is submitted, but the title isn't known until probe completes.
-    var title: String?
-    /// Source/extractor name (e.g. "Youtube", "Vimeo") for the small badge in the UI.
-    var extractor: String?
-    /// Remote thumbnail URL from the probe. Rendered by `KFImage` which caches it on disk so
-    /// the row keeps showing the thumb even when the user is offline.
-    var thumbnailURL: String?
-    /// File-system path (under Documents) of the completed download. `nil` while
-    /// the URL has been probed but not yet downloaded. We persist the relative filename
-    /// rather than the absolute path because the iOS container path can change across
-    /// reinstalls — `URLDownloadManager.fileURL(for:)` re-resolves the absolute path.
-    var localFilename: String?
-    var lastUsedAt: Date
-
-    var id: String { url }
 }
 
 /// Caps the total on-disk size of downloaded videos. When the cache exceeds the limit after a

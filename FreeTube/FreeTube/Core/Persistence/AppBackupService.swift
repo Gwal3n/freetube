@@ -143,7 +143,7 @@ final class AppBackupService {
         "oledPlayerBackground",
         "playbackRate", "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder",
         "preferredQuality", "prefetchVideoDetails",
-        "recentFetchURLs", "saveWatchHistory", "showChannelAboutTab", "showChannelLiveTab",
+        "saveWatchHistory", "showChannelAboutTab", "showChannelLiveTab",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview",
         "showHistoryProgressBars", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",

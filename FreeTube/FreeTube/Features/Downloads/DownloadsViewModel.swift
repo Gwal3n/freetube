@@ -36,16 +36,8 @@ final class DownloadsViewModel {
         }
     }
 
-    /// Cancel a transfer-queue row. Routes by snapshot kind:
-    ///   - YouTube downloads (id is the snapshot UUID) → `DownloadManager.cancel(taskID:)`.
-    ///   - URL downloads (id has `"fetch-"` prefix, set in `URLDownloadManager.transferSnapshotID`)
-    ///     → `URLDownloadManager.cancel(url:)`. The original URL is stored in `snapshot.videoID`
-    ///     for exactly this lookup.
+    /// Cancel a transfer-queue row by its download task ID.
     func cancel(_ snapshot: DownloadTaskSnapshot) {
-        if snapshot.id.hasPrefix("fetch-") {
-            URLDownloadManager.shared.cancel(url: snapshot.videoID)
-        } else {
-            manager.cancel(taskID: snapshot.id)
-        }
+        manager.cancel(taskID: snapshot.id)
     }
 }

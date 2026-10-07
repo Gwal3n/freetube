@@ -9,7 +9,7 @@ struct DownloadsScreen: View {
     @State private var model = DownloadsViewModel()
     /// File-system + xattr backed downloads list. Replaces the SwiftData `@Query` —
     /// the store rebuilds `entries` from the Documents root on launch and after every
-    /// `DownloadsStore.didChange` notification (posted by the YouTube + URL writers).
+    /// `DownloadsStore.didChange` notification (posted by the download writers).
     @State private var store = DownloadsStore.shared
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
     @Environment(PlayerStateManager.self) private var player
@@ -76,14 +76,6 @@ struct DownloadsScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List(selection: $selectedIDs) {
-                Section {
-                    NavigationLink {
-                        FetchScreen(embedsInNavigationStack: false)
-                    } label: {
-                        Label("Download from a link", systemImage: "link")
-                    }
-                }
-
                 if !inProgress.isEmpty {
                     Section("Transfer queue") {
                         ForEach(inProgress) { snapshot in
@@ -618,11 +610,11 @@ struct SavedItem: Identifiable {
     /// sort key without async plumbing.
     let duration: TimeInterval?
     /// `nil` for YouTube downloads (videoID alone reconstructs the canonical YouTube URL).
-    /// Set to the original pasted URL for files downloaded via the "From URL" tab — drives
+    /// Set to the original pasted URL for legacy Link downloads — drives
     /// the branch between `loadLocalFile` (URL items) and the YouTube resolver.
     let originalURL: String?
 
-    /// Convenience flag: true when this row came from the "From URL" tab. Drives tap and
+    /// Convenience flag: true when this row came from the former Link downloader. Drives tap and
     /// menu behavior in `DownloadsScreen` so we don't accidentally route an Instagram
     /// download through the YouTube resolver.
     var isFromURL: Bool { originalURL != nil }
