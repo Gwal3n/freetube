@@ -20,6 +20,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var chromePresentationReady = true
     @State private var floatingCorner: FloatingCorner = .bottomTrailing
     @State private var floatingIsStashed = false
+    @State private var floatingStashOverlayVisible = false
+    @State private var floatingStashGeneration = 0
     @State private var floatingRestingY: CGFloat?
     @State private var floatingStashPullX: CGFloat = 0
     @State private var floatingStashDragY: CGFloat = 0
@@ -198,20 +200,23 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         .allowsHitTesting(!player.fullScreenPresented && !isLaunchingFromThumbnail
                             && !floatingIsDismissing && !floatingIsStashed)
 
-                    if floatingIsStashed && !player.fullScreenPresented && !isLaunchingFromThumbnail {
-                        // Cover the entire video with the same shape and position. Only its
-                        // on-screen edge is visible, but it remains seamless as it is pulled out.
-                        FloatingMiniPlayerStashOverlay(
-                            isLeading: floatingCorner.isLeading,
-                            size: floatingSize
-                        )
-                        .position(floatingPosition)
-                        .opacity(max(0, 1 - abs(floatingStashPullX)
-                            / max(1, abs(stashedX - floatingBase.x))))
-                        .allowsHitTesting(false)
-                        .zIndex(4)
-                        .transition(.opacity)
+                    // This cover stays mounted and shares the video's animated position.
+                    // Inserting it only after stashing made its chevron appear at the final
+                    // edge while the existing video was still travelling there.
+                    FloatingMiniPlayerStashOverlay(
+                        isLeading: floatingCorner.isLeading,
+                        size: floatingSize
+                    )
+                    .position(floatingPosition)
+                    .opacity(floatingStashOverlayVisible
+                        ? max(0, 1 - abs(floatingStashPullX)
+                            / max(1, abs(stashedX - floatingBase.x)))
+                        : 0)
+                    .allowsHitTesting(false)
+                    .zIndex(4)
 
+                    if floatingIsStashed && floatingStashOverlayVisible
+                        && !player.fullScreenPresented && !isLaunchingFromThumbnail {
                         floatingStashHitTarget(
                             in: proxy.size, window: floatingSize,
                             base: floatingBase, position: floatingPosition,
@@ -247,6 +252,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 // even if the previous floating window was dragged to another corner.
                 floatingCorner = .bottomTrailing
                 floatingIsStashed = false
+                floatingStashGeneration &+= 1
+                floatingStashOverlayVisible = false
                 floatingRestingY = nil
                 floatingStashPullX = 0
                 floatingStashDragY = 0
@@ -269,6 +276,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 floatingDragTranslation = .zero
                 floatingDismissTranslation = .zero
                 floatingIsStashed = false
+                floatingStashGeneration &+= 1
+                floatingStashOverlayVisible = false
                 floatingRestingY = nil
                 floatingStashPullX = 0
                 floatingStashDragY = 0
@@ -490,7 +499,13 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     && abs(value.translation.width) > abs(value.translation.height) * 1.25
                 let crossedSideEdge = actual.x < -12 || actual.x > size.width + 12
                 if horizontalIntent && crossedSideEdge {
-                    withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.86)) {
+                    floatingStashGeneration &+= 1
+                    let generation = floatingStashGeneration
+                    floatingStashOverlayVisible = false
+                    withAnimation(
+                        reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.86),
+                        completionCriteria: .logicallyComplete
+                    ) {
                         floatingCorner = FloatingCorner.nearest(to: actual, in: size)
                         let yBounds = floatingYBounds(
                             in: size,
@@ -504,6 +519,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         floatingStashPullX = 0
                         floatingStashDragY = 0
                         floatingIsStashed = true
+                    } completion: {
+                        guard generation == floatingStashGeneration,
+                              floatingIsStashed else { return }
+                        withAnimation(reduceMotion ? nil : .easeIn(duration: 0.12)) {
+                            floatingStashOverlayVisible = true
+                        }
                     }
                     floatingActionsSuppressed = false
                     return
@@ -650,6 +671,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             floatingDragTranslation = .zero
             floatingDismissTranslation = .zero
             floatingIsStashed = false
+            floatingStashGeneration &+= 1
+            floatingStashOverlayVisible = false
             floatingRestingY = nil
             floatingStashPullX = 0
             floatingStashDragY = 0
@@ -690,7 +713,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     private func restoreFloatingPlayer() {
         guard floatingIsStashed else { return }
+        floatingStashGeneration &+= 1
         withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.38, dampingFraction: 0.84)) {
+            floatingStashOverlayVisible = false
             floatingIsStashed = false
             floatingStashPullX = 0
             floatingStashDragY = 0
@@ -783,6 +808,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         floatingDragTranslation = .zero
         floatingDismissTranslation = .zero
         floatingIsStashed = false
+        floatingStashGeneration &+= 1
+        floatingStashOverlayVisible = false
         floatingRestingY = nil
         floatingStashPullX = 0
         floatingStashDragY = 0

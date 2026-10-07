@@ -1,17 +1,19 @@
 import SwiftUI
 
-/// A material cover with the exact bounds and corner shape of the floating video. While the
-/// video is mostly off-screen, only the covered edge and its subtle restore chevron remain visible.
+/// A material cover matching the floating video's shape, with a one-pixel bleed to conceal
+/// antialiased seams. Only its edge and restore chevron remain visible while stashed.
 @available(iOS 17.0, *)
 struct FloatingMiniPlayerStashOverlay: View {
     @AppStorage("oledMiniPlayer") private var oledMiniPlayer = false
+    @Environment(\.displayScale) private var displayScale
 
     let isLeading: Bool
     let size: CGSize
 
     var body: some View {
+        let bleed = 1 / max(displayScale, 1)
         let shape = RoundedRectangle(
-            cornerRadius: FloatingMiniPlayerChrome.cornerRadius,
+            cornerRadius: FloatingMiniPlayerChrome.cornerRadius + bleed,
             style: .continuous
         )
 
@@ -25,9 +27,10 @@ struct FloatingMiniPlayerStashOverlay: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .frame(width: 22, height: size.height)
+                    .offset(x: isLeading ? -bleed : bleed)
             }
             .clipShape(shape)
-            .frame(width: size.width, height: size.height)
+            .frame(width: size.width + 2 * bleed, height: size.height + 2 * bleed)
             .accessibilityHidden(true)
     }
 }
