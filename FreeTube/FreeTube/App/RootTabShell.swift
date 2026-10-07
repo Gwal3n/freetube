@@ -23,7 +23,7 @@ struct RootTabShell: View {
             TabView(selection: $selection) {
                 if showsFeed {
                     SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: RootView.Tab.feed) {
-                        SubscriptionFeedScreen()
+                        SubscriptionFeedScreen(selectedTab: $selection)
                     }
                 }
 
@@ -52,7 +52,7 @@ struct RootTabShell: View {
     private var legacyTabShell: some View {
         TabView(selection: $selection) {
             if showsFeed {
-                SubscriptionFeedScreen()
+                SubscriptionFeedScreen(selectedTab: $selection)
                     .tabItem { Label("Feed", systemImage: "rectangle.stack") }
                     .tag(RootView.Tab.feed)
             }

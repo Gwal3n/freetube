@@ -240,53 +240,6 @@ final class DownloadsStore {
         return failed.isEmpty
     }
 
-    // MARK: - Cache eviction
-
-    /// Drop the oldest files until total size fits under `limitBytes`. The most-recent
-    /// file is always preserved — never sabotage the play request that triggered the
-    /// eviction sweep. `nil` limit → no-op. Runs the actual `FileManager.removeItem`
-    /// calls on a `.utility` detached task because deleting tens of files can take
-    /// noticeable wall-clock time and shouldn't block the main thread.
-    func enforceCacheLimit(_ limitBytes: Int64?, protectedVideoIDs: Set<String> = []) {
-        guard let limitBytes else { return }
-        // Explicitly downloaded playlist members are library content, not disposable cache.
-        // They still occupy space in the budget, but are never selected for eviction.
-        let protectedBytes = entries.reduce(Int64(0)) { total, entry in
-            guard protectedVideoIDs.contains(entry.videoID) else { return total }
-            return total + entry.fileSize
-        }
-        let remainingBudget = max(0, limitBytes - protectedBytes)
-        var retainedBytes: Int64 = 0
-        var evict: [URL] = []
-        // entries is already newest-first; walk and accumulate. Capture URLs only —
-        // DownloadEntry isn't Sendable across the detached boundary, and we don't need
-        // anything else off the entry to delete the file.
-        for (index, entry) in entries.enumerated() {
-            if protectedVideoIDs.contains(entry.videoID) { continue }
-            // Always keep the newest (index 0) regardless of its size — otherwise a
-            // single large download with a tiny cap would immediately self-evict.
-            if index > 0 && retainedBytes + entry.fileSize > remainingBudget {
-                evict.append(entry.fileURL)
-            } else {
-                retainedBytes += entry.fileSize
-            }
-        }
-        guard !evict.isEmpty else { return }
-        let urls = evict
-        log.info("cache eviction removing \(urls.count, privacy: .public) files to fit \(limitBytes, privacy: .public) B")
-        Task.detached(priority: .utility) {
-            for url in urls {
-                try? FileManager.default.removeItem(at: url)
-            }
-            await MainActor.run {
-                for url in urls where !FileManager.default.fileExists(atPath: url.path) && url.pathExtension.lowercased() == "mp4" {
-                    Task { await OfflineCaptionStore.shared.delete(for: url.deletingPathExtension().lastPathComponent) }
-                }
-                NotificationCenter.default.post(name: Self.didChange, object: nil)
-            }
-        }
-    }
-
     // MARK: - Internals
 
     /// The directory we scan for downloads. **Documents root** — exposed to the user via

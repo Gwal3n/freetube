@@ -226,6 +226,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   Do not pass the live playback clock back through `CustomPlayerControls` or its parent.
   Feed refresh counts similarly belong to `FeedRefreshProgress` in the navigation bar, rather
   than a changing List row that shifts videos and invalidates the feed on every channel update.
+- **Automatic subscription-feed refresh is opt-in and foreground-only.** The Feed tab checks the
+  last successful refresh and last in-session attempt against the selected interval (1, 6, 12,
+  or 24 hours). It pauses when the tab is not selected or the scene is inactive, defers while
+  the player is expanded, and uses the same deduplicated refresh path as pull-to-refresh.
 - **Loading feedback reflects real work.** Search and public-playlist pagination share a stable
   `MediaPaginationFooter`; after failure, preserve loaded rows and offer explicit retry instead
   of silently repeating lookahead requests. Search continuations and errors are generation-guarded
@@ -471,9 +475,10 @@ and a rejected strategy is excluded before requesting the next candidate.
 - `BackgroundDownloadCoordinator` configures `URLSession(.background(withIdentifier:))` so user-initiated direct-URL downloads (tier 2 strategy 1/2) survive backgrounding.
 - `BGProcessingTaskRequest` is registered for resuming downloads at next launch.
 
-### Cache limit
+### Download storage
 
-- `UserPreferences.downloadCacheLimitBytes` — when exceeded, oldest `DownloadedVideo` rows by `downloadedAt` get evicted along with their files.
+- Downloaded media stays on device until the user explicitly removes it. Settings displays current storage usage; there is no automatic cache eviction.
+- The app does not refresh its yt-dlp module on a timer. The downloader package handles initial module setup when a compatibility fallback first needs it.
 
 ---
 
@@ -633,7 +638,7 @@ Current state of the implementation. Items marked ✓ are shipped.
   - Channel screen and read-only public playlist screen
 - **P2 — Engagement** ✓ (mostly)
   - `CommentService` (read-only comments and replies)
-  - `DownloadManager` with priority queue + cache limit
+  - `DownloadManager` with priority queue and user-managed storage
   - Queue management UI
   - PiP, AirPlay
   - CarPlay audio mode — not yet

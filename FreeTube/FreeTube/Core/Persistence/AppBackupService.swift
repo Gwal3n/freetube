@@ -134,8 +134,9 @@ final class AppBackupService {
 
     private static let settingKeys: Set<String> = [
         "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appFontPreset",
+        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval",
         "appearanceMode", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
-        "concurrentFragments", "downloadCacheLimit", "formattedCaptions",
+        "concurrentFragments", "formattedCaptions",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",
         "com.leshko.freetube.deArrowRandomThumbnails",
         "hiddenPlayerTopControls", "historyRetentionPolicy", "largeSubscriptionFeedThumbnails",

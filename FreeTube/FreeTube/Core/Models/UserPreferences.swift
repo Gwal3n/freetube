@@ -34,6 +34,9 @@ struct UserPreferences {
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     /// Shows a quiet New label for subscription uploads estimated after the previous app visit.
     @AppStorage("showNewSubscriptionUploads") var showNewSubscriptionUploads: Bool = true
+    /// Opt-in, foreground-only refresh of the local subscription feed.
+    @AppStorage("automaticFeedRefreshEnabled") var automaticFeedRefreshEnabled: Bool = false
+    @AppStorage("automaticFeedRefreshInterval") var automaticFeedRefreshIntervalRaw: String = FeedRefreshInterval.everySixHours.rawValue
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showDescription") var showDescription: Bool = true
     /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit
@@ -74,7 +77,6 @@ struct UserPreferences {
     /// queue) can flip this off in Settings.
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("appFontPreset") var appFontPresetRaw: String = AppFontPreset.system.rawValue
-    @AppStorage("downloadCacheLimit") var downloadCacheLimitRaw: String = DownloadCacheLimit.unlimited.rawValue
     /// `--concurrent-fragments` value passed to yt-dlp. Higher values fetch more DASH/HLS chunks
     /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
     /// balance for cellular and consumer Wi-Fi. Values above 8 risk YouTube rate-limiting.
@@ -96,17 +98,6 @@ struct UserPreferences {
     @AppStorage("sponsorBlockIntroBehavior") var sponsorBlockIntroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockOutroBehavior") var sponsorBlockOutroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
-
-    /// yt-dlp `__version__` from the last successful download/load (e.g. `"2026.3.17"`).
-    /// Empty until `YtDlpUpdater` has loaded the module at least once. Displayed in Settings so
-    /// the user can see what version they're running without opening the device log.
-    @AppStorage("ytDlpVersion") var ytDlpVersion: String = ""
-
-    /// UNIX timestamp of the last successful yt-dlp re-download. `Date` itself isn't `AppStorage`-
-    /// compatible without a wrapper, so we store the time interval and expose `Date?` below.
-    /// Zero means "never refreshed since install" — the launch-time TTL check treats that as
-    /// "use whatever's on disk" (the package's first-run download set it up).
-    @AppStorage("lastYtDlpUpdate") var lastYtDlpUpdateRaw: Double = 0
 
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
@@ -172,42 +163,9 @@ struct UserPreferences {
         nonmutating set { appearanceModeRaw = newValue.rawValue }
     }
 
-    var downloadCacheLimit: DownloadCacheLimit {
-        get { DownloadCacheLimit(rawValue: downloadCacheLimitRaw) ?? .unlimited }
-        nonmutating set { downloadCacheLimitRaw = newValue.rawValue }
-    }
-
-    /// `nil` when yt-dlp has never been refreshed by `YtDlpUpdater` (initial install state).
-    var lastYtDlpUpdate: Date? {
-        get { lastYtDlpUpdateRaw > 0 ? Date(timeIntervalSince1970: lastYtDlpUpdateRaw) : nil }
-        nonmutating set { lastYtDlpUpdateRaw = newValue?.timeIntervalSince1970 ?? 0 }
-    }
-}
-
-/// Caps the total on-disk size of downloaded videos. When the cache exceeds the limit after a
-/// new download lands, the oldest entries are evicted (by `downloadedAt`) until total bytes fit.
-enum DownloadCacheLimit: String, CaseIterable, Identifiable {
-    case gb1, gb5, gb10, unlimited
-
-    var id: String { rawValue }
-
-    /// `nil` means "no cap — keep downloading until the device runs out of storage".
-    var bytes: Int64? {
-        switch self {
-        case .gb1: return 1 * 1_073_741_824
-        case .gb5: return 5 * 1_073_741_824
-        case .gb10: return 10 * 1_073_741_824
-        case .unlimited: return nil
-        }
-    }
-
-    var displayName: String {
-        switch self {
-        case .gb1: return "1 GB"
-        case .gb5: return "5 GB"
-        case .gb10: return "10 GB"
-        case .unlimited: return "Unlimited"
-        }
+    var automaticFeedRefreshInterval: FeedRefreshInterval {
+        get { FeedRefreshInterval(rawValue: automaticFeedRefreshIntervalRaw) ?? .everySixHours }
+        nonmutating set { automaticFeedRefreshIntervalRaw = newValue.rawValue }
     }
 }
 

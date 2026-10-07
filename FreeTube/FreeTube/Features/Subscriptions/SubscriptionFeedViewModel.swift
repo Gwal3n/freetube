@@ -16,6 +16,7 @@ final class SubscriptionFeedViewModel {
     private(set) var isRefreshWarningDismissed = false
     private(set) var canLoadMore = false
     private(set) var lastRefreshAt: Date?
+    private(set) var lastRefreshAttemptAt: Date?
     private(set) var selectedGroupID: UUID?
 
     private let pageSize = 100
@@ -80,6 +81,7 @@ final class SubscriptionFeedViewModel {
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
+        lastRefreshAttemptAt = .now
         failedChannels = []
         isRefreshWarningDismissed = false
         refreshedChannels = 0

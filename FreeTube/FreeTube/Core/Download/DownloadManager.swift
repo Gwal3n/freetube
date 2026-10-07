@@ -53,11 +53,7 @@ actor PythonRunner {
 
     /// A unit of work runnable on the Python-isolated execution context. Each job handles
     /// its own completion (resuming whatever continuation the public-API call created), so
-    /// `pump()` just runs them sequentially without having to know what kind they are.
-    /// This unification lets us serialize yt-dlp downloads AND one-off Python operations
-    /// (e.g. `YtDlpUpdater`'s version read) through the same FIFO — without it, two paths
-    /// calling `Python.attemptImport` from different cooperative-pool workers would race
-    /// CPython's interpreter state and crash with `_PyTuple_FromArray` / `init_fs_encoding`.
+    /// `pump()` just runs yt-dlp downloads sequentially on the Python executor.
     private typealias Job = @Sendable () async -> Void
 
     private var highPriority: [Job] = []
@@ -103,39 +99,6 @@ actor PythonRunner {
             // the queues sequentially. Detached to keep the priority on the work, not on the
             // caller (a UI-tap-priority caller shouldn't pin the entire download chain to that
             // priority — see `.utility` choice in the pump loop).
-            Task { await self.pump() }
-        }
-    }
-
-    /// Run an arbitrary Python-touching closure serialized through this runner's FIFO.
-    /// Use for one-off operations that need a Python interpreter (e.g. `YtDlpUpdater`'s
-    /// post-download version read via `Python.attemptImport("yt_dlp")`) so they never
-    /// race in-flight yt-dlp work on a different cooperative-pool worker.
-    ///
-    /// **Always jumps to `.high` priority** — these are short, user-facing operations
-    /// (a stuck version read holds up Settings UI feedback). The yt-dlp lane has its own
-    /// `.high` for play-now taps, so `runIsolated` work and a play-now tap still interleave
-    /// fairly, just both ahead of any background backlog.
-    ///
-    /// Same execution context as `run(argv:)`: a `Task.detached(priority: .utility)`
-    /// inside `pump()`. Don't put SwiftUI / main-actor work in here — only Python.
-    func runIsolated<T: Sendable>(_ work: @Sendable @escaping () async throws -> T) async throws -> T {
-        log.info("[PythonRunner.runIsolated] enqueue (queue high=\(self.highPriority.count, privacy: .public) low=\(self.lowPriority.count, privacy: .public) isRunning=\(self.isRunning, privacy: .public))")
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
-            let log = self.log
-            let job: Job = {
-                log.info("[PythonRunner.runIsolated] job starting work closure")
-                do {
-                    let result = try await work()
-                    log.info("[PythonRunner.runIsolated] work returned successfully")
-                    continuation.resume(returning: result)
-                } catch {
-                    log.error("[PythonRunner.runIsolated] work threw: \(String(describing: error), privacy: .public)")
-                    continuation.resume(throwing: error)
-                }
-            }
-            highPriority.append(job)
-            log.info("[PythonRunner.runIsolated] enqueued; spawning pump")
             Task { await self.pump() }
         }
     }
@@ -929,20 +892,8 @@ final class DownloadManager: TemporaryDownloading {
             at: fileURL
         )
         log.info("persistDownloaded(\(video.id, privacy: .public)) wrote xattr size=\(size, privacy: .public) bytes")
-        enforceCacheLimit()
         // Caption sidecars are optional and never hold up a completed media download.
         Task { await OfflineCaptionStore.shared.downloadAvailableTracks(for: video.id) }
-    }
-
-    /// Runs the LRU eviction sweep against the user's current cache-size preference. The newest
-    /// download is preserved (the one we just persisted), so this never sabotages the playback
-    /// request that triggered it. Now driven by `DownloadsStore` over the filesystem.
-    private func enforceCacheLimit() {
-        let limit = UserPreferences().downloadCacheLimit.bytes
-        DownloadsStore.shared.enforceCacheLimit(
-            limit,
-            protectedVideoIDs: PlaylistDownloadCoordinator.shared.protectedVideoIDs
-        )
     }
 
     private func downloadThumbnailData(url: URL?) async -> Data? {

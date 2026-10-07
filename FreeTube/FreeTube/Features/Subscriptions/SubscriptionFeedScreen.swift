@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SubscriptionFeedScreen: View {
+    @Binding var selectedTab: RootView.Tab
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @Environment(AppVisitState.self) private var appVisitState
     @State private var model = SubscriptionFeedViewModel()
@@ -13,6 +14,8 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
+    @AppStorage("automaticFeedRefreshEnabled") private var automaticFeedRefreshEnabled = false
+    @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
     @State private var currentDate = Date.now
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
@@ -127,7 +130,7 @@ struct SubscriptionFeedScreen: View {
                         .padding(.top, 44)
                 }
             }
-            .task { await model.load() }
+            .task(id: automaticRefreshTaskKey) { await loadAndScheduleAutomaticRefresh() }
             .onChange(of: groups.groups) { _, _ in
                 Task { await model.groupsChanged() }
             }
@@ -161,6 +164,32 @@ struct SubscriptionFeedScreen: View {
 
     private var automaticLoadKey: String {
         "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count)"
+    }
+
+    private var automaticRefreshTaskKey: String {
+        "\(selectedTab == .feed):\(scenePhase == .active):\(automaticFeedRefreshEnabled):\(automaticFeedRefreshIntervalRaw)"
+    }
+
+    /// Foreground, Feed-only timer. A manual pull-to-refresh moves the due time forward; a
+    /// failed automatic attempt still waits one interval before retrying. Nothing is scheduled
+    /// through BackgroundTasks and the timer stops when the tab or app becomes inactive.
+    private func loadAndScheduleAutomaticRefresh() async {
+        guard selectedTab == .feed, scenePhase == .active else { return }
+        if !model.hasLoaded { await model.load() }
+        guard automaticFeedRefreshEnabled, scenePhase == .active else { return }
+        let interval = FeedRefreshInterval(rawValue: automaticFeedRefreshIntervalRaw) ?? .everySixHours
+        while !Task.isCancelled {
+            guard model.hasSubscriptions, !player.fullScreenPresented else {
+                try? await Task.sleep(for: .seconds(60))
+                continue
+            }
+            let mostRecent = max(model.lastRefreshAt ?? .distantPast, model.lastRefreshAttemptAt ?? .distantPast)
+            if Date.now.timeIntervalSince(mostRecent) >= interval.seconds {
+                await model.refresh()
+            } else {
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
     }
 
     /// A feed-only, best-effort marker. YouTube supplies relative upload ages rather than an

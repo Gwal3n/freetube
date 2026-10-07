@@ -12,6 +12,6 @@ struct DownloadsSettingsFooter: View {
     }
 
     var body: some View {
-        Text("Using \(formattedCacheUsage). Oldest downloads are removed when the cache limit is reached. Playback does not save a copy. More parallel fragments may speed up downloads but can trigger rate limits.")
+        Text("Local downloads use \(formattedCacheUsage) of storage. They remain on this device until you delete them. Playback does not save a copy. More parallel fragments may speed up downloads but can trigger rate limits.")
     }
 }

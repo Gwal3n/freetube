@@ -77,10 +77,23 @@ struct SettingsScreen: View {
                     Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
                     Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
                     Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
+                    Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
+                    if model.automaticFeedRefreshEnabled {
+                        Picker("Refresh interval", selection: Bindable(model).automaticFeedRefreshInterval) {
+                            ForEach(FeedRefreshInterval.allCases) { interval in
+                                switch interval {
+                                case .hourly: Text("Every hour").tag(interval)
+                                case .everySixHours: Text("Every 6 hours").tag(interval)
+                                case .everyTwelveHours: Text("Every 12 hours").tag(interval)
+                                case .daily: Text("Every day").tag(interval)
+                                }
+                            }
+                        }
+                    }
                 } header: {
                     Text("Feed")
                 } footer: {
-                    Text("Hiding Feed does not remove your subscriptions. Large thumbnails change only the layout.")
+                    Text("Hiding Feed does not remove your subscriptions. Automatic refresh runs only while the Feed tab is selected and the app is active.")
                 }
 
                 Section("Channels") {
@@ -158,11 +171,6 @@ struct SettingsScreen: View {
 
                 Section {
                     Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
-                    Picker("Cache limit", selection: Bindable(model).downloadCacheLimit) {
-                        ForEach(DownloadCacheLimit.allCases) { option in
-                            Text(option.displayName).tag(option)
-                        }
-                    }
                     Picker("Parallel fragments", selection: Bindable(model).concurrentFragments) {
                         ForEach([1, 2, 4, 8, 16], id: \.self) { value in
                             Text(value == 1 ? "1 (sequential)" : "\(value)").tag(value)
@@ -172,51 +180,6 @@ struct SettingsScreen: View {
                     Text("Downloads")
                 } footer: {
                     DownloadsSettingsFooter()
-                }
-
-                Section {
-                    LabeledContent("Version") {
-                        Text(model.ytDlpVersion.isEmpty ? "Not yet loaded" : model.ytDlpVersion)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    LabeledContent("Last updated") {
-                        Text(model.ytDlpLastUpdatedDisplay ?? "Never")
-                            .foregroundStyle(.secondary)
-                    }
-                    Button {
-                        model.updateYtDlpNow()
-                    } label: {
-                        HStack {
-                            Label("Update now", systemImage: "arrow.down.circle")
-                            if model.isUpdatingYtDlp {
-                                Spacer()
-                                ProgressView()
-                            }
-                        }
-                    }
-                    .disabled(model.isUpdatingYtDlp)
-
-                    if let status = model.ytDlpUpdateStatus {
-                        switch status {
-                        case .success(let version):
-                            Label("Updated to \(version)", systemImage: "checkmark.circle")
-                                .foregroundStyle(.green)
-                                .font(.footnote)
-                        case .noChange(let version):
-                            Label("Already at latest (\(version))", systemImage: "checkmark.circle")
-                                .foregroundStyle(.secondary)
-                                .font(.footnote)
-                        case .failure(let message):
-                            Label(message, systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.red)
-                                .font(.footnote)
-                        }
-                    }
-                } header: {
-                    Text(verbatim: "yt-dlp")
-                } footer: {
-                    Text("Playback does not use yt-dlp. Downloads may fall back to it; FreeTube checks for updates about once a week.")
                 }
 
                 Section {
