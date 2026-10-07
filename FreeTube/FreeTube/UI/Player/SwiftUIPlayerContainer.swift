@@ -51,6 +51,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 ? 0
                 : systemInsets.top
             let miniBottomPadding = PlayerLayoutMetrics.bottomTabBarClearance
+            // The clearance includes six points of breathing room above the real tab bar.
+            let tabBarTop = proxy.size.height - miniBottomPadding + 6
             let floatingWidthRange = floatingWidthBounds(
                 in: proxy.size,
                 topInset: systemInsets.top,
@@ -163,6 +165,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // to relayout on every pinch sample. The source frame is committed once
                         // the fingers lift, so the image tracks the gesture without lag.
                         .scaleEffect(floatingPinchScale, anchor: floatingPinchAnchor)
+                        .modifier(FloatingTabBarOcclusion(
+                            tabBarTop: tabBarTop,
+                            isEnabled: !player.fullScreenPresented
+                        ))
                         // Position the hosting view itself, not just its SwiftUI drawing. The
                         // AVPlayerViewController inside can commit a frame ahead of an `.offset`
                         // animation, exposing video at the destination while the chrome moves.
@@ -185,6 +191,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     )
                         .frame(width: floatingSize.width, height: floatingSize.height)
                         .scaleEffect(floatingPinchScale, anchor: floatingPinchAnchor)
+                        .modifier(FloatingTabBarOcclusion(
+                            tabBarTop: tabBarTop,
+                            isEnabled: true
+                        ))
                         .position(floatingPosition)
                         .opacity(player.fullScreenPresented || isLaunchingFromThumbnail
                             || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
@@ -207,6 +217,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         isLeading: floatingCorner.isLeading,
                         size: floatingSize
                     )
+                    .modifier(FloatingTabBarOcclusion(
+                        tabBarTop: tabBarTop,
+                        isEnabled: true
+                    ))
                     .position(floatingPosition)
                     .opacity(floatingStashOverlayVisible
                         ? max(0, 1 - abs(floatingStashPullX)
@@ -229,6 +243,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .coordinateSpace(name: "playerContainer")
             .onChange(of: player.playerCollapseRequest) { _, _ in
                 guard player.fullScreenPresented else { return }
                 // The collapse control follows the same geometry path as a released drag.
