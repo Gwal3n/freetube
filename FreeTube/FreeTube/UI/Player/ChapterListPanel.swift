@@ -12,7 +12,6 @@ struct ChapterListPanel: View {
     let chapters: [VideoChapter]
     let elapsed: TimeInterval
     let isLandscape: Bool
-    let usesOLEDBackground: Bool
     @Binding var expansionProgress: CGFloat
     let expansionTravel: CGFloat
     let onSeek: (TimeInterval) -> Void
@@ -77,13 +76,7 @@ struct ChapterListPanel: View {
                 }
             }
         }
-        .background {
-            if usesOLEDBackground {
-                Color.black
-            } else {
-                Rectangle().fill(.regularMaterial)
-            }
-        }
+        .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
         .overlay(alignment: isLandscape ? .leading : .top) {
             Rectangle()

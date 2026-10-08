@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 @available(iOS 17.0, *)
 struct LocalPlaylistScreen: View {
@@ -20,6 +21,9 @@ struct LocalPlaylistScreen: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedVideoIDs = Set<String>()
     @State private var showingVideoDeleteConfirmation = false
+    @State private var showingPlaylistExporter = false
+    @State private var playlistExportDocument = JSONDocument(data: Data())
+    @State private var playlistExportError: String?
     @State private var searchText = ""
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -148,6 +152,22 @@ struct LocalPlaylistScreen: View {
         .sheet(isPresented: $showingAddVideo) {
             AddVideoToPlaylistSheet(playlistID: playlistID)
         }
+        .fileExporter(
+            isPresented: $showingPlaylistExporter,
+            document: playlistExportDocument,
+            contentType: .json,
+            defaultFilename: "FreeTube Playlist"
+        ) { result in
+            if case .failure(let error) = result { playlistExportError = error.localizedDescription }
+        }
+        .alert("Couldn’t Export Playlist", isPresented: Binding(
+            get: { playlistExportError != nil },
+            set: { if !$0 { playlistExportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(playlistExportError ?? "")
+        }
         .confirmationDialog(
             "Restore the original playlist?",
             isPresented: $showingRestoreConfirmation,
@@ -242,6 +262,11 @@ struct LocalPlaylistScreen: View {
             } label: {
                 Label("Edit Playlist", systemImage: "list.bullet")
             }
+            Button {
+                Task { await exportPlaylist() }
+            } label: {
+                Label("Export Playlist", systemImage: "square.and.arrow.up")
+            }
             if local.playlist.isSavedFromYouTube {
                 Button {
                     showingRestoreConfirmation = true
@@ -282,6 +307,17 @@ struct LocalPlaylistScreen: View {
             await reload()
         } catch {
             restoreError = error.localizedDescription
+        }
+    }
+
+    private func exportPlaylist() async {
+        do {
+            let archiveService = PlaylistArchiveService()
+            let archive = try await archiveService.makeArchive(playlistID: playlistID)
+            playlistExportDocument = JSONDocument(data: try archiveService.encode(archive))
+            showingPlaylistExporter = true
+        } catch {
+            playlistExportError = error.localizedDescription
         }
     }
 

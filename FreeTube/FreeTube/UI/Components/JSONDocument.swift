@@ -1,7 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct AppBackupDocument: FileDocument {
+/// A JSON file chosen by the system document exporter. The payload is prepared by a service.
+struct JSONDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.json] }
     var data: Data
 

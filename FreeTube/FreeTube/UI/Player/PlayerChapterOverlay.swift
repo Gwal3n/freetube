@@ -10,7 +10,6 @@ struct PlayerChapterOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let isLandscape: Bool
-    let usesOLEDBackground: Bool
     @Binding var expansionProgress: CGFloat
     let expansionTravel: CGFloat
     let onInteraction: () -> Void
@@ -20,7 +19,6 @@ struct PlayerChapterOverlay: View {
             chapters: player.chapters,
             elapsed: player.elapsed,
             isLandscape: isLandscape,
-            usesOLEDBackground: usesOLEDBackground,
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
             onSeek: { target in

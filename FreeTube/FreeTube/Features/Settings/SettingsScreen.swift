@@ -133,12 +133,8 @@ struct SettingsScreen: View {
                                 .tag(preset)
                         }
                     }
-                    Toggle("OLED player background", isOn: Bindable(model).oledPlayerBackground)
-                    Toggle("OLED mini-player", isOn: Bindable(model).oledMiniPlayer)
                 } header: {
                     Text("Appearance")
-                } footer: {
-                    Text("OLED uses true black instead of the usual translucent background.")
                 }
 
                 Section {

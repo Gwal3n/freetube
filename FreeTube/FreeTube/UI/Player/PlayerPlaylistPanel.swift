@@ -16,7 +16,6 @@ struct PlayerPlaylistPanel: View {
 
     let isPresented: Bool
     let isLandscape: Bool
-    let usesOLEDBackground: Bool
     @Binding var expansionProgress: CGFloat
     let expansionTravel: CGFloat
     let onOpen: () -> Void
@@ -142,15 +141,9 @@ struct PlayerPlaylistPanel: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
             .background {
-                if usesOLEDBackground {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .fill(Color.black)
-                        .allowsHitTesting(false)
-                } else {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .fill(.regularMaterial)
-                        .allowsHitTesting(false)
-                }
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .fill(Color.black)
+                    .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
@@ -285,13 +278,7 @@ struct PlayerPlaylistPanel: View {
                     }
                 }
             }
-            .background {
-                if usesOLEDBackground {
-                    Color.black
-                } else {
-                    Rectangle().fill(.regularMaterial)
-                }
-            }
+            .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
             .overlay(alignment: isLandscape ? .leading : .top) {
                 Rectangle()

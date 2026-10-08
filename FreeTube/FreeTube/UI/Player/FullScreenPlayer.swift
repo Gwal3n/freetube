@@ -55,7 +55,6 @@ struct FullScreenPlayer: View {
     @AppStorage("showDescription") private var showDescription = true
     @AppStorage("showUpNext") private var showUpNext = true
     @AppStorage("upNextInitialCount") private var upNextInitialCount = 5
-    @AppStorage("oledPlayerBackground") private var oledPlayerBackground = false
     @AppStorage("captionBackgroundEnabled") private var captionBackgroundEnabled = true
     @AppStorage("captionTextScale") private var captionTextScale = 1.0
     @AppStorage("formattedCaptions") private var formattedCaptions = true
@@ -481,7 +480,6 @@ struct FullScreenPlayer: View {
                 let chapterTop = surfaceHeight * (1 - chapterPanelExpansion)
                 PlayerChapterOverlay(
                     isLandscape: isLandscape,
-                    usesOLEDBackground: oledPlayerBackground,
                     expansionProgress: $chapterPanelExpansion,
                     expansionTravel: surfaceHeight,
                     onInteraction: showPlayerControls
@@ -512,18 +510,9 @@ struct FullScreenPlayer: View {
             .zIndex(6)
             }
             }
-        // One continuous material under EVERYTHING, including the top safe-area inset (status bar).
-        // VStack content still respects safe area; only the material extends behind the inset.
+        // Keep a continuous OLED-black canvas behind the expanded player and status area.
         .background {
-            Group {
-                if oledPlayerBackground {
-                    Color.black.ignoresSafeArea()
-                } else {
-                    Rectangle()
-                        .fill(.thinMaterial)
-                        .ignoresSafeArea()
-                }
-            }
+            Color.black.ignoresSafeArea()
             // In floating mode the moving host should contain only the video. The expanded
             // details canvas fades away instead of travelling down as a miniature sheet.
             .opacity(player.fullScreenPresented && chromePresentationReady
@@ -648,7 +637,6 @@ struct FullScreenPlayer: View {
             PlayerPlaylistPanel(
                 isPresented: isPlaylistPanelPresented,
                 isLandscape: isLandscape,
-                usesOLEDBackground: oledPlayerBackground,
                 expansionProgress: $playlistPanelExpansion,
                 expansionTravel: surfaceHeight,
                 onOpen: {

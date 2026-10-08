@@ -8,11 +8,12 @@ struct ImportDataScreen: View {
     private enum ImportKind: Equatable {
         case backup
         case subscriptions
+        case playlistArchive
         case playlists
 
         var contentTypes: [UTType] {
             switch self {
-            case .backup: [.json]
+            case .backup, .playlistArchive: [.json]
             case .subscriptions, .playlists: [.commaSeparatedText, .plainText]
             }
         }
@@ -22,15 +23,19 @@ struct ImportDataScreen: View {
 
     private enum DataOperation {
         case exporting
+        case exportingPlaylists
         case restoring
         case importingSubscriptions
+        case importingPlaylistArchive
         case importingPlaylists(completed: Int, total: Int)
 
         var title: String {
             switch self {
             case .exporting: "Preparing Backup"
+            case .exportingPlaylists: "Preparing Playlists"
             case .restoring: "Restoring Backup"
             case .importingSubscriptions: "Importing Subscriptions"
+            case .importingPlaylistArchive: "Importing Playlists"
             case .importingPlaylists: "Importing Playlists"
             }
         }
@@ -39,10 +44,14 @@ struct ImportDataScreen: View {
             switch self {
             case .exporting:
                 "Collecting your settings and local data…"
+            case .exportingPlaylists:
+                "Collecting playlists and saved video information…"
             case .restoring:
                 "Replacing local data from your backup…"
             case .importingSubscriptions:
                 "Adding channels to Local Subscriptions…"
+            case .importingPlaylistArchive:
+                "Restoring playlists with saved video information…"
             case .importingPlaylists(let completed, let total):
                 "Importing playlist \(min(completed + 1, total)) of \(total)…"
             }
@@ -60,14 +69,17 @@ struct ImportDataScreen: View {
     @State private var showingImporter = false
     @State private var showingBackupExporter = false
     @State private var showingSubscriptionsExporter = false
+    @State private var showingPlaylistsExporter = false
     @State private var confirmsBackupRestore = false
     @State private var pendingBackup: AppBackup?
-    @State private var exportDocument = AppBackupDocument(data: Data())
+    @State private var exportDocument = JSONDocument(data: Data())
+    @State private var playlistsDocument = JSONDocument(data: Data())
     @State private var subscriptionsDocument = CSVDocument(data: Data())
     @State private var activeOperation: DataOperation?
     @State private var resultMessage: String?
     @State private var errorMessage: String?
     private let playlistService = LocalPlaylistService()
+    private let playlistArchiveService = PlaylistArchiveService()
 
     private var isWorking: Bool { activeOperation != nil }
 
@@ -106,14 +118,35 @@ struct ImportDataScreen: View {
                     Label("Import Subscriptions CSV", systemImage: "person.2.badge.plus")
                 }
                 .disabled(isWorking)
+            } header: {
+                Text("Subscriptions")
+            } footer: {
+                Text("Exports the same CSV format accepted by the subscriptions importer.")
+            }
+
+            Section {
+                Button {
+                    Task { await exportPlaylists() }
+                } label: {
+                    Label("Export Local Playlists", systemImage: "square.and.arrow.up")
+                }
+                .disabled(isWorking)
+                Button {
+                    presentImporter(.playlistArchive)
+                } label: {
+                    Label("Import Playlist Archive", systemImage: "square.and.arrow.down")
+                }
+                .disabled(isWorking)
                 Button {
                     presentImporter(.playlists)
                 } label: {
                     Label("Import Playlist CSV Files", systemImage: "music.note.list")
                 }
                 .disabled(isWorking)
+            } header: {
+                Text("Playlists")
             } footer: {
-                Text("Imports stay on this device. Each playlist CSV becomes a separate personal playlist.")
+                Text("Playlist archives keep titles, order, and saved video information without changing other app data. CSV imports create personal playlists and fetch missing video information later.")
             }
 
             if let activeOperation {
@@ -134,7 +167,7 @@ struct ImportDataScreen: View {
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isWorking)
-        .navigationTitle("Import Data")
+        .navigationTitle("Import & Export")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
             isPresented: $showingImporter,
@@ -156,6 +189,14 @@ struct ImportDataScreen: View {
             document: subscriptionsDocument,
             contentType: .commaSeparatedText,
             defaultFilename: "FreeTube Subscriptions"
+        ) { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+        .fileExporter(
+            isPresented: $showingPlaylistsExporter,
+            document: playlistsDocument,
+            contentType: .json,
+            defaultFilename: "FreeTube Playlists"
         ) { result in
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
         }
@@ -191,6 +232,8 @@ struct ImportDataScreen: View {
             prepareBackupImport(result)
         case .subscriptions:
             importSubscriptions(result)
+        case .playlistArchive:
+            Task { await importPlaylistArchive(result) }
         case .playlists:
             Task { await importPlaylists(result) }
         }
@@ -202,8 +245,21 @@ struct ImportDataScreen: View {
         defer { activeOperation = nil }
         do {
             let backup = try await AppBackupService.shared.makeBackup()
-            exportDocument = AppBackupDocument(data: try AppBackupService.shared.encode(backup))
+            exportDocument = JSONDocument(data: try AppBackupService.shared.encode(backup))
             showingBackupExporter = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func exportPlaylists() async {
+        guard !isWorking else { return }
+        activeOperation = .exportingPlaylists
+        defer { activeOperation = nil }
+        do {
+            let archive = try await playlistArchiveService.makeArchive()
+            playlistsDocument = JSONDocument(data: try playlistArchiveService.encode(archive))
+            showingPlaylistsExporter = true
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -253,6 +309,22 @@ struct ImportDataScreen: View {
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
             let count = try LocalSubscriptionStore.shared.importCSV(data: Data(contentsOf: url))
             resultMessage = "Imported \(count) \(count == 1 ? "channel" : "channels")."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func importPlaylistArchive(_ result: Result<[URL], Error>) async {
+        guard !isWorking else { return }
+        activeOperation = .importingPlaylistArchive
+        defer { activeOperation = nil }
+        do {
+            guard let url = try result.get().first else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            let archive = try playlistArchiveService.decode(Data(contentsOf: url))
+            let count = try await playlistArchiveService.importArchive(archive)
+            resultMessage = "Imported \(count) \(count == 1 ? "playlist" : "playlists") with saved video information."
         } catch {
             errorMessage = error.localizedDescription
         }

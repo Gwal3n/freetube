@@ -192,16 +192,6 @@ final class SettingsViewModel {
         }
     }
 
-    var oledPlayerBackground: Bool {
-        get { preferences.oledPlayerBackground }
-        set { preferences.oledPlayerBackground = newValue }
-    }
-
-    var oledMiniPlayer: Bool {
-        get { preferences.oledMiniPlayer }
-        set { preferences.oledMiniPlayer = newValue }
-    }
-
     func movePlayerControl(
         _ control: PlayerTopControl,
         to section: PlayerControlLayout.Section,

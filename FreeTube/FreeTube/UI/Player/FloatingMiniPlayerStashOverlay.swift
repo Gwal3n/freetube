@@ -4,7 +4,6 @@ import SwiftUI
 /// antialiased seams. Only its edge and restore chevron remain visible while stashed.
 @available(iOS 17.0, *)
 struct FloatingMiniPlayerStashOverlay: View {
-    @AppStorage("oledMiniPlayer") private var oledMiniPlayer = false
     @Environment(\.displayScale) private var displayScale
 
     let isLeading: Bool
@@ -20,7 +19,7 @@ struct FloatingMiniPlayerStashOverlay: View {
         shape
             .fill(.regularMaterial)
             .overlay {
-                shape.fill(.black.opacity(oledMiniPlayer ? 0.3 : 0.08))
+                shape.fill(.black.opacity(0.3))
             }
             .overlay(alignment: isLeading ? .trailing : .leading) {
                 Image(systemName: isLeading ? "chevron.right" : "chevron.left")
