@@ -455,7 +455,7 @@ private enum FeedDurationFilter: String, CaseIterable, Identifiable {
     func includes(_ duration: TimeInterval?) -> Bool {
         guard self != .all else { return true }
         guard let duration, duration.isFinite, duration > 0 else { return false }
-        switch self {
+        return switch self {
         case .all: true
         case .underFourMinutes: duration < 240
         case .fourToTwentyMinutes: duration >= 240 && duration <= 1200
