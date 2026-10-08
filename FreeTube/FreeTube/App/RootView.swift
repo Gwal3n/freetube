@@ -19,6 +19,7 @@ struct RootView: View {
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
     @AppStorage("appFontPreset") private var appFontPresetRaw = AppFontPreset.system.rawValue
     @State private var navigationRouter = AppNavigationRouter()
+    @State private var incomingLinkModel = IncomingLinkViewModel()
     private enum RootSheet: String, Identifiable {
         case settings
         case subscriptionGroups
@@ -58,6 +59,10 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
+        .errorToast(Bindable(incomingLinkModel).errorState)
+        .onOpenURL { url in
+            Task { await openIncomingLink(url) }
+        }
         .sheet(item: $rootSheet, onDismiss: {
             log.info("Root sheet dismissed")
             rootSheet = nil
@@ -165,6 +170,33 @@ struct RootView: View {
             navigationRouter.library = request
         case .downloads:
             navigationRouter.downloads = request
+        }
+    }
+
+    /// Handle external public links without changing the selected tab. The tab's existing
+    /// navigation stack receives channel/playlist destinations; video resolution starts first.
+    private func openIncomingLink(_ url: URL) async {
+        guard let link = YouTubeIncomingLink.parse(url) else {
+            incomingLinkModel.errorState = ErrorState(message: "This isn't a supported YouTube link.")
+            return
+        }
+        switch link {
+        case .video(let id):
+            player.load(YouTubeVideoLink.playbackSeed(for: id))
+            await Task.yield()
+            if let metadata = await incomingLinkModel.metadata(for: id) {
+                player.enrichCurrentVideo(with: metadata)
+            }
+        case .channel(let id):
+            routeFromPlayer(.channel(id))
+        case .channelHandle(let handle):
+            guard let id = await incomingLinkModel.channelID(for: handle) else {
+                incomingLinkModel.errorState = ErrorState(message: "This channel couldn't be opened. Try searching for it instead.")
+                return
+            }
+            routeFromPlayer(.channel(id))
+        case .playlist(let id):
+            routeFromPlayer(.playlist(id))
         }
     }
 

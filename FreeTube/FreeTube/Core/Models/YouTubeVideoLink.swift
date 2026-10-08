@@ -2,6 +2,24 @@ import Foundation
 
 /// Parses a YouTube video link without making a request or accepting arbitrary hosts.
 enum YouTubeVideoLink {
+    /// A playable placeholder while metadata loads independently of stream resolution.
+    static func playbackSeed(for id: String) -> Video {
+        Video(
+            id: id,
+            title: "YouTube video",
+            channelID: "",
+            channelName: "YouTube",
+            channelThumbnailURL: nil,
+            thumbnailURL: URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"),
+            duration: nil,
+            viewCount: nil,
+            publishedAt: nil,
+            descriptionSnippet: nil,
+            isLive: false,
+            isShort: false
+        )
+    }
+
     static func videoID(from text: String, allowBareID: Bool = false) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

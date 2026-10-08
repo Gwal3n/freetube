@@ -273,6 +273,12 @@ final class DownloadManager: TemporaryDownloading {
     private(set) var phaseByVideoID: [String: String] = [:]
 
     private var tasks: [String: DownloadTaskSnapshot] = [:]
+    private struct RetryRequest {
+        let video: Video
+        let quality: VideoQuality
+    }
+    /// Failed rows keep their original selection, so Retry never silently changes quality.
+    private var retryRequests: [String: RetryRequest] = [:]
     @ObservationIgnored private var overallProgress: [String: DownloadOverallProgress] = [:]
     @ObservationIgnored private var cancelledSnapshotIDs: [String] = []
 
@@ -339,8 +345,33 @@ final class DownloadManager: TemporaryDownloading {
             return try await inflightTask.value
         }
 
+        let supersededFailures = tasks.values.compactMap { snapshot -> String? in
+            guard snapshot.videoID == video.id, case .failed = snapshot.state else { return nil }
+            return snapshot.id
+        }
+        for id in supersededFailures {
+            tasks[id] = nil
+            retryRequests[id] = nil
+        }
+        if !supersededFailures.isEmpty { publishSnapshots() }
+
         log.info("ensureDownloaded(\(video.id, privacy: .public)): checking network gate (allowCellular=\(self.preferences.allowCellularDownloads, privacy: .public))")
-        try await waitForAllowedNetwork()
+        do {
+            try await waitForAllowedNetwork()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let snapshotID = UUID().uuidString
+            retryRequests[snapshotID] = RetryRequest(video: video, quality: quality)
+            publish(snapshot: DownloadTaskSnapshot(
+                id: snapshotID,
+                videoID: video.id,
+                title: video.title,
+                state: .failed(error.localizedDescription),
+                createdAt: .now
+            ))
+            throw error
+        }
         try Task.checkCancellation()
         log.info("ensureDownloaded(\(video.id, privacy: .public)): network gate passed, spawning download task")
 
@@ -373,10 +404,49 @@ final class DownloadManager: TemporaryDownloading {
         progressByVideoID[snapshot.videoID] = nil
         phaseByVideoID[snapshot.videoID] = nil
         tasks[taskID] = nil
+        retryRequests[taskID] = nil
         publishSnapshots()
         if let task = inflight[snapshot.videoID] {
             task.cancel()
             inflight[snapshot.videoID] = nil
+        }
+    }
+
+    /// Starts a fresh attempt for a failed transfer using its original video and quality.
+    /// This is a retry from the beginning, not a claim that HLS/yt-dlp can resume partial bytes.
+    func retry(taskID: String) async throws {
+        guard let snapshot = tasks[taskID], case .failed = snapshot.state,
+              let request = retryRequests[taskID] else {
+            throw NSError(
+                domain: "com.leshko.freetube.download",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "This download can no longer be retried. Start it again from the video."]
+            )
+        }
+
+        // A failure snapshot can be published just before the previous task's defer clears
+        // `inflight`. Await it so ensureDownloaded does not join that failed attempt.
+        if let previous = inflight[snapshot.videoID] {
+            _ = try? await previous.value
+        }
+        tasks[taskID] = nil
+        retryRequests[taskID] = nil
+        publishSnapshots()
+        do {
+            _ = try await ensureDownloaded(
+                video: request.video,
+                quality: request.quality,
+                priority: .userInitiated
+            )
+        } catch {
+            // A network gate can fail before the new attempt creates a snapshot. Restore
+            // the retryable row in that case; actual transfer failures publish their own row.
+            if !tasks.values.contains(where: { $0.videoID == snapshot.videoID }) {
+                tasks[taskID] = snapshot
+                retryRequests[taskID] = request
+                publishSnapshots()
+            }
+            throw error
         }
     }
 
@@ -408,6 +478,7 @@ final class DownloadManager: TemporaryDownloading {
         let startedAt = Date()
         log.info("yt-dlp[\(video.id, privacy: .public)] runYoutubeDLDownload start quality=\(quality.rawValue, privacy: .public)")
         let snapshotID = UUID().uuidString
+        retryRequests[snapshotID] = RetryRequest(video: video, quality: quality)
         log.debug("yt-dlp[\(video.id, privacy: .public)] snapshotID=\(snapshotID, privacy: .public) → state=queued")
         publish(snapshot: DownloadTaskSnapshot(
             id: snapshotID,
@@ -1525,6 +1596,7 @@ final class DownloadManager: TemporaryDownloading {
         } else if case .completed = snapshot.state {
             overallProgress[snapshot.id] = nil
             progressByVideoID.removeValue(forKey: snapshot.videoID)
+            retryRequests[snapshot.id] = nil
         } else if case .failed = snapshot.state {
             overallProgress[snapshot.id] = nil
             progressByVideoID.removeValue(forKey: snapshot.videoID)

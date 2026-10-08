@@ -40,4 +40,12 @@ final class DownloadsViewModel {
     func cancel(_ snapshot: DownloadTaskSnapshot) {
         manager.cancel(taskID: snapshot.id)
     }
+
+    func retry(_ snapshot: DownloadTaskSnapshot) async {
+        do {
+            try await manager.retry(taskID: snapshot.id)
+        } catch {
+            errorState = ErrorState(from: error)
+        }
+    }
 }

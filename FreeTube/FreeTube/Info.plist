@@ -4,6 +4,17 @@
 <dict>
 	<key>FreeTubeCommit</key>
 	<string>$(FREETUBE_COMMIT)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.leshko.freetube.open</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.leshko.freetube</string>
+			</array>
+		</dict>
+	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.leshko.freetube.resume-downloads</string>

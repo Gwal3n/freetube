@@ -48,20 +48,7 @@ final class SearchViewModel {
     /// filled in separately so parsing a pasted URL never adds a blocking request before playback.
     func directVideo(from text: String) -> Video? {
         guard let id = YouTubeVideoLink.videoID(from: text) else { return nil }
-        return Video(
-            id: id,
-            title: "YouTube video",
-            channelID: "",
-            channelName: "YouTube",
-            channelThumbnailURL: nil,
-            thumbnailURL: URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"),
-            duration: nil,
-            viewCount: nil,
-            publishedAt: nil,
-            descriptionSnippet: nil,
-            isLive: false,
-            isShort: false
-        )
+        return YouTubeVideoLink.playbackSeed(for: id)
     }
 
     func metadata(forDirectVideoID id: String) async -> Video? {

@@ -5,6 +5,7 @@ import UIKit
 struct DownloadTransferRow: View {
     let snapshot: DownloadTaskSnapshot
     let onCancel: () -> Void
+    let onRetry: () -> Void
 
     var body: some View {
         HStack(spacing: MediaStyle.spacing) {
@@ -16,14 +17,25 @@ struct DownloadTransferRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button(role: .destructive, action: onCancel) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    .contentShape(Rectangle())
+            if case .failed = snapshot.state {
+                Button(action: onRetry) {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(.primary)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel("Retry download")
+            } else {
+                Button(role: .destructive, action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel("Cancel download")
             }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityLabel("Cancel download")
         }
     }
 
@@ -47,7 +59,15 @@ struct DownloadTransferRow: View {
         case .completed:
             Text("Completed").font(.caption).foregroundStyle(.green)
         case .failed(let message):
-            Text(message).font(.caption).foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Download failed")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.red)
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
     }
 

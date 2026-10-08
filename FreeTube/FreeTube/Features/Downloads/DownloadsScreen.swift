@@ -21,6 +21,7 @@ struct DownloadsScreen: View {
     @State private var selectedIDs: Set<String> = []
     @State private var sortBy: SortBy = .date
     @State private var sortDescending = true
+    @State private var searchText = ""
     /// Confirmation alert before deleting selected items in selection mode.
     @State private var showBulkDeleteConfirmation = false
     /// When non-nil, the user tapped delete on a single row — confirm before removing.
@@ -45,6 +46,7 @@ struct DownloadsScreen: View {
     private var inProgress: [DownloadTaskSnapshot] {
         model.manager.activeTasks.filter { snapshot in
             guard !playlistMemberIDs.contains(snapshot.videoID) else { return false }
+            guard matchesSearch(snapshot.title, snapshot.videoID) else { return false }
             switch snapshot.state {
             case .queued, .downloading, .paused, .failed: return true
             case .completed: return false
@@ -60,7 +62,23 @@ struct DownloadsScreen: View {
             .filter { entry in
                 !playlistMemberIDs.contains(entry.videoID)
             }
-            .map(SavedItem.init(from:)))
+            .map(SavedItem.init(from:))
+            .filter { matchesSearch($0.title, $0.channelName, $0.videoID) })
+    }
+
+    private var visiblePlaylists: [PlaylistDownloadManifest] {
+        playlistDownloads.manifests
+            .filter { matchesSearch($0.title) }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func matchesSearch(_ values: String...) -> Bool {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return query.isEmpty || values.contains { $0.localizedStandardContains(query) }
     }
 
     private var playlistMemberIDs: Set<String> { playlistDownloads.protectedVideoIDs }
@@ -69,13 +87,27 @@ struct DownloadsScreen: View {
         Set(store.entries.map(\.videoID))
     }
 
-    /// Aggregate stats shown under the title.
-    private var totalSize: Int64 { savedItems.reduce(0) { $0 + $1.fileSize } }
-    private var totalCount: Int { savedItems.count }
+    /// Count actual files once, even if a video belongs to several downloaded playlists.
+    private var totalSize: Int64 { store.entries.reduce(0) { $0 + $1.fileSize } }
+    private var totalCount: Int { store.entries.count }
 
     var body: some View {
         NavigationStack(path: $path) {
             List(selection: $selectedIDs) {
+                if totalCount > 0 {
+                    Section {
+                        HStack {
+                            Label("Downloaded media", systemImage: "internaldrive")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
+                                .foregroundStyle(.primary)
+                        }
+                        .font(.subheadline)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+
                 if !inProgress.isEmpty {
                     Section("Transfer queue") {
                         ForEach(inProgress) { snapshot in
@@ -84,10 +116,10 @@ struct DownloadsScreen: View {
                     }
                 }
 
-                if !playlistDownloads.manifests.isEmpty {
+                if !visiblePlaylists.isEmpty {
                     Section("Playlists") {
                         let downloadedIDs = downloadedVideoIDs
-                        ForEach(playlistDownloads.manifests.sorted { $0.updatedAt > $1.updatedAt }) { manifest in
+                        ForEach(visiblePlaylists) { manifest in
                             let downloadedCount = manifest.videos.reduce(0) {
                                 $0 + (downloadedIDs.contains($1.id) ? 1 : 0)
                             }
@@ -136,9 +168,9 @@ struct DownloadsScreen: View {
                     }
                 }
 
-                if !savedItems.isEmpty || playlistDownloads.manifests.isEmpty {
+                if !savedItems.isEmpty || (!isSearching && playlistDownloads.manifests.isEmpty && inProgress.isEmpty) {
                     Section {
-                        if savedItems.isEmpty {
+                        if savedItems.isEmpty && !isSearching {
                             ContentUnavailableView(
                                 "No Downloads",
                                 systemImage: "arrow.down.circle",
@@ -155,8 +187,19 @@ struct DownloadsScreen: View {
                         savedHeader
                     }
                 }
+
+                if isSearching && inProgress.isEmpty && visiblePlaylists.isEmpty && savedItems.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                }
             }
             .listStyle(.plain)
+            .searchable(text: $searchText, prompt: "Search downloads")
+            .onChange(of: searchText) { _, _ in
+                selectedIDs.removeAll()
+                isSelecting = false
+            }
             .scrollContentBackground(.hidden)
             .background(Color.black)
             .navigationTitle(isSelecting
@@ -275,8 +318,8 @@ struct DownloadsScreen: View {
     private var savedHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Saved on device").font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-            if totalCount > 0 {
-                Text(verbatim: "\(totalCount) \(totalCount == 1 ? "video" : "videos") • \(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))")
+            if !savedItems.isEmpty {
+                Text(verbatim: "\(savedItems.count) \(savedItems.count == 1 ? "video" : "videos")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -292,6 +335,13 @@ struct DownloadsScreen: View {
         DownloadTransferRow(snapshot: snapshot) {
             withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                 model.cancel(snapshot)
+            }
+        } onRetry: {
+            Task { await model.retry(snapshot) }
+        }
+        .swipeActions {
+            if case .failed = snapshot.state {
+                Button("Dismiss", role: .destructive) { model.cancel(snapshot) }
             }
         }
     }
