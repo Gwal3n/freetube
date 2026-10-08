@@ -20,7 +20,6 @@ struct PlayerPlaylistPanel: View {
     let expansionTravel: CGFloat
     let onOpen: () -> Void
     let onDismiss: () -> Void
-    let onLeavePlaylist: () -> Void
     let onOpenPlaylist: (String) -> Void
 
     @State private var lastAutomaticPageCount: Int?
@@ -233,7 +232,7 @@ struct PlayerPlaylistPanel: View {
                                     .accessibilityLabel("Share playlist")
                                 }
                             }
-                            Button(action: onLeavePlaylist) {
+                            Button(action: onDismiss) {
                                 Image(systemName: "xmark")
                                     .font(.subheadline.weight(.bold))
                                     .frame(width: 32, height: 32)
@@ -242,7 +241,7 @@ struct PlayerPlaylistPanel: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Leave playlist")
+                            .accessibilityLabel("Close playlist")
                         }
                         .font(.system(size: 15, weight: .semibold))
                     }
@@ -278,6 +277,19 @@ struct PlayerPlaylistPanel: View {
                         scrollProxy.scrollTo(player.queue.currentIndex, anchor: .center)
                     }
                 }
+
+                Button {
+                    player.leavePlaylist()
+                } label: {
+                    Label("Continue without playlist", systemImage: "minus.circle")
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.82))
+                .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom)
+                .accessibilityHint("Keep this video playing and return to regular recommendations")
             }
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
@@ -322,7 +334,7 @@ struct PlayerPlaylistPanel: View {
                 }
             }
             .padding(.vertical, 6)
-            .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom)
+            .padding(.bottom, 8)
             .offset(y: isDraggingListSheet ? -listOverscroll : 0)
         }
         .scrollIndicators(.visible)

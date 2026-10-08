@@ -652,13 +652,6 @@ struct FullScreenPlayer: View {
                         playlistPanelExpansion = 0
                     }
                 },
-                onLeavePlaylist: {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                        isPlaylistPanelPresented = false
-                        playlistPanelExpansion = 0
-                        player.leavePlaylist()
-                    }
-                },
                 onOpenPlaylist: openPlaylist
             )
             .frame(
