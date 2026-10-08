@@ -44,6 +44,7 @@ struct UserPreferences {
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
+    @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
     /// Fetches expanded details and the first comments page only after playback is ready. Further
     /// comment pages and replies always remain user initiated.
@@ -86,6 +87,9 @@ struct UserPreferences {
     /// `PlayerStateManager` reads this on init and observes the player's `defaultRate` to write
     /// changes back here — so a relaunch picks up where the last session left off.
     @AppStorage("playbackRate") var playbackRate: Double = 1.0
+    @AppStorage("showRecentLibraryVideos") var showRecentLibraryVideos: Bool = true
+    @AppStorage("recentLibraryVideoCount") var recentLibraryVideoCount: Int = 5
+    @AppStorage("showResumeLibraryVideos") var showResumeLibraryVideos: Bool = true
     @AppStorage("sponsorBlockEnabled") var sponsorBlockEnabled: Bool = false
     @AppStorage("sponsorBlockSponsor") var sponsorBlockSponsor: Bool = true
     @AppStorage("sponsorBlockSelfPromotion") var sponsorBlockSelfPromotion: Bool = false

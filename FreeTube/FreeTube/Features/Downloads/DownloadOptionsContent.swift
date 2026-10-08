@@ -9,7 +9,7 @@ struct DownloadOptionsContent: View {
     let onSelect: (VideoQuality) -> Void
 
     private let videoQualities: [VideoQuality] = [
-        .auto, .p2160, .p1440, .p1080, .p720, .p480, .p360, .p240, .p144
+        .auto, .p1080, .p720, .p480, .p360, .p240, .p144
     ]
 
     var body: some View {

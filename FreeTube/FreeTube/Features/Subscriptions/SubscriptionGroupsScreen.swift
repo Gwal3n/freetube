@@ -3,11 +3,16 @@ import SwiftUI
 /// Native, device-local management for the groups used by the subscription feed.
 @available(iOS 17.0, *)
 struct SubscriptionGroupsScreen: View {
+    let isEmbedded: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var store = LocalSubscriptionGroupStore.shared
     @State private var name = ""
     @State private var selectedGroup: SubscriptionGroup?
     @FocusState private var nameFocused: Bool
+
+    init(isEmbedded: Bool = false) {
+        self.isEmbedded = isEmbedded
+    }
 
     private var canAdd: Bool {
         let candidate = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -17,7 +22,17 @@ struct SubscriptionGroupsScreen: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
+            if isEmbedded {
+                groupContent
+            } else {
+                NavigationStack { groupContent }
+            }
+        }
+        .tint(.white)
+    }
+
+    private var groupContent: some View {
             List {
                 Section {
                     HStack {
@@ -72,12 +87,12 @@ struct SubscriptionGroupsScreen: View {
                 SubscriptionGroupMembersScreen(groupID: group.id)
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                if !isEmbedded {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
                 }
             }
-        }
-        .tint(.white)
     }
 
     private func addGroup() {

@@ -18,6 +18,7 @@ struct SearchContent: View {
     @State private var areVideosExpanded = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @State private var progressByVideoID: [String: Double] = [:]
+    @State private var showingClearSearchHistoryConfirmation = false
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
@@ -239,7 +240,7 @@ struct SearchContent: View {
     @ViewBuilder
     private var historyList: some View {
         List {
-            Section("Recent searches") {
+            Section {
                 ForEach(history) { entry in
                     Button {
                         model.query = entry.query
@@ -262,16 +263,35 @@ struct SearchContent: View {
                     try? modelContext.save()
                 }
 
-                if !history.isEmpty {
-                    Button("Clear all", role: .destructive) {
-                        for entry in history { modelContext.delete(entry) }
-                        try? modelContext.save()
+            } header: {
+                HStack {
+                    Text("Recent searches")
+                    Spacer()
+                    Button("Clear") {
+                        showingClearSearchHistoryConfirmation = true
                     }
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .textCase(nil)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("Clear recent searches")
                 }
             }
         }
         .listStyle(.plain)
         .scrollDismissesKeyboard(.interactively)
+        .confirmationDialog(
+            "Clear recent searches?",
+            isPresented: $showingClearSearchHistoryConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear Searches", role: .destructive) {
+                for entry in history { modelContext.delete(entry) }
+                try? modelContext.save()
+            }
+        } message: {
+            Text("This removes saved searches from this device.")
+        }
     }
 
     private func dismissKeyboard() {

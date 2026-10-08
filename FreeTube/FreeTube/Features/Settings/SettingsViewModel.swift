@@ -18,6 +18,21 @@ final class SettingsViewModel {
     var saveWatchHistory: Bool {
         didSet { preferences.saveWatchHistory = saveWatchHistory }
     }
+    var saveSearchHistory: Bool {
+        didSet { preferences.saveSearchHistory = saveSearchHistory }
+    }
+    var showRecentLibraryVideos: Bool {
+        didSet { preferences.showRecentLibraryVideos = showRecentLibraryVideos }
+    }
+    var recentLibraryVideoCount: Int {
+        didSet { preferences.recentLibraryVideoCount = recentLibraryVideoCount }
+    }
+    var showResumeLibraryVideos: Bool {
+        didSet { preferences.showResumeLibraryVideos = showResumeLibraryVideos }
+    }
+    var playbackRate: Double {
+        didSet { preferences.playbackRate = playbackRate }
+    }
     var deArrowTitles: Bool {
         didSet { preferences.deArrowTitles = deArrowTitles }
     }
@@ -61,6 +76,11 @@ final class SettingsViewModel {
         self.upNextInitialCount = preferences.upNextInitialCount
         self.showUpNext = preferences.showUpNext
         self.saveWatchHistory = preferences.saveWatchHistory
+        self.saveSearchHistory = preferences.saveSearchHistory
+        self.showRecentLibraryVideos = preferences.showRecentLibraryVideos
+        self.recentLibraryVideoCount = preferences.recentLibraryVideoCount
+        self.showResumeLibraryVideos = preferences.showResumeLibraryVideos
+        self.playbackRate = preferences.playbackRate
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails

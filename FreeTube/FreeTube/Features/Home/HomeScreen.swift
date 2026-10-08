@@ -15,6 +15,7 @@ struct HomeScreen: View {
     @State private var isSearchPresented = false
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
+    @AppStorage("saveSearchHistory") private var saveSearchHistory = true
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     /// Recent search queries — same store the previous Search tab used. Stays here so the
@@ -127,12 +128,14 @@ struct HomeScreen: View {
         // Respond immediately; network completion must not later dismiss a keyboard the user
         // has reopened to edit a different query.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        if let existing = history.first(where: { $0.query == trimmed }) {
-            existing.searchedAt = .now
-        } else {
-            modelContext.insert(SearchHistoryEntry(query: trimmed))
+        if saveSearchHistory {
+            if let existing = history.first(where: { $0.query == trimmed }) {
+                existing.searchedAt = .now
+            } else {
+                modelContext.insert(SearchHistoryEntry(query: trimmed))
+            }
+            try? modelContext.save()
         }
-        try? modelContext.save()
         if let directVideo = searchModel.directVideo(from: trimmed) {
             searchModel.clearResults()
             isSearchPresented = false

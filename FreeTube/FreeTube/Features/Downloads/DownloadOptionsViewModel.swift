@@ -40,7 +40,7 @@ final class DownloadOptionsViewModel {
         let videos = info.formats.filter { format in
             format.isVideoOnly && format.height != nil && (format.bitrate ?? 0) > 0
         }
-        for quality in VideoQuality.allCases where quality != .audioOnly {
+        for quality in VideoQuality.allCases where quality != .audioOnly && (quality.heightCap ?? .max) <= 1080 {
             guard let cap = quality.heightCap else { continue }
             let withinCap = videos.filter { ($0.height ?? .max) <= cap }
             let candidates: [VideoFormat]

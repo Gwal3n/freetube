@@ -367,7 +367,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             horizontalSeekTarget = target
             onSeekPreview(target)
             showFeedback(
-                horizontalSeekText(offset: target - start),
+                horizontalSeekText(target: target, duration: duration),
                 horizontalFraction: 0.5,
                 verticalFraction: 0.10,
                 compact: true,
@@ -450,11 +450,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         isForward ? "\(seekFeedbackText)  ≫" : "≪  \(seekFeedbackText)"
     }
 
-    private func horizontalSeekText(offset: TimeInterval) -> String {
-        let seconds = Int(abs(offset).rounded())
-        guard seconds > 0 else { return "0 seconds" }
-        let sign = offset > 0 ? "+" : "−"
-        return "\(sign)\(seconds) \(seconds == 1 ? "second" : "seconds")"
+    private func horizontalSeekText(target: TimeInterval, duration: TimeInterval) -> String {
+        let seconds = Int(max(0, target).rounded())
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        let remainingSeconds = seconds % 60
+        if duration >= 3_600 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 
     private func resetHorizontalSeek() {

@@ -6,7 +6,14 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
+    @Environment(PlayerStateManager.self) private var player
+    @AppStorage("showRecentLibraryVideos") private var showRecentLibraryVideos = true
+    @AppStorage("recentLibraryVideoCount") private var recentLibraryVideoCount = 5
+    @AppStorage("showResumeLibraryVideos") private var showResumeLibraryVideos = true
+    @AppStorage("saveWatchHistory") private var saveWatchHistory = true
     @State private var localHistoryCount: Int?
+    @State private var recentVideos: [WatchHistorySnapshot] = []
+    @State private var resumableVideos: [WatchHistorySnapshot] = []
     @State private var localSubscriptions = LocalSubscriptionStore.shared
     @State private var localPlaylistCount: Int?
     @State private var externalDestination: AppNavigationRequest.Destination?
@@ -17,6 +24,12 @@ struct LibraryScreen: View {
     var body: some View {
         List {
             localHistorySection
+            if saveWatchHistory && showResumeLibraryVideos && !resumableVideos.isEmpty {
+                videoShelf("Resume watching", entries: resumableVideos)
+            }
+            if saveWatchHistory && showRecentLibraryVideos && !recentVideos.isEmpty {
+                videoShelf("Recently watched", entries: Array(recentVideos.prefix(recentLibraryVideoCount)))
+            }
         }
         .navigationTitle("Library")
         .toolbar {
@@ -49,14 +62,12 @@ struct LibraryScreen: View {
             await loadRootData()
         }
         .refreshable {
-            localHistoryCount = await PersistenceWriter.shared.watchHistoryCount()
+            await loadHistorySummary()
             localPlaylistCount = await localPlaylistCountFromStore()
         }
         .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
             Task {
-                let count = await PersistenceWriter.shared.watchHistoryCount()
-                guard rootIsVisible else { return }
-                localHistoryCount = count
+                await loadHistorySummary()
             }
         }
         .onChange(of: navigationRouter.library?.id, initial: true) { _, _ in
@@ -75,14 +86,22 @@ struct LibraryScreen: View {
     }
 
     private func loadRootData() async {
-        let historyCount = await PersistenceWriter.shared.watchHistoryCount()
+        await loadHistorySummary()
         guard !Task.isCancelled, rootIsVisible else { return }
         let playlistCount = await localPlaylistCountFromStore()
         guard !Task.isCancelled, rootIsVisible else { return }
-        localHistoryCount = historyCount
         localPlaylistCount = playlistCount
 
         didLoadRootData = true
+    }
+
+    private func loadHistorySummary() async {
+        let count = await PersistenceWriter.shared.watchHistoryCount()
+        let page = await PersistenceWriter.shared.fetchWatchHistory(offset: 0, limit: 100)
+        guard !Task.isCancelled, rootIsVisible else { return }
+        localHistoryCount = count
+        recentVideos = Array(page.prefix(12))
+        resumableVideos = Array(page.filter { $0.resumableProgress != nil }.prefix(12))
     }
 
     private func localPlaylistCountFromStore() async -> Int {
@@ -129,6 +148,59 @@ struct LibraryScreen: View {
             }
             .tint(.white)
         }
+    }
+
+    private func videoShelf(_ title: String, entries: [WatchHistorySnapshot]) -> some View {
+        Section {
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(entries) { entry in
+                        Button {
+                            player.load(video(from: entry))
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                VideoThumbnail(
+                                    video: video(from: entry),
+                                    size: CGSize(width: 160, height: 90),
+                                    progress: entry.resumableProgress
+                                )
+                                Text(entry.title)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .frame(width: 160, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .accessibilityLabel("Play \(entry.title)")
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .scrollIndicators(.hidden)
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 0))
+        } header: {
+            Text(title)
+        }
+    }
+
+    private func video(from entry: WatchHistorySnapshot) -> Video {
+        Video(
+            id: entry.videoID,
+            title: entry.title,
+            channelID: entry.channelID ?? "",
+            channelName: entry.channelName,
+            channelThumbnailURL: nil,
+            thumbnailURL: entry.thumbnailURL,
+            duration: entry.duration > 0 ? entry.duration : nil,
+            viewCount: nil,
+            publishedAt: nil,
+            descriptionSnippet: nil,
+            isLive: false,
+            isShort: false
+        )
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't

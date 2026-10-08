@@ -215,8 +215,6 @@ struct DownloadsScreen: View {
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             .toolbar {
                 transferToolbarItem
-                selectionToolbarLeading
-                sortAndSelectToolbarTrailing
             }
             // Glass-style action bar with just two pill buttons: Select all + Delete.
             .safeAreaInset(edge: .top) {
@@ -316,16 +314,51 @@ struct DownloadsScreen: View {
 
     @ViewBuilder
     private var savedHeader: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Saved on device").font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Saved on device").font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                if !savedItems.isEmpty {
+                    Text(verbatim: "\(savedItems.count) \(savedItems.count == 1 ? "video" : "videos")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
             if !savedItems.isEmpty {
-                Text(verbatim: "\(savedItems.count) \(savedItems.count == 1 ? "video" : "videos")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !isSelecting {
+                    Menu {
+                        ForEach(SortBy.allCases) { option in
+                            Button {
+                                if sortBy == option {
+                                    sortDescending.toggle()
+                                } else {
+                                    sortBy = option
+                                    sortDescending = option == .date || option == .size
+                                }
+                            } label: {
+                                if sortBy == option {
+                                    Label(option.rawValue, systemImage: sortDescending ? "arrow.down" : "arrow.up")
+                                } else {
+                                    Text(option.rawValue)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Sort", systemImage: "arrow.up.arrow.down")
+                            .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("Sort saved videos")
+                }
+                Button(isSelecting ? "Done" : "Select") {
+                    isSelecting.toggle()
+                    selectedIDs.removeAll()
+                }
+                .frame(minWidth: 44, minHeight: 44)
             }
         }
         .textCase(nil)
-        .padding(.bottom, 4)
+        .tint(.white)
     }
 
     // MARK: - Transfer rows (in-progress)
@@ -445,57 +478,6 @@ struct DownloadsScreen: View {
                         .contentTransition(.numericText())
                         .animation(reduceMotion ? nil : .spring, value: inProgress.count)
                 }
-            }
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var selectionToolbarLeading: some ToolbarContent {
-        if isSelecting {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Done") {
-                    isSelecting = false
-                    selectedIDs.removeAll()
-                }
-            }
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var sortAndSelectToolbarTrailing: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Menu {
-                // Select action goes at the top of the menu with an icon.
-                Button {
-                    isSelecting.toggle()
-                    selectedIDs.removeAll()
-                } label: {
-                    Label(isSelecting ? "Cancel selection" : "Select", systemImage: "checkmark.circle")
-                }
-                Divider()
-                // Sort options live below the Select action.
-                Section("Sort by") {
-                    ForEach(SortBy.allCases) { option in
-                        Button {
-                            if sortBy == option {
-                                sortDescending.toggle()
-                            } else {
-                                sortBy = option
-                                sortDescending = (option == .date || option == .size)
-                            }
-                        } label: {
-                            HStack {
-                                Text(option.rawValue)
-                                Spacer()
-                                if sortBy == option {
-                                    Image(systemName: sortDescending ? "arrow.down" : "arrow.up")
-                                }
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
             }
         }
     }

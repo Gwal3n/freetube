@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     let onClose: () -> Void
+    @Environment(PlayerStateManager.self) private var player
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -26,6 +27,14 @@ struct SettingsScreen: View {
                         ForEach(VideoQuality.allCases) { quality in
                             Text(quality.displayName).tag(quality)
                         }
+                    }
+                    Picker("Default playback speed", selection: Bindable(model).playbackRate) {
+                        ForEach([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0], id: \.self) { rate in
+                            Text(verbatim: rate == 1 ? "Normal" : "\(rate.formatted())×").tag(rate)
+                        }
+                    }
+                    .onChange(of: model.playbackRate) { _, rate in
+                        player.setPlaybackRate(rate)
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     Toggle("Swipe vertically for fullscreen", isOn: Bindable(model).verticalSwipeFullscreen)
@@ -69,8 +78,13 @@ struct SettingsScreen: View {
                     }
                 }
 
-                Section("Search") {
+                Section {
                     Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
+                    Toggle("Save recent searches", isOn: Bindable(model).saveSearchHistory)
+                } header: {
+                    Text("Search")
+                } footer: {
+                    Text("Turning off recent searches stops saving new queries. Existing searches remain until cleared from Search.")
                 }
 
                 Section {
@@ -97,6 +111,12 @@ struct SettingsScreen: View {
                 }
 
                 Section("Channels") {
+                    NavigationLink {
+                        SubscriptionGroupsScreen(isEmbedded: true)
+                    } label: {
+                        navigationLabel("Manage subscription groups", systemImage: "square.stack.3d.up")
+                    }
+                    .tint(.white)
                     NavigationLink {
                         ChannelTabsSettingsScreen()
                     } label: {
@@ -152,6 +172,18 @@ struct SettingsScreen: View {
                     }
                     .tint(.white)
                     Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
+                    Toggle("Recently watched in Library", isOn: Bindable(model).showRecentLibraryVideos)
+                        .disabled(!model.saveWatchHistory)
+                    if model.showRecentLibraryVideos && model.saveWatchHistory {
+                        Stepper(value: Bindable(model).recentLibraryVideoCount, in: 3...12) {
+                            LabeledContent("Recent videos") {
+                                Text("\(model.recentLibraryVideoCount)")
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
+                    Toggle("Resume watching in Library", isOn: Bindable(model).showResumeLibraryVideos)
+                        .disabled(!model.saveWatchHistory)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)
