@@ -39,6 +39,7 @@ struct PlayerPlaylistPanel: View {
     @State private var showsSavedNotice = false
     @State private var savedNoticeIsRemoval = false
     @State private var savedNoticeGeneration = 0
+    @State private var showsLeaveConfirmation = false
     private let localPlaylistService = LocalPlaylistService()
 
     private var playlist: Playlist? { player.activePlaylist }
@@ -59,6 +60,7 @@ struct PlayerPlaylistPanel: View {
             }
         }
         .onChange(of: playlist?.id) { _, _ in
+            showsLeaveConfirmation = false
             lastAutomaticPageCount = nil
             isSavedLocally = false
             hasLoadedSavedState = false
@@ -100,46 +102,83 @@ struct PlayerPlaylistPanel: View {
             }
         }
         .errorToast($saveError)
+        .confirmationDialog(
+            "Leave playlist?",
+            isPresented: $showsLeaveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Leave Playlist", role: .destructive) {
+                player.leavePlaylist()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The current video will keep playing with regular recommendations.")
+        }
     }
 
     @ViewBuilder
     private var dock: some View {
         if let playlist {
-            Button(action: onOpen) {
+            Group {
                 if isLandscape {
-                    Image(systemName: "list.bullet.rectangle")
-                        .font(.title3)
-                        .frame(width: 46, height: 46)
-                } else {
-                    HStack(spacing: 12) {
+                    Button(action: onOpen) {
                         Image(systemName: "list.bullet.rectangle")
                             .font(.title3)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(playlist.title)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                            Group {
-                                if isPlayingPlaylistItem {
-                                    Text("\(player.queue.currentIndex + 1) of \(playlist.videoCount ?? player.queue.items.count)")
-                                } else {
-                                    Text("Resumes after queue")
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.up")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .frame(width: 46, height: 46)
                     }
-                    .padding(.horizontal, 16)
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel("Open playlist, \(playlist.title)")
+                } else {
+                    HStack(spacing: 0) {
+                        Button(action: onOpen) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "list.bullet.rectangle")
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(playlist.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                    Group {
+                                        if isPlayingPlaylistItem {
+                                            Text("\(player.queue.currentIndex + 1) of \(playlist.videoCount ?? player.queue.items.count)")
+                                        } else {
+                                            Text("Resumes after queue")
+                                        }
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.up")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.leading, 16)
+                            .padding(.trailing, 4)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .accessibilityLabel("Open playlist, \(playlist.title)")
+
+                        Button {
+                            showsLeaveConfirmation = true
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 44, height: 52)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Leave playlist")
+                    }
+                    .padding(.trailing, 8)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .contentShape(Rectangle())
                 }
             }
-            .buttonStyle(ResponsiveButtonStyle())
             .background {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .fill(Color.black)
@@ -154,7 +193,6 @@ struct PlayerPlaylistPanel: View {
             .padding(.horizontal, isLandscape ? 0 : 16)
             .padding(.bottom, isLandscape ? 0 : PlayerLayoutMetrics.safeAreaInsets.bottom + 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .center : .bottom)
-            .accessibilityLabel("Open playlist, \(playlist.title)")
         }
     }
 
@@ -241,7 +279,7 @@ struct PlayerPlaylistPanel: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Close playlist")
+                            .accessibilityLabel("Hide playlist panel")
                         }
                         .font(.system(size: 15, weight: .semibold))
                     }
@@ -277,19 +315,6 @@ struct PlayerPlaylistPanel: View {
                         scrollProxy.scrollTo(player.queue.currentIndex, anchor: .center)
                     }
                 }
-
-                Button {
-                    player.leavePlaylist()
-                } label: {
-                    Label("Continue without playlist", systemImage: "minus.circle")
-                        .font(.subheadline.weight(.medium))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.82))
-                .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom)
-                .accessibilityHint("Keep this video playing and return to regular recommendations")
             }
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
@@ -334,7 +359,7 @@ struct PlayerPlaylistPanel: View {
                 }
             }
             .padding(.vertical, 6)
-            .padding(.bottom, 8)
+            .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom)
             .offset(y: isDraggingListSheet ? -listOverscroll : 0)
         }
         .scrollIndicators(.visible)
