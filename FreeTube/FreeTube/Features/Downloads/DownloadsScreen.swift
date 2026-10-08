@@ -42,6 +42,15 @@ struct DownloadsScreen: View {
         var id: String { rawValue }
     }
 
+    private var sortLabel: String {
+        switch sortBy {
+        case .date: return sortDescending ? String(localized: "Newest") : String(localized: "Oldest")
+        case .title: return sortDescending ? "Z–A" : "A–Z"
+        case .size: return sortDescending ? String(localized: "Largest") : String(localized: "Smallest")
+        case .duration: return sortDescending ? String(localized: "Longest") : String(localized: "Shortest")
+        }
+    }
+
     /// Active in-flight downloads.
     private var inProgress: [DownloadTaskSnapshot] {
         model.manager.activeTasks.filter { snapshot in
@@ -109,10 +118,25 @@ struct DownloadsScreen: View {
                 }
 
                 if !inProgress.isEmpty {
-                    Section("Transfer queue") {
+                    Section {
                         ForEach(inProgress) { snapshot in
                             transferRow(snapshot)
                         }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Text("Transfer queue")
+                            Spacer()
+                            Image(systemName: "arrow.down.circle.fill")
+                                .symbolEffect(
+                                    .pulse,
+                                    options: reduceMotion ? .nonRepeating : .repeating,
+                                    value: inProgress.count
+                                )
+                            Text(verbatim: "\(inProgress.count)")
+                                .contentTransition(.numericText())
+                        }
+                        .textCase(nil)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -213,9 +237,6 @@ struct DownloadsScreen: View {
                 }
             }
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
-            .toolbar {
-                transferToolbarItem
-            }
             // Glass-style action bar with just two pill buttons: Select all + Delete.
             .safeAreaInset(edge: .top) {
                 if isSelecting {
@@ -344,9 +365,10 @@ struct DownloadsScreen: View {
                             }
                         }
                     } label: {
-                        Label("Sort", systemImage: "arrow.up.arrow.down")
-                            .labelStyle(.iconOnly)
-                            .frame(minWidth: 44, minHeight: 44)
+                        Label(sortLabel, systemImage: "arrow.up.arrow.down")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.white)
+                            .frame(minHeight: 44)
                     }
                     .accessibilityLabel("Sort saved videos")
                 }
@@ -456,29 +478,6 @@ struct DownloadsScreen: View {
             pendingSingleDelete = item
         } label: {
             Label("Delete from downloaded", systemImage: "trash")
-        }
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var transferToolbarItem: some ToolbarContent {
-        if !inProgress.isEmpty {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .symbolEffect(
-                            .pulse,
-                            options: reduceMotion ? .nonRepeating : .repeating,
-                            value: inProgress.count
-                        )
-                        .foregroundStyle(.tint)
-                    Text(verbatim: "\(inProgress.count)")
-                        .font(.caption.weight(.semibold))
-                        .contentTransition(.numericText())
-                        .animation(reduceMotion ? nil : .spring, value: inProgress.count)
-                }
-            }
         }
     }
 
