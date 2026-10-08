@@ -54,6 +54,9 @@ final class PlayerStateManager {
     private(set) var hasEnded: Bool = false
     private(set) var elapsed: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
+    /// Actual loaded ranges can be discontinuous, especially for HLS. Keep each range separate
+    /// so the timeline never suggests that an unbuffered gap is ready to play.
+    private(set) var bufferedRanges: [ClosedRange<TimeInterval>] = []
     private(set) var playbackRate: Double
     private(set) var playbackQuality: VideoQuality
     private(set) var sleepTimerOption: SleepTimerOption = .off
@@ -178,6 +181,7 @@ final class PlayerStateManager {
     private var endObserver: NSObjectProtocol?
     private var itemStatusObservation: NSKeyValueObservation?
     private var itemPresentationSizeObservation: NSKeyValueObservation?
+    private var itemLoadedTimeRangesObservation: NSKeyValueObservation?
     private var itemLoadStartedAt: Date?
     /// KVO-driven readiness handshake for the candidate currently under test.
     ///
@@ -276,6 +280,7 @@ final class PlayerStateManager {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         itemStatusObservation?.invalidate()
         itemPresentationSizeObservation?.invalidate()
+        itemLoadedTimeRangesObservation?.invalidate()
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let itemErrorLogObservation { NotificationCenter.default.removeObserver(itemErrorLogObservation) }
         if let itemAccessLogObservation { NotificationCenter.default.removeObserver(itemAccessLogObservation) }
@@ -285,6 +290,8 @@ final class PlayerStateManager {
         itemAccessLogObservation = nil
         itemStatusObservation = nil
         itemPresentationSizeObservation = nil
+        itemLoadedTimeRangesObservation = nil
+        bufferedRanges = []
         clearSponsorBlockState()
         chapters = []
         storyboard = nil
@@ -376,6 +383,9 @@ final class PlayerStateManager {
         presentPlayer(for: synthetic.id, expanded: true)
         elapsed = 0
         duration = 0
+        itemLoadedTimeRangesObservation?.invalidate()
+        itemLoadedTimeRangesObservation = nil
+        bufferedRanges = []
         hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
@@ -502,6 +512,9 @@ final class PlayerStateManager {
         // that's what showed phantom progress bars on cells the user never played.
         elapsed = 0
         duration = 0
+        itemLoadedTimeRangesObservation?.invalidate()
+        itemLoadedTimeRangesObservation = nil
+        bufferedRanges = []
         hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
@@ -1192,6 +1205,9 @@ final class PlayerStateManager {
         loadState = .idle
         hasEnded = false
         player.removeAllItems()
+        itemLoadedTimeRangesObservation?.invalidate()
+        itemLoadedTimeRangesObservation = nil
+        bufferedRanges = []
         playbackHistory.removeAll()
         playbackHistoryIndex = -1
         NowPlayingCenter.clear()
@@ -1487,6 +1503,8 @@ final class PlayerStateManager {
     private func observe(item: AVPlayerItem) {
         itemStatusObservation?.invalidate()
         itemPresentationSizeObservation?.invalidate()
+        itemLoadedTimeRangesObservation?.invalidate()
+        bufferedRanges = []
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
 
@@ -1520,6 +1538,21 @@ final class PlayerStateManager {
                       size.width.isFinite, size.height.isFinite,
                       size.width > 0, size.height > 0 else { return }
                 self.videoPresentationSize = size
+            }
+        }
+
+        itemLoadedTimeRangesObservation = item.observe(\.loadedTimeRanges, options: [.new, .initial]) { [weak self] item, _ in
+            guard let self else { return }
+            Task { @MainActor in
+                guard self.player.currentItem === item else { return }
+                let ranges: [ClosedRange<TimeInterval>] = item.loadedTimeRanges.compactMap { value in
+                    let timeRange = value.timeRangeValue
+                    let start = timeRange.start.seconds
+                    let end = timeRange.end.seconds
+                    guard start.isFinite, end.isFinite, end > max(0, start) else { return nil }
+                    return max(0, start)...end
+                }
+                if self.bufferedRanges != ranges { self.bufferedRanges = ranges }
             }
         }
 

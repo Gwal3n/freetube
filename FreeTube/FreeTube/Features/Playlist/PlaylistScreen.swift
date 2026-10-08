@@ -24,6 +24,7 @@ struct PlaylistScreen: View {
     /// header stays compact and the video list isn't pushed below the fold.
     @State private var isDetailsExpanded = false
     @State private var showsNavigationTitle = false
+    @State private var searchText = ""
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @State private var playbackProgress: [String: Double] = [:]
 
@@ -73,6 +74,7 @@ struct PlaylistScreen: View {
         }
         .navigationTitle(showsNavigationTitle ? (model.details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search loaded videos")
         // Let artwork show through initially, then restore native bar material when the
         // scrolled-away playlist name becomes the compact navigation title.
         .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
@@ -248,8 +250,14 @@ struct PlaylistScreen: View {
 
     @ViewBuilder
     private func videosList(_ details: PlaylistDetails) -> some View {
-        let videos = details.videos
-        if videos.isEmpty && !model.isLoadingMore {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isSearching = !query.isEmpty
+        let videos = isSearching
+            ? details.videos.filter {
+                $0.title.localizedStandardContains(query) || $0.channelName.localizedStandardContains(query)
+            }
+            : details.videos
+        if details.videos.isEmpty && !model.isLoadingMore && !model.canLoadMore {
             ContentUnavailableView(
                 "No Videos",
                 systemImage: "rectangle.stack",
@@ -258,6 +266,10 @@ struct PlaylistScreen: View {
             .padding(.vertical, 24)
         } else {
             LazyVStack(spacing: 0) {
+                if isSearching && videos.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                        .padding(.vertical, 24)
+                }
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                     VideoRow(
                         video: video,
@@ -275,17 +287,28 @@ struct PlaylistScreen: View {
                         // Trigger the next-page fetch when the row 5 from the bottom appears.
                         // PlaylistService caches the continuation token on the response struct, so
                         // each `loadMore` advances the cursor for subsequent calls.
-                        if index >= videos.count - 5, model.canLoadMore, !model.paginationFailed {
+                        if !isSearching, index >= videos.count - 5,
+                           model.canLoadMore, !model.paginationFailed {
                             Task { await model.loadMore() }
                         }
                     }
                 }
                 if model.canLoadMore || model.isLoadingMore {
+                    if isSearching {
+                        Text("Search includes loaded videos. Load more to search the rest.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                    }
                     MediaPaginationFooter(isLoading: model.isLoadingMore, isRetry: model.paginationFailed) {
                         Task { await model.loadMore() }
                     }
                     .onAppear {
-                        if model.canLoadMore, !model.paginationFailed { Task { await model.loadMore() } }
+                        if !isSearching, model.canLoadMore, !model.paginationFailed {
+                            Task { await model.loadMore() }
+                        }
                     }
                 }
             }

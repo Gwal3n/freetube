@@ -5,6 +5,7 @@ struct SponsorBlockTimeline: View {
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
     let duration: TimeInterval
+    let bufferedRanges: [ClosedRange<TimeInterval>]
     let isLive: Bool
     let segments: [SponsorBlockSegment]
     let chapters: [VideoChapter]
@@ -68,7 +69,16 @@ struct SponsorBlockTimeline: View {
                 let progress = fraction(for: displayedTime)
 
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.32)).frame(height: 4)
+                    Capsule().fill(.white.opacity(0.22)).frame(height: 4)
+                    ForEach(bufferedRanges.indices, id: \.self) { index in
+                        let range = bufferedRanges[index]
+                        let start = fraction(for: range.lowerBound)
+                        let end = fraction(for: range.upperBound)
+                        Capsule()
+                            .fill(.white.opacity(0.55))
+                            .frame(width: width * max(0, end - start), height: 4)
+                            .offset(x: width * start)
+                    }
                     Capsule().fill(.red).frame(width: width * progress, height: 4)
 
                     ForEach(segments, id: \.id) { segment in

@@ -15,6 +15,7 @@ struct PlayerTimelineOverlay: View {
             elapsed: player.elapsed,
             previewElapsed: previewElapsed,
             duration: player.duration,
+            bufferedRanges: player.bufferedRanges,
             isLive: player.currentVideo?.isLive == true,
             segments: player.sponsorBlockSegments,
             chapters: player.chapters,
