@@ -168,6 +168,7 @@ struct SettingsScreen: View {
                     }
                     .tint(.white)
                     Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
+                    Toggle("Continue Watching in Library", isOn: Bindable(model).showContinueWatchingMenu)
                     Toggle("Library video shelf", isOn: Bindable(model).showLibraryShelf)
                         .disabled(!model.saveWatchHistory)
                     if model.showLibraryShelf && model.saveWatchHistory {

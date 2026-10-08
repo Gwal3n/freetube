@@ -146,7 +146,7 @@ final class AppBackupService {
         "preferredQuality", "prefetchVideoDetails",
         "saveSearchHistory", "saveWatchHistory", "showChannelAboutTab", "showChannelLiveTab",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview",
-        "showHistoryProgressBars", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
+        "showContinueWatchingMenu", "showHistoryProgressBars", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",

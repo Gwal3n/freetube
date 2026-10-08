@@ -3,6 +3,12 @@ import SwiftUI
 /// Device-only watch history backed by entries written during local playback.
 @available(iOS 17.0, *)
 struct LocalHistoryScreen: View {
+    enum Mode: Equatable {
+        case all
+        case continueWatching
+    }
+
+    let mode: Mode
     @Environment(PlayerStateManager.self) private var player
     @State private var entries: [WatchHistorySnapshot] = []
     @State private var isLoading = false
@@ -15,18 +21,30 @@ struct LocalHistoryScreen: View {
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     private let pageSize = 50
 
+    init(mode: Mode = .all) {
+        self.mode = mode
+    }
+
     var body: some View {
         Group {
             if !hasLoaded {
                 MediaListPlaceholder()
             } else if !searchText.isEmpty && visibleEntries.isEmpty {
                 ContentUnavailableView.search(text: searchText)
-            } else if entries.isEmpty {
-                ContentUnavailableView(
-                    "No Local History",
-                    systemImage: "clock.arrow.circlepath",
-                    description: Text("Videos you watch will appear here on this device.")
-                )
+            } else if visibleEntries.isEmpty && !hasMore {
+                if mode == .continueWatching {
+                    ContentUnavailableView(
+                        "Nothing to Resume",
+                        systemImage: "play.circle",
+                        description: Text("Partially watched videos will appear here.")
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "No Local History",
+                        systemImage: "clock.arrow.circlepath",
+                        description: Text("Videos you watch will appear here on this device.")
+                    )
+                }
             } else {
                 List {
                     ForEach(dayGroups, id: \.day) { group in
@@ -57,7 +75,7 @@ struct LocalHistoryScreen: View {
                                     }
                                 }
                                 .onAppear {
-                                    if searchText.isEmpty && entry.videoID == entries.last?.videoID {
+                                    if searchText.isEmpty && entry.videoID == visibleEntries.last?.videoID {
                                         Task { await loadMore() }
                                     }
                                 }
@@ -70,9 +88,12 @@ struct LocalHistoryScreen: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Local History")
+        .navigationTitle(mode == .continueWatching
+                         ? String(localized: "Continue Watching")
+                         : String(localized: "Local History"))
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Search history")
+        .searchable(text: $searchText, prompt: mode == .continueWatching
+                    ? Text("Search continue watching") : Text("Search history"))
         .toolbar {
             if channelNavigation.isResolving {
                 ProgressView()
@@ -100,7 +121,10 @@ struct LocalHistoryScreen: View {
     }
 
     private var visibleEntries: [WatchHistorySnapshot] {
-        searchText.isEmpty ? entries : searchResults
+        let source = searchText.isEmpty ? entries : searchResults
+        return mode == .continueWatching
+            ? source.filter { $0.resumableProgress != nil }
+            : source
     }
 
     private var dayGroups: [(day: Date, entries: [WatchHistorySnapshot])] {
@@ -138,20 +162,28 @@ struct LocalHistoryScreen: View {
         await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID)
         entries.removeAll { $0.videoID == entry.videoID }
         searchResults.removeAll { $0.videoID == entry.videoID }
+        if mode == .continueWatching && searchText.isEmpty && visibleEntries.isEmpty && hasMore {
+            await loadMore()
+        }
     }
 
     private func loadMore() async {
         guard !isLoading, hasMore else { return }
         isLoading = true
         defer { isLoading = false }
-        let page = await PersistenceWriter.shared.fetchWatchHistory(
-            offset: entries.count,
-            limit: pageSize
-        )
-        guard !Task.isCancelled else { return }
-        let existingIDs = Set(entries.map(\.videoID))
-        entries.append(contentsOf: page.filter { !existingIDs.contains($0.videoID) })
-        hasMore = page.count == pageSize
+        var newlyResumable = 0
+        repeat {
+            let page = await PersistenceWriter.shared.fetchWatchHistory(
+                offset: entries.count,
+                limit: pageSize
+            )
+            guard !Task.isCancelled else { return }
+            let existingIDs = Set(entries.map(\.videoID))
+            let newEntries = page.filter { !existingIDs.contains($0.videoID) }
+            entries.append(contentsOf: newEntries)
+            newlyResumable += newEntries.filter { $0.resumableProgress != nil }.count
+            hasMore = page.count == pageSize && !newEntries.isEmpty
+        } while mode == .continueWatching && hasMore && newlyResumable < 20
         hasLoaded = true
     }
 }

@@ -8,6 +8,7 @@ import UIKit
 struct LibraryScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @AppStorage("showLibraryShelf") private var showLibraryShelf = true
+    @AppStorage("showContinueWatchingMenu") private var showContinueWatchingMenu = true
     @AppStorage("libraryShelfContent") private var libraryShelfContentRaw = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") private var recentLibraryVideoCount = 5
     @AppStorage("saveWatchHistory") private var saveWatchHistory = true
@@ -135,6 +136,19 @@ struct LibraryScreen: View {
                 )
             }
             .tint(.white)
+
+            if showContinueWatchingMenu {
+                NavigationLink {
+                    LocalHistoryScreen(mode: .continueWatching)
+                } label: {
+                    LibraryDestinationRow(
+                        title: "Continue Watching",
+                        subtitle: "Partially watched videos",
+                        systemImage: "play.rectangle"
+                    )
+                }
+                .tint(.white)
+            }
 
             NavigationLink {
                 LocalSubscriptionsScreen()

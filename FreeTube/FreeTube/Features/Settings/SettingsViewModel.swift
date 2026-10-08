@@ -24,6 +24,9 @@ final class SettingsViewModel {
     var showLibraryShelf: Bool {
         didSet { preferences.showLibraryShelf = showLibraryShelf }
     }
+    var showContinueWatchingMenu: Bool {
+        didSet { preferences.showContinueWatchingMenu = showContinueWatchingMenu }
+    }
     var recentLibraryVideoCount: Int {
         didSet { preferences.recentLibraryVideoCount = recentLibraryVideoCount }
     }
@@ -78,6 +81,7 @@ final class SettingsViewModel {
         self.saveWatchHistory = preferences.saveWatchHistory
         self.saveSearchHistory = preferences.saveSearchHistory
         self.showLibraryShelf = preferences.showLibraryShelf
+        self.showContinueWatchingMenu = preferences.showContinueWatchingMenu
         self.recentLibraryVideoCount = preferences.recentLibraryVideoCount
         self.libraryShelfContent = preferences.libraryShelfContent
         self.playbackRate = preferences.playbackRate

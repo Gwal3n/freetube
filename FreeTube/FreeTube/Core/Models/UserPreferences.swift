@@ -83,6 +83,7 @@ struct UserPreferences {
     /// changes back here — so a relaunch picks up where the last session left off.
     @AppStorage("playbackRate") var playbackRate: Double = 1.0
     @AppStorage("showLibraryShelf") var showLibraryShelf: Bool = true
+    @AppStorage("showContinueWatchingMenu") var showContinueWatchingMenu: Bool = true
     @AppStorage("libraryShelfContent") var libraryShelfContentRaw: String = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") var recentLibraryVideoCount: Int = 5
     @AppStorage("sponsorBlockEnabled") var sponsorBlockEnabled: Bool = false

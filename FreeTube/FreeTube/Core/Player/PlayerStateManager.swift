@@ -1137,6 +1137,38 @@ final class PlayerStateManager {
         playlistContinuationToken = details.continuationToken
     }
 
+    /// Detaches playlist navigation without touching the installed AVPlayerItem or playhead.
+    /// The current video becomes a standalone recommendation seed; previously fetched suggestions
+    /// remain available while the normal refill path tops them up in the background.
+    func leavePlaylist() {
+        guard let currentVideo, activePlaylist != nil else { return }
+        log.info("Leaving playlist while continuing (currentVideo.id, privacy: .public)")
+        recommendationTask?.cancel()
+        recommendationTask = nil
+
+        let suggestions = playlistRecommendations.filter { $0.id != currentVideo.id }
+        activePlaylist = nil
+        playlistRecommendations = []
+        playlistContinuationToken = nil
+        isLoadingMorePlaylistVideos = false
+        queueAcceptsRecommendations = true
+        recommendationBacklog = []
+        recommendationContinuationToken = nil
+        queue.replace(with: [currentVideo] + suggestions)
+        queue.isShuffleOn = false
+
+        if playbackHistory.indices.contains(playbackHistoryIndex) {
+            playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
+                video: currentVideo,
+                skipRecommendations: false,
+                preservesPlaylistPosition: false
+            )
+        }
+        recommendationTask = Task { [weak self] in
+            await self?.fillQueueWithRecommendations(for: currentVideo)
+        }
+    }
+
     var canLoadMorePlaylistItems: Bool {
         activePlaylist != nil && playlistContinuationToken != nil
     }
