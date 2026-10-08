@@ -82,9 +82,9 @@ struct UserPreferences {
     /// `PlayerStateManager` reads this on init and observes the player's `defaultRate` to write
     /// changes back here — so a relaunch picks up where the last session left off.
     @AppStorage("playbackRate") var playbackRate: Double = 1.0
-    @AppStorage("showRecentLibraryVideos") var showRecentLibraryVideos: Bool = true
+    @AppStorage("showLibraryShelf") var showLibraryShelf: Bool = true
+    @AppStorage("libraryShelfContent") var libraryShelfContentRaw: String = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") var recentLibraryVideoCount: Int = 5
-    @AppStorage("showResumeLibraryVideos") var showResumeLibraryVideos: Bool = true
     @AppStorage("sponsorBlockEnabled") var sponsorBlockEnabled: Bool = false
     @AppStorage("sponsorBlockSponsor") var sponsorBlockSponsor: Bool = true
     @AppStorage("sponsorBlockSelfPromotion") var sponsorBlockSelfPromotion: Bool = false
@@ -101,6 +101,11 @@ struct UserPreferences {
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var libraryShelfContent: LibraryShelfContent {
+        get { LibraryShelfContent(rawValue: libraryShelfContentRaw) ?? .continueWatching }
+        nonmutating set { libraryShelfContentRaw = newValue.rawValue }
     }
 
     var historyRetentionPolicy: HistoryRetentionPolicy {

@@ -21,14 +21,14 @@ final class SettingsViewModel {
     var saveSearchHistory: Bool {
         didSet { preferences.saveSearchHistory = saveSearchHistory }
     }
-    var showRecentLibraryVideos: Bool {
-        didSet { preferences.showRecentLibraryVideos = showRecentLibraryVideos }
+    var showLibraryShelf: Bool {
+        didSet { preferences.showLibraryShelf = showLibraryShelf }
     }
     var recentLibraryVideoCount: Int {
         didSet { preferences.recentLibraryVideoCount = recentLibraryVideoCount }
     }
-    var showResumeLibraryVideos: Bool {
-        didSet { preferences.showResumeLibraryVideos = showResumeLibraryVideos }
+    var libraryShelfContent: LibraryShelfContent {
+        didSet { preferences.libraryShelfContent = libraryShelfContent }
     }
     var playbackRate: Double {
         didSet { preferences.playbackRate = playbackRate }
@@ -77,9 +77,9 @@ final class SettingsViewModel {
         self.showUpNext = preferences.showUpNext
         self.saveWatchHistory = preferences.saveWatchHistory
         self.saveSearchHistory = preferences.saveSearchHistory
-        self.showRecentLibraryVideos = preferences.showRecentLibraryVideos
+        self.showLibraryShelf = preferences.showLibraryShelf
         self.recentLibraryVideoCount = preferences.recentLibraryVideoCount
-        self.showResumeLibraryVideos = preferences.showResumeLibraryVideos
+        self.libraryShelfContent = preferences.libraryShelfContent
         self.playbackRate = preferences.playbackRate
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Device-local library following NewPipe's account-free model. Remote channel and playlist
 /// destinations remain available when linked from other parts of the app, but this root owns
@@ -6,10 +7,9 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
-    @Environment(PlayerStateManager.self) private var player
-    @AppStorage("showRecentLibraryVideos") private var showRecentLibraryVideos = true
+    @AppStorage("showLibraryShelf") private var showLibraryShelf = true
+    @AppStorage("libraryShelfContent") private var libraryShelfContentRaw = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") private var recentLibraryVideoCount = 5
-    @AppStorage("showResumeLibraryVideos") private var showResumeLibraryVideos = true
     @AppStorage("saveWatchHistory") private var saveWatchHistory = true
     @State private var localHistoryCount: Int?
     @State private var recentVideos: [WatchHistorySnapshot] = []
@@ -23,14 +23,13 @@ struct LibraryScreen: View {
 
     var body: some View {
         List {
+            if saveWatchHistory && showLibraryShelf && !shelfEntries.isEmpty {
+                videoShelf(libraryShelfContent.shelfTitle, entries: shelfEntries)
+            }
             localHistorySection
-            if saveWatchHistory && showResumeLibraryVideos && !resumableVideos.isEmpty {
-                videoShelf("Resume watching", entries: resumableVideos)
-            }
-            if saveWatchHistory && showRecentLibraryVideos && !recentVideos.isEmpty {
-                videoShelf("Recently watched", entries: Array(recentVideos.prefix(recentLibraryVideoCount)))
-            }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemBackground))
         .navigationTitle("Library")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -58,8 +57,12 @@ struct LibraryScreen: View {
         .onAppear { rootIsVisible = true }
         .onDisappear { rootIsVisible = false }
         .task(id: rootIsVisible) {
-            guard rootIsVisible, !didLoadRootData else { return }
-            await loadRootData()
+            guard rootIsVisible else { return }
+            if didLoadRootData {
+                await loadHistorySummary()
+            } else {
+                await loadRootData()
+            }
         }
         .refreshable {
             await loadHistorySummary()
@@ -109,6 +112,15 @@ struct LibraryScreen: View {
         return playlists.count
     }
 
+    private var libraryShelfContent: LibraryShelfContent {
+        LibraryShelfContent(rawValue: libraryShelfContentRaw) ?? .continueWatching
+    }
+
+    private var shelfEntries: [WatchHistorySnapshot] {
+        let source = libraryShelfContent == .continueWatching ? resumableVideos : recentVideos
+        return Array(source.prefix(max(3, min(recentLibraryVideoCount, 12))))
+    }
+
     @ViewBuilder
     private var localHistorySection: some View {
         Section("On this device") {
@@ -155,52 +167,21 @@ struct LibraryScreen: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 12) {
                     ForEach(entries) { entry in
-                        Button {
-                            player.load(video(from: entry))
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                VideoThumbnail(
-                                    video: video(from: entry),
-                                    size: CGSize(width: 160, height: 90),
-                                    progress: entry.resumableProgress
-                                )
-                                Text(entry.title)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            .frame(width: 160, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(ResponsiveButtonStyle())
-                        .accessibilityLabel("Play \(entry.title)")
+                        LibraryVideoShelfCard(
+                            entry: entry,
+                            canMarkComplete: libraryShelfContent == .continueWatching
+                        )
                     }
                 }
                 .padding(.vertical, 4)
             }
             .scrollIndicators(.hidden)
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         } header: {
             Text(title)
         }
-    }
-
-    private func video(from entry: WatchHistorySnapshot) -> Video {
-        Video(
-            id: entry.videoID,
-            title: entry.title,
-            channelID: entry.channelID ?? "",
-            channelName: entry.channelName,
-            channelThumbnailURL: nil,
-            thumbnailURL: entry.thumbnailURL,
-            duration: entry.duration > 0 ? entry.duration : nil,
-            viewCount: nil,
-            publishedAt: nil,
-            descriptionSnippet: nil,
-            isLive: false,
-            isShort: false
-        )
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't

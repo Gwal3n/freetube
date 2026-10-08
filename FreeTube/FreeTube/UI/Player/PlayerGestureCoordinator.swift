@@ -502,11 +502,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             : .preferredFont(forTextStyle: .headline)
         label.font = font
         label.text = text
+        let compactTextWidth = min(
+            max(ceil((text as NSString).size(withAttributes: [.font: font]).width + 20), 52),
+            124
+        )
         label.bounds.size = outlined
             ? CGSize(width: 104, height: 38)
             : wide
             ? compact
-                ? CGSize(width: 124, height: 26)
+                ? CGSize(width: compactTextWidth, height: 26)
                 : CGSize(width: 150, height: 38)
             : compact
                 ? CGSize(width: 52, height: 26)

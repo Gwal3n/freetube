@@ -164,22 +164,25 @@ struct SettingsScreen: View {
                         ImportDataScreen()
                             .onAppear { log.info("Settings import destination appeared") }
                     } label: {
-                        navigationLabel("Import Data", systemImage: "square.and.arrow.down")
+                        navigationLabel("Import & Export", systemImage: "square.and.arrow.down")
                     }
                     .tint(.white)
                     Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
-                    Toggle("Recently watched in Library", isOn: Bindable(model).showRecentLibraryVideos)
+                    Toggle("Library video shelf", isOn: Bindable(model).showLibraryShelf)
                         .disabled(!model.saveWatchHistory)
-                    if model.showRecentLibraryVideos && model.saveWatchHistory {
+                    if model.showLibraryShelf && model.saveWatchHistory {
+                        Picker("Shelf content", selection: Bindable(model).libraryShelfContent) {
+                            ForEach(LibraryShelfContent.allCases) { content in
+                                Text(content.settingsTitle).tag(content)
+                            }
+                        }
                         Stepper(value: Bindable(model).recentLibraryVideoCount, in: 3...12) {
-                            LabeledContent("Recent videos") {
+                            LabeledContent("Shelf videos") {
                                 Text("\(model.recentLibraryVideoCount)")
                                     .monospacedDigit()
                             }
                         }
                     }
-                    Toggle("Resume watching in Library", isOn: Bindable(model).showResumeLibraryVideos)
-                        .disabled(!model.saveWatchHistory)
                     Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
                         ForEach(HistoryRetentionPolicy.allCases) { policy in
                             Text(policy.title).tag(policy)

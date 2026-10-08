@@ -148,7 +148,7 @@ struct SearchContent: View {
                         collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
                     }
                 }
-                if results.continuationToken != nil || model.isLoading {
+                if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {
                     MediaPaginationFooter(isLoading: model.isLoading, isRetry: model.paginationFailed) {
                         Task { await model.loadMore() }
                     }
