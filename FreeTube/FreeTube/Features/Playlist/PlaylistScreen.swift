@@ -32,22 +32,30 @@ struct PlaylistScreen: View {
         _model = State(wrappedValue: PlaylistViewModel(playlistID: playlistID))
     }
 
+    private var searchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isSearching: Bool { !searchQuery.isEmpty }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let details = model.details {
-                    // The image begins below the status bar but fills the navigation-bar region.
-                    // Metadata keeps the standard content inset below it.
-                    VStack(alignment: .leading, spacing: 16) {
-                        artworkHeader(details)
-                        PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
+                    if !isSearching {
+                        // During search, put the matching rows directly beneath the native field
+                        // instead of leaving them below a full-screen artwork header.
+                        VStack(alignment: .leading, spacing: 16) {
+                            artworkHeader(details)
+                            PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
+                        }
+                        .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
+                        .padding(.bottom, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
-                    .padding(.bottom, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     videosList(details)
-                        .padding(.top, 8)
+                        .padding(.top, isSearching ? 16 : 8)
                         .padding(.bottom, 16)
                 } else if model.isLoading {
                     playlistPlaceholder
@@ -65,20 +73,27 @@ struct PlaylistScreen: View {
                 }
             }
         }
-        .ignoresSafeArea(.container, edges: model.details == nil ? [] : .top)
+        .ignoresSafeArea(.container, edges: model.details == nil || isSearching ? [] : .top)
         .background(Color.black)
         .coordinateSpace(name: "playlistScroll")
         .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
             guard titleBottom.isFinite else { return }
             showsNavigationTitle = model.details != nil && titleBottom <= 0
         }
-        .navigationTitle(showsNavigationTitle ? (model.details?.playlist.title ?? "") : "")
+        .navigationTitle(isSearching || showsNavigationTitle ? (model.details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Search loaded videos")
+        .searchable(text: $searchText, prompt: "Search playlist")
         // Let artwork show through initially, then restore native bar material when the
         // scrolled-away playlist name becomes the compact navigation title.
-        .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
+        .toolbarBackground(isSearching || showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .task { await model.load() }
+        .task(id: "\(model.details?.playlist.id ?? ""):\(searchQuery)") {
+            let query = searchQuery
+            guard !query.isEmpty, model.details != nil else { return }
+            do { try await Task.sleep(for: .milliseconds(400)) }
+            catch { return }
+            await model.loadUntilFirstMatch(for: query)
+        }
         .task(id: model.details?.playlist.id) {
             guard let id = model.details?.playlist.id else { return }
             isSavedLocally = await localPlaylistService.isRemoteSaved(id: id)
@@ -250,14 +265,13 @@ struct PlaylistScreen: View {
 
     @ViewBuilder
     private func videosList(_ details: PlaylistDetails) -> some View {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isSearching = !query.isEmpty
+        let query = searchQuery
         let videos = isSearching
             ? details.videos.filter {
                 $0.title.localizedStandardContains(query) || $0.channelName.localizedStandardContains(query)
             }
             : details.videos
-        if details.videos.isEmpty && !model.isLoadingMore && !model.canLoadMore {
+        if details.videos.isEmpty && !model.isLoadingMore && !model.canLoadMore && !isSearching {
             ContentUnavailableView(
                 "No Videos",
                 systemImage: "rectangle.stack",
@@ -267,8 +281,22 @@ struct PlaylistScreen: View {
         } else {
             LazyVStack(spacing: 0) {
                 if isSearching && videos.isEmpty {
-                    ContentUnavailableView.search(text: query)
+                    if model.isSearchingForMatch || model.isLoadingMore
+                        || (model.canLoadMore && !model.paginationFailed) {
+                        ProgressView("Searching playlist…")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                    } else if model.paginationFailed {
+                        ContentUnavailableView(
+                            "Search paused",
+                            systemImage: "wifi.exclamationmark",
+                            description: Text("Couldn't load more playlist videos. Try again below.")
+                        )
                         .padding(.vertical, 24)
+                    } else {
+                        ContentUnavailableView.search(text: query)
+                            .padding(.vertical, 24)
+                    }
                 }
                 ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                     VideoRow(
@@ -293,9 +321,9 @@ struct PlaylistScreen: View {
                         }
                     }
                 }
-                if model.canLoadMore || model.isLoadingMore {
+                if (model.canLoadMore || model.isLoadingMore) && !model.isSearchingForMatch {
                     if isSearching {
-                        Text("Search includes loaded videos. Load more to search the rest.")
+                        Text("More playlist videos may contain matches.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
@@ -303,7 +331,13 @@ struct PlaylistScreen: View {
                             .padding(.top, 12)
                     }
                     MediaPaginationFooter(isLoading: model.isLoadingMore, isRetry: model.paginationFailed) {
-                        Task { await model.loadMore() }
+                        Task {
+                            if isSearching && model.paginationFailed {
+                                await model.loadUntilFirstMatch(for: query)
+                            } else {
+                                await model.loadMore()
+                            }
+                        }
                     }
                     .onAppear {
                         if !isSearching, model.canLoadMore, !model.paginationFailed {

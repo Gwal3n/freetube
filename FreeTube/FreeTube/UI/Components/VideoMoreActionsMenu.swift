@@ -34,6 +34,7 @@ struct VideoMoreActionsMenu: View {
             VideoActionsContent(
                 video: video,
                 offersPlay: false,
+                onPlay: nil,
                 offersPlayNext: offersPlayNext,
                 onRemoveFromUpNext: onRemoveFromUpNext,
                 onOpenChannel: onOpenChannel,
@@ -83,6 +84,7 @@ struct VideoMoreActionsMenu: View {
 private struct VideoActionsContent: View {
     let video: Video
     let offersPlay: Bool
+    let onPlay: (() -> Void)?
     let offersPlayNext: Bool
     let onRemoveFromUpNext: (() -> Void)?
     let onOpenChannel: (() -> Void)?
@@ -96,6 +98,7 @@ private struct VideoActionsContent: View {
     init(
         video: Video,
         offersPlay: Bool,
+        onPlay: (() -> Void)?,
         offersPlayNext: Bool,
         onRemoveFromUpNext: (() -> Void)?,
         onOpenChannel: (() -> Void)?,
@@ -105,6 +108,7 @@ private struct VideoActionsContent: View {
     ) {
         self.video = video
         self.offersPlay = offersPlay
+        self.onPlay = onPlay
         self.offersPlayNext = offersPlayNext
         self.onRemoveFromUpNext = onRemoveFromUpNext
         self.onOpenChannel = onOpenChannel
@@ -117,7 +121,7 @@ private struct VideoActionsContent: View {
     var body: some View {
         if offersPlay {
             Button {
-                player.load(video)
+                if let onPlay { onPlay() } else { player.load(video) }
             } label: {
                 Label("Play", systemImage: "play.fill")
             }
@@ -177,17 +181,6 @@ private struct VideoActionsContent: View {
         } label: {
             Label("Copy URL", systemImage: "link")
         }
-        // Do not read the live playback clock while constructing the menu: re-evaluating it
-        // every tick can reset an open native menu. Capture the time only when tapped.
-        if player.currentVideo?.id == video.id {
-            Button {
-                if let url = video.youtubeShareURL(at: player.elapsed) {
-                    UIPasteboard.general.string = url.absoluteString
-                }
-            } label: {
-                Label("Copy URL at current time", systemImage: "clock")
-            }
-        }
         Divider()
         Menu {
             DownloadOptionsContent(video: video, onSelect: onDownload)
@@ -229,8 +222,11 @@ private struct VideoActionsContent: View {
 private struct VideoContextMenuModifier: ViewModifier {
     let video: Video
     let offersPlayNext: Bool
+    let onPlay: (() -> Void)?
     let onRemoveFromUpNext: (() -> Void)?
     let onOpenChannel: (() -> Void)?
+    let onMarkComplete: (() -> Void)?
+    let onRemoveFromHistory: (() -> Void)?
 
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
@@ -242,6 +238,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                 VideoActionsContent(
                     video: video,
                     offersPlay: true,
+                    onPlay: onPlay,
                     offersPlayNext: offersPlayNext,
                     onRemoveFromUpNext: onRemoveFromUpNext,
                     onOpenChannel: onOpenChannel,
@@ -249,6 +246,19 @@ private struct VideoContextMenuModifier: ViewModifier {
                     shareFileURL: $shareFileURL,
                     addToPlaylistVideo: $addToPlaylistVideo
                 )
+                if onMarkComplete != nil || onRemoveFromHistory != nil {
+                    Divider()
+                    if let onMarkComplete {
+                        Button(action: onMarkComplete) {
+                            Label("Mark as complete", systemImage: "checkmark.circle")
+                        }
+                    }
+                    if let onRemoveFromHistory {
+                        Button(role: .destructive, action: onRemoveFromHistory) {
+                            Label("Remove from history", systemImage: "trash")
+                        }
+                    }
+                }
             } preview: {
                 VideoContextPreview(video: video)
             }
@@ -281,14 +291,20 @@ extension View {
     func videoContextMenu(
         video: Video,
         offersPlayNext: Bool = false,
+        onPlay: (() -> Void)? = nil,
         onRemoveFromUpNext: (() -> Void)? = nil,
-        onOpenChannel: (() -> Void)? = nil
+        onOpenChannel: (() -> Void)? = nil,
+        onMarkComplete: (() -> Void)? = nil,
+        onRemoveFromHistory: (() -> Void)? = nil
     ) -> some View {
         modifier(VideoContextMenuModifier(
             video: video,
             offersPlayNext: offersPlayNext,
+            onPlay: onPlay,
             onRemoveFromUpNext: onRemoveFromUpNext,
-            onOpenChannel: onOpenChannel
+            onOpenChannel: onOpenChannel,
+            onMarkComplete: onMarkComplete,
+            onRemoveFromHistory: onRemoveFromHistory
         ))
     }
 }

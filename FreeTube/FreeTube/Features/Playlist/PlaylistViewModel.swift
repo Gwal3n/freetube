@@ -11,6 +11,8 @@ final class PlaylistViewModel {
     /// Separate flag so the row-level prefetch trigger doesn't fire while a previous
     /// `loadMore` is still in flight.
     private(set) var isLoadingMore: Bool = false
+    private(set) var isSearchingForMatch = false
+    private var searchSequence = 0
     private(set) var paginationFailed = false
     var errorState: ErrorState?
 
@@ -50,14 +52,50 @@ final class PlaylistViewModel {
         defer { isLoadingMore = false }
         do {
             let page = try await service.fetchMore(continuation: token)
+            guard !Task.isCancelled else { return }
             details = PlaylistDetails(
                 playlist: current.playlist,
                 videos: current.videos + page.videos,
                 continuationToken: page.continuationToken
             )
         } catch {
+            guard !Task.isCancelled else { return }
             paginationFailed = true
             errorState = ErrorState(from: error)
+        }
+    }
+
+    /// Search is local to this public playlist. Its endpoint offers continuation pages but no
+    /// query parameter, so check later pages only when the loaded rows have no match. Stop as soon
+    /// as a match appears; users can explicitly load more if they want additional matches. The
+    /// caller owns cancellation when the field changes or the screen disappears.
+    func loadUntilFirstMatch(for query: String) async {
+        guard !query.isEmpty, details != nil else { return }
+        searchSequence &+= 1
+        let sequence = searchSequence
+        isSearchingForMatch = true
+        defer {
+            if searchSequence == sequence { isSearchingForMatch = false }
+        }
+
+        while !Task.isCancelled {
+            guard let current = details,
+                  !current.videos.contains(where: {
+                      $0.title.localizedStandardContains(query)
+                          || $0.channelName.localizedStandardContains(query)
+                  }),
+                  let previousToken = current.continuationToken else { return }
+
+            // The visible list may already be fetching its look-ahead page. Let that request
+            // finish instead of racing two requests against the same continuation token.
+            if isLoadingMore {
+                do { try await Task.sleep(for: .milliseconds(100)) }
+                catch { return }
+                continue
+            }
+
+            await loadMore()
+            guard details?.continuationToken != previousToken else { return }
         }
     }
 

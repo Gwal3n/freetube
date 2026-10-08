@@ -52,34 +52,33 @@ struct LibraryVideoShelfCard: View {
         }
         .buttonStyle(ResponsiveButtonStyle())
         .accessibilityLabel("Play \(entry.title)")
-        .contextMenu {
-            Button(action: openVideo) {
-                Label("Play", systemImage: "play.fill")
-            }
-            if canMarkComplete && entry.duration > 0 && player.currentVideo?.id != entry.videoID {
-                Button {
-                    Task {
-                        await PersistenceWriter.shared.updateWatchProgress(
-                            videoID: entry.videoID,
-                            position: entry.duration,
-                            duration: entry.duration,
-                            notifyObservers: true
-                        )
-                    }
-                } label: {
-                    Label("Mark as complete", systemImage: "checkmark.circle")
-                }
-            }
-            Button(role: .destructive) {
-                Task { await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID) }
-            } label: {
-                Label("Remove from history", systemImage: "trash")
-            }
-        }
+        .videoContextMenu(
+            video: video,
+            offersPlayNext: true,
+            onPlay: openVideo,
+            onMarkComplete: canMarkComplete && entry.duration > 0 && player.currentVideo?.id != entry.videoID
+                ? markComplete : nil,
+            onRemoveFromHistory: removeFromHistory
+        )
     }
 
     private func openVideo() {
         player.prepareLaunch(for: entry.videoID, from: launchAnchor.frame)
         player.load(video)
+    }
+
+    private func markComplete() {
+        Task {
+            await PersistenceWriter.shared.updateWatchProgress(
+                videoID: entry.videoID,
+                position: entry.duration,
+                duration: entry.duration,
+                notifyObservers: true
+            )
+        }
+    }
+
+    private func removeFromHistory() {
+        Task { await PersistenceWriter.shared.deleteWatchHistory(videoID: entry.videoID) }
     }
 }
