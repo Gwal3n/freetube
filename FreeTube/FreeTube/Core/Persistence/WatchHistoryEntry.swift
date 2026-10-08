@@ -55,6 +55,26 @@ extension WatchHistoryEntry {
               lastPosition < duration * 0.95 else { return nil }
         return lastPosition / duration
     }
+
+    /// Feed filters classify saved progress separately from resume eligibility. Near-end videos
+    /// may not resume, but should not be called finished until they reach 95% of their duration.
+    var feedWatchStatus: FeedWatchStatus {
+        guard lastPosition.isFinite, duration.isFinite, duration > 0 else { return .watched }
+        if lastPosition >= duration * 0.95 { return .finished }
+        if lastPosition >= min(duration * 0.05, 10) { return .partial }
+        return .watched
+    }
+}
+
+nonisolated enum FeedWatchStatus: Sendable, Equatable {
+    case watched
+    case partial
+    case finished
+}
+
+nonisolated struct FeedWatchSummary: Sendable {
+    var progress: [String: Double] = [:]
+    var statuses: [String: FeedWatchStatus] = [:]
 }
 
 /// Sendable read model used by the paginated History UI. SwiftData model instances stay bound to

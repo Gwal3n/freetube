@@ -14,6 +14,8 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
+    @AppStorage("feedWatchFilter") private var watchFilterRaw = FeedWatchFilter.all.rawValue
+    @AppStorage("feedDurationFilter") private var durationFilterRaw = FeedDurationFilter.all.rawValue
     @AppStorage("automaticFeedRefreshEnabled") private var automaticFeedRefreshEnabled = false
     @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
     @State private var currentDate = Date.now
@@ -24,12 +26,14 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                if !groups.groups.isEmpty {
-                    groupPicker
-                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                HStack(spacing: 12) {
+                    if !groups.groups.isEmpty { groupPicker }
+                    Spacer(minLength: 0)
+                    filterMenu
                 }
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
                 if model.isRefreshing || model.lastRefreshAt != nil {
                     FeedRefreshProgress(model: model, referenceDate: currentDate)
                 }
@@ -39,7 +43,7 @@ struct SubscriptionFeedScreen: View {
                     }
                 }
 
-                ForEach(model.videos) { video in
+                ForEach(filteredVideos) { video in
                     feedRow(video)
                 }
 
@@ -128,6 +132,17 @@ struct SubscriptionFeedScreen: View {
                 } else if model.videos.isEmpty && model.isRefreshing {
                     MediaListPlaceholder()
                         .padding(.top, 44)
+                } else if filteredVideos.isEmpty && !model.canLoadMore && !model.isRefreshing {
+                    ContentUnavailableView {
+                        Label("No matching videos", systemImage: "line.3.horizontal.decrease")
+                    } description: {
+                        Text("Try changing the Feed filters.")
+                    } actions: {
+                        Button("Reset Filters") {
+                            watchFilterRaw = FeedWatchFilter.all.rawValue
+                            durationFilterRaw = FeedDurationFilter.all.rawValue
+                        }
+                    }
                 }
             }
             .task(id: automaticRefreshTaskKey) { await loadAndScheduleAutomaticRefresh() }
@@ -163,7 +178,74 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var automaticLoadKey: String {
-        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count)"
+        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw)"
+    }
+
+    private var watchFilter: FeedWatchFilter {
+        FeedWatchFilter(rawValue: watchFilterRaw) ?? .all
+    }
+
+    private var durationFilter: FeedDurationFilter {
+        FeedDurationFilter(rawValue: durationFilterRaw) ?? .all
+    }
+
+    private var filteredVideos: [Video] {
+        model.videos.filter { video in
+            watchFilter.includes(model.watchStatuses[video.id])
+                && durationFilter.includes(video.duration)
+        }
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Section("Watch status") {
+                ForEach(FeedWatchFilter.allCases) { option in
+                    Button {
+                        watchFilterRaw = option.rawValue
+                    } label: {
+                        if watchFilter == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+            Section("Duration") {
+                ForEach(FeedDurationFilter.allCases) { option in
+                    Button {
+                        durationFilterRaw = option.rawValue
+                    } label: {
+                        if durationFilter == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+            if watchFilter != .all || durationFilter != .all {
+                Divider()
+                Button("Reset Filters") {
+                    watchFilterRaw = FeedWatchFilter.all.rawValue
+                    durationFilterRaw = FeedDurationFilter.all.rawValue
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "line.3.horizontal.decrease")
+                if watchFilter != .all || durationFilter != .all {
+                    Text("Filtered")
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Feed filters")
+        .accessibilityValue(watchFilter == .all && durationFilter == .all ? "Off" : "On")
     }
 
     private var automaticRefreshTaskKey: String {
@@ -326,6 +408,58 @@ struct SubscriptionFeedScreen: View {
             ) {
                 player.load(video)
             }
+        }
+    }
+}
+
+private enum FeedWatchFilter: String, CaseIterable, Identifiable {
+    case all, hideWatched, hidePartial, onlyPartial, onlyFinished
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All videos"
+        case .hideWatched: "Hide watched"
+        case .hidePartial: "Hide partially watched"
+        case .onlyPartial: "Only partially watched"
+        case .onlyFinished: "Only finished"
+        }
+    }
+
+    func includes(_ status: FeedWatchStatus?) -> Bool {
+        switch self {
+        case .all: true
+        case .hideWatched: status == nil
+        case .hidePartial: status != .partial
+        case .onlyPartial: status == .partial
+        case .onlyFinished: status == .finished
+        }
+    }
+}
+
+private enum FeedDurationFilter: String, CaseIterable, Identifiable {
+    case all, underFourMinutes, fourToTwentyMinutes, overTwentyMinutes
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "Any length"
+        case .underFourMinutes: "Under 4 minutes"
+        case .fourToTwentyMinutes: "4–20 minutes"
+        case .overTwentyMinutes: "Over 20 minutes"
+        }
+    }
+
+    func includes(_ duration: TimeInterval?) -> Bool {
+        guard self != .all else { return true }
+        guard let duration, duration.isFinite, duration > 0 else { return false }
+        switch self {
+        case .all: true
+        case .underFourMinutes: duration < 240
+        case .fourToTwentyMinutes: duration >= 240 && duration <= 1200
+        case .overTwentyMinutes: duration > 1200
         }
     }
 }

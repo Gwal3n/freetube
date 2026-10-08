@@ -7,6 +7,7 @@ import Observation
 final class SubscriptionFeedViewModel {
     private(set) var videos: [Video] = []
     private(set) var playbackProgress: [String: Double] = [:]
+    private(set) var watchStatuses: [String: FeedWatchStatus] = [:]
     private(set) var isRefreshing = false
     private(set) var isLoadingMore = false
     private(set) var refreshedChannels = 0
@@ -75,7 +76,11 @@ final class SubscriptionFeedViewModel {
 
     /// History changes affect progress only; preserve the feed rows and pagination.
     func refreshProgress() async {
-        playbackProgress = await writer.watchProgress(videoIDs: videos.map(\.id))
+        let generation = cacheGeneration
+        let summary = await writer.feedWatchSummary(videoIDs: videos.map(\.id))
+        guard generation == cacheGeneration else { return }
+        playbackProgress = summary.progress
+        watchStatuses = summary.statuses
     }
 
     func refresh() async {
@@ -121,14 +126,15 @@ final class SubscriptionFeedViewModel {
         let snapshots = await writer.fetchSubscriptionFeed(limit: visibleLimit, channelIDs: channelIDs)
         let refreshedVideos = SubscriptionFeedOrdering.diversified(snapshots, pageSize: pageSize).map(\.video)
         let totalCount = await writer.subscriptionFeedCount(channelIDs: channelIDs)
-        let progress = await writer.watchProgress(videoIDs: refreshedVideos.map(\.id))
+        let watchSummary = await writer.feedWatchSummary(videoIDs: refreshedVideos.map(\.id))
         let refreshDate = await writer.latestSubscriptionFeedRefreshDate()
         guard generation == cacheGeneration else { return }
         // Commit rows and their progress together, rather than painting fresh rows with stale
         // progress while the remaining persistence reads are suspended.
         videos = refreshedVideos
         canLoadMore = refreshedVideos.count < totalCount
-        playbackProgress = progress
+        playbackProgress = watchSummary.progress
+        watchStatuses = watchSummary.statuses
         lastRefreshAt = refreshDate
     }
 }
