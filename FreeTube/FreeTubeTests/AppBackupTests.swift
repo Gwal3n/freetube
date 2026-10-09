@@ -24,7 +24,7 @@ final class AppBackupTests: XCTestCase {
             exportedAt: exportDate,
             settings: ["autoplayNext": .boolean(true), "preferredQuality": .integer(1080)],
             subscriptions: [],
-            playlists: [.init(title: "Saved playlist", descriptionText: "Description", sourcePlaylistID: "PL123", videos: [video])],
+            playlists: [.init(localID: "local-id", title: "Saved playlist", descriptionText: "Description", sourcePlaylistID: "PL123", videos: [video])],
             watchHistory: [],
             searchHistory: [.init(query: "swift", searchedAt: exportDate)],
             favoriteVideos: [],
@@ -42,6 +42,7 @@ final class AppBackupTests: XCTestCase {
 
         XCTAssertEqual(restored.formatVersion, 1)
         XCTAssertEqual(restored.playlists.first?.sourcePlaylistID, "PL123")
+        XCTAssertEqual(restored.playlists.first?.localID, "local-id")
         XCTAssertEqual(restored.playlists.first?.videos.first, video)
         XCTAssertEqual(restored.searchHistory.first?.query, "swift")
         XCTAssertEqual(restored.subscriptionGroups, backup.subscriptionGroups)
@@ -70,5 +71,13 @@ final class AppBackupTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         XCTAssertNil(try decoder.decode(AppBackup.self, from: data).subscriptionGroups)
+    }
+
+    func testOldPlaylistRecordWithoutLocalIDStillDecodes() throws {
+        let data = try XCTUnwrap("""
+        {"title":"Old playlist","descriptionText":null,"sourcePlaylistID":null,"videos":[]}
+        """.data(using: .utf8))
+        let record = try JSONDecoder().decode(AppBackup.PlaylistRecord.self, from: data)
+        XCTAssertNil(record.localID)
     }
 }

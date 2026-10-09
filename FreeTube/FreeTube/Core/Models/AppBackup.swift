@@ -21,6 +21,8 @@ struct AppBackup: Codable, Sendable {
     }
 
     struct PlaylistRecord: Codable, Sendable {
+        /// Optional so backups made before History stored playlist context still decode.
+        var localID: String? = nil
         let title: String
         let descriptionText: String?
         let sourcePlaylistID: String?

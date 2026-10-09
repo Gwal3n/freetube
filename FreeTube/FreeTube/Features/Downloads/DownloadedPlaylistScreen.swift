@@ -40,7 +40,7 @@ struct DownloadedPlaylistScreen: View {
                                 videos: offlineVideos,
                                 continuationToken: nil
                             )
-                            player.loadPlaylist(details, startAt: video)
+                            player.loadPlaylist(details, startAt: video, origin: .downloaded)
                         } label: {
                             HStack(spacing: 12) {
                                 Text("\(index + 1)")

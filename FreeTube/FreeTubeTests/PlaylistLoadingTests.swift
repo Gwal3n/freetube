@@ -47,6 +47,30 @@ final class PlaylistLoadingTests: XCTestCase {
         XCTAssertNil(model.details?.continuationToken)
         XCTAssertFalse(model.isSearchingPages)
     }
+
+    func testHistoryRestoresVideoBeyondFirstPlaylistPage() async throws {
+        let service = PagedPlaylistService()
+        let restoration = HistoryPlaylistRestorationService(remotePlaylists: service)
+        let entry = WatchHistorySnapshot(
+            videoID: "last",
+            title: "Last match",
+            channelName: "Channel",
+            channelID: nil,
+            thumbnailURL: nil,
+            watchedAt: .now,
+            lastPosition: 60,
+            duration: 240,
+            playlistID: "playlist",
+            playlistTitle: "Playlist",
+            playlistOriginRaw: PlaylistPlaybackOrigin.youtube.rawValue
+        )
+
+        let details = try await restoration.restore(for: entry)
+
+        XCTAssertEqual(details?.videos.map(\.id), ["first", "middle", "last"])
+        XCTAssertNil(details?.continuationToken)
+        XCTAssertEqual(service.requestedTokens, ["page-2", "page-3"])
+    }
 }
 
 @MainActor

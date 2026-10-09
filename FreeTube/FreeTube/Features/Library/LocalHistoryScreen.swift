@@ -17,6 +17,7 @@ struct LocalHistoryScreen: View {
     @State private var searchText = ""
     @State private var searchResults: [WatchHistorySnapshot] = []
     @State private var channelNavigation = LocalHistoryChannelNavigationModel()
+    @State private var historyPlayback = HistoryPlaybackViewModel.shared
     @State private var channelToOpen: String?
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
@@ -68,7 +69,7 @@ struct LocalHistoryScreen: View {
                                         }
                                     }
                                 ) {
-                                    player.load(video)
+                                    historyPlayback.open(entry, video: video, player: player)
                                 }
                                 .swipeActions {
                                     Button(role: .destructive) {

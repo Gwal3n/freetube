@@ -57,7 +57,7 @@ struct LocalPlaylistScreen: View {
                                 selectedVideoIDs.insert(video.id)
                             }
                         } else if editingMode == nil {
-                            player.loadPlaylist(playbackDetails(from: details), startAt: video)
+                            player.loadPlaylist(details.playbackDetails, startAt: video, origin: .local)
                         }
                     }
                     .swipeActions {
@@ -214,26 +214,12 @@ struct LocalPlaylistScreen: View {
         hasLoaded = true
     }
 
-    private func playbackDetails(from local: LocalPlaylistDetails) -> PlaylistDetails {
-        PlaylistDetails(
-            playlist: Playlist(
-                id: "local:\(local.playlist.id)", title: local.playlist.title,
-                channelID: nil, channelName: nil, thumbnailURL: local.playlist.thumbnailURL,
-                videoCount: local.playlist.videoCount,
-                descriptionText: local.playlist.descriptionText,
-                isOwnedByUser: true
-            ),
-            videos: local.videos,
-            continuationToken: nil
-        )
-    }
-
     private func playlistHeader(_ local: LocalPlaylistDetails) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             PlaylistArtworkHeader(thumbnailURL: local.playlist.thumbnailURL) {
                 localActionToolbar(local)
             }
-            PlaylistMetadataBlock(details: playbackDetails(from: local), isExpanded: $isDetailsExpanded)
+            PlaylistMetadataBlock(details: local.playbackDetails, isExpanded: $isDetailsExpanded)
         }
         .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
         .padding(.bottom, 16)
@@ -243,12 +229,12 @@ struct LocalPlaylistScreen: View {
         HStack(spacing: 10) {
             PlaylistHeaderActionButton(title: "Play all", systemImage: "play.fill") {
                 guard let first = local.videos.first else { return }
-                player.loadPlaylist(playbackDetails(from: local), startAt: first)
+                player.loadPlaylist(local.playbackDetails, startAt: first, origin: .local)
             }
             .disabled(local.videos.isEmpty || editingMode != nil)
             PlaylistHeaderActionButton(title: "Shuffle", systemImage: "shuffle") {
                 guard let random = local.videos.randomElement() else { return }
-                player.loadPlaylist(playbackDetails(from: local), startAt: random, shuffled: true)
+                player.loadPlaylist(local.playbackDetails, startAt: random, shuffled: true, origin: .local)
             }
             .disabled(local.videos.isEmpty || editingMode != nil)
             Spacer(minLength: 0)

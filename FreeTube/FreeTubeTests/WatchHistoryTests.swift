@@ -45,6 +45,8 @@ final class WatchHistoryTests: XCTestCase {
         """
         let restored = try JSONDecoder().decode(WatchHistorySnapshot.self, from: Data(legacyJSON.utf8))
         XCTAssertNil(restored.channelID)
+        XCTAssertNil(restored.playlistID)
+        XCTAssertNil(restored.playlistOrigin)
     }
 
     func testHistorySnapshotRetainsChannelIDInBackup() throws {
@@ -60,6 +62,26 @@ final class WatchHistoryTests: XCTestCase {
         )
         let restored = try JSONDecoder().decode(WatchHistorySnapshot.self, from: JSONEncoder().encode(original))
         XCTAssertEqual(restored.channelID, "UC123")
+    }
+
+    func testHistorySnapshotRetainsPlaylistContextInBackup() throws {
+        let original = WatchHistorySnapshot(
+            videoID: "video",
+            title: "Video",
+            channelName: "Channel",
+            channelID: "UC123",
+            thumbnailURL: nil,
+            watchedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            lastPosition: 60,
+            duration: 240,
+            playlistID: "local:123",
+            playlistTitle: "Saved videos",
+            playlistOriginRaw: PlaylistPlaybackOrigin.local.rawValue
+        )
+        let restored = try JSONDecoder().decode(WatchHistorySnapshot.self, from: JSONEncoder().encode(original))
+        XCTAssertEqual(restored.playlistID, "local:123")
+        XCTAssertEqual(restored.playlistTitle, "Saved videos")
+        XCTAssertEqual(restored.playlistOrigin, .local)
     }
 
     private func snapshot(position: TimeInterval, duration: TimeInterval) -> WatchHistorySnapshot {

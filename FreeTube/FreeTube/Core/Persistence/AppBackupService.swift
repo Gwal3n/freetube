@@ -17,6 +17,7 @@ final class AppBackupService {
         for playlist in await playlists.playlists() {
             guard let details = await playlists.details(id: playlist.id) else { continue }
             playlistRecords.append(AppBackup.PlaylistRecord(
+                localID: playlist.id,
                 title: playlist.title,
                 descriptionText: playlist.descriptionText,
                 sourcePlaylistID: playlist.sourcePlaylistID,
@@ -67,6 +68,7 @@ final class AppBackupService {
         let existing = await playlists.playlists()
         await playlists.delete(ids: Set(existing.map(\.id)))
         var restoredPlaylistIDs: [String] = []
+        var remappedLocalPlaylistIDs: [String: String] = [:]
         for playlist in backup.playlists {
             let id = await LocalPlaylistWriter.shared.replace(
                 title: playlist.title,
@@ -75,9 +77,15 @@ final class AppBackupService {
                 videos: playlist.videos
             )
             restoredPlaylistIDs.append(id)
+            if let oldID = playlist.localID {
+                remappedLocalPlaylistIDs[oldID] = id
+            }
         }
         await playlists.reorderPlaylists(restoredPlaylistIDs)
-        await PersistenceWriter.shared.replaceWatchHistory(with: backup.watchHistory)
+        await PersistenceWriter.shared.replaceWatchHistory(
+            with: backup.watchHistory,
+            remappedLocalPlaylistIDs: remappedLocalPlaylistIDs
+        )
 
         replaceSwiftData(backup)
         LocalSubscriptionStore.shared.replaceAll(with: backup.subscriptions)

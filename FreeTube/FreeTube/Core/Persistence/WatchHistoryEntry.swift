@@ -21,6 +21,10 @@ final class WatchHistoryEntry {
     /// resume-on-tap can skip entries that already reached the end. Default 0 — SwiftData
     /// lightweight migration fills existing rows with this on first read after the upgrade.
     var duration: TimeInterval = 0
+    /// Optional for lightweight migration of existing on-device history.
+    var playlistID: String? = nil
+    var playlistTitle: String? = nil
+    var playlistOriginRaw: String? = nil
 
     init(
         videoID: String,
@@ -30,7 +34,10 @@ final class WatchHistoryEntry {
         thumbnailURL: URL?,
         watchedAt: Date = .now,
         lastPosition: TimeInterval = 0,
-        duration: TimeInterval = 0
+        duration: TimeInterval = 0,
+        playlistID: String? = nil,
+        playlistTitle: String? = nil,
+        playlistOriginRaw: String? = nil
     ) {
         self.videoID = videoID
         self.title = title
@@ -40,6 +47,9 @@ final class WatchHistoryEntry {
         self.watchedAt = watchedAt
         self.lastPosition = lastPosition
         self.duration = duration
+        self.playlistID = playlistID
+        self.playlistTitle = playlistTitle
+        self.playlistOriginRaw = playlistOriginRaw
     }
 }
 
@@ -90,6 +100,14 @@ struct WatchHistorySnapshot: Identifiable, Sendable, Codable {
     let watchedAt: Date
     let lastPosition: TimeInterval
     let duration: TimeInterval
+    /// Missing from older backups; nil means this entry opens as a standalone video.
+    var playlistID: String? = nil
+    var playlistTitle: String? = nil
+    var playlistOriginRaw: String? = nil
+
+    var playlistOrigin: PlaylistPlaybackOrigin? {
+        playlistOriginRaw.flatMap(PlaylistPlaybackOrigin.init(rawValue:))
+    }
 
     var resumableProgress: Double? {
         guard lastPosition.isFinite,

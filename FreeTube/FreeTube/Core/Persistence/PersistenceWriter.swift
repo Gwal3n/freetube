@@ -134,7 +134,10 @@ actor PersistenceWriter {
         thumbnailURL: URL?,
         position: TimeInterval,
         duration: TimeInterval,
-        saveProgress: Bool = true
+        saveProgress: Bool = true,
+        playlistID: String? = nil,
+        playlistTitle: String? = nil,
+        playlistOrigin: PlaylistPlaybackOrigin? = nil
     ) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
@@ -146,6 +149,9 @@ actor PersistenceWriter {
             existing.thumbnailURL = thumbnailURL
             if saveProgress { existing.lastPosition = position }
             existing.duration = duration
+            existing.playlistID = playlistID
+            existing.playlistTitle = playlistTitle
+            existing.playlistOriginRaw = playlistOrigin?.rawValue
         } else {
             modelContext.insert(WatchHistoryEntry(
                 videoID: videoID,
@@ -154,7 +160,10 @@ actor PersistenceWriter {
                 channelID: channelID.isEmpty ? nil : channelID,
                 thumbnailURL: thumbnailURL,
                 lastPosition: saveProgress ? position : 0,
-                duration: duration
+                duration: duration,
+                playlistID: playlistID,
+                playlistTitle: playlistTitle,
+                playlistOriginRaw: playlistOrigin?.rawValue
             ))
         }
         try? modelContext.save()
@@ -194,6 +203,25 @@ actor PersistenceWriter {
         existing.channelName = channelName
         if !channelID.isEmpty { existing.channelID = channelID }
         existing.thumbnailURL = thumbnailURL
+        try? modelContext.save()
+    }
+
+    /// Changes playlist context only for a history row that already exists. An asynchronous
+    /// restoration must never create an entry before the normal watch-time threshold.
+    func updateWatchHistoryPlaylistContext(
+        videoID: String,
+        playlistID: String?,
+        playlistTitle: String?,
+        playlistOrigin: PlaylistPlaybackOrigin?,
+        onlyIfCurrentPlaylistID expectedPlaylistID: String? = nil
+    ) {
+        let target = videoID
+        let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
+        guard let existing = try? modelContext.fetch(descriptor).first else { return }
+        if let expectedPlaylistID, existing.playlistID != expectedPlaylistID { return }
+        existing.playlistID = playlistID
+        existing.playlistTitle = playlistTitle
+        existing.playlistOriginRaw = playlistOrigin?.rawValue
         try? modelContext.save()
     }
 
@@ -261,7 +289,10 @@ actor PersistenceWriter {
                 thumbnailURL: $0.thumbnailURL,
                 watchedAt: $0.watchedAt,
                 lastPosition: $0.lastPosition,
-                duration: $0.duration
+                duration: $0.duration,
+                playlistID: $0.playlistID,
+                playlistTitle: $0.playlistTitle,
+                playlistOriginRaw: $0.playlistOriginRaw
             )
         }
     }
@@ -286,12 +317,22 @@ actor PersistenceWriter {
         }
     }
 
-    func replaceWatchHistory(with restored: [WatchHistorySnapshot]) {
+    func replaceWatchHistory(
+        with restored: [WatchHistorySnapshot],
+        remappedLocalPlaylistIDs: [String: String] = [:]
+    ) {
         for entry in (try? modelContext.fetch(FetchDescriptor<WatchHistoryEntry>())) ?? [] {
             modelContext.delete(entry)
         }
         try? modelContext.save()
         for item in restored {
+            let playlistID: String?
+            if item.playlistOrigin == .local, let oldID = item.playlistID {
+                let bareID = oldID.hasPrefix("local:") ? String(oldID.dropFirst(6)) : oldID
+                playlistID = remappedLocalPlaylistIDs[bareID].map { "local:\($0)" }
+            } else {
+                playlistID = item.playlistID
+            }
             modelContext.insert(WatchHistoryEntry(
                 videoID: item.videoID,
                 title: item.title,
@@ -300,7 +341,10 @@ actor PersistenceWriter {
                 thumbnailURL: item.thumbnailURL,
                 watchedAt: item.watchedAt,
                 lastPosition: item.lastPosition,
-                duration: item.duration
+                duration: item.duration,
+                playlistID: playlistID,
+                playlistTitle: playlistID == nil ? nil : item.playlistTitle,
+                playlistOriginRaw: playlistID == nil ? nil : item.playlistOriginRaw
             ))
         }
         try? modelContext.save()

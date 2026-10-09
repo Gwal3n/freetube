@@ -9,6 +9,7 @@ struct LibraryVideoShelfCard: View {
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @State private var launchAnchor = VideoLaunchAnchor()
+    @State private var historyPlayback = HistoryPlaybackViewModel.shared
 
     let entry: WatchHistorySnapshot
     let canMarkComplete: Bool
@@ -67,7 +68,7 @@ struct LibraryVideoShelfCard: View {
 
     private func openVideo() {
         player.prepareLaunch(for: entry.videoID, from: launchAnchor.frame)
-        player.load(video)
+        historyPlayback.open(entry, video: video, player: player)
     }
 
     private func markComplete() {

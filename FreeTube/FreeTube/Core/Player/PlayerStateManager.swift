@@ -73,6 +73,10 @@ final class PlayerStateManager {
     private(set) var commentsCountText: String?
     private(set) var isLoadingMoreRecommendations = false
     private(set) var activePlaylist: Playlist?
+    private(set) var activePlaylistOrigin: PlaylistPlaybackOrigin?
+    /// Increments for each actual video load so late History playlist lookups cannot attach to a
+    /// different playback, even if the user opens the same video again from another surface.
+    private(set) var playbackSessionID = 0
     private(set) var isLoadingMorePlaylistVideos = false
     private(set) var playlistRecommendations: [Video] = []
     /// Explicit user choices are independent from disposable recommendations and playlists.
@@ -301,6 +305,7 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         activePlaylist = nil
+        activePlaylistOrigin = nil
         playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
@@ -327,6 +332,7 @@ final class PlayerStateManager {
     /// playback state still surface through the existing UI.
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
         log.info("loadLocalFile path=\(fileURL.path, privacy: .public) title=\"\(title, privacy: .public)\"")
+        playbackSessionID &+= 1
         if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
         // Link downloads are independent of the YouTube quality preference. An audio file keeps
         // its artwork visible; a video file keeps its actual frames visible.
@@ -351,6 +357,7 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         activePlaylist = nil
+        activePlaylistOrigin = nil
         playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
@@ -430,6 +437,7 @@ final class PlayerStateManager {
                 return
             }
         }
+        playbackSessionID &+= 1
         if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
         // Settings can change while the player is alive. Adopt that choice for the next video,
         // without disturbing the stream currently playing when the preference changes.
@@ -473,6 +481,7 @@ final class PlayerStateManager {
         }
         if !skipRecommendations {
             activePlaylist = nil
+            activePlaylistOrigin = nil
             playlistRecommendations = []
             playlistContinuationToken = nil
             isLoadingMorePlaylistVideos = false
@@ -1125,7 +1134,12 @@ final class PlayerStateManager {
 
     /// Starts playback with an explicit playlist context. Unlike a generic recommendation queue,
     /// this retains the playlist title and continuation so the player can identify and extend it.
-    func loadPlaylist(_ details: PlaylistDetails, startAt video: Video, shuffled: Bool = false) {
+    func loadPlaylist(
+        _ details: PlaylistDetails,
+        startAt video: Video,
+        shuffled: Bool = false,
+        origin: PlaylistPlaybackOrigin = .youtube
+    ) {
         let videos = shuffled ? details.videos.shuffled() : details.videos
         guard videos.contains(where: { $0.id == video.id }) else { return }
         queue.isShuffleOn = false
@@ -1133,21 +1147,67 @@ final class PlayerStateManager {
         if shuffled { queue.isShuffleOn = true }
         load(video, skipRecommendations: true)
         activePlaylist = details.playlist
+        activePlaylistOrigin = origin
         playlistRecommendations = []
         playlistContinuationToken = details.continuationToken
+    }
+
+    /// Restores History's playlist around a video that is already resolving or playing. The
+    /// AVPlayerItem is untouched; only the upcoming queue and playlist panel gain context.
+    func attachPlaylistFromHistory(
+        _ details: PlaylistDetails,
+        origin: PlaylistPlaybackOrigin,
+        videoID: String,
+        playbackSessionID expectedSessionID: Int
+    ) {
+        guard playbackSessionID == expectedSessionID,
+              currentVideo?.id == videoID,
+              activePlaylist == nil,
+              let index = details.videos.firstIndex(where: { $0.id == videoID }) else { return }
+        recommendationTask?.cancel()
+        recommendationTask = nil
+        recommendationBacklog = []
+        recommendationContinuationToken = nil
+        playlistRecommendations = []
+        queue.isShuffleOn = false
+        queue.replace(with: details.videos, startAt: index)
+        if let currentVideo { queue.updateVideo(currentVideo) }
+        queueAcceptsRecommendations = false
+        activePlaylist = details.playlist
+        activePlaylistOrigin = origin
+        playlistContinuationToken = details.continuationToken
+        if playbackHistory.indices.contains(playbackHistoryIndex) {
+            playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
+                video: currentVideo ?? details.videos[index],
+                skipRecommendations: true,
+                preservesPlaylistPosition: false
+            )
+        }
+        if preferences.recordsWatchHistory {
+            Task {
+                await PersistenceWriter.shared.updateWatchHistoryPlaylistContext(
+                    videoID: videoID,
+                    playlistID: details.playlist.id,
+                    playlistTitle: details.playlist.title,
+                    playlistOrigin: origin
+                )
+            }
+        }
     }
 
     /// Detaches playlist navigation without touching the installed AVPlayerItem or playhead.
     /// The current video becomes a standalone recommendation seed; previously fetched suggestions
     /// remain available while the normal refill path tops them up in the background.
     func leavePlaylist() {
-        guard let currentVideo, activePlaylist != nil else { return }
+        guard let currentVideo, let playlist = activePlaylist else { return }
+        let departedPlaylistID = playlist.id
         log.info("Leaving playlist while continuing (currentVideo.id, privacy: .public)")
         recommendationTask?.cancel()
         recommendationTask = nil
 
         let suggestions = playlistRecommendations.filter { $0.id != currentVideo.id }
         activePlaylist = nil
+        activePlaylistOrigin = nil
         playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
@@ -1163,6 +1223,17 @@ final class PlayerStateManager {
                 skipRecommendations: false,
                 preservesPlaylistPosition: false
             )
+        }
+        if preferences.recordsWatchHistory {
+            Task {
+                await PersistenceWriter.shared.updateWatchHistoryPlaylistContext(
+                    videoID: currentVideo.id,
+                    playlistID: nil,
+                    playlistTitle: nil,
+                    playlistOrigin: nil,
+                    onlyIfCurrentPlaylistID: departedPlaylistID
+                )
+            }
         }
         recommendationTask = Task { [weak self] in
             await self?.fillQueueWithRecommendations(for: currentVideo)
@@ -1220,6 +1291,8 @@ final class PlayerStateManager {
         recommendationContinuationToken = nil
         isLoadingMoreRecommendations = false
         activePlaylist = nil
+        activePlaylistOrigin = nil
+        playbackSessionID &+= 1
         playlistRecommendations = []
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
@@ -2202,6 +2275,8 @@ final class PlayerStateManager {
             let position = elapsed
             let totalDuration = duration
             let saveProgress = preferences.recordsWatchProgress
+            let historyPlaylist = queue.current?.id == video.id ? activePlaylist : nil
+            let historyPlaylistOrigin = historyPlaylist == nil ? nil : activePlaylistOrigin
             Task {
                 await PersistenceWriter.shared.upsertWatchHistory(
                     videoID: video.id,
@@ -2211,7 +2286,10 @@ final class PlayerStateManager {
                     thumbnailURL: video.thumbnailURL,
                     position: position,
                     duration: totalDuration,
-                    saveProgress: saveProgress
+                    saveProgress: saveProgress,
+                    playlistID: historyPlaylist?.id,
+                    playlistTitle: historyPlaylist?.title,
+                    playlistOrigin: historyPlaylistOrigin
                 )
             }
             return
