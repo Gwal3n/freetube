@@ -31,6 +31,8 @@ struct FullScreenPlayer: View {
     @State private var captionsModel = PlayerCaptionsModel()
     @State private var isTranscriptPresented = false
     @State private var savedMomentFeedbackCount = 0
+    @State private var showsSavedMomentNotice = false
+    @State private var savedMomentNoticeGeneration = 0
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
@@ -544,6 +546,14 @@ struct FullScreenPlayer: View {
         .preferredColorScheme(.dark)
         .statusBarHidden(portraitFullscreenActive)
         .sensoryFeedback(.success, trigger: savedMomentFeedbackCount)
+        .overlay(alignment: .bottom) {
+            if showsSavedMomentNotice && player.fullScreenPresented && collapseProgress < 0.05 {
+                TransientNoticePill(title: Text("Moment saved"), systemImage: "checkmark", onUndo: nil)
+                    .padding(.bottom, PlayerLayoutMetrics.safeAreaInsets.bottom + 12)
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(reduceMotion ? nil : InterfaceMotion.notice, value: showsSavedMomentNotice)
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL
         // in a `Binding<Bool>` that flips when the URL is set/cleared so the sheet lifecycle
         // matches the user's intent.
@@ -569,9 +579,11 @@ struct FullScreenPlayer: View {
                         UIPasteboard.general.string = video.youtubeShareURL(at: time)?.absoluteString
                     },
                     onSaveMoment: { time, label in
-                        if SavedMomentStore.shared.add(video: video, time: time, label: label) != nil {
-                            savedMomentFeedbackCount &+= 1
+                        guard SavedMomentStore.shared.add(video: video, time: time, label: label) != nil else {
+                            return false
                         }
+                        savedMomentFeedbackCount &+= 1
+                        return true
                     }
                 )
                 .presentationDetents([.medium, .large])
@@ -1035,6 +1047,7 @@ struct FullScreenPlayer: View {
             onSaveCurrentMoment: {
                 if SavedMomentStore.shared.add(video: video, time: player.elapsed) != nil {
                     savedMomentFeedbackCount &+= 1
+                    showSavedMomentConfirmation()
                 }
             },
             onShareDownloadedFile: {
@@ -1047,6 +1060,21 @@ struct FullScreenPlayer: View {
                 actionsModel.startDownload(video, quality: quality)
             }
         )
+    }
+
+    private func showSavedMomentConfirmation() {
+        savedMomentNoticeGeneration &+= 1
+        let generation = savedMomentNoticeGeneration
+        withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+            showsSavedMomentNotice = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1400))
+            guard savedMomentNoticeGeneration == generation else { return }
+            withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+                showsSavedMomentNotice = false
+            }
+        }
     }
 
     // MARK: - Transport

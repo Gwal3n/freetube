@@ -46,9 +46,23 @@ final class SavedMomentStoreTests: XCTestCase {
         XCTAssertEqual(restored.savedMoments?.first?.label, "Moment")
     }
 
-    private func testVideo() -> Video {
+    func testVideoMomentsAreFilteredAndOrderedByPlaybackTime() throws {
+        let suiteName = "com.leshko.freetube.tests.savedMoments.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SavedMomentStore(defaults: defaults)
+
+        store.add(video: testVideo(), time: 80)
+        store.add(video: testVideo(id: "9bZkp7q19f0"), time: 10)
+        store.add(video: testVideo(), time: 20)
+
+        XCTAssertEqual(store.moments(for: "dQw4w9WgXcQ").map(\.time), [20, 80])
+        XCTAssertEqual(store.moments(for: "9bZkp7q19f0").map(\.time), [10])
+    }
+
+    private func testVideo(id: String = "dQw4w9WgXcQ") -> Video {
         Video(
-            id: "dQw4w9WgXcQ",
+            id: id,
             title: "Test video",
             channelID: "channel",
             channelName: "Test channel",

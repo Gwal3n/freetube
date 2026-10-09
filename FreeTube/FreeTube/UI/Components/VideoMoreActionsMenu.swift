@@ -95,6 +95,7 @@ private struct VideoActionsContent: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
     @State private var blocklist = VideoBlocklist.shared
+    @State private var savedMomentStore = SavedMomentStore.shared
 
     init(
         video: Video,
@@ -193,6 +194,7 @@ private struct VideoActionsContent: View {
         } label: {
             Label("Save to local playlist", systemImage: "bookmark")
         }
+        savedMomentsMenu
         if !video.channelID.isEmpty || !video.channelName.isEmpty {
             Divider()
             Button {
@@ -218,6 +220,31 @@ private struct VideoActionsContent: View {
     }
 
     // MARK: - Helpers
+
+    @ViewBuilder
+    private var savedMomentsMenu: some View {
+        let videoMoments = savedMomentStore.moments(for: video.id)
+        if !videoMoments.isEmpty {
+            Menu {
+                ForEach(videoMoments) { moment in
+                    Button {
+                        let preservesPlaylist = player.activePlaylist != nil
+                            && player.queue.items.contains(where: { $0.id == video.id })
+                        player.load(video, skipRecommendations: preservesPlaylist, startAt: moment.time)
+                    } label: {
+                        Label {
+                            Text(verbatim: moment.label.map { "\(moment.timestampText) · \($0)" }
+                                ?? moment.timestampText)
+                        } icon: {
+                            Image(systemName: "play")
+                        }
+                    }
+                }
+            } label: {
+                Label("Saved moments", systemImage: "bookmark.fill")
+            }
+        }
+    }
 
     private var watchURL: URL? {
         URL(string: "https://www.youtube.com/watch?v=\(video.id)")

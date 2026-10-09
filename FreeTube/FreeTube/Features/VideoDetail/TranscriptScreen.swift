@@ -9,10 +9,13 @@ struct TranscriptScreen: View {
     let onSeek: (TimeInterval) -> Void
     let onCopyText: (String) -> Void
     let onCopyTimestampLink: (TimeInterval) -> Void
-    let onSaveMoment: (TimeInterval, String) -> Void
+    let onSaveMoment: (TimeInterval, String) -> Bool
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var searchText = ""
+    @State private var showsSavedMomentNotice = false
+    @State private var savedMomentNoticeGeneration = 0
 
     var body: some View {
         NavigationStack {
@@ -71,7 +74,9 @@ struct TranscriptScreen: View {
                                         Label("Copy link at this time", systemImage: "link")
                                     }
                                     Button {
-                                        onSaveMoment(cue.startTime, cue.text)
+                                        if onSaveMoment(cue.startTime, cue.text) {
+                                            showSavedMomentConfirmation()
+                                        }
                                     } label: {
                                         Label("Save this moment", systemImage: "bookmark")
                                     }
@@ -89,6 +94,29 @@ struct TranscriptScreen: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search transcript")
+        }
+        .overlay(alignment: .bottom) {
+            if showsSavedMomentNotice {
+                TransientNoticePill(title: Text("Moment saved"), systemImage: "checkmark", onUndo: nil)
+                    .padding(.bottom, 12)
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(reduceMotion ? nil : InterfaceMotion.notice, value: showsSavedMomentNotice)
+    }
+
+    private func showSavedMomentConfirmation() {
+        savedMomentNoticeGeneration &+= 1
+        let generation = savedMomentNoticeGeneration
+        withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+            showsSavedMomentNotice = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1400))
+            guard savedMomentNoticeGeneration == generation else { return }
+            withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+                showsSavedMomentNotice = false
+            }
         }
     }
 

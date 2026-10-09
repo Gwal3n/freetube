@@ -93,6 +93,8 @@ struct PlayerInformationPanel<Actions: View>: View {
                 )
             }
 
+            SavedMomentsSection(videoID: video.id, onSeek: onSeek)
+
             VStack(alignment: .leading, spacing: 8) {
                 PlayerQueueSections(
                     showsUpNext: showsUpNext,

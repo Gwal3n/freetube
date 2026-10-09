@@ -14,6 +14,7 @@ struct PlayerPlaylistPanel: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.openURL) private var openURL
     @State private var blocklist = VideoBlocklist.shared
+    @State private var savedMomentStore = SavedMomentStore.shared
 
     let isPresented: Bool
     let isLandscape: Bool
@@ -369,6 +370,7 @@ struct PlayerPlaylistPanel: View {
 
     private func row(_ video: Video, index: Int) -> some View {
         let isCurrent = isPlayingPlaylistItem && index == player.queue.currentIndex
+        let moments = savedMomentStore.moments(for: video.id)
         return DeArrowVideoContent(video: video) { branding in
             Button {
                 // Keep the browser mounted and its scroll offset intact while playback changes.
@@ -400,6 +402,7 @@ struct PlayerPlaylistPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, 14)
+                .padding(.trailing, moments.isEmpty ? 0 : 42)
                 .frame(height: dynamicTypeSize.isAccessibilitySize ? 96 : 72)
                 .background {
                     if isCurrent {
@@ -411,7 +414,44 @@ struct PlayerPlaylistPanel: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .overlay(alignment: .trailing) {
+                playlistMomentMenu(video: video, moments: moments)
+            }
             .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isCurrent)
+        }
+    }
+
+    @ViewBuilder
+    private func playlistMomentMenu(video: Video, moments: [SavedMoment]) -> some View {
+        if !moments.isEmpty {
+            Menu {
+                ForEach(moments) { moment in
+                    Button {
+                        player.load(video, skipRecommendations: true, startAt: moment.time)
+                    } label: {
+                        Label {
+                            Text(verbatim: moment.label.map { "\(moment.timestampText) · \($0)" }
+                                ?? moment.timestampText)
+                        } icon: {
+                            Image(systemName: "play")
+                        }
+                    }
+                }
+            } label: {
+                Label {
+                    Text(verbatim: String(moments.count))
+                } icon: {
+                    Image(systemName: "bookmark.fill")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Saved moments")
+            .accessibilityValue(Text(verbatim: String(moments.count)))
+            .padding(.trailing, 12)
         }
     }
 

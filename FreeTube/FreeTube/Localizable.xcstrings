@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Moment saved" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Moment gespeichert" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Moment saved" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Momento guardado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Moment enregistré" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Момент сохранён" } }
+      }
+    },
+    "Saved moment" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherter Moment" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved moment" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Momento guardado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Moment enregistré" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранённый момент" } }
+      }
+    },
     "Saved moments" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherte Momente" } },
