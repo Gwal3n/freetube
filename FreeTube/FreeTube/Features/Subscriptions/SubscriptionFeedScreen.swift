@@ -34,20 +34,30 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                HStack(spacing: 12) {
-                    if !groups.groups.isEmpty { groupPicker }
-                    Spacer(minLength: 0)
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if !groups.groups.isEmpty { groupPicker }
+                        if model.isRefreshing || model.lastRefreshAt != nil {
+                            FeedRefreshProgress(model: model, referenceDate: currentDate)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 11)
                     filterMenu
                 }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                if model.isRefreshing || model.lastRefreshAt != nil {
-                    FeedRefreshProgress(model: model, referenceDate: currentDate)
-                }
                 if model.failedChannelCount > 0 && !model.isRefreshWarningDismissed {
                     Section {
                         refreshWarning
+                    }
+                }
+
+                if shouldShowLoadingRows {
+                    ForEach(0..<6, id: \.self) { _ in
+                        FeedSkeletonRow(largeThumbnail: largeVideoThumbnails)
+                            .modifier(SkeletonPulse(dimmedOpacity: 0.52))
                     }
                 }
 
@@ -142,15 +152,13 @@ struct SubscriptionFeedScreen: View {
             .task(id: filteredFillKey) { await fillFilteredFeed() }
             .onChange(of: filteredFillKey) { _, _ in lastFilteredPrefetchKey = nil }
             .overlay {
-                if !model.hasLoaded {
-                    MediaListPlaceholder()
-                } else if !model.hasSubscriptions && model.videos.isEmpty {
+                if model.hasLoaded && !model.hasSubscriptions && model.videos.isEmpty {
                     ContentUnavailableView(
                         "No subscriptions",
                         systemImage: "rectangle.stack.person.crop",
                         description: Text("Channels you subscribe to locally will appear here.")
                     )
-                } else if model.videos.isEmpty && model.didLastRefreshCompletelyFail {
+                } else if model.hasLoaded && model.videos.isEmpty && model.didLastRefreshCompletelyFail {
                     ContentUnavailableView {
                         Label("Unable to Refresh", systemImage: "wifi.exclamationmark")
                     } description: {
@@ -167,7 +175,7 @@ struct SubscriptionFeedScreen: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
-                } else if model.videos.isEmpty && !model.isRefreshing {
+                } else if model.hasLoaded && model.videos.isEmpty && !model.isRefreshing {
                     if model.selectedGroupID != nil {
                         ContentUnavailableView(
                             "No videos in this group",
@@ -181,10 +189,8 @@ struct SubscriptionFeedScreen: View {
                             description: Text("Pull down to refresh your subscriptions.")
                         )
                     }
-                } else if model.videos.isEmpty && model.isRefreshing {
-                    MediaListPlaceholder()
-                        .padding(.top, 44)
-                } else if filteredVideos.isEmpty && !model.canLoadMore && !model.isRefreshing {
+                } else if model.hasLoaded && !model.videos.isEmpty
+                            && filteredVideos.isEmpty && !model.canLoadMore && !model.isRefreshing {
                     ContentUnavailableView {
                         Label("No matching videos", systemImage: "line.3.horizontal.decrease")
                     } description: {
@@ -255,6 +261,10 @@ struct SubscriptionFeedScreen: View {
                     maximumMinutes: customMaximumMinutes
                 )
         }
+    }
+
+    private var shouldShowLoadingRows: Bool {
+        model.videos.isEmpty && (model.isRefreshing || !model.hasLoaded)
     }
 
     /// Feed pagination reads cached videos, but sparse filters still need several cache pages to

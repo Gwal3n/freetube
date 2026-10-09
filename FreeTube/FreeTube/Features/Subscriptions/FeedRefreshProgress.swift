@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Scrollable feed status. The same row shows bounded refresh progress or the last
-/// successful refresh age, so the list does not jump between those two states.
+/// A quiet status beneath the Feed group subtitle. It stays above loading and video rows.
 @available(iOS 17.0, *)
 struct FeedRefreshProgress: View {
     let model: SubscriptionFeedViewModel
@@ -15,26 +14,19 @@ struct FeedRefreshProgress: View {
                 lastRefreshedText(since: lastRefreshAt)
             }
 
-            Group {
-                if model.isRefreshing {
-                    ProgressView(
-                        value: Double(model.refreshedChannels),
-                        total: Double(max(1, model.refreshChannelCount))
-                    )
-                    .progressViewStyle(.linear)
-                    .tint(.white)
-                } else {
-                    Color.clear
-                }
+            if model.isRefreshing {
+                ProgressView(
+                    value: Double(model.refreshedChannels),
+                    total: Double(max(1, model.refreshChannelCount))
+                )
+                .progressViewStyle(.linear)
+                .tint(.white)
+                .frame(height: 4)
             }
-            .frame(height: 4)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 4, trailing: 16))
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
     }
