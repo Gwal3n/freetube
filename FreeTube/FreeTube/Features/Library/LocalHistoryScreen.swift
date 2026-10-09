@@ -34,60 +34,84 @@ struct LocalHistoryScreen: View {
     }
 
     var body: some View {
+        historyTasks
+    }
+
+    private var historyTasks: some View {
+        historyPresentation
+            .task {
+                if entries.isEmpty && hasMore { await loadMore() }
+            }
+            .task(id: searchText) {
+                await searchHistory()
+            }
+    }
+
+    private var historyPresentation: some View {
+        historyNavigation
+            .sheet(isPresented: $showSavedMoments, onDismiss: openSelectedMoment) {
+                SavedMomentsScreen { moment in
+                    momentToOpen = moment
+                    showSavedMoments = false
+                }
+            }
+            .navigationDestination(item: $channelToOpen) { channelID in
+                ChannelScreen(channelID: channelID)
+            }
+            .errorToast(Bindable(channelNavigation).errorState)
+    }
+
+    private var historyNavigation: some View {
         historyContent
-        .navigationTitle(mode == .continueWatching
-                         ? String(localized: "Continue Watching")
-                         : String(localized: "Local History"))
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: mode == .continueWatching
-                    ? Text("Search continue watching") : Text("Search history"))
-        .toolbar {
-            if channelNavigation.isResolving {
+            .navigationTitle(mode == .continueWatching
+                             ? String(localized: "Continue Watching")
+                             : String(localized: "Local History"))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: mode == .continueWatching
+                        ? Text("Search continue watching") : Text("Search history"))
+            .toolbar {
+                historyToolbar
+            }
+    }
+
+    @ToolbarContentBuilder
+    private var historyToolbar: some ToolbarContent {
+        if channelNavigation.isResolving {
+            ToolbarItem(placement: .topBarTrailing) {
                 ProgressView()
                     .accessibilityLabel("Opening channel")
             }
-            if mode == .all {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSavedMoments = true
-                    } label: {
-                        Label("Saved moments", systemImage: "bookmark")
-                    }
-                    .tint(.white)
+        }
+        if mode == .all {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showSavedMoments = true
+                } label: {
+                    Label("Saved moments", systemImage: "bookmark")
                 }
+                .tint(.white)
             }
-        }
-        .sheet(isPresented: $showSavedMoments, onDismiss: {
-            guard let moment = momentToOpen else { return }
-            momentToOpen = nil
-            player.load(moment.video, startAt: moment.time)
-        }) {
-            SavedMomentsScreen { moment in
-                momentToOpen = moment
-                showSavedMoments = false
-            }
-        }
-        .navigationDestination(item: $channelToOpen) { channelID in
-            ChannelScreen(channelID: channelID)
-        }
-        .errorToast(Bindable(channelNavigation).errorState)
-        .task {
-            if entries.isEmpty && hasMore { await loadMore() }
-        }
-        .task(id: searchText) {
-            guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                searchResults = []
-                return
-            }
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            let results = await PersistenceWriter.shared.searchWatchHistory(searchText)
-            guard !Task.isCancelled else { return }
-            searchResults = results
         }
     }
 
-    @ViewBuilder
+    private func openSelectedMoment() {
+        guard let moment = momentToOpen else { return }
+        momentToOpen = nil
+        player.load(moment.video, startAt: moment.time)
+    }
+
+    private func searchHistory() async {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            searchResults = []
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(250))
+        guard !Task.isCancelled else { return }
+        let results = await PersistenceWriter.shared.searchWatchHistory(searchText)
+        guard !Task.isCancelled else { return }
+        searchResults = results
+    }
+
     private var historyContent: some View {
         Group {
             if !hasLoaded {
