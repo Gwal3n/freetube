@@ -29,6 +29,11 @@ struct LocalPlaylistScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
 
+    init(playlistID: String, initialSearchText: String = "") {
+        self.playlistID = playlistID
+        _searchText = State(initialValue: initialSearchText)
+    }
+
     var body: some View {
         List(selection: $selectedVideoIDs) {
             if let details {
@@ -193,10 +198,12 @@ struct LocalPlaylistScreen: View {
     }
 
     private func visibleVideos(in details: LocalPlaylistDetails) -> [Video] {
-        guard !searchText.isEmpty else { return details.videos }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return details.videos }
         return details.videos.filter {
-            $0.title.localizedStandardContains(searchText)
-                || $0.channelName.localizedStandardContains(searchText)
+            $0.title.localizedStandardContains(query)
+                || $0.channelName.localizedStandardContains(query)
+                || $0.id.localizedStandardContains(query)
         }
     }
 

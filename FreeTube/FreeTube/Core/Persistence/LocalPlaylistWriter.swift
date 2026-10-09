@@ -33,6 +33,36 @@ actor LocalPlaylistWriter {
         }
     }
 
+    /// Searches saved video metadata across local playlists. Return one matching title per
+    /// playlist so the Library can explain why a playlist with a different name appears.
+    /// Fetch in bounded pages rather than materializing every imported video at once.
+    func playlistsMatchingVideo(query: String) -> [String: String] {
+        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !search.isEmpty else { return [:] }
+
+        var matches: [String: String] = [:]
+        var offset = 0
+        let pageSize = 400
+        while !Task.isCancelled {
+            var descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(
+                sortBy: [SortDescriptor(\LocalPlaylistVideoRecord.membershipID)]
+            )
+            descriptor.fetchOffset = offset
+            descriptor.fetchLimit = pageSize
+            guard let page = try? modelContext.fetch(descriptor) else { break }
+            for item in page where matches[item.playlistID] == nil {
+                if item.title.localizedStandardContains(search)
+                    || item.channelName.localizedStandardContains(search)
+                    || item.videoID.localizedStandardContains(search) {
+                    matches[item.playlistID] = item.title
+                }
+            }
+            guard page.count == pageSize else { break }
+            offset += page.count
+        }
+        return matches
+    }
+
     func details(playlistID: String) -> LocalPlaylistDetails? {
         let target = playlistID
         let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })

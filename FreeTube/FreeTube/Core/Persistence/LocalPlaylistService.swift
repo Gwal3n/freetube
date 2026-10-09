@@ -18,6 +18,9 @@ final class LocalPlaylistService: Sendable {
     }
 
     func playlists() async -> [LocalPlaylistSnapshot] { await writer.playlists() }
+    func playlistsMatchingVideo(query: String) async -> [String: String] {
+        await writer.playlistsMatchingVideo(query: query)
+    }
     func details(id: String) async -> LocalPlaylistDetails? { await writer.details(playlistID: id) }
     func create(title: String) async -> String { await writer.create(title: title) }
     func add(video: Video, to playlistID: String) async { await writer.add(video: video, to: playlistID) }

@@ -15,9 +15,17 @@ struct LocalPlaylistsScreen: View {
     @State private var editingPlaylist: LocalPlaylistSnapshot?
     @State private var pendingContextDeletion: LocalPlaylistSnapshot?
     @State private var searchText = ""
+    @State private var videoSearchMatches: [String: String] = [:]
+    @State private var completedVideoSearchQuery = ""
+    @State private var isSearchingVideos = false
+    @State private var searchRevision = 0
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
     @State private var downloads = DownloadsStore.shared
     private let service = LocalPlaylistService()
+
+    private var searchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         List(selection: $selectedPlaylistIDs) {
@@ -38,6 +46,10 @@ struct LocalPlaylistsScreen: View {
                     systemImage: "music.note.list",
                     description: Text("Create a playlist here or import playlists from Settings.")
                 )
+            } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty
+                        && !searchQuery.isEmpty
+                        && (isSearchingVideos || completedVideoSearchQuery != searchQuery) {
+                ProgressView("Searching saved videos…")
             } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty {
                 ContentUnavailableView.search(text: searchText)
             }
@@ -69,6 +81,25 @@ struct LocalPlaylistsScreen: View {
         .task {
             await reload()
             await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
+        }
+        .task(id: "\(searchRevision):\(searchText)") {
+            let query = searchQuery
+            if completedVideoSearchQuery != query {
+                videoSearchMatches = [:]
+                completedVideoSearchQuery = ""
+            }
+            guard !query.isEmpty else {
+                isSearchingVideos = false
+                return
+            }
+            isSearchingVideos = true
+            do { try await Task.sleep(for: .milliseconds(250)) }
+            catch { return }
+            let matches = await service.playlistsMatchingVideo(query: query)
+            guard !Task.isCancelled else { return }
+            videoSearchMatches = matches
+            completedVideoSearchQuery = query
+            isSearchingVideos = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
@@ -118,6 +149,7 @@ struct LocalPlaylistsScreen: View {
         guard !Task.isCancelled else { return }
         playlists = loaded
         hasLoaded = true
+        searchRevision &+= 1
     }
 
     private func create() async {
@@ -162,7 +194,10 @@ struct LocalPlaylistsScreen: View {
 
     private func playlistLink(_ playlist: LocalPlaylistSnapshot, availableIDs: Set<String>) -> some View {
         NavigationLink {
-            LocalPlaylistScreen(playlistID: playlist.id)
+            LocalPlaylistScreen(
+                playlistID: playlist.id,
+                initialSearchText: matchingVideoTitle(in: playlist) == nil ? "" : searchQuery
+            )
         } label: {
             playlistLabel(playlist, availableIDs: availableIDs)
         }
@@ -235,6 +270,12 @@ struct LocalPlaylistsScreen: View {
                 Text(playlist.title).appFont(.body).lineLimit(1)
                 Text("\(playlist.videoCount) \(playlist.videoCount == 1 ? "video" : "videos")")
                     .appFont(.caption).foregroundStyle(.secondary)
+                if let matchingTitle = matchingVideoTitle(in: playlist) {
+                    Text("Contains “\(matchingTitle)”")
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 if playlist.isHydratingMetadata {
                     ProgressView(
                         value: Double(playlist.metadataHydrationProcessed),
@@ -274,11 +315,22 @@ struct LocalPlaylistsScreen: View {
     }
 
     private var visiblePlaylists: [LocalPlaylistSnapshot] {
-        guard !searchText.isEmpty else { return playlists }
+        let query = searchQuery
+        guard !query.isEmpty else { return playlists }
         return playlists.filter {
-            $0.title.localizedStandardContains(searchText)
-                || ($0.descriptionText?.localizedStandardContains(searchText) ?? false)
+            $0.title.localizedStandardContains(query)
+                || ($0.descriptionText?.localizedStandardContains(query) ?? false)
+                || (completedVideoSearchQuery == query && videoSearchMatches[$0.id] != nil)
         }
+    }
+
+    private func matchingVideoTitle(in playlist: LocalPlaylistSnapshot) -> String? {
+        let query = searchQuery
+        guard !query.isEmpty,
+              completedVideoSearchQuery == query,
+              !playlist.title.localizedStandardContains(query),
+              !(playlist.descriptionText?.localizedStandardContains(query) ?? false) else { return nil }
+        return videoSearchMatches[playlist.id]
     }
 
     private func movePlaylists(
