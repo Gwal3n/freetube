@@ -16,11 +16,14 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
     @AppStorage("feedWatchFilter") private var watchFilterRaw = FeedWatchFilter.all.rawValue
     @AppStorage("feedDurationFilter") private var durationFilterRaw = FeedDurationFilter.all.rawValue
+    @AppStorage("feedCustomDurationMinimumMinutes") private var customMinimumMinutes = 0
+    @AppStorage("feedCustomDurationMaximumMinutes") private var customMaximumMinutes = 60
     @AppStorage("automaticFeedRefreshEnabled") private var automaticFeedRefreshEnabled = false
     @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
     @State private var currentDate = Date.now
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
+    @State private var isCustomDurationPresented = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
@@ -47,6 +50,14 @@ struct SubscriptionFeedScreen: View {
                     feedRow(video)
                 }
 
+                if filteredVideos.isEmpty && !model.videos.isEmpty && model.canLoadMore {
+                    Text("No loaded videos match. Load more to check the next page.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .listRowSeparator(.hidden)
+                }
+
                 if model.canLoadMore {
                     Button {
                         Task { await model.loadMore() }
@@ -63,7 +74,9 @@ struct SubscriptionFeedScreen: View {
                     .disabled(model.isLoadingMore || model.isRefreshing)
                     .id(automaticLoadKey)
                     .onAppear {
-                        guard !model.isRefreshing,
+                        guard watchFilter == .all,
+                              durationFilter == .all,
+                              !model.isRefreshing,
                               lastAutomaticLoadKey != automaticLoadKey else { return }
                         lastAutomaticLoadKey = automaticLoadKey
                         Task { await model.loadMore() }
@@ -86,6 +99,16 @@ struct SubscriptionFeedScreen: View {
                         .onAppear { log.info("Feed channel destination appeared") }
                 case .playlist(let id): PlaylistScreen(playlistID: id)
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
+                }
+            }
+            .sheet(isPresented: $isCustomDurationPresented) {
+                FeedDurationRangeSheet(
+                    minimumMinutes: customMinimumMinutes,
+                    maximumMinutes: customMaximumMinutes
+                ) { minimum, maximum in
+                    customMinimumMinutes = minimum
+                    customMaximumMinutes = maximum
+                    durationFilterRaw = FeedDurationFilter.custom.rawValue
                 }
             }
             .refreshable { await model.refresh() }
@@ -178,7 +201,7 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var automaticLoadKey: String {
-        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw)"
+        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes)"
     }
 
     private var watchFilter: FeedWatchFilter {
@@ -192,13 +215,17 @@ struct SubscriptionFeedScreen: View {
     private var filteredVideos: [Video] {
         model.videos.filter { video in
             watchFilter.includes(model.watchStatuses[video.id])
-                && durationFilter.includes(video.duration)
+                && durationFilter.includes(
+                    video.duration,
+                    minimumMinutes: customMinimumMinutes,
+                    maximumMinutes: customMaximumMinutes
+                )
         }
     }
 
     private var filterMenu: some View {
         Menu {
-            Section("Watch status") {
+            Menu("Watch status") {
                 ForEach(FeedWatchFilter.allCases) { option in
                     Button {
                         watchFilterRaw = option.rawValue
@@ -211,10 +238,14 @@ struct SubscriptionFeedScreen: View {
                     }
                 }
             }
-            Section("Duration") {
+            Menu("Duration") {
                 ForEach(FeedDurationFilter.allCases) { option in
                     Button {
-                        durationFilterRaw = option.rawValue
+                        if option == .custom {
+                            isCustomDurationPresented = true
+                        } else {
+                            durationFilterRaw = option.rawValue
+                        }
                     } label: {
                         if durationFilter == option {
                             Label(option.title, systemImage: "checkmark")
@@ -439,7 +470,7 @@ private enum FeedWatchFilter: String, CaseIterable, Identifiable {
 }
 
 private enum FeedDurationFilter: String, CaseIterable, Identifiable {
-    case all, underFourMinutes, fourToTwentyMinutes, overTwentyMinutes
+    case all, underFourMinutes, fourToTwentyMinutes, overTwentyMinutes, custom
 
     var id: String { rawValue }
 
@@ -449,10 +480,15 @@ private enum FeedDurationFilter: String, CaseIterable, Identifiable {
         case .underFourMinutes: "Under 4 minutes"
         case .fourToTwentyMinutes: "4–20 minutes"
         case .overTwentyMinutes: "Over 20 minutes"
+        case .custom: "Custom range…"
         }
     }
 
-    func includes(_ duration: TimeInterval?) -> Bool {
+    func includes(
+        _ duration: TimeInterval?,
+        minimumMinutes: Int,
+        maximumMinutes: Int
+    ) -> Bool {
         guard self != .all else { return true }
         guard let duration, duration.isFinite, duration > 0 else { return false }
         return switch self {
@@ -460,6 +496,9 @@ private enum FeedDurationFilter: String, CaseIterable, Identifiable {
         case .underFourMinutes: duration < 240
         case .fourToTwentyMinutes: duration >= 240 && duration <= 1200
         case .overTwentyMinutes: duration > 1200
+        case .custom:
+            duration >= TimeInterval(max(0, minimumMinutes)) * 60
+                && (maximumMinutes == 0 || duration <= TimeInterval(maximumMinutes) * 60)
         }
     }
 }
