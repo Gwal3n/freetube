@@ -26,14 +26,19 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
 
         // Four requests at a time is responsive without creating a burst for large CSV imports.
         for batchStart in stride(from: 0, to: subscriptions.count, by: 4) {
+            guard !Task.isCancelled else { break }
             let batch = Array(subscriptions[batchStart..<min(batchStart + 4, subscriptions.count)])
             await withTaskGroup(of: ChannelResult.self) { group in
                 for subscription in batch {
+                    guard !Task.isCancelled else { break }
                     group.addTask { [channelService] in
                         do {
+                            try Task.checkCancellation()
+                            let videos = try await channelService.fetchLatestVideos(channelID: subscription.id)
+                            try Task.checkCancellation()
                             return .success(
                                 channelID: subscription.id,
-                                videos: try await channelService.fetchLatestVideos(channelID: subscription.id)
+                                videos: videos
                             )
                         } catch {
                             return .failure(subscription)
@@ -41,6 +46,10 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
                     }
                 }
                 for await result in group {
+                    if Task.isCancelled {
+                        group.cancelAll()
+                        break
+                    }
                     switch result {
                     case .success(let channelID, let videos):
                         await writer.replaceSubscriptionFeedChannel(channelID: channelID, videos: videos, refreshedAt: .now)

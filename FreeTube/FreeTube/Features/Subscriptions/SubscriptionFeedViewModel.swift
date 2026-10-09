@@ -25,6 +25,8 @@ final class SubscriptionFeedViewModel {
     private let pageSize = 100
     private var visibleLimit = 100
     private var cacheGeneration = 0
+    @ObservationIgnored private var activeRefreshTask: Task<SubscriptionFeedRefresh, Never>?
+    @ObservationIgnored private var activeRefreshID: UUID?
 
     private let service: any SubscriptionFeedServicing
     private let writer: PersistenceWriter
@@ -87,14 +89,40 @@ final class SubscriptionFeedViewModel {
 
     func refresh() async {
         guard !isRefreshing else { return }
+        let refreshID = UUID()
+        activeRefreshID = refreshID
         isRefreshing = true
         lastRefreshAttemptAt = .now
         failedChannels = []
         isRefreshWarningDismissed = false
         refreshedChannels = 0
-        refreshChannelCount = subscriptions.subscriptions.count
-        let result = await service.refresh(subscriptions: subscriptions.subscriptions) { [weak self] completed, total in
-            await self?.updateRefreshProgress(completed: completed, total: total)
+        let snapshot = subscriptions.subscriptions
+        refreshChannelCount = snapshot.count
+        let task = Task { [service] in
+            await service.refresh(subscriptions: snapshot) { [weak self] completed, total in
+                await self?.updateRefreshProgress(completed: completed, total: total, for: refreshID)
+            }
+        }
+        activeRefreshTask = task
+        let result = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        guard activeRefreshID == refreshID else {
+            // A cancelled run may already have saved completed channels. Show those cached rows
+            // once its in-flight batch has drained, unless a newer refresh has started.
+            if activeRefreshID == nil { await loadCache() }
+            return
+        }
+        activeRefreshTask = nil
+        activeRefreshID = nil
+        if task.isCancelled {
+            isRefreshing = false
+            refreshedChannels = 0
+            refreshChannelCount = 0
+            await loadCache()
+            return
         }
         failedChannels = result.failedChannels
         visibleLimit = pageSize
@@ -102,11 +130,23 @@ final class SubscriptionFeedViewModel {
         isRefreshing = false
     }
 
+    func cancelRefresh() {
+        guard isRefreshing else { return }
+        activeRefreshID = nil
+        activeRefreshTask?.cancel()
+        activeRefreshTask = nil
+        isRefreshing = false
+        refreshedChannels = 0
+        refreshChannelCount = 0
+        failedChannels = []
+    }
+
     func dismissRefreshWarning() {
         isRefreshWarningDismissed = true
     }
 
-    private func updateRefreshProgress(completed: Int, total: Int) {
+    private func updateRefreshProgress(completed: Int, total: Int, for refreshID: UUID) {
+        guard activeRefreshID == refreshID else { return }
         refreshedChannels = completed
         refreshChannelCount = total
     }

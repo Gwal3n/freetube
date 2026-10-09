@@ -13,6 +13,16 @@ enum PlayerLayoutMetrics {
         keyWindow?.safeAreaInsets ?? .zero
     }
 
+    /// Keep the HUD on the side opposite the portrait top edge when rotated to landscape.
+    /// In portrait, either side is clear at the video's mid-height.
+    static func swipeAdjustmentHUDX(surfaceWidth: CGFloat) -> CGFloat {
+        let inset = min(34, surfaceWidth / 2)
+        if keyWindow?.windowScene?.interfaceOrientation == .landscapeLeft {
+            return inset
+        }
+        return surfaceWidth - inset
+    }
+
     static var bottomTabBarClearance: CGFloat {
         guard let window = keyWindow else { return 50 }
         guard let tabBar = visibleTabBar(in: window) else { return window.safeAreaInsets.bottom + 50 }

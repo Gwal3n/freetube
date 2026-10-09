@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Compact side HUD for a one-finger brightness or player-volume adjustment.
+/// Compact HUD for one-finger brightness or player-volume adjustment.
 @available(iOS 17.0, *)
 struct PlayerSwipeAdjustmentOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -31,7 +31,7 @@ struct PlayerSwipeAdjustmentOverlay: View {
                 .frame(width: 48, height: 126)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .position(
-                    x: kind == .brightness ? 34 : max(34, surfaceSize.width - 34),
+                    x: PlayerLayoutMetrics.swipeAdjustmentHUDX(surfaceWidth: surfaceSize.width),
                     y: surfaceSize.height / 2
                 )
                 .transition(.opacity)

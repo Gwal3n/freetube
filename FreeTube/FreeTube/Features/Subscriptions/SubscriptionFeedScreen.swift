@@ -38,7 +38,8 @@ struct SubscriptionFeedScreen: View {
                     FeedRefreshProgress(
                         model: model,
                         referenceDate: currentDate,
-                        hasLeadingContent: !groups.groups.isEmpty
+                        hasLeadingContent: !groups.groups.isEmpty,
+                        onCancel: { model.cancelRefresh() }
                     ) {
                         groupPicker
                     }

@@ -6,17 +6,20 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
     let model: SubscriptionFeedViewModel
     let referenceDate: Date
     let hasLeadingContent: Bool
+    let onCancel: () -> Void
     let leadingContent: LeadingContent
 
     init(
         model: SubscriptionFeedViewModel,
         referenceDate: Date,
         hasLeadingContent: Bool,
+        onCancel: @escaping () -> Void,
         @ViewBuilder leadingContent: () -> LeadingContent
     ) {
         self.model = model
         self.referenceDate = referenceDate
         self.hasLeadingContent = hasLeadingContent
+        self.onCancel = onCancel
         self.leadingContent = leadingContent()
     }
 
@@ -28,8 +31,21 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if model.isRefreshing || model.lastRefreshAt != nil {
-                    status
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    HStack(spacing: 0) {
+                        status
+                        if model.isRefreshing {
+                            Button(action: onCancel) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Cancel feed refresh")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 24)
