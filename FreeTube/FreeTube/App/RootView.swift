@@ -17,6 +17,9 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var selectedTab: Tab
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideFeed") private var incognitoHideFeed = false
+    @AppStorage("incognitoHideLibrary") private var incognitoHideLibrary = false
     @AppStorage("appFontPreset") private var appFontPresetRaw = AppFontPreset.system.rawValue
     @State private var navigationRouter = AppNavigationRouter()
     @State private var incomingLinkModel = IncomingLinkViewModel()
@@ -32,6 +35,14 @@ struct RootView: View {
 
     enum Tab: String, Hashable {
         case feed, search, library, downloads
+    }
+
+    private var showsFeed: Bool {
+        showSubscriptionFeedTab && !(incognitoEnabled && incognitoHideFeed)
+    }
+
+    private var showsLibrary: Bool {
+        !(incognitoEnabled && incognitoHideLibrary)
     }
 
     private var queueNoticeBottomPadding: CGFloat {
@@ -105,7 +116,11 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                selectedTab = tab == .feed && !showSubscriptionFeedTab ? .search : tab
+                if (tab == .feed && !showsFeed) || (tab == .library && !showsLibrary) {
+                    selectedTab = .search
+                } else {
+                    selectedTab = tab
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
@@ -133,14 +148,13 @@ struct RootView: View {
         }
         .onAppear {
             log.info("Root appeared with tab=\(selectedTab.rawValue, privacy: .public)")
-            if !showSubscriptionFeedTab, selectedTab == .feed {
-                selectedTab = .search
-            }
+            selectVisibleTabIfNeeded()
         }
-        .onChange(of: showSubscriptionFeedTab) { _, isVisible in
-            if !isVisible, selectedTab == .feed {
-                selectedTab = .search
-            }
+        .onChange(of: showsFeed) { _, _ in
+            selectVisibleTabIfNeeded()
+        }
+        .onChange(of: showsLibrary) { _, _ in
+            selectVisibleTabIfNeeded()
         }
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
@@ -151,9 +165,16 @@ struct RootView: View {
     private var tabShell: some View {
         RootTabShell(
             selection: $selectedTab,
-            showsFeed: showSubscriptionFeedTab
+            showsFeed: showsFeed,
+            showsLibrary: showsLibrary
         )
         .environment(navigationRouter)
+    }
+
+    private func selectVisibleTabIfNeeded() {
+        if (selectedTab == .feed && !showsFeed) || (selectedTab == .library && !showsLibrary) {
+            selectedTab = .search
+        }
     }
 
     /// Open player/context-menu links in the current tab's existing navigation stack. Ordinary

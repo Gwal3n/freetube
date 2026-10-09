@@ -19,6 +19,8 @@ struct LocalHistoryScreen: View {
     @State private var channelNavigation = LocalHistoryChannelNavigationModel()
     @State private var channelToOpen: String?
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     private let pageSize = 50
 
     init(mode: Mode = .all) {
@@ -54,7 +56,8 @@ struct LocalHistoryScreen: View {
                                 VideoRow(
                                     video: video,
                                     accessory: .actions(offersPlayNext: true),
-                                    playbackProgress: showHistoryProgressBars ? entry.resumableProgress : nil,
+                                    playbackProgress: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+                                        ? entry.resumableProgress : nil,
                                     onOpenChannel: {
                                         if let channelID = entry.channelID, !channelID.isEmpty {
                                             channelToOpen = channelID

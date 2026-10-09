@@ -133,7 +133,8 @@ actor PersistenceWriter {
         channelID: String,
         thumbnailURL: URL?,
         position: TimeInterval,
-        duration: TimeInterval
+        duration: TimeInterval,
+        saveProgress: Bool = true
     ) {
         let target = videoID
         let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
@@ -143,7 +144,7 @@ actor PersistenceWriter {
             existing.channelName = channelName
             if !channelID.isEmpty { existing.channelID = channelID }
             existing.thumbnailURL = thumbnailURL
-            existing.lastPosition = position
+            if saveProgress { existing.lastPosition = position }
             existing.duration = duration
         } else {
             modelContext.insert(WatchHistoryEntry(
@@ -152,7 +153,7 @@ actor PersistenceWriter {
                 channelName: channelName,
                 channelID: channelID.isEmpty ? nil : channelID,
                 thumbnailURL: thumbnailURL,
-                lastPosition: position,
+                lastPosition: saveProgress ? position : 0,
                 duration: duration
             ))
         }

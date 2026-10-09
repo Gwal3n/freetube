@@ -45,6 +45,14 @@ struct UserPreferences {
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true
+    /// Incognito keeps existing local data intact while changing what this session records or shows.
+    @AppStorage("incognitoEnabled") var incognitoEnabled: Bool = false
+    @AppStorage("incognitoSkipSearchHistory") var incognitoSkipSearchHistory: Bool = true
+    @AppStorage("incognitoSkipWatchHistory") var incognitoSkipWatchHistory: Bool = true
+    @AppStorage("incognitoSkipWatchProgress") var incognitoSkipWatchProgress: Bool = true
+    @AppStorage("incognitoHideWatchProgress") var incognitoHideWatchProgress: Bool = true
+    @AppStorage("incognitoHideFeed") var incognitoHideFeed: Bool = false
+    @AppStorage("incognitoHideLibrary") var incognitoHideLibrary: Bool = false
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
     /// Fetches expanded details and the first comments page only after playback is ready. Further
     /// comment pages and replies always remain user initiated.
@@ -102,6 +110,22 @@ struct UserPreferences {
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var recordsSearchHistory: Bool {
+        saveSearchHistory && !(incognitoEnabled && incognitoSkipSearchHistory)
+    }
+
+    var recordsWatchHistory: Bool {
+        saveWatchHistory && !(incognitoEnabled && incognitoSkipWatchHistory)
+    }
+
+    var recordsWatchProgress: Bool {
+        recordsWatchHistory && !(incognitoEnabled && incognitoSkipWatchProgress)
+    }
+
+    var displaysWatchProgress: Bool {
+        showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
     }
 
     var libraryShelfContent: LibraryShelfContent {

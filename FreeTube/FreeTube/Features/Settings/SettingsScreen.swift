@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsScreen: View {
     let onClose: () -> Void
     @Environment(PlayerStateManager.self) private var player
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -85,6 +86,22 @@ struct SettingsScreen: View {
                     Text("Search")
                 } footer: {
                     Text("Turning off recent searches stops saving new queries. Existing searches remain until cleared from Search.")
+                }
+
+                Section("Privacy") {
+                    NavigationLink {
+                        IncognitoSettingsScreen()
+                    } label: {
+                        HStack {
+                            navigationLabel("Incognito", systemImage: "eye.slash")
+                            Spacer()
+                            if incognitoEnabled {
+                                Text("On")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .tint(.white)
                 }
 
                 Section {

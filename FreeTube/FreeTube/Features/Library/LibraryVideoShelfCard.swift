@@ -6,6 +6,8 @@ import SwiftUI
 struct LibraryVideoShelfCard: View {
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @State private var launchAnchor = VideoLaunchAnchor()
 
     let entry: WatchHistorySnapshot
@@ -34,7 +36,8 @@ struct LibraryVideoShelfCard: View {
                 VideoThumbnail(
                     video: video,
                     size: CGSize(width: 160, height: 90),
-                    progress: showHistoryProgressBars ? entry.resumableProgress : nil
+                    progress: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+                        ? entry.resumableProgress : nil
                 )
                 .onGeometryChange(for: CGRect.self) { proxy in
                     proxy.frame(in: .global)

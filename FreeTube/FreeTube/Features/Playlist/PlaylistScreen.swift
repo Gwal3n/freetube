@@ -26,6 +26,8 @@ struct PlaylistScreen: View {
     @State private var showsNavigationTitle = false
     @State private var searchText = ""
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @State private var playbackProgress: [String: Double] = [:]
 
     init(playlistID: String) {
@@ -37,6 +39,10 @@ struct PlaylistScreen: View {
     }
 
     private var isSearching: Bool { !searchQuery.isEmpty }
+
+    private var displaysWatchProgress: Bool {
+        showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+    }
 
     var body: some View {
         ScrollView {
@@ -98,9 +104,9 @@ struct PlaylistScreen: View {
             guard let id = model.details?.playlist.id else { return }
             isSavedLocally = await localPlaylistService.isRemoteSaved(id: id)
         }
-        .task(id: "\(showHistoryProgressBars):" + (model.details?.videos.map(\.id).joined(separator: ",") ?? "")) {
+        .task(id: "\(showHistoryProgressBars):\(incognitoEnabled):\(incognitoHideWatchProgress):" + (model.details?.videos.map(\.id).joined(separator: ",") ?? "")) {
             let ids = model.details?.videos.map(\.id) ?? []
-            playbackProgress = showHistoryProgressBars
+            playbackProgress = displaysWatchProgress
                 ? await PersistenceWriter.shared.watchProgress(videoIDs: ids)
                 : [:]
         }
@@ -302,7 +308,7 @@ struct PlaylistScreen: View {
                     VideoRow(
                         video: video,
                         accessory: .actions(offersPlayNext: true),
-                        playbackProgress: showHistoryProgressBars ? playbackProgress[video.id] : nil
+                        playbackProgress: displaysWatchProgress ? playbackProgress[video.id] : nil
                     ) {
                         // Make sure the queue reflects the playlist's order before kicking off
                         // playback, so "next video" actually means the next playlist entry.

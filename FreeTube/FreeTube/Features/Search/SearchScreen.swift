@@ -33,6 +33,9 @@ struct SearchContent: View {
     @State private var areChannelsExpanded = true
     @State private var areVideosExpanded = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
+    @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
@@ -63,7 +66,7 @@ struct SearchContent: View {
                     }
                     .buttonStyle(.bordered)
                 }
-            } else if !history.isEmpty {
+            } else if !history.isEmpty && !(incognitoEnabled && incognitoSkipSearchHistory) {
                 historyList
             } else {
                 ContentUnavailableView(
@@ -417,7 +420,7 @@ struct SearchContent: View {
     }
 
     private func progressLookupID(for videos: [Video]) -> String {
-        "\(showHistoryProgressBars):" + videos.map(\.id).joined(separator: ",")
+        "\(showHistoryProgressBars):\(incognitoEnabled):\(incognitoHideWatchProgress):" + videos.map(\.id).joined(separator: ",")
     }
 
     /// Fill a sparse filtered list without turning a very narrow filter into an unlimited stream
@@ -472,7 +475,7 @@ struct SearchContent: View {
         let summary = await PersistenceWriter.shared.watchHistorySummary(videoIDs: ids)
         guard !Task.isCancelled, model.results?.videos.map(\.id) == ids else { return }
         watchStatusByVideoID = summary.statuses
-        progressByVideoID = showHistoryProgressBars ? summary.progress : [:]
+        progressByVideoID = UserPreferences().displaysWatchProgress ? summary.progress : [:]
     }
 
     @ViewBuilder

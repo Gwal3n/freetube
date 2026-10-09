@@ -5,6 +5,7 @@ import SwiftUI
 struct RootTabShell: View {
     @Binding var selection: RootView.Tab
     let showsFeed: Bool
+    let showsLibrary: Bool
 
     private let downloads = DownloadManager.shared
 
@@ -27,9 +28,11 @@ struct RootTabShell: View {
                     }
                 }
 
-                SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
-                    NavigationStack {
-                        LibraryScreen()
+                if showsLibrary {
+                    SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
+                        NavigationStack {
+                            LibraryScreen()
+                        }
                     }
                 }
 
@@ -61,11 +64,13 @@ struct RootTabShell: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(RootView.Tab.search)
 
-            NavigationStack {
-                LibraryScreen()
+            if showsLibrary {
+                NavigationStack {
+                    LibraryScreen()
+                }
+                    .tabItem { Label("Library", systemImage: "play.square.stack") }
+                    .tag(RootView.Tab.library)
             }
-                .tabItem { Label("Library", systemImage: "play.square.stack") }
-                .tag(RootView.Tab.library)
 
             DownloadsScreen()
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }

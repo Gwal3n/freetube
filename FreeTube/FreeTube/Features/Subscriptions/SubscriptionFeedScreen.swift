@@ -12,6 +12,8 @@ struct SubscriptionFeedScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
     @AppStorage("feedWatchFilter") private var watchFilterRaw = FeedWatchFilter.all.rawValue
@@ -520,7 +522,7 @@ struct SubscriptionFeedScreen: View {
                 onTap: { player.load(video) },
                 showsMoreMenu: true,
                 offersPlayNext: true,
-                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil,
+                playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             )
@@ -540,13 +542,17 @@ struct SubscriptionFeedScreen: View {
             VideoRow(
                 video: video,
                 accessory: .actions(offersPlayNext: true),
-                playbackProgress: showHistoryProgressBars ? model.playbackProgress[video.id] : nil,
+                playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             ) {
                 player.load(video)
             }
         }
+    }
+
+    private var displaysWatchProgress: Bool {
+        showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
     }
 }
 

@@ -547,7 +547,7 @@ final class PlayerStateManager {
             )
         }
         refreshArtwork(for: video)
-        if preferences.saveWatchHistory, historyRecordedVideoID == video.id {
+        if preferences.recordsWatchHistory, historyRecordedVideoID == video.id {
             Task {
                 await PersistenceWriter.shared.updateWatchHistoryMetadata(
                     videoID: video.id,
@@ -1670,7 +1670,7 @@ final class PlayerStateManager {
         // The model-actor read runs alongside network resolution and is consumed only after the
         // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
         let resumeLookup = Task<(position: TimeInterval, duration: TimeInterval)?, Never> {
-            guard preferences.saveWatchHistory else { return nil }
+            guard preferences.recordsWatchProgress else { return nil }
             return await PersistenceWriter.shared.watchProgress(videoID: video.id)
         }
         loadState = .resolving
@@ -2163,7 +2163,7 @@ final class PlayerStateManager {
         _ progress: (position: TimeInterval, duration: TimeInterval)?,
         for video: Video
     ) {
-        guard preferences.saveWatchHistory,
+        guard preferences.recordsWatchProgress,
               currentVideo?.id == video.id,
               let progress,
               progress.position.isFinite,
@@ -2179,8 +2179,13 @@ final class PlayerStateManager {
     /// Writes at most every ten seconds during playback, plus forced lifecycle saves. Duplicate
     /// pause/dismiss/video-switch calls are suppressed when the position has not advanced.
     private func persistCurrentPlaybackProgress(force: Bool) {
-        guard preferences.saveWatchHistory,
-              let video = currentVideo,
+        guard preferences.recordsWatchHistory else {
+            historyRecordedVideoID = nil
+            historyPlaybackSeconds = 0
+            lastHistoryPlaybackTick = nil
+            return
+        }
+        guard let video = currentVideo,
               !video.id.hasPrefix("fetch-"),
               elapsed.isFinite,
               duration.isFinite,
@@ -2196,6 +2201,7 @@ final class PlayerStateManager {
             lastSavedProgressPosition = elapsed
             let position = elapsed
             let totalDuration = duration
+            let saveProgress = preferences.recordsWatchProgress
             Task {
                 await PersistenceWriter.shared.upsertWatchHistory(
                     videoID: video.id,
@@ -2204,11 +2210,13 @@ final class PlayerStateManager {
                     channelID: video.channelID,
                     thumbnailURL: video.thumbnailURL,
                     position: position,
-                    duration: totalDuration
+                    duration: totalDuration,
+                    saveProgress: saveProgress
                 )
             }
             return
         }
+        guard preferences.recordsWatchProgress else { return }
         let now = Date()
         if !force, now.timeIntervalSince(lastProgressSaveAt) < 10 { return }
         if lastSavedProgressVideoID == video.id,
@@ -2231,6 +2239,12 @@ final class PlayerStateManager {
     }
 
     private func accumulateHistoryPlaybackTime() {
+        guard preferences.recordsWatchHistory else {
+            historyRecordedVideoID = nil
+            historyPlaybackSeconds = 0
+            lastHistoryPlaybackTick = nil
+            return
+        }
         let now = Date()
         guard player.timeControlStatus == .playing else {
             lastHistoryPlaybackTick = nil
