@@ -32,6 +32,72 @@ final class PlaylistLoadingTests: XCTestCase {
         XCTAssertNotNil(model.errorState)
         XCTAssertFalse(model.isLoading)
     }
+
+    func testPlaylistSearchContinuesPastFirstMatch() async {
+        let service = PagedPlaylistService()
+        let model = PlaylistViewModel(playlistID: "playlist", service: service)
+        await model.load()
+
+        // The first page already matches. Search still needs later pages, because they may
+        // contain another matching video that should appear in the filtered results.
+        await model.loadRemainingPagesForSearch(for: "match")
+
+        XCTAssertEqual(service.requestedTokens, ["page-2", "page-3"])
+        XCTAssertEqual(model.details?.videos.map(\.title), ["First match", "Other", "Last match"])
+        XCTAssertNil(model.details?.continuationToken)
+        XCTAssertFalse(model.isSearchingPages)
+    }
+}
+
+@MainActor
+private final class PagedPlaylistService: PlaylistServicing {
+    private(set) var requestedTokens: [String] = []
+
+    func fetchPlaylist(id: String) async throws -> PlaylistDetails {
+        PlaylistDetails(
+            playlist: Playlist(
+                id: id, title: "Playlist", channelID: nil, channelName: nil,
+                thumbnailURL: nil, videoCount: 3, descriptionText: nil, isOwnedByUser: false
+            ),
+            videos: [video(id: "first", title: "First match")],
+            continuationToken: "page-2"
+        )
+    }
+
+    func fetchMore(continuation: String) async throws -> PlaylistDetails {
+        requestedTokens.append(continuation)
+        switch continuation {
+        case "page-2":
+            return PlaylistDetails(
+                playlist: placeholder,
+                videos: [video(id: "middle", title: "Other")],
+                continuationToken: "page-3"
+            )
+        case "page-3":
+            return PlaylistDetails(
+                playlist: placeholder,
+                videos: [video(id: "last", title: "Last match")],
+                continuationToken: nil
+            )
+        default:
+            throw URLError(.badServerResponse)
+        }
+    }
+
+    private var placeholder: Playlist {
+        Playlist(
+            id: "", title: "", channelID: nil, channelName: nil,
+            thumbnailURL: nil, videoCount: nil, descriptionText: nil, isOwnedByUser: false
+        )
+    }
+
+    private func video(id: String, title: String) -> Video {
+        Video(
+            id: id, title: title, channelID: "", channelName: "Channel",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: nil, viewCount: nil,
+            publishedAt: nil, descriptionSnippet: nil, isLive: false, isShort: false
+        )
+    }
 }
 
 @MainActor

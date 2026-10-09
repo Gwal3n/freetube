@@ -92,7 +92,7 @@ struct PlaylistScreen: View {
             guard !query.isEmpty, model.details != nil else { return }
             do { try await Task.sleep(for: .milliseconds(400)) }
             catch { return }
-            await model.loadUntilFirstMatch(for: query)
+            await model.loadRemainingPagesForSearch(for: query)
         }
         .task(id: model.details?.playlist.id) {
             guard let id = model.details?.playlist.id else { return }
@@ -281,7 +281,7 @@ struct PlaylistScreen: View {
         } else {
             LazyVStack(spacing: 0) {
                 if isSearching && videos.isEmpty {
-                    if model.isSearchingForMatch || model.isLoadingMore
+                    if model.isSearchingPages || model.isLoadingMore
                         || (model.canLoadMore && !model.paginationFailed) {
                         ProgressView("Searching playlist…")
                             .frame(maxWidth: .infinity)
@@ -321,7 +321,12 @@ struct PlaylistScreen: View {
                         }
                     }
                 }
-                if (model.canLoadMore || model.isLoadingMore) && !model.isSearchingForMatch {
+                if isSearching && model.isSearchingPages && !videos.isEmpty {
+                    ProgressView("Searching remaining videos…")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
+                if (model.canLoadMore || model.isLoadingMore) && !model.isSearchingPages {
                     if isSearching {
                         Text("More playlist videos may contain matches.")
                             .font(.footnote)
@@ -333,7 +338,7 @@ struct PlaylistScreen: View {
                     MediaPaginationFooter(isLoading: model.isLoadingMore, isRetry: model.paginationFailed) {
                         Task {
                             if isSearching && model.paginationFailed {
-                                await model.loadUntilFirstMatch(for: query)
+                                await model.loadRemainingPagesForSearch(for: query)
                             } else {
                                 await model.loadMore()
                             }

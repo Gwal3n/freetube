@@ -11,7 +11,7 @@ final class PlaylistViewModel {
     /// Separate flag so the row-level prefetch trigger doesn't fire while a previous
     /// `loadMore` is still in flight.
     private(set) var isLoadingMore: Bool = false
-    private(set) var isSearchingForMatch = false
+    private(set) var isSearchingPages = false
     private var searchSequence = 0
     private(set) var paginationFailed = false
     var errorState: ErrorState?
@@ -65,25 +65,21 @@ final class PlaylistViewModel {
         }
     }
 
-    /// Search is local to this public playlist. Its endpoint offers continuation pages but no
-    /// query parameter, so check later pages only when the loaded rows have no match. Stop as soon
-    /// as a match appears; users can explicitly load more if they want additional matches. The
-    /// caller owns cancellation when the field changes or the screen disappears.
-    func loadUntilFirstMatch(for query: String) async {
+    /// Public playlists have no server-side query endpoint. Load their remaining pages while a
+    /// search is active, filtering locally as each page arrives. Stopping at the first match leaves
+    /// later matching videos invisible and can make a playlist search appear incomplete.
+    /// The screen owns cancellation when the query changes or disappears.
+    func loadRemainingPagesForSearch(for query: String) async {
         guard !query.isEmpty, details != nil else { return }
         searchSequence &+= 1
         let sequence = searchSequence
-        isSearchingForMatch = true
+        isSearchingPages = true
         defer {
-            if searchSequence == sequence { isSearchingForMatch = false }
+            if searchSequence == sequence { isSearchingPages = false }
         }
 
-        while !Task.isCancelled {
+        while !Task.isCancelled && searchSequence == sequence {
             guard let current = details,
-                  !current.videos.contains(where: {
-                      $0.title.localizedStandardContains(query)
-                          || $0.channelName.localizedStandardContains(query)
-                  }),
                   let previousToken = current.continuationToken else { return }
 
             // The visible list may already be fetching its look-ahead page. Let that request
@@ -95,6 +91,8 @@ final class PlaylistViewModel {
             }
 
             await loadMore()
+            guard !Task.isCancelled, searchSequence == sequence else { return }
+            // A failed request or a repeated token must not spin on the same page forever.
             guard details?.continuationToken != previousToken else { return }
         }
     }
