@@ -26,6 +26,7 @@ struct PlayerTopControls: View {
     let onToggleAutoplay: () -> Void
     let onToggleAudioOnly: () -> Void
     let onSetSleepTimer: (SleepTimerOption) -> Void
+    let onShowTranscript: () -> Void
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -248,6 +249,12 @@ struct PlayerTopControls: View {
             .disabled(true)
         } else if captionsModel.hasCueError {
             Button("Retry captions") { captionsModel.retrySelectedTrack() }
+        }
+        if captionsModel.selectedTrackID != nil {
+            Divider()
+            Button(action: onShowTranscript) {
+                Label("View transcript", systemImage: "text.magnifyingglass")
+            }
         }
     }
 

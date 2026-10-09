@@ -29,6 +29,7 @@ struct FullScreenPlayer: View {
     @State private var controlsVisibility = PlayerControlsVisibilityModel()
     @State private var actionsModel = PlayerActionsModel()
     @State private var captionsModel = PlayerCaptionsModel()
+    @State private var isTranscriptPresented = false
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
@@ -301,6 +302,9 @@ struct FullScreenPlayer: View {
                                 onSetSleepTimer: { option in
                                     player.setSleepTimer(option)
                                     showPlayerControls()
+                                },
+                                onShowTranscript: {
+                                    isTranscriptPresented = true
                                 }
                             )
                         ),
@@ -552,6 +556,13 @@ struct FullScreenPlayer: View {
         .sheet(item: $saveToPlaylistVideo) { video in
             AddToPlaylistSheet(video: video)
         }
+        .sheet(isPresented: $isTranscriptPresented) {
+            TranscriptScreen(captionsModel: captionsModel) { time in
+                player.seek(to: time)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .confirmationDialog(
             "Delete downloaded video?",
             isPresented: Binding(
@@ -572,6 +583,7 @@ struct FullScreenPlayer: View {
             await actionsModel.refreshPlaylistMembership(for: player.currentVideo?.id)
         }
         .onChange(of: player.currentVideo?.id, initial: true) { _, videoID in
+            isTranscriptPresented = false
             captionsModel.reset(for: videoID)
         }
         .task(id: player.fullScreenPresented && player.loadState == .readyToPlay ? player.currentVideo?.id : nil) {
@@ -592,6 +604,7 @@ struct FullScreenPlayer: View {
         ))
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
+                isTranscriptPresented = false
                 swipeAdjustment.cancel()
                 portraitVideoFullscreen = false
                 isPlaylistPanelPresented = false

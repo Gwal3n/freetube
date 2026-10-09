@@ -1,6 +1,78 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Transcript" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Transkript" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcript" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Transcripción" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Transcription" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Текст видео" } }
+      }
+    },
+    "View transcript" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Transkript anzeigen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "View transcript" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ver transcripción" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Voir la transcription" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показать текст видео" } }
+      }
+    },
+    "Loading transcript…" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Transkript wird geladen …" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading transcript…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cargando transcripción…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chargement de la transcription…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Загрузка текста видео…" } }
+      }
+    },
+    "Transcript unavailable" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Transkript nicht verfügbar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcript unavailable" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Transcripción no disponible" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Transcription indisponible" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Текст видео недоступен" } }
+      }
+    },
+    "The captions could not be loaded." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Untertitel konnten nicht geladen werden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The captions could not be loaded." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se pudieron cargar los subtítulos." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de charger les sous-titres." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Не удалось загрузить субтитры." } }
+      }
+    },
+    "No transcript available" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Kein Transkript verfügbar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No transcript available" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay transcripción disponible" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune transcription disponible" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Текст видео недоступен" } }
+      }
+    },
+    "Search transcript" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Transkript durchsuchen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search transcript" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Buscar en la transcripción" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Rechercher dans la transcription" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Поиск по тексту видео" } }
+      }
+    },
+    "Jump to this point in the video" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zu dieser Stelle im Video springen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Jump to this point in the video" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ir a este punto del vídeo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Accéder à ce passage de la vidéo" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перейти к этому моменту видео" } }
+      }
+    },
     "Export Subscriptions CSV" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Abonnements als CSV exportieren" } },
