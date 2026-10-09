@@ -11,17 +11,7 @@ import Foundation
 extension YouTube {
 
     public enum ExtractionMethod: Hashable, Sendable {
-#if canImport(JavaScriptCore)
         case local
-#endif
-        case remote(serverURL: URL)
-
-        public static var remote: ExtractionMethod {
-            guard let url = URL(string: "https://remote-production.youtubekit.dev") else {
-                preconditionFailure("The built-in remote extraction URL is invalid")
-            }
-            return .remote(serverURL: url)
-        }
     }
 
 }
@@ -29,13 +19,9 @@ extension YouTube {
 @available(iOS 13.0, watchOS 6.0, tvOS 13.0, macOS 10.15, *)
 extension [YouTube.ExtractionMethod] {
 
-    /// Some platforms (i.e. watchOS) don't support javascript execution, which makes local evaluation impossible
+    /// FreeTube resolves streams locally; the hosted extractor is intentionally unavailable.
     public static var `default`: Self {
-#if canImport(JavaScriptCore)
         [.local]
-#else
-        [.remote]
-#endif
     }
 
 }

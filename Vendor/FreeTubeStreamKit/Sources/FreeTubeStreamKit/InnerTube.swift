@@ -85,12 +85,6 @@ class InnerTube {
         case web, webSafari, android, androidSdkless, androidMusic, androidVR, visionOS, webEmbed, webCreator, androidEmbed, tv, tvEmbed, ios, iosMusic, mediaConnectFrontend, mWeb
     }
 
-    private var accessToken: String?
-    private var refreshToken: String?
-
-    private let useOAuth: Bool
-    private let allowCache: Bool
-
     private let apiKey: String
     private let context: Context
     private let headers: [String: String]
@@ -102,7 +96,7 @@ class InnerTube {
 
     private let baseURL = "https://www.youtube.com/youtubei/v1"
 
-    init(client: ClientType = .ios, signatureTimestamp: Int?, ytcfg: Extraction.YtCfg, useOAuth: Bool = false, allowCache: Bool = true) {
+    init(client: ClientType = .ios, signatureTimestamp: Int?, ytcfg: Extraction.YtCfg) {
         self.context = defaultClients[client]!.context
         self.apiKey = defaultClients[client]!.apiKey
         self.headers = defaultClients[client]!.headers
@@ -110,26 +104,6 @@ class InnerTube {
         self.encryptedHostFlags = client == .webEmbed ? ytcfg.embeddedPlayerEncryptedHostFlags : nil
         self.signatureTimestamp = signatureTimestamp
         self.ytcfg = ytcfg
-        self.useOAuth = useOAuth
-        self.allowCache = allowCache
-
-        if useOAuth && allowCache {
-            // TODO: load from cache file
-        }
-    }
-
-    func cacheTokens() {
-        guard allowCache else { return }
-        // TODO: cache access and refresh tokens
-    }
-
-    func refreshBearerToken(force: Bool = false) {
-        guard useOAuth else { return }
-        // TODO: implement refresh of access token
-    }
-
-    func fetchBearerToken() {
-        // TODO: fetch tokens
     }
 
     private struct BaseData: Encodable {
@@ -155,8 +129,6 @@ class InnerTube {
 
     private func callAPI<T: Decodable>(endpoint: String, query: [URLQueryItem], data: Data) async throws -> T {
 
-        // TODO: handle oauth case
-
         var urlComponents = URLComponents(string: endpoint)!
         urlComponents.queryItems = query
 
@@ -173,8 +145,6 @@ class InnerTube {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-
-        // TODO: handle oauth auth case again
 
         let (responseData, _) = try await URLSession.shared.data(for: request)
 

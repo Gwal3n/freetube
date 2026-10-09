@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Security
 
 /// Process-wide privacy defaults that must be established before logging or networking starts.
@@ -10,9 +11,28 @@ nonisolated enum SecurityHardening {
     private static let configured: Bool = {
         lockDownSharedCookieJar()
         removeLegacyAccountCredentials()
+        configurePythonCertificateBundle()
         migrateLegacyDiagnostics()
         return true
     }()
+
+    /// Embedded Python's OpenSSL does not know the iOS trust store. Supply a bundled Mozilla
+    /// CA bundle before yt-dlp initializes, so its HTTPS requests can verify certificates.
+    /// Never fall back to disabling verification when the resource is missing.
+    private static func configurePythonCertificateBundle() {
+        let log = Logger(subsystem: "com.leshko.freetube", category: "Security")
+        guard let url = Bundle.main.url(forResource: "cacert", withExtension: "pem"),
+              FileManager.default.isReadableFile(atPath: url.path) else {
+            log.error("Python CA bundle is missing; yt-dlp fallback will fail closed")
+            return
+        }
+        guard setenv("SSL_CERT_FILE", url.path, 1) == 0,
+              setenv("REQUESTS_CA_BUNDLE", url.path, 1) == 0 else {
+            log.error("Could not configure Python CA bundle; yt-dlp fallback will fail closed")
+            return
+        }
+        log.info("Python certificate verification configured")
+    }
 
     /// FreeTube is account-free. Reject and erase any response cookies that Foundation might
     /// otherwise retain implicitly, even though app requests never provide account credentials.
@@ -72,7 +92,7 @@ nonisolated enum SecurityHardening {
         try? fileManager.removeItem(at: legacy)
     }
 
-    /// Query strings on login and media URLs can contain session or CDN authorization material.
+    /// Query strings on media URLs can contain CDN authorization material.
     static func redactedForLog(_ url: URL?) -> String {
         guard let url else { return "?" }
         var value = url.scheme.map { "\($0)://" } ?? ""

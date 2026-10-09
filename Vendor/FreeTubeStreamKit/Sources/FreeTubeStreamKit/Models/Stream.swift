@@ -20,13 +20,13 @@ public struct Stream: Sendable {
     public let bitrate: Int?
     public let averageBitrate: Int?
 
-    @available(*, deprecated, message: "Might be empty if using remote fetching method. Use `videoCodec`, `audioCodec` or `fileExtension` instead.")
+    @available(*, deprecated, message: "Use `videoCodec`, `audioCodec` or `fileExtension` instead.")
     public let mimeType: String
 
-    @available(*, deprecated, message: "Might be empty if using remote fetching method. Use `videoCodec`, `audioCodec` or `fileExtension` instead.")
+    @available(*, deprecated, message: "Use `videoCodec`, `audioCodec` or `fileExtension` instead.")
     public let type: String
 
-    @available(*, deprecated, message: "Might be empty if using remote fetching method. Use `videoCodec`, `audioCodec` or `fileExtension` instead.")
+    @available(*, deprecated, message: "Use `videoCodec`, `audioCodec` or `fileExtension` instead.")
     public let subtype: String
 
     private let filesize: Int?
@@ -68,32 +68,6 @@ public struct Stream: Sendable {
         self.bitrate = format.bitrate
         self.averageBitrate = format.averageBitrate
         self.filesize = format.contentLength.flatMap { Int($0) }
-    }
-
-    init(remoteStream: RemoteStream) throws {
-        guard let itag = ITag(remoteStream.itag) else {
-            throw YouTubeKitError.extractError
-        }
-
-        self.url = remoteStream.url
-        self.itag = itag
-        self.videoCodec = remoteStream.videoCodec.map { VideoCodec(rawValue: $0) }
-        self.audioCodec = remoteStream.audioCodec.map { AudioCodec(rawValue: $0) }
-
-        if self.videoCodec == nil && self.audioCodec == nil {
-            throw YouTubeKitError.extractError
-        }
-
-        self.fileExtension = FileExtension(rawValue: remoteStream.ext) ?? .unknown
-
-        self.bitrate = remoteStream.videoBitrate ?? remoteStream.audioBitrate
-        self.averageBitrate = remoteStream.averageBitrate
-        self.filesize = remoteStream.filesize
-
-        // Backward compatibility for deprecated `subtype` and `mimeType`
-        self.type = (remoteStream.videoCodec != nil) ? "video" : "audio"
-        self.subtype = ""
-        self.mimeType = ""
     }
 
     /// whether the stream is DASH

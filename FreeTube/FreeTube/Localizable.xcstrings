@@ -752,40 +752,6 @@
         }
       }
     },
-    "Account" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Konto"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Account"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cuenta"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compte"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Аккаунт"
-          }
-        }
-      }
-    },
     "Add to favorites" : {
       "localizations" : {
         "de" : {
@@ -1604,41 +1570,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Конвертировать видео в H.264"
-          }
-        }
-      }
-    },
-    "Cookies are stored only in the Keychain." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookies werden ausschließlich im Schlüsselbund gespeichert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookies are stored only in the Keychain."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las cookies se guardan solo en el Llavero."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les cookies sont stockés uniquement dans le Trousseau."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookies хранятся только в связке ключей."
           }
         }
       }
@@ -2812,40 +2743,6 @@
         }
       }
     },
-    "Finishing sign-in…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anmeldung wird abgeschlossen…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finishing sign-in…"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finalizando inicio de sesión…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finalisation de la connexion…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Завершение входа…"
-          }
-        }
-      }
-    },
     "Format" : {
       "localizations" : {
         "de" : {
@@ -2914,74 +2811,6 @@
         }
       }
     },
-    "FreeTube is a personal/sideload-only YouTube client. It uses YouTubeKit (cookie-based, no Google API key) plus yt-dlp for downloads. YouTube can change its internal API at any time — please be patient when things break." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube ist ein YouTube-Client ausschließlich für die persönliche Nutzung bzw. das Sideloading. Er verwendet YouTubeKit (cookie-basiert, ohne Google-API-Schlüssel) sowie yt-dlp für Downloads. YouTube kann seine interne API jederzeit ändern — bitte habe Geduld, wenn etwas nicht funktioniert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube is a personal/sideload-only YouTube client. It uses YouTubeKit (cookie-based, no Google API key) plus yt-dlp for downloads. YouTube can change its internal API at any time — please be patient when things break."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube es un cliente de YouTube personal solo para sideload. Usa YouTubeKit (basado en cookies, sin clave de API de Google) y yt-dlp para descargas. YouTube puede cambiar su API interna en cualquier momento — ten paciencia cuando algo deje de funcionar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube est un client YouTube réservé à l’usage personnel / au sideload. Il utilise YouTubeKit (basé sur les cookies, sans clé d’API Google) et yt-dlp pour les téléchargements. YouTube peut modifier son API interne à tout moment — soyez patient lorsque quelque chose se casse."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube — это персональный YouTube-клиент только для установки в обход App Store. Использует YouTubeKit (по cookies, без ключа Google API) и yt-dlp для загрузок. YouTube может в любой момент изменить свой внутренний API — пожалуйста, проявляйте терпение, когда что-то ломается."
-          }
-        }
-      }
-    },
-    "FreeTube uses a `WKWebView` to capture cookies. They are stored only in the Keychain." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube verwendet einen `WKWebView`, um Cookies zu erfassen. Sie werden ausschließlich im Schlüsselbund gespeichert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube uses a `WKWebView` to capture cookies. They are stored only in the Keychain."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube usa un `WKWebView` para capturar las cookies. Se guardan solo en el Llavero."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube utilise un `WKWebView` pour capturer les cookies. Ils sont stockés uniquement dans le Trousseau."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FreeTube использует `WKWebView` для получения cookies. Они хранятся только в связке ключей."
-          }
-        }
-      }
-    },
     "H.264 is universally playable on Apple platforms. MP3 is for audio you'll share with apps that don't accept AAC / Opus. Conversion happens on-device via FFmpeg and may take a few seconds." : {
       "localizations" : {
         "de" : {
@@ -3046,75 +2875,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "История"
-          }
-        }
-      }
-    },
-    "Home" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Home"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inicio"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accueil"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Главная"
-          }
-        }
-      }
-    },
-    "If videos stop loading, tap this to wipe stored cookies and the visitor token. The next playback attempt will run anonymously." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wenn Videos nicht mehr geladen werden, hier tippen, um die gespeicherten Cookies und das Besucher-Token zu löschen. Der nächste Wiedergabeversuch erfolgt anonym."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If videos stop loading, tap this to wipe stored cookies and the visitor token. The next playback attempt will run anonymously."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si los vídeos dejan de cargar, toca para borrar las cookies guardadas y el token de visitante. El próximo intento de reproducción será anónimo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si les vidéos cessent de se charger, appuyez ici pour supprimer les cookies stockés et le jeton de visiteur. La prochaine tentative de lecture s’exécutera anonymement."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Если видео перестали загружаться, нажмите, чтобы удалить сохранённые cookies и токен посетителя. Следующее воспроизведение начнётся анонимно."
           }
         }
       }
@@ -5187,41 +4947,6 @@
         }
       }
     },
-    "Pull to refresh or sign in to see your home feed." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zum Aktualisieren ziehen oder anmelden, um deinen Startfeed zu sehen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pull to refresh or sign in to see your home feed."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desliza para refrescar o inicia sesión para ver tu inicio."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tirez pour rafraîchir ou connectez-vous pour voir votre fil d’accueil."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Потяните вниз для обновления или войдите, чтобы увидеть свою ленту."
-          }
-        }
-      }
-    },
     "Pull to retry." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6456,176 +6181,6 @@
         }
       }
     },
-    "Sign in" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anmelden"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign in"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Iniciar sesión"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se connecter"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Войти"
-          }
-        }
-      }
-    },
-    "Sign in to access your watch history, playlists, liked videos, and Watch Later." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melde dich an, um auf deinen Verlauf, deine Playlists, gelikten Videos und „Später ansehen“ zuzugreifen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign in to access your watch history, playlists, liked videos, and Watch Later."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inicia sesión para acceder al historial, listas, vídeos que te gustaron y Ver más tarde."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connectez-vous pour accéder à votre historique, vos playlists, vos vidéos aimées et « À regarder plus tard »."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Войдите, чтобы получить доступ к истории просмотров, плейлистам, понравившимся видео и Watch Later."
-          }
-        }
-      }
-    },
-    "Sign in to YouTube" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bei YouTube anmelden"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign in to YouTube"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Iniciar sesión en YouTube"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se connecter à YouTube"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Войти в YouTube"
-          }
-        }
-      }
-    },
-    "Sign out" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abmelden"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign out"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cerrar sesión"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se déconnecter"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выйти"
-          }
-        }
-      }
-    },
-    "Sign-in failed" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anmeldung fehlgeschlagen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign-in failed"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error al iniciar sesión"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Échec de la connexion"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ошибка входа"
-          }
-        }
-      }
-    },
     "Skip Backward 15s" : {
       "localizations" : {
         "de" : {
@@ -7136,40 +6691,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Это удалит все файлы в Documents/Logs/. Если включён параметр «Сохранять логи в файл», для новых записей будет создан новый файл лога."
-          }
-        }
-      }
-    },
-    "This signs you out and clears cached cookies." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Damit wirst du abgemeldet und gespeicherte Cookies werden gelöscht."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This signs you out and clears cached cookies."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esto cierra la sesión y borra las cookies guardadas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cela vous déconnecte et efface les cookies en cache."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Это завершит сессию и очистит сохранённые cookies."
           }
         }
       }
@@ -7927,40 +7448,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Будет сохранено"
-          }
-        }
-      }
-    },
-    "Wipes stored cookies and the visitor token. The next playback attempt will run anonymously. Use this if playback or sign-in is stuck." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Löscht gespeicherte Cookies und das Besucher-Token. Der nächste Wiedergabeversuch erfolgt anonym. Verwende dies, wenn Wiedergabe oder Anmeldung hängen bleiben."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wipes stored cookies and the visitor token. The next playback attempt will run anonymously. Use this if playback or sign-in is stuck."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Borra las cookies guardadas y el token de visitante. El próximo intento de reproducción será anónimo. Úsalo si la reproducción o el inicio de sesión están atascados."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprime les cookies stockés et le jeton de visiteur. La prochaine tentative de lecture s’exécutera anonymement. Utilisez ceci si la lecture ou la connexion est bloquée."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Стирает сохранённые cookies и токен посетителя. Следующее воспроизведение начнётся анонимно. Используйте, если воспроизведение или вход застряли."
           }
         }
       }

@@ -10,7 +10,6 @@
 		AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = AC591D772FB9E26E009EE538 /* YouTubeKit */; };
 		AC591D892FB9E2BE009EE538 /* YoutubeDL in Frameworks */ = {isa = PBXBuildFile; productRef = AC591D882FB9E2BE009EE538 /* YoutubeDL */; };
 		AC591DA82FB9E35C009EE538 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = AC591DA72FB9E35C009EE538 /* Kingfisher */; };
-		AC591DAB2FB9E36D009EE538 /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = AC591DAA2FB9E36D009EE538 /* KeychainAccess */; };
 		AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */ = {isa = PBXBuildFile; productRef = AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */; };
 		AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */ = {isa = PBXBuildFile; productRef = AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */; };
 		AC5930012FC00001009EE538 /* FreeTubeStreamKit in Frameworks */ = {isa = PBXBuildFile; productRef = AC5930032FC00001009EE538 /* FreeTubeStreamKit */; };
@@ -65,7 +64,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AC591DAB2FB9E36D009EE538 /* KeychainAccess in Frameworks */,
 				AC591DA82FB9E35C009EE538 /* Kingfisher in Frameworks */,
 				AC591D892FB9E2BE009EE538 /* YoutubeDL in Frameworks */,
 				AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */,
@@ -150,7 +148,6 @@
 				AC591D772FB9E26E009EE538 /* YouTubeKit */,
 				AC591D882FB9E2BE009EE538 /* YoutubeDL */,
 				AC591DA72FB9E35C009EE538 /* Kingfisher */,
-				AC591DAA2FB9E36D009EE538 /* KeychainAccess */,
 				AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */,
 				AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */,
 				AC5930032FC00001009EE538 /* FreeTubeStreamKit */,
@@ -193,7 +190,6 @@
 				AC591D762FB9E26E009EE538 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
 				AC591D872FB9E2BE009EE538 /* XCRemoteSwiftPackageReference "YoutubeDL-iOS" */,
 				AC591DA62FB9E35C009EE538 /* XCRemoteSwiftPackageReference "Kingfisher" */,
-				AC591DA92FB9E36D009EE538 /* XCRemoteSwiftPackageReference "keychainaccess" */,
 				AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */,
 				AC5924CC2FBB5F2B009EE538 /* XCRemoteSwiftPackageReference "SwimplyPlayIndicator" */,
 				AC5930022FC00001009EE538 /* XCLocalSwiftPackageReference "FreeTubeStreamKit" */,
@@ -586,14 +582,6 @@
 				minimumVersion = 8.9.0;
 			};
 		};
-		AC591DA92FB9E36D009EE538 /* XCRemoteSwiftPackageReference "keychainaccess" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/kishikawakatsumi/keychainaccess";
-			requirement = {
-				branch = master;
-				kind = branch;
-			};
-		};
 		AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kewlbear/FFmpeg-iOS-Support";
@@ -627,11 +615,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AC591DA62FB9E35C009EE538 /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
-		};
-		AC591DAA2FB9E36D009EE538 /* KeychainAccess */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AC591DA92FB9E36D009EE538 /* XCRemoteSwiftPackageReference "keychainaccess" */;
-			productName = KeychainAccess;
 		};
 		AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */ = {
 			isa = XCSwiftPackageProductDependency;

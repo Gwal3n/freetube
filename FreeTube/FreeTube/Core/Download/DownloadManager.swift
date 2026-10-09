@@ -255,7 +255,7 @@ final class PythonSerialExecutor: SerialExecutor, @unchecked Sendable {
 @available(iOS 17.0, *)
 @Observable
 @MainActor
-final class DownloadManager: TemporaryDownloading {
+final class DownloadManager {
     static let shared = DownloadManager()
 
     /// Live snapshots of every in-flight + recently completed download. Both the Downloads screen
@@ -450,28 +450,6 @@ final class DownloadManager: TemporaryDownloading {
         }
     }
 
-    // MARK: - TemporaryDownloading
-
-    /// Legacy path retained to satisfy the resolver protocol. The new resolver calls
-    /// `ensureDownloaded(video:quality:)` directly; this is just a thin wrapper.
-    func downloadTemporary(videoID: String, format: VideoFormat) async throws -> URL {
-        let placeholder = Video(
-            id: videoID,
-            title: videoID,
-            channelID: "",
-            channelName: "",
-            channelThumbnailURL: nil,
-            thumbnailURL: nil,
-            duration: nil,
-            viewCount: nil,
-            publishedAt: nil,
-            descriptionSnippet: nil,
-            isLive: false,
-            isShort: false
-        )
-        return try await ensureDownloaded(video: placeholder, quality: preferences.preferredQuality)
-    }
-
     // MARK: - yt-dlp execution
 
     private func runYoutubeDLDownload(video: Video, quality: VideoQuality, priority: DownloadPriority = .background) async throws -> URL {
@@ -591,8 +569,8 @@ final class DownloadManager: TemporaryDownloading {
 
         // Use `,` (download multiple formats as separate files) instead of `+` (download + merge
         // via ffmpeg). yt-dlp's ffmpeg merger reliably hangs on iOS — once `Popen.communicate`
-        // dispatches the merger ffmpeg subprocess we never see Python return. Doing the mux ourselves
-        // via AVAssetExportSession is the robust path. We still keep a single-file fallback
+        // dispatches the merger ffmpeg subprocess we never see Python return. We mux the tracks
+        // through the serialized in-process FFmpeg runner. We still keep a single-file fallback
         // (`best[ext=mp4]/best`) for the rare case where YouTube serves a combined progressive file.
         let formatString = Self.formatString(for: quality)
         log.debug("yt-dlp[\(video.id, privacy: .public)] format selector=\(formatString, privacy: .public)")
@@ -605,12 +583,8 @@ final class DownloadManager: TemporaryDownloading {
         // global yt_dlp(argv:) routes through Python and intercepts subprocess.Popen for ffmpeg/ffprobe,
         // so the in-tree FFmpegSupport library handles muxing transparently.
         //
-        // `--no-check-certificates` is required because the embedded Python runtime (Python-iOS)
-        // doesn't ship with a CA cert bundle on a path OpenSSL expects, so verification fails with
-        // `CERTIFICATE_VERIFY_FAILED` on the first YouTube API request. We accept the trade-off
-        // because (a) the only host we talk to is youtube.com / googlevideo.com, (b) this is a
-        // sideload/personal app, and (c) the alternative is shipping certifi's cacert.pem and
-        // setting `SSL_CERT_FILE` ourselves — that can come later.
+        // SecurityHardening configures embedded Python's SSL_CERT_FILE to the bundled Mozilla
+        // CA roots before the first yt-dlp run. Keep certificate verification enabled.
         //
         // **No `--cookies` flag** — counter-intuitive, but yt-dlp's safety check
         // ("Skipping client X since it does not support cookies") removes the `tv_simply`,
@@ -626,7 +600,6 @@ final class DownloadManager: TemporaryDownloading {
             "-o", outputTemplate,
             "--no-playlist",
             "--no-progress",
-            "--no-check-certificates",
             // **Player-client fallback chain.** Try several anonymous client profiles so yt-dlp
             // can retain valid HLS/progressive fallbacks when the native resolver fails.
             //
@@ -659,7 +632,7 @@ final class DownloadManager: TemporaryDownloading {
             "--concurrent-fragments", "\(max(1, min(16, preferences.concurrentFragments)))",
             // Belt-and-braces: point yt-dlp at a nonexistent ffmpeg so even if some edge case tries
             // to add the merger postprocessor, it fails-fast at probe time and yt-dlp skips it
-            // instead of hanging in `Popen.communicate`. Our Swift-side AVAssetExportSession mux is
+            // instead of hanging in `Popen.communicate`. Our serialized Swift-side FFmpeg mux is
             // the canonical join step now.
             "--ffmpeg-location", "/dev/null/no-ffmpeg"
         ]
@@ -1373,149 +1346,6 @@ final class DownloadManager: TemporaryDownloading {
             log.info("ffmpeg-muxed file duration=\(dur.seconds, privacy: .public)s path=\(destination.lastPathComponent, privacy: .public)")
         }
     }
-
-    /// Legacy AVAssetExportSession path — kept private and unused for now. It can't handle YouTube's
-    /// DASH-fragmented mp4 correctly (see `muxToDestination` for the gory details).
-    @available(*, deprecated)
-    private func muxViaAVFoundation(video: URL, audio: URL, destination: URL) async throws {
-        log.info("mux: video=\(video.lastPathComponent, privacy: .public) audio=\(audio.lastPathComponent, privacy: .public)")
-        let videoAsset = AVURLAsset(url: video)
-        let audioAsset = AVURLAsset(url: audio)
-
-        async let videoTracksTask = videoAsset.loadTracks(withMediaType: .video)
-        async let audioTracksTask = audioAsset.loadTracks(withMediaType: .audio)
-        async let videoDurationTask = videoAsset.load(.duration)
-        async let audioDurationTask = audioAsset.load(.duration)
-
-        let (vTracks, aTracks, videoDur, audioDur) = try await (
-            videoTracksTask, audioTracksTask, videoDurationTask, audioDurationTask
-        )
-
-        guard let videoTrack = vTracks.first else {
-            log.error("mux: no video track in \(video.lastPathComponent, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        guard let audioTrack = aTracks.first else {
-            log.error("mux: no audio track in \(audio.lastPathComponent, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-
-        let videoTrackRange = try await videoTrack.load(.timeRange)
-        let audioTrackRange = try await audioTrack.load(.timeRange)
-        let videoSegments = try await videoTrack.load(.segments)
-        let audioSegments = try await audioTrack.load(.segments)
-
-        log.info("mux: asset durations video=\(videoDur.seconds, privacy: .public)s audio=\(audioDur.seconds, privacy: .public)s")
-        log.info("mux: track ranges video=[start=\(videoTrackRange.start.seconds, privacy: .public), dur=\(videoTrackRange.duration.seconds, privacy: .public)] audio=[start=\(audioTrackRange.start.seconds, privacy: .public), dur=\(audioTrackRange.duration.seconds, privacy: .public)]")
-        log.info("mux: segments video=\(videoSegments.count, privacy: .public) audio=\(audioSegments.count, privacy: .public)")
-        for (i, seg) in videoSegments.enumerated() {
-            log.info("mux:   video.seg[\(i, privacy: .public)] empty=\(seg.isEmpty, privacy: .public) src=[\(seg.timeMapping.source.start.seconds, privacy: .public), dur=\(seg.timeMapping.source.duration.seconds, privacy: .public)] tgt=[\(seg.timeMapping.target.start.seconds, privacy: .public), dur=\(seg.timeMapping.target.duration.seconds, privacy: .public)]")
-        }
-        for (i, seg) in audioSegments.enumerated() {
-            log.info("mux:   audio.seg[\(i, privacy: .public)] empty=\(seg.isEmpty, privacy: .public) src=[\(seg.timeMapping.source.start.seconds, privacy: .public), dur=\(seg.timeMapping.source.duration.seconds, privacy: .public)] tgt=[\(seg.timeMapping.target.start.seconds, privacy: .public), dur=\(seg.timeMapping.target.duration.seconds, privacy: .public)]")
-        }
-
-        // The track's *real* media content range is the first non-empty segment's source range.
-        // Edit lists can stack multiple identical segments to produce a presentation that plays the
-        // same bytes twice; we ignore that and only insert the underlying media data once.
-        let firstVideoSegment = videoSegments.first(where: { !$0.isEmpty }).map { $0.timeMapping.source }
-        let firstAudioSegment = audioSegments.first(where: { !$0.isEmpty }).map { $0.timeMapping.source }
-        let videoMediaRange = firstVideoSegment ?? CMTimeRange(start: .zero, duration: videoDur)
-        let audioMediaRange = firstAudioSegment ?? CMTimeRange(start: .zero, duration: audioDur)
-        log.info("mux: chosen video media range=[start=\(videoMediaRange.start.seconds, privacy: .public), dur=\(videoMediaRange.duration.seconds, privacy: .public)]")
-        log.info("mux: chosen audio media range=[start=\(audioMediaRange.start.seconds, privacy: .public), dur=\(audioMediaRange.duration.seconds, privacy: .public)]")
-
-        let cap = CMTimeMinimum(videoDur, audioDur)
-        let mergedDuration = CMTimeMinimum(
-            CMTimeMinimum(videoMediaRange.duration, audioMediaRange.duration),
-            cap
-        )
-        log.info("mux: merged target duration=\(mergedDuration.seconds, privacy: .public)s (cap=\(cap.seconds, privacy: .public)s)")
-
-        let composition = AVMutableComposition()
-        guard let compVideo = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-              let compAudio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            log.error("mux: failed to create composition tracks")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-
-        // Read from each segment's media-domain start (which AVFoundation uses to look up samples in
-        // the underlying mdat) and clamp to the merged duration so neither track plays past where
-        // both have content. Both inserts target composition timeline `.zero` — overlay, not concat.
-        let videoInsertRange = CMTimeRange(start: videoMediaRange.start, duration: mergedDuration)
-        let audioInsertRange = CMTimeRange(start: audioMediaRange.start, duration: mergedDuration)
-        log.info("mux: inserting video range=[\(videoInsertRange.start.seconds, privacy: .public), dur=\(videoInsertRange.duration.seconds, privacy: .public)] audio range=[\(audioInsertRange.start.seconds, privacy: .public), dur=\(audioInsertRange.duration.seconds, privacy: .public)]")
-        try compVideo.insertTimeRange(videoInsertRange, of: videoTrack, at: .zero)
-        try compAudio.insertTimeRange(audioInsertRange, of: audioTrack, at: .zero)
-
-        log.info("mux: composition built. duration=\(composition.duration.seconds, privacy: .public)s tracks=\(composition.tracks.count, privacy: .public)")
-        for (i, track) in composition.tracks.enumerated() {
-            log.info("mux:  comp.tracks[\(i, privacy: .public)] mediaType=\(track.mediaType.rawValue, privacy: .public) segments=\(track.segments.count, privacy: .public) timeRange=[start=\(track.timeRange.start.seconds, privacy: .public), dur=\(track.timeRange.duration.seconds, privacy: .public)]")
-        }
-
-        // Diagnostic — if the composition is somehow longer than the media-duration cap, the rest of
-        // the file would be garbage on playback. Bail rather than ship a broken mp4.
-        if composition.duration > CMTimeMultiplyByFloat64(cap, multiplier: 1.05) {
-            log.error("mux: composition duration \(composition.duration.seconds, privacy: .public)s exceeds 105%% of media cap \(cap.seconds, privacy: .public)s — refusing to export this would be doubled")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-
-        try? FileManager.default.removeItem(at: destination)
-
-        // Passthrough first; only re-encode if passthrough refuses the codec combo.
-        if try await runExport(composition: composition, preset: AVAssetExportPresetPassthrough, destination: destination) {
-            await logExportedDuration(destination)
-            log.info("mux: passthrough export succeeded → \(destination.path, privacy: .public)")
-            return
-        }
-        log.notice("mux: passthrough rejected the codec combo, re-encoding via HighestQuality preset")
-        if try await runExport(composition: composition, preset: AVAssetExportPresetHighestQuality, destination: destination) {
-            await logExportedDuration(destination)
-            log.info("mux: re-encode succeeded → \(destination.path, privacy: .public)")
-            return
-        }
-        throw YouTubeServiceError.streamExtractionFailed
-    }
-
-    /// Loads the duration of the exported file and logs it. Helps confirm the mux produced a file
-    /// of the expected length — if you ever see "doubled" again, this line catches it.
-    private func logExportedDuration(_ url: URL) async {
-        let asset = AVURLAsset(url: url)
-        if let duration = try? await asset.load(.duration) {
-            log.info("mux: exported file duration=\(duration.seconds, privacy: .public)s path=\(url.lastPathComponent, privacy: .public)")
-        }
-    }
-
-    /// Runs one `AVAssetExportSession` invocation against `composition` with `preset` and writes to
-    /// `destination`. Returns true on .completed, false on .cancelled, throws on .failed.
-    private func runExport(composition: AVMutableComposition, preset: String, destination: URL) async throws -> Bool {
-        guard let session = AVAssetExportSession(asset: composition, presetName: preset) else {
-            log.error("mux: could not init AVAssetExportSession for preset=\(preset, privacy: .public)")
-            return false
-        }
-        session.outputURL = destination
-        session.outputFileType = .mp4
-        session.shouldOptimizeForNetworkUse = true
-
-        log.debug("mux: export start preset=\(preset, privacy: .public)")
-        await session.export()
-
-        switch session.status {
-        case .completed:
-            return true
-        case .failed:
-            let err = session.error?.localizedDescription ?? "unknown"
-            log.error("mux: export failed preset=\(preset, privacy: .public) error=\(err, privacy: .public)")
-            return false
-        case .cancelled:
-            log.notice("mux: export cancelled preset=\(preset, privacy: .public)")
-            return false
-        default:
-            log.error("mux: export ended in unexpected state \(session.status.rawValue, privacy: .public)")
-            return false
-        }
-    }
-
     // MARK: - File locations + format selection
 
     /// Canonical on-disk location for a downloaded video. Files land at the **Documents

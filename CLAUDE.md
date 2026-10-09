@@ -27,7 +27,7 @@ These come first. Violating them breaks the project.
 5. **Anonymous operation is mandatory.** Never add login, capture or store account cookies, or synchronize local state with a YouTube account. `YouTubeKitClient` explicitly keeps both models cookie-free.
 6. **Signed stream URLs are sensitive and time-limited.** Never persist them. In-memory cache only (`StreamURLCache`), 30-minute TTL max.
 7. **MVVM with service layer is mandatory.** Views do not import `YouTubeKit` or `YoutubeDL`. ViewModels do not perform networking directly — they call services in `Core/Networking/`.
-8. **SwiftUI only for UI.** No UIKit `UIViewController` subclasses except where bridging is unavoidable (`AVPlayerViewController`, `WKWebView`, `AVPictureInPictureController`). Wrap those in `UIViewControllerRepresentable` / `UIViewRepresentable`.
+8. **SwiftUI only for UI.** No UIKit `UIViewController` subclasses except where bridging is unavoidable (`AVPlayerViewController`, `AVPictureInPictureController`). Wrap those in `UIViewControllerRepresentable` / `UIViewRepresentable`. There is no login `WKWebView`.
 9. **Swift Concurrency is the default.** Use `async`/`await` and `AsyncSequence`. Use Combine only inside `PlayerStateManager` for `AVPlayer` time observation. Do not introduce RxSwift.
 10. **No force unwraps in production code.** Use `guard let`, `if let`, or proper `throw`. Force unwraps allowed only in test fixtures.
 11. **`@Observable` is the default for view models, not `ObservableObject`.** Injected through SwiftUI `@Environment(...)`.
@@ -49,6 +49,7 @@ These come first. Violating them breaks the project.
 | Now-playing indicator | `SwimplyPlayIndicator` |
 | Images | `Kingfisher` |
 | Legacy credential cleanup | `Security` (deletes credentials left by older builds) |
+| Embedded-Python HTTPS trust | Bundled certifi Mozilla CA roots (`Resources/cacert.pem`) via `SSL_CERT_FILE` |
 | Persistence | `SwiftData` (`@Model`); `UserDefaults` for simple flags via `UserPreferences` |
 | Background work | `BackgroundTasks` framework + `URLSession` background config (`BackgroundDownloadCoordinator`) |
 | Logging | `os.Logger` with subsystem `com.leshko.freetube` |
@@ -86,7 +87,7 @@ FreeTube/
 │                          # VideoFormat, VideoQuality, ErrorState,
 │                          # PlaybackSource, UserPreferences, YouTubeServiceError
 ├── Features/
-│   ├── Home/              # HomeScreen + HomeViewModel
+│   ├── Home/              # HomeScreen: the Search tab's native searchable host
 │   ├── Search/            # SearchScreen, SearchSuggestionList, SearchViewModel
 │   ├── Subscriptions/     # SubscriptionsScreen + ViewModel
 │   ├── Library/           # LibraryScreen, HistoryScreen, SubscribedChannelsScreen, ViewModels
@@ -130,8 +131,6 @@ Every YouTubeKit response type gets exactly one service method. Do not call `You
 
 | Response | Service method |
 |---|---|
-| `HomeScreenResponse` (+Continuation) | `HomeService.fetchHome()` / `fetchMore()` |
-| `TrendingVideosResponse` | `HomeService.fetchTrending()` |
 | `SearchResponse` (+Continuation) | `SearchService.search(query:)` / `fetchMore()` |
 | `AutoCompletionResponse` | `SearchService.autocomplete(query:)` |
 | `ChannelInfosResponse` (+Videos/Shorts/Directs/Playlists +Continuations) | `ChannelService.fetchChannel(id:)` / `fetchVideos()` / `fetchShorts()` / `fetchDirects()` / `fetchPlaylists()` |
@@ -431,6 +430,8 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 - The app has no login, sign-out, account state, or authenticated YouTube endpoints.
 - `YouTubeKitClient` explicitly sets empty cookies and disables `alwaysUseCookies` for both models.
+- The vendored `FreeTubeStreamKit` has only local extraction; its upstream hosted extractor,
+  redirect-cookie proxy, and OAuth placeholders were removed. Do not reintroduce them.
 - Foundation's shared cookie jar rejects response cookies and is purged at launch.
 - A one-way migration deletes the legacy Keychain credential created by older builds.
 - Subscriptions, history, playlists, and favorites are device-local. Import/export is their backup mechanism.
@@ -479,6 +480,9 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 - Downloaded media stays on device until the user explicitly removes it. Settings displays current storage usage; there is no automatic cache eviction.
 - The app does not refresh its yt-dlp module on a timer. The downloader package handles initial module setup when a compatibility fallback first needs it.
+- The yt-dlp compatibility fallback verifies HTTPS with the bundled certifi Mozilla CA roots.
+  `SecurityHardening` sets `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` at launch. Keep the bundle,
+  license, and source revision together; do not restore `--no-check-certificates`.
 
 ---
 
@@ -628,8 +632,8 @@ Current state of the implementation. Items marked ✓ are shipped.
 
 - **P0 — MVP playback** ✓
   - YouTubeKit + YoutubeDL-iOS SPM setup
-  - `HomeService`, `SearchService` (+ autocomplete), `VideoService`
-  - Home screen, Search screen, Video detail screen
+  - `SearchService` (+ autocomplete), `VideoService`
+  - Search-only `HomeScreen` host, search results, video detail screen
   - Three-tier playback resolver (yt-dlp / YouTubeKit / streaming HLS)
   - `PlayerStateManager`, mini player + expanded SwiftUI player container
   - Background audio + Now Playing + Remote Command Center

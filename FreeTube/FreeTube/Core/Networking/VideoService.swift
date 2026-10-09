@@ -7,8 +7,6 @@ struct VideoInfo: Sendable {
     let descriptionText: String?
     let descriptionParts: [VideoDescriptionPart]
     let likeCount: Int?
-    let isLikedByUser: Bool
-    let isDislikedByUser: Bool
     let recommended: [Video]
     let recommendedContinuationToken: String?
     let viewCountText: String?
@@ -154,8 +152,6 @@ final class VideoService: VideoServicing {
                 likeCount: Self.count(
                     from: response.likesCount.defaultState ?? response.likesCount.clickedState
                 ),
-                isLikedByUser: response.authenticatedInfos?.likeStatus == .liked,
-                isDislikedByUser: response.authenticatedInfos?.likeStatus == .disliked,
                 recommended: recommended,
                 recommendedContinuationToken: response.recommendedVideosContinuationToken,
                 viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
@@ -274,8 +270,6 @@ final class VideoService: VideoServicing {
             descriptionText: response.videoDescription,
             descriptionParts: [],
             likeCount: nil,
-            isLikedByUser: false,
-            isDislikedByUser: false,
             recommended: recommended,
             recommendedContinuationToken: nil,
             viewCountText: nil,

@@ -7,9 +7,6 @@ struct Comment: Identifiable, Hashable, Sendable {
     let authorThumbnailURL: URL?
     let bodyText: String
     let likeCount: Int
-    let isLikedByUser: Bool
-    let isDislikedByUser: Bool
-    let isAuthoredByUser: Bool
     let publishedRelative: String
     let replyCount: Int
     let replyContinuationToken: String?

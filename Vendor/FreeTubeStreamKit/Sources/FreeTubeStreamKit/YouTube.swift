@@ -103,35 +103,26 @@ public class YouTube {
     private var title: String?
     private var publishDate: String?
 
-    let useOAuth: Bool
-    let allowOAuthCache: Bool
-
     let methods: [ExtractionMethod]
 
     private let log = OSLog(YouTube.self)
 
-    /// - parameter methods: Methods used to extract streams from the video - ordered by priority (Default: `local` on iOS, macOS, tvOS, visionOS; `remote` on watchOS)
-    public init(videoID: String, proxies: [String: URL] = [:], useOAuth: Bool = false, allowOAuthCache: Bool = false, methods: [ExtractionMethod] = .default) {
+    /// - parameter methods: Local stream extraction; hosted extraction is not part of FreeTube.
+    public init(videoID: String, proxies: [String: URL] = [:], methods: [ExtractionMethod] = .default) {
         self.videoID = videoID
-        self.useOAuth = useOAuth
-        self.allowOAuthCache = allowOAuthCache
         // TODO: install proxies if needed
 
         if methods.isEmpty {
-#if canImport(JavaScriptCore)
             self.methods = [.local]
-#else
-            self.methods = [.remote]
-#endif
         } else {
             self.methods = methods.removeDuplicates()
         }
     }
 
-    /// - parameter methods: Methods used to extract streams from the video - ordered by priority (Default: `local` on iOS, macOS, tvOS, visionOS; `remote` on watchOS)
-    public convenience init(url: URL, proxies: [String: URL] = [:], useOAuth: Bool = false, allowOAuthCache: Bool = false, methods: [ExtractionMethod] = .default) {
+    /// - parameter methods: Local stream extraction; hosted extraction is not part of FreeTube.
+    public convenience init(url: URL, proxies: [String: URL] = [:], methods: [ExtractionMethod] = .default) {
         let videoID = Extraction.extractVideoID(from: url.absoluteString) ?? ""
-        self.init(videoID: videoID, proxies: proxies, useOAuth: useOAuth, allowOAuthCache: allowOAuthCache, methods: methods)
+        self.init(videoID: videoID, proxies: proxies, methods: methods)
     }
 
 
@@ -344,11 +335,6 @@ public class YouTube {
                     return streams
 #endif
 
-                case .remote(let serverURL):
-                    let remoteClient = RemoteYouTubeClient(serverURL: serverURL)
-                    let remoteStreams = try await remoteClient.extractStreams(forVideoID: videoID)
-
-                    return remoteStreams.compactMap { try? Stream(remoteStream: $0) }
                 }
             }
 
@@ -462,8 +448,8 @@ public class YouTube {
 
             let innertubeClients: [InnerTube.ClientType] = [.visionOS, .web]
 
-            let results: [Result<InnerTube.VideoInfo, Error>] = await innertubeClients.concurrentMap { [videoID, useOAuth, allowOAuthCache] client in
-                let innertube = InnerTube(client: client, signatureTimestamp: signatureTimestamp, ytcfg: ytcfg, useOAuth: useOAuth, allowCache: allowOAuthCache)
+            let results: [Result<InnerTube.VideoInfo, Error>] = await innertubeClients.concurrentMap { [videoID] client in
+                let innertube = InnerTube(client: client, signatureTimestamp: signatureTimestamp, ytcfg: ytcfg)
 
                 do {
                     let innertubeResponse = try await innertube.player(videoID: videoID)
@@ -515,7 +501,7 @@ public class YouTube {
         } else {
             try await ytcfg
         }
-        let innertube = InnerTube(client: client, signatureTimestamp: signatureTimestamp, ytcfg: ytcfg, useOAuth: useOAuth, allowCache: allowOAuthCache)
+        let innertube = InnerTube(client: client, signatureTimestamp: signatureTimestamp, ytcfg: ytcfg)
         let videoInfo = try await innertube.player(videoID: videoID)
 
         // ignore if incorrect videoID
@@ -530,7 +516,7 @@ public class YouTube {
     private func bypassAgeGate() async throws {
         let signatureTimestamp = try await signatureTimestamp
         let ytcfg = try await ytcfg
-        let innertube = InnerTube(client: .webCreator, signatureTimestamp: signatureTimestamp, ytcfg: ytcfg, useOAuth: useOAuth, allowCache: allowOAuthCache)
+        let innertube = InnerTube(client: .webCreator, signatureTimestamp: signatureTimestamp, ytcfg: ytcfg)
         let innertubeResponse = try await innertube.player(videoID: videoID)
 
         if innertubeResponse.playabilityStatus?.status == "UNPLAYABLE" || innertubeResponse.playabilityStatus?.status == "LOGIN_REQUIRED" {

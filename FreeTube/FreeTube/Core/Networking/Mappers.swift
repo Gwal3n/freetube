@@ -186,7 +186,7 @@ enum Mappers {
 
     // MARK: - Comments
 
-    static func comment(from yt: YTComment, isAuthoredByUser: Bool = false) -> Comment {
+    static func comment(from yt: YTComment) -> Comment {
         let likeCount = Int(yt.likesCount?.filter(\.isNumber) ?? "") ?? 0
         return Comment(
             id: yt.commentIdentifier,
@@ -195,9 +195,6 @@ enum Mappers {
             authorThumbnailURL: bestThumbnailURL(yt.sender?.thumbnails ?? []),
             bodyText: yt.text,
             likeCount: likeCount,
-            isLikedByUser: yt.likeState == .liked,
-            isDislikedByUser: yt.likeState == .disliked,
-            isAuthoredByUser: isAuthoredByUser,
             publishedRelative: yt.timePosted ?? "",
             replyCount: Int(yt.totalRepliesNumber?.filter(\.isNumber) ?? "") ?? yt.replies.count,
             replyContinuationToken: yt.actionsParams[.repliesContinuation]

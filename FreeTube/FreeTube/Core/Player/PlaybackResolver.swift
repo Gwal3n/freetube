@@ -139,9 +139,3 @@ protocol DownloadManagerLike: Sendable {
 
 @available(iOS 17.0, *)
 extension DownloadManager: DownloadManagerLike {}
-
-/// Subset of `DownloadManager` that older call sites depend on. Retained so the build graph stays
-/// stable while we transition off `downloadTemporary` — new code should call `ensureDownloaded`.
-protocol TemporaryDownloading: Sendable {
-    func downloadTemporary(videoID: String, format: VideoFormat) async throws -> URL
-}
