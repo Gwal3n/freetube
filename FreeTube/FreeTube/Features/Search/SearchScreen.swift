@@ -308,7 +308,7 @@ struct SearchContent: View {
 
     private var videoFilterMenu: some View {
         Menu {
-            Menu("Watch history") {
+            Menu {
                 ForEach(SearchVideoFilters.Watch.allCases) { option in
                     Button {
                         videoFilters.watch = option
@@ -320,8 +320,14 @@ struct SearchContent: View {
                         }
                     }
                 }
+            } label: {
+                if videoFilters.watch == .all {
+                    Text("Watch history")
+                } else {
+                    Label("Watch history", systemImage: "checkmark")
+                }
             }
-            Menu("Upload date") {
+            Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
                     Button {
                         if option == .custom {
@@ -337,8 +343,14 @@ struct SearchContent: View {
                         }
                     }
                 }
+            } label: {
+                if videoFilters.uploaded == .anytime {
+                    Text("Upload date")
+                } else {
+                    Label("Upload date", systemImage: "checkmark")
+                }
             }
-            Menu("Length") {
+            Menu {
                 ForEach(SearchVideoFilters.Length.allCases) { option in
                     Button {
                         if option == .custom {
@@ -354,8 +366,14 @@ struct SearchContent: View {
                         }
                     }
                 }
+            } label: {
+                if videoFilters.length == .any {
+                    Text("Length")
+                } else {
+                    Label("Length", systemImage: "checkmark")
+                }
             }
-            Menu("Views") {
+            Menu {
                 ForEach(SearchVideoFilters.Views.allCases) { option in
                     Button {
                         if option == .custom {
@@ -370,6 +388,12 @@ struct SearchContent: View {
                             Text(option.title)
                         }
                     }
+                }
+            } label: {
+                if videoFilters.views == .any {
+                    Text("Views")
+                } else {
+                    Label("Views", systemImage: "checkmark")
                 }
             }
             if videoFilters.isActive {

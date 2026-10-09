@@ -298,9 +298,13 @@ struct SubscriptionFeedScreen: View {
             Button {
                 isWatchFilterPresented = true
             } label: {
-                Label("Watch status", systemImage: "eye")
+                if watchFilter == .all {
+                    Text("Watch status")
+                } else {
+                    Label("Watch status", systemImage: "checkmark")
+                }
             }
-            Menu("Duration") {
+            Menu {
                 ForEach(FeedDurationFilter.allCases) { option in
                     Button {
                         if option == .custom {
@@ -315,6 +319,12 @@ struct SubscriptionFeedScreen: View {
                             Text(option.title)
                         }
                     }
+                }
+            } label: {
+                if durationFilter == .all {
+                    Text("Duration")
+                } else {
+                    Label("Duration", systemImage: "checkmark")
                 }
             }
             if watchFilter != .all || durationFilter != .all {
