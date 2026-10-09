@@ -22,6 +22,8 @@ struct LocalHistoryScreen: View {
     @State private var channelNavigation = LocalHistoryChannelNavigationModel()
     @State private var historyPlayback = HistoryPlaybackViewModel.shared
     @State private var channelToOpen: String?
+    @State private var showSavedMoments = false
+    @State private var momentToOpen: SavedMoment?
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
@@ -130,6 +132,26 @@ struct LocalHistoryScreen: View {
             if channelNavigation.isResolving {
                 ProgressView()
                     .accessibilityLabel("Opening channel")
+            }
+            if mode == .all {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSavedMoments = true
+                    } label: {
+                        Label("Saved moments", systemImage: "bookmark")
+                    }
+                    .tint(.white)
+                }
+            }
+        }
+        .sheet(isPresented: $showSavedMoments, onDismiss: {
+            guard let moment = momentToOpen else { return }
+            momentToOpen = nil
+            player.load(moment.video, startAt: moment.time)
+        }) {
+            SavedMomentsScreen { moment in
+                momentToOpen = moment
+                showSavedMoments = false
             }
         }
         .navigationDestination(item: $channelToOpen) { channelID in

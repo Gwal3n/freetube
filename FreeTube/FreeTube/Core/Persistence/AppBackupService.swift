@@ -44,6 +44,7 @@ final class AppBackupService {
             }
         )
         backup.subscriptionGroups = LocalSubscriptionGroupStore.shared.groups
+        backup.savedMoments = SavedMomentStore.shared.moments
         return backup
     }
 
@@ -93,6 +94,11 @@ final class AppBackupService {
             with: backup.subscriptionGroups ?? [],
             validChannelIDs: Set(backup.subscriptions.map(\.id))
         )
+        // An older backup cannot describe this newer collection. Keep current moments in that
+        // case; a new backup exports an explicit empty array when the user has none.
+        if let savedMoments = backup.savedMoments {
+            SavedMomentStore.shared.replaceAll(with: savedMoments)
+        }
         restoreSettings(backup.settings)
         VideoBlocklist.shared.reload()
     }

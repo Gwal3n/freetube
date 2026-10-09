@@ -4,8 +4,12 @@ import SwiftUI
 /// caption model; opening the transcript does not add another extraction or network path.
 @available(iOS 17.0, *)
 struct TranscriptScreen: View {
+    let video: Video
     let captionsModel: PlayerCaptionsModel
     let onSeek: (TimeInterval) -> Void
+    let onCopyText: (String) -> Void
+    let onCopyTimestampLink: (TimeInterval) -> Void
+    let onSaveMoment: (TimeInterval, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
@@ -54,6 +58,25 @@ struct TranscriptScreen: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel(Text(verbatim: "\(timestamp(for: cue.startTime)), \(cue.text)"))
                             .accessibilityHint("Jump to this point in the video")
+                            .contextMenu {
+                                Button {
+                                    onCopyText(cue.text)
+                                } label: {
+                                    Label("Copy text", systemImage: "doc.on.doc")
+                                }
+                                if video.youtubeShareURL(at: cue.startTime) != nil {
+                                    Button {
+                                        onCopyTimestampLink(cue.startTime)
+                                    } label: {
+                                        Label("Copy link at this time", systemImage: "link")
+                                    }
+                                    Button {
+                                        onSaveMoment(cue.startTime, cue.text)
+                                    } label: {
+                                        Label("Save this moment", systemImage: "bookmark")
+                                    }
+                                }
+                            }
                         }
                     }
                 }

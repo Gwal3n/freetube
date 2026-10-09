@@ -207,6 +207,8 @@ final class PlayerStateManager {
     private var handledSponsorBlockSegmentIDs = Set<String>()
     private var sponsorBlockNoticeTask: Task<Void, Never>?
     private var pendingSeekTarget: TimeInterval?
+    /// A user-chosen bookmark overrides automatic history resume once the winning item is ready.
+    private var pendingExplicitStart: TimeInterval?
     private var seekRequestID = 0
     private var audioModeSwitchGeneration = 0
     private var resumeAfterAudioSwitch: Bool?
@@ -395,6 +397,7 @@ final class PlayerStateManager {
         bufferedRanges = []
         hasEnded = false
         pendingSeekTarget = nil
+        pendingExplicitStart = nil
         seekRequestID += 1
         refreshArtwork(for: synthetic)
 
@@ -416,6 +419,8 @@ final class PlayerStateManager {
     ///   transitions pass `false` so a user who collapsed the player is not pulled back into it.
     /// - Parameter preservePlaylistPosition: plays a manual-queue item between playlist videos
     ///   without adding it to the playlist or advancing the playlist's current position.
+    /// - Parameter startAt: an explicit timestamp bookmark, applied after stream readiness in
+    ///   preference to automatic watch-history resume.
     func load(
         _ video: Video,
         autoplay: Bool = true,
@@ -423,9 +428,11 @@ final class PlayerStateManager {
         expandPlayer: Bool = true,
         recordInPlaybackHistory: Bool = true,
         localFileURL: URL? = nil,
-        preservePlaylistPosition: Bool = false
+        preservePlaylistPosition: Bool = false,
+        startAt: TimeInterval? = nil
     ) {
         log.info("load(\(video.id, privacy: .public)) autoplay=\(autoplay, privacy: .public) skipRecs=\(skipRecommendations, privacy: .public)")
+        let requestedStart = startAt.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         if localFileURL == nil, currentVideo?.id == video.id {
             if case .failed = loadState {
                 // A deliberate second tap retries a failed resolution.
@@ -433,6 +440,14 @@ final class PlayerStateManager {
                 log.info("load: current video selected again; expanding without restarting playback")
                 if expandPlayer {
                     presentPlayer(for: video.id, expanded: true)
+                }
+                if let requestedStart {
+                    if loadState == .readyToPlay {
+                        pendingExplicitStart = nil
+                        seek(to: requestedStart)
+                    } else {
+                        pendingExplicitStart = requestedStart
+                    }
                 }
                 return
             }
@@ -526,6 +541,7 @@ final class PlayerStateManager {
         bufferedRanges = []
         hasEnded = false
         pendingSeekTarget = nil
+        pendingExplicitStart = requestedStart
         seekRequestID += 1
         refreshArtwork(for: video)
         loadSponsorBlockSegments(for: video.id)
@@ -1308,6 +1324,7 @@ final class PlayerStateManager {
 
     func dismiss() {
         log.info("dismiss()")
+        pendingExplicitStart = nil
         setSleepTimer(.off)
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
@@ -1867,7 +1884,12 @@ final class PlayerStateManager {
                 if let nativeStoryboard = candidate.storyboard {
                     storyboard = nativeStoryboard
                 }
-                applyStoredResumePosition(await resumeLookup.value, for: video)
+                if let pendingExplicitStart {
+                    self.pendingExplicitStart = nil
+                    seek(to: pendingExplicitStart)
+                } else {
+                    applyStoredResumePosition(await resumeLookup.value, for: video)
+                }
                 updateNowPlaying()
                 contentPrefetchTask?.cancel()
                 contentPrefetchTask = Task {

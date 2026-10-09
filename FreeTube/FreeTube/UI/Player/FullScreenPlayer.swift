@@ -30,6 +30,7 @@ struct FullScreenPlayer: View {
     @State private var actionsModel = PlayerActionsModel()
     @State private var captionsModel = PlayerCaptionsModel()
     @State private var isTranscriptPresented = false
+    @State private var savedMomentFeedbackCount = 0
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
     @State private var shareFileURL: URL?
@@ -542,6 +543,7 @@ struct FullScreenPlayer: View {
         // Ensure the system status bar stays visible with light glyphs against the dark material.
         .preferredColorScheme(.dark)
         .statusBarHidden(portraitFullscreenActive)
+        .sensoryFeedback(.success, trigger: savedMomentFeedbackCount)
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL
         // in a `Binding<Bool>` that flips when the URL is set/cleared so the sheet lifecycle
         // matches the user's intent.
@@ -557,11 +559,24 @@ struct FullScreenPlayer: View {
             AddToPlaylistSheet(video: video)
         }
         .sheet(isPresented: $isTranscriptPresented) {
-            TranscriptScreen(captionsModel: captionsModel) { time in
-                player.seek(to: time)
+            if let video = player.currentVideo {
+                TranscriptScreen(
+                    video: video,
+                    captionsModel: captionsModel,
+                    onSeek: { player.seek(to: $0) },
+                    onCopyText: { UIPasteboard.general.string = $0 },
+                    onCopyTimestampLink: { time in
+                        UIPasteboard.general.string = video.youtubeShareURL(at: time)?.absoluteString
+                    },
+                    onSaveMoment: { time, label in
+                        if SavedMomentStore.shared.add(video: video, time: time, label: label) != nil {
+                            savedMomentFeedbackCount &+= 1
+                        }
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
             "Delete downloaded video?",
@@ -1015,6 +1030,11 @@ struct FullScreenPlayer: View {
             onCopyURLAtCurrentTime: {
                 if let url = watchURLAtCurrentTime(video) {
                     UIPasteboard.general.string = url.absoluteString
+                }
+            },
+            onSaveCurrentMoment: {
+                if SavedMomentStore.shared.add(video: video, time: player.elapsed) != nil {
+                    savedMomentFeedbackCount &+= 1
                 }
             },
             onShareDownloadedFile: {

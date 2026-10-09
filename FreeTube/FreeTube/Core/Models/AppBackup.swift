@@ -12,6 +12,8 @@ struct AppBackup: Codable, Sendable {
     let favoritePlaylists: [FavoritePlaylistRecord]
     /// Optional so backups made before subscription groups remain importable.
     var subscriptionGroups: [SubscriptionGroup]? = nil
+    /// Optional so backups made before timestamp bookmarks remain importable.
+    var savedMoments: [SavedMoment]? = nil
 
     enum SettingValue: Codable, Sendable {
         case boolean(Bool)

@@ -23,6 +23,7 @@ struct PlayerActionBar: View {
     let onSaveToPlaylist: () -> Void
     let onCopyURL: () -> Void
     let onCopyURLAtCurrentTime: () -> Void
+    let onSaveCurrentMoment: () -> Void
     let onShareDownloadedFile: () -> Void
     let onDownload: () -> Void
     let onDownloadChoice: (VideoQuality) -> Void
@@ -55,6 +56,11 @@ struct PlayerActionBar: View {
                 }
                 Button(action: onCopyURLAtCurrentTime) {
                     Label("Copy URL at current time", systemImage: "clock")
+                }
+                if !video.isLive, video.youtubeShareURL(at: 0) != nil {
+                    Button(action: onSaveCurrentMoment) {
+                        Label("Save this moment", systemImage: "bookmark")
+                    }
                 }
                 if downloadedFileURL != nil {
                     Button(action: onShareDownloadedFile) {

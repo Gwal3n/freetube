@@ -1,6 +1,114 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Saved moments" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherte Momente" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved moments" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Momentos guardados" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Moments enregistrés" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранённые моменты" } }
+      }
+    },
+    "Save this moment" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Diesen Moment speichern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save this moment" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Guardar este momento" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Enregistrer ce moment" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранить этот момент" } }
+      }
+    },
+    "Copy text" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Text kopieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy text" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Copiar texto" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Copier le texte" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скопировать текст" } }
+      }
+    },
+    "Copy link at this time" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Link zu dieser Stelle kopieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy link at this time" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Copiar enlace a este momento" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Copier le lien à cet instant" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скопировать ссылку на этот момент" } }
+      }
+    },
+    "No saved moments" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Keine gespeicherten Momente" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No saved moments" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay momentos guardados" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun moment enregistré" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет сохранённых моментов" } }
+      }
+    },
+    "Save a moment from the player or transcript." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Speichere einen Moment im Player oder Transkript." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save a moment from the player or transcript." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Guarda un momento desde el reproductor o la transcripción." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Enregistrez un moment depuis le lecteur ou la transcription." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохраните момент из плеера или текста видео." } }
+      }
+    },
+    "Play from this saved moment" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ab diesem gespeicherten Moment abspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play from this saved moment" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reproducir desde este momento guardado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lire à partir de ce moment enregistré" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Воспроизвести с этого момента" } }
+      }
+    },
+    "Edit label" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Bezeichnung bearbeiten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit label" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Editar etiqueta" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Modifier le libellé" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Изменить название" } }
+      }
+    },
+    "Search saved moments" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherte Momente durchsuchen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search saved moments" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Buscar momentos guardados" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Rechercher dans les moments enregistrés" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Поиск сохранённых моментов" } }
+      }
+    },
+    "Name moment" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Moment benennen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name moment" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Nombrar momento" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nommer ce moment" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Назвать момент" } }
+      }
+    },
+    "Label" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Bezeichnung" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Label" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Etiqueta" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Libellé" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Название" } }
+      }
+    },
+    "Leave blank to use the video title." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Leer lassen, um den Videotitel zu verwenden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Leave blank to use the video title." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Déjalo en blanco para usar el título del vídeo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Laissez vide pour utiliser le titre de la vidéo." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Оставьте пустым, чтобы использовать название видео." } }
+      }
+    },
     "Transcript" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Transkript" } },
