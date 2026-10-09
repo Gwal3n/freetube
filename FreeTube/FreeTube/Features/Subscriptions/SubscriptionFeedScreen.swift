@@ -35,17 +35,15 @@ struct SubscriptionFeedScreen: View {
         NavigationStack(path: $path) {
             List {
                 if !groups.groups.isEmpty || model.isRefreshing || model.lastRefreshAt != nil {
-                    HStack(spacing: 8) {
-                        if !groups.groups.isEmpty {
-                            groupPicker
-                                .layoutPriority(1)
-                        }
-                        Spacer(minLength: 8)
-                        if model.isRefreshing || model.lastRefreshAt != nil {
-                            FeedRefreshProgress(model: model, referenceDate: currentDate)
-                        }
+                    FeedRefreshProgress(
+                        model: model,
+                        referenceDate: currentDate,
+                        hasLeadingContent: !groups.groups.isEmpty
+                    ) {
+                        groupPicker
                     }
-                    .frame(height: 44)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)

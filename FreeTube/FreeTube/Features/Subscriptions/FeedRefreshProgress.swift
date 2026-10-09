@@ -1,21 +1,38 @@
 import SwiftUI
 
-/// A compact feed status that shares one header line with the selected subscription group.
+/// The feed header keeps its status inside the row and gives the refresh bar the full row width.
 @available(iOS 17.0, *)
-struct FeedRefreshProgress: View {
+struct FeedRefreshProgress<LeadingContent: View>: View {
     let model: SubscriptionFeedViewModel
     let referenceDate: Date
+    let hasLeadingContent: Bool
+    let leadingContent: LeadingContent
+
+    init(
+        model: SubscriptionFeedViewModel,
+        referenceDate: Date,
+        hasLeadingContent: Bool,
+        @ViewBuilder leadingContent: () -> LeadingContent
+    ) {
+        self.model = model
+        self.referenceDate = referenceDate
+        self.hasLeadingContent = hasLeadingContent
+        self.leadingContent = leadingContent()
+    }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 3) {
-            if model.isRefreshing {
-                Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
-            } else if let lastRefreshAt = model.lastRefreshAt {
-                ViewThatFits(in: .horizontal) {
-                    Text("Updated \(relativeAge(since: lastRefreshAt))")
-                    Text(verbatim: relativeAge(since: lastRefreshAt))
+        VStack(spacing: 7) {
+            HStack(spacing: 8) {
+                if hasLeadingContent {
+                    leadingContent
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if model.isRefreshing || model.lastRefreshAt != nil {
+                    status
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 24)
 
             if model.isRefreshing {
                 ProgressView(
@@ -24,14 +41,29 @@ struct FeedRefreshProgress: View {
                 )
                 .progressViewStyle(.linear)
                 .tint(.white)
-                .frame(height: 2)
-            } else {
-                Color.clear.frame(height: 2)
+                .frame(maxWidth: .infinity)
+                .frame(height: 4)
+                .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var status: some View {
+        Group {
+            if model.isRefreshing {
+                Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
+            } else if let lastRefreshAt = model.lastRefreshAt {
+                ViewThatFits(in: .horizontal) {
+                    Text("Updated \(relativeAge(since: lastRefreshAt))")
+                    Text(verbatim: relativeAge(since: lastRefreshAt))
+                }
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(1)
+        .minimumScaleFactor(0.8)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityStatus)
