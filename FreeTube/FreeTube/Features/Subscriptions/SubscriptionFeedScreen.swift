@@ -34,20 +34,22 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if !groups.groups.isEmpty { groupPicker }
+                if !groups.groups.isEmpty || model.isRefreshing || model.lastRefreshAt != nil {
+                    HStack(spacing: 8) {
+                        if !groups.groups.isEmpty {
+                            groupPicker
+                                .layoutPriority(1)
+                        }
+                        Spacer(minLength: 8)
                         if model.isRefreshing || model.lastRefreshAt != nil {
                             FeedRefreshProgress(model: model, referenceDate: currentDate)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 11)
-                    filterMenu
+                    .frame(height: 44)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
                 if model.failedChannelCount > 0 && !model.isRefreshWarningDismissed {
                     Section {
                         refreshWarning
@@ -127,6 +129,9 @@ struct SubscriptionFeedScreen: View {
                     ToolbarTitleMenu {
                         groupMenuActions
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    filterMenu
                 }
             }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
@@ -352,18 +357,16 @@ struct SubscriptionFeedScreen: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "line.3.horizontal.decrease")
-                if watchFilter != .all || durationFilter != .all {
-                    Text("Filtered")
+            Image(systemName: "line.3.horizontal.decrease")
+                .overlay(alignment: .topTrailing) {
+                    if watchFilter != .all || durationFilter != .all {
+                        Circle()
+                            .fill(.primary)
+                            .frame(width: 5, height: 5)
+                            .offset(x: 4, y: -4)
+                    }
                 }
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("Feed filters")
         .accessibilityValue(watchFilter == .all && durationFilter == .all ? "Off" : "On")
         .popover(isPresented: $isWatchFilterPresented, arrowEdge: .top) {

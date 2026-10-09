@@ -1,17 +1,20 @@
 import SwiftUI
 
-/// A quiet status beneath the Feed group subtitle. It stays above loading and video rows.
+/// A compact feed status that shares one header line with the selected subscription group.
 @available(iOS 17.0, *)
 struct FeedRefreshProgress: View {
     let model: SubscriptionFeedViewModel
     let referenceDate: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .trailing, spacing: 3) {
             if model.isRefreshing {
                 Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
             } else if let lastRefreshAt = model.lastRefreshAt {
-                lastRefreshedText(since: lastRefreshAt)
+                ViewThatFits(in: .horizontal) {
+                    Text("Updated \(relativeAge(since: lastRefreshAt))")
+                    Text(verbatim: relativeAge(since: lastRefreshAt))
+                }
             }
 
             if model.isRefreshing {
@@ -21,29 +24,33 @@ struct FeedRefreshProgress: View {
                 )
                 .progressViewStyle(.linear)
                 .tint(.white)
-                .frame(height: 4)
+                .frame(height: 2)
+            } else {
+                Color.clear.frame(height: 2)
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .lineLimit(1)
         .allowsHitTesting(false)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityStatus)
     }
 
-    private func lastRefreshedText(since date: Date) -> Text {
-        let elapsed = max(0, referenceDate.timeIntervalSince(date))
-        if elapsed < 3_600 {
-            return Text("Last refreshed less than an hour ago")
+    private var accessibilityStatus: Text {
+        if model.isRefreshing {
+            return Text("Refreshing \(model.refreshedChannels) of \(model.refreshChannelCount) channels")
         }
-        let hours = Int(elapsed / 3_600)
-        if hours == 1 {
-            return Text("Last refreshed 1 hour ago")
-        }
-        if hours < 48 {
-            return Text("Last refreshed \(hours) hours ago")
-        }
-        let days = Int(elapsed / 86_400)
-        return Text("Last refreshed \(days) days ago")
+        guard let lastRefreshAt = model.lastRefreshAt else { return Text("Not refreshed yet") }
+        return Text("Last refreshed \(relativeAge(since: lastRefreshAt, style: .full))")
+    }
+
+    private func relativeAge(
+        since date: Date,
+        style: RelativeDateTimeFormatter.UnitsStyle = .abbreviated
+    ) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = style
+        return formatter.localizedString(for: date, relativeTo: referenceDate)
     }
 }
