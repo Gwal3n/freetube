@@ -46,10 +46,12 @@ struct FullScreenPlayer: View {
     @State private var fullscreenSwipeIsVertical: Bool?
     @State private var fullscreenSwipeStartedInExpectedDirection = false
     @State private var fullscreenSwipeHidControls = false
+    @State private var swipeAdjustment = PlayerSwipeAdjustmentModel()
     @State private var zoomInteractionActive = false
     @State private var zoomModel = PlayerZoomModel()
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
+    @AppStorage("verticalSwipeAdjustments") private var verticalSwipeAdjustments = false
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
     @AppStorage("showDescription") private var showDescription = true
@@ -194,6 +196,7 @@ struct FullScreenPlayer: View {
                             zoomInteractionActive = active
                             if active {
                                 // A moving two-finger centroid is not a fullscreen-exit swipe.
+                                swipeAdjustment.cancel()
                                 fullscreenSwipeTranslation = 0
                                 fullscreenSwipeIsVertical = false
                                 fullscreenSwipeStartedInExpectedDirection = false
@@ -401,12 +404,23 @@ struct FullScreenPlayer: View {
                         .position(x: controlFrame.midX, y: controlFrame.midY)
                         .opacity(max(0, 1 - collapseProgress * 2.5))
                     }
+                    if !isFloating {
+                        PlayerSwipeAdjustmentOverlay(
+                            model: swipeAdjustment,
+                            surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight)
+                        )
+                        .zIndex(7)
+                    }
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
                 .simultaneousGesture(
                     fullscreenSwipeGesture(
                         isFullscreen: portraitFullscreenActive || isLandscape,
-                        viewportHeight: proxy.size.height
+                        viewportHeight: proxy.size.height,
+                        surfaceFrame: CGRect(
+                            origin: proxy.frame(in: .global).origin,
+                            size: CGSize(width: surfaceWidth, height: surfaceHeight)
+                        )
                     )
                 )
                 .onAppear { showPlayerControls() }
@@ -428,6 +442,7 @@ struct FullScreenPlayer: View {
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
+                    swipeAdjustment.cancel()
                     player.chapterListPresented = false
                     portraitVideoFullscreen = false
                     fullscreenSwipeTranslation = 0
@@ -577,6 +592,7 @@ struct FullScreenPlayer: View {
         ))
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
+                swipeAdjustment.cancel()
                 portraitVideoFullscreen = false
                 isPlaylistPanelPresented = false
                 playlistPanelExpansion = 0
@@ -598,6 +614,13 @@ struct FullScreenPlayer: View {
                 fullscreenSwipeHidControls = false
             }
         }
+        .onChange(of: playerVerticalSwipeAction) { _, _ in
+            swipeAdjustment.cancel()
+            fullscreenSwipeTranslation = 0
+            fullscreenSwipeIsVertical = nil
+            fullscreenSwipeStartedInExpectedDirection = false
+            fullscreenSwipeHidControls = false
+        }
         .onChange(of: isPlaylistPanelPresented) { _, isPresented in
             player.playlistPanelPresented = isPresented
             player.playerPresentationGestureEnabled = !portraitFullscreenActive
@@ -607,6 +630,7 @@ struct FullScreenPlayer: View {
             if !isPresented { chapterPanelExpansion = 0 }
         }
         .onDisappear {
+            swipeAdjustment.cancel()
             player.playerPresentationGestureEnabled = true
             player.playlistPanelPresented = false
             player.portraitPlayerFullscreenActive = false
@@ -727,11 +751,25 @@ struct FullScreenPlayer: View {
 
     private func fullscreenSwipeGesture(
         isFullscreen: Bool,
-        viewportHeight: CGFloat
+        viewportHeight: CGFloat,
+        surfaceFrame: CGRect
     ) -> some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .global)
             .onChanged { value in
-                guard verticalSwipeFullscreen, !zoomInteractionActive else { return }
+                guard player.fullScreenPresented,
+                      collapseProgress < 0.05,
+                      !zoomInteractionActive else { return }
+                if isFullscreen && playerVerticalSwipeAction == .adjustPlayback {
+                    swipeAdjustment.update(
+                        translation: value.translation,
+                        startLocation: value.startLocation,
+                        surfaceFrame: surfaceFrame,
+                        controlsVisible: controlsVisibility.isVisible,
+                        player: player
+                    )
+                    return
+                }
+                guard playerVerticalSwipeAction != .off else { return }
                 let expectedDirection: CGFloat = isFullscreen ? 1 : -1
                 if fullscreenSwipeIsVertical == nil {
                     fullscreenSwipeIsVertical = abs(value.translation.height)
@@ -756,13 +794,17 @@ struct FullScreenPlayer: View {
                 fullscreenSwipeTranslation = travel * expectedDirection
             }
             .onEnded { value in
+                if isFullscreen && playerVerticalSwipeAction == .adjustPlayback {
+                    swipeAdjustment.finish()
+                    return
+                }
                 let shouldRestoreControls = fullscreenSwipeHidControls
                 defer {
                     fullscreenSwipeIsVertical = nil
                     fullscreenSwipeStartedInExpectedDirection = false
                     fullscreenSwipeHidControls = false
                 }
-                guard verticalSwipeFullscreen,
+                guard playerVerticalSwipeAction != .off,
                       !zoomInteractionActive,
                       fullscreenSwipeIsVertical == true,
                       fullscreenSwipeStartedInExpectedDirection else {
@@ -795,6 +837,11 @@ struct FullScreenPlayer: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             }
+    }
+
+    private var playerVerticalSwipeAction: PlayerVerticalSwipeAction {
+        if verticalSwipeAdjustments { return .adjustPlayback }
+        return verticalSwipeFullscreen ? .fullscreen : .off
     }
 
     private func enterFullscreen() {

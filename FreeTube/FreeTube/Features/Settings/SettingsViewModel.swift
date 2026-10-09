@@ -124,9 +124,9 @@ final class SettingsViewModel {
         set { preferences.autoplayNext = newValue }
     }
 
-    var verticalSwipeFullscreen: Bool {
-        get { preferences.verticalSwipeFullscreen }
-        set { preferences.verticalSwipeFullscreen = newValue }
+    var playerVerticalSwipeAction: PlayerVerticalSwipeAction {
+        get { preferences.playerVerticalSwipeAction }
+        set { preferences.playerVerticalSwipeAction = newValue }
     }
 
     var showHistoryProgressBars: Bool {

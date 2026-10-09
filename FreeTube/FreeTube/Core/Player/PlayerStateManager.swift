@@ -863,6 +863,17 @@ final class PlayerStateManager {
         log.info("Player muted=\(self.isMuted, privacy: .public)")
     }
 
+    /// Changes this player's loudness relative to the device volume. Unmute when the user
+    /// explicitly raises it; the system output level remains owned by iOS.
+    func setPlaybackVolume(_ volume: Float) {
+        let boundedVolume = min(1, max(0, volume))
+        player.volume = boundedVolume
+        if isMuted && boundedVolume > 0 {
+            isMuted = false
+            player.isMuted = false
+        }
+    }
+
     var isLoopingCurrentVideo: Bool {
         queue.repeatMode == .one
     }

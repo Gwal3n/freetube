@@ -18,9 +18,10 @@ struct UserPreferences {
     /// cleanly for existing installs.
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
-    /// Enables vertical video-surface gestures: swipe up to enter fullscreen and swipe down to
-    /// leave it. Kept independent from the fullscreen button for users who prefer fixed gestures.
+    /// Enables the existing swipe-up entry and swipe-down fullscreen exit. Retained to preserve
+    /// the user's prior on/off choice when adding the fullscreen-only adjustment mode.
     @AppStorage("verticalSwipeFullscreen") var verticalSwipeFullscreen: Bool = true
+    @AppStorage("verticalSwipeAdjustments") var verticalSwipeAdjustments: Bool = false
     /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
     /// Stops writing local watch history and playback positions when disabled. Existing entries
@@ -110,6 +111,17 @@ struct UserPreferences {
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var playerVerticalSwipeAction: PlayerVerticalSwipeAction {
+        get {
+            if verticalSwipeAdjustments { return .adjustPlayback }
+            return verticalSwipeFullscreen ? .fullscreen : .off
+        }
+        nonmutating set {
+            verticalSwipeAdjustments = newValue == .adjustPlayback
+            verticalSwipeFullscreen = newValue == .fullscreen
+        }
     }
 
     var recordsSearchHistory: Bool {

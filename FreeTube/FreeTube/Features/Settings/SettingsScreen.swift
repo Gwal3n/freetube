@@ -38,7 +38,11 @@ struct SettingsScreen: View {
                         player.setPlaybackRate(rate)
                     }
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
-                    Toggle("Swipe vertically for fullscreen", isOn: Bindable(model).verticalSwipeFullscreen)
+                    Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
+                        Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
+                        Text("Brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
+                        Text("Off").tag(PlayerVerticalSwipeAction.off)
+                    }
                     Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
                     Toggle("Show description", isOn: Bindable(model).showDescription)
                     Toggle("Show comments", isOn: Bindable(model).showComments)
@@ -60,7 +64,12 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Playback")
                 } footer: {
-                    Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        if model.playerVerticalSwipeAction == .adjustPlayback {
+                            Text("In fullscreen, swipe on the left for screen brightness or the right for FreeTube's playback volume. The device volume buttons still control system volume.")
+                        }
+                        Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback.")
+                    }
                 }
 
                 Section("Captions") {
