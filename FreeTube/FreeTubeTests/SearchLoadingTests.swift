@@ -56,6 +56,7 @@ final class SearchLoadingTests: XCTestCase {
         let model = SearchViewModel(service: service)
         model.query = "first"
         await model.submit()
+        let firstPageRevision = model.resultsRevision
         let page = Task { await model.loadMore() }
         await service.waitForPage()
         service.completePage(.failure(URLError(.notConnectedToInternet)))
@@ -69,6 +70,10 @@ final class SearchLoadingTests: XCTestCase {
         XCTAssertFalse(model.paginationFailed)
         XCTAssertNil(model.errorState)
         XCTAssertEqual(model.results?.playlists.map(\.id), ["first", "next"])
+        XCTAssertEqual(model.resultsRevision, firstPageRevision)
+
+        await model.refresh()
+        XCTAssertEqual(model.resultsRevision, firstPageRevision + 1)
     }
 }
 

@@ -15,6 +15,9 @@ final class SearchViewModel {
     private(set) var submittedQuery: String?
     private(set) var suggestions: [SearchSuggestion] = []
     private(set) var results: SearchResult?
+    /// Advances only when a new first page replaces the results, not for continuation pages.
+    /// Filtered-result fill tasks use this to start once per search/refresh with a fixed budget.
+    private(set) var resultsRevision = 0
     private(set) var isLoading: Bool = false
     private(set) var didSearchFail = false
     private(set) var paginationFailed = false
@@ -107,6 +110,7 @@ final class SearchViewModel {
                   query.trimmingCharacters(in: .whitespacesAndNewlines) == submittedQuery
             else { return }
             results = result
+            resultsRevision &+= 1
             self.submittedQuery = submittedQuery
             suggestions = []
         } catch {
@@ -159,6 +163,7 @@ final class SearchViewModel {
             let refreshed = try await service.search(query: submittedQuery)
             guard searchGeneration == generation else { return }
             results = refreshed
+            resultsRevision &+= 1
         } catch {
             guard searchGeneration == generation else { return }
             log.notice("Refreshing search failed: \(String(describing: error), privacy: .public)")

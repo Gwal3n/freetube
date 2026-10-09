@@ -6,6 +6,17 @@ import UIKit
 /// presentation and the history-upsert submit callback.
 @available(iOS 17.0, *)
 struct SearchContent: View {
+    private struct FilterFillRequest: Equatable {
+        let resultsRevision: Int
+        let filters: SearchVideoFilters
+        let isExpanded: Bool
+    }
+
+    private struct FilterPageKey: Equatable {
+        let request: FilterFillRequest
+        let loadedCount: Int
+    }
+
     private enum CustomRange: String, Identifiable {
         case uploaded, length, views
         var id: String { rawValue }
@@ -26,6 +37,7 @@ struct SearchContent: View {
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
     @State private var customRange: CustomRange?
+    @State private var lastFilteredPrefetch: FilterPageKey?
     @State private var showingClearSearchHistoryConfirmation = false
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -71,7 +83,9 @@ struct SearchContent: View {
             areChannelsExpanded = true
             areVideosExpanded = true
             videoFilters = SearchVideoFilters()
+            lastFilteredPrefetch = nil
         }
+        .onChange(of: videoFilters) { _, _ in lastFilteredPrefetch = nil }
         .errorToast($model.errorState)
         .sheet(item: $customRange) { range in
             switch range {
@@ -165,7 +179,9 @@ struct SearchContent: View {
                                         if results.continuationToken == nil {
                                             Text("No videos match these filters")
                                         } else {
-                                            Text("No loaded videos match. Load more to check the next page.")
+                                            Text(model.isLoading
+                                                 ? "Finding matching videos…"
+                                                 : "No loaded videos match. Load more to check the next page.")
                                         }
                                     }
                                     .foregroundStyle(.secondary)
@@ -178,7 +194,8 @@ struct SearchContent: View {
                                 .frame(maxWidth: .infinity, minHeight: 76)
                                 .listRowSeparator(.hidden)
                             }
-                            let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
+                            let lookaheadIDs = Set((videoFilters.isActive ? visibleVideos : results.videos)
+                                .suffix(5).map(\.id))
                             ForEach(visibleVideos) { video in
                                 VideoRow(
                                     video: video,
@@ -193,12 +210,30 @@ struct SearchContent: View {
                                     player.load(video)
                                 }
                                 .onAppear {
-                                    guard !videoFilters.isActive,
-                                          lookaheadIDs.contains(video.id),
+                                    guard lookaheadIDs.contains(video.id),
                                           results.continuationToken != nil,
                                           !model.paginationFailed,
                                           !model.isLoading else { return }
-                                    Task { await model.loadMore() }
+                                    if videoFilters.isActive {
+                                        // The bounded fill owns sparse first pages. Once there
+                                        // are enough visible rows, scrolling near their end can
+                                        // prefetch the next page without a repeated button tap.
+                                        guard visibleVideos.count >= 12 else { return }
+                                        let key = FilterPageKey(
+                                            request: .init(
+                                                resultsRevision: model.resultsRevision,
+                                                filters: videoFilters,
+                                                isExpanded: areVideosExpanded
+                                            ),
+                                            loadedCount: results.videos.count
+                                        )
+                                        guard lastFilteredPrefetch != key else { return }
+                                        lastFilteredPrefetch = key
+                                    }
+                                    Task {
+                                        await model.loadMore()
+                                        if videoFilters.isActive { await fillFilteredResults() }
+                                    }
                                 }
                             }
                         }
@@ -212,12 +247,15 @@ struct SearchContent: View {
                 }
                 if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {
                     MediaPaginationFooter(isLoading: model.isLoading, isRetry: model.paginationFailed) {
-                        Task { await model.loadMore() }
+                        Task {
+                            await model.loadMore()
+                            if videoFilters.isActive { await fillFilteredResults() }
+                        }
                     }
                     .listRowSeparator(.hidden)
                     .onAppear {
-                        // Local filters can hide entire pages. Keep continuation explicit so a
-                        // selective filter never burns through every search page on its own.
+                        // The bounded filtered fill owns sparse pages. Ordinary unfiltered
+                        // browsing retains its existing automatic footer pagination.
                         guard !videoFilters.isActive, !model.paginationFailed else { return }
                         Task { await model.loadMore() }
                     }
@@ -226,6 +264,13 @@ struct SearchContent: View {
             .listStyle(.plain)
             .scrollDismissesKeyboard(.interactively)
             .refreshable { await model.refresh() }
+            .task(id: FilterFillRequest(
+                resultsRevision: model.resultsRevision,
+                filters: videoFilters,
+                isExpanded: areVideosExpanded
+            )) {
+                await fillFilteredResults()
+            }
             .task(id: progressLookupID(for: results.videos)) {
                 await loadProgress(for: results.videos)
             }
@@ -276,7 +321,7 @@ struct SearchContent: View {
                     }
                 }
             }
-            Menu("Uploaded (approximate)") {
+            Menu("Upload date") {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
                     Button {
                         if option == .custom {
@@ -349,6 +394,53 @@ struct SearchContent: View {
 
     private func progressLookupID(for videos: [Video]) -> String {
         "\(showHistoryProgressBars):" + videos.map(\.id).joined(separator: ",")
+    }
+
+    /// Fill a sparse filtered list without turning a very narrow filter into an unlimited stream
+    /// of YouTube requests. A later explicit Load more starts another bounded batch.
+    private func fillFilteredResults() async {
+        let filters = videoFilters
+        guard filters.isActive, areVideosExpanded,
+              let query = model.submittedQuery else { return }
+        let revision = model.resultsRevision
+        let targetCount = 12
+        let maximumPages = 6
+
+        for _ in 0..<maximumPages {
+            while model.isLoading {
+                do { try await Task.sleep(for: .milliseconds(100)) }
+                catch { return }
+            }
+            guard !Task.isCancelled,
+                  filters == videoFilters,
+                  areVideosExpanded,
+                  model.resultsRevision == revision,
+                  model.submittedQuery == query,
+                  !model.isEditingNewQuery,
+                  !model.paginationFailed,
+                  let results = model.results,
+                  let token = results.continuationToken else { return }
+
+            let statuses: [String: WatchHistoryStatus]
+            if filters.watch == .all {
+                statuses = [:]
+            } else {
+                let summary = await PersistenceWriter.shared.watchHistorySummary(
+                    videoIDs: results.videos.map(\.id)
+                )
+                guard !Task.isCancelled, filters == videoFilters,
+                      model.resultsRevision == revision else { return }
+                statuses = summary.statuses
+            }
+            let now = Date.now
+            let visibleCount = results.videos.filter {
+                filters.includes($0, status: statuses[$0.id], now: now)
+            }.count
+            if visibleCount >= targetCount { return }
+
+            await model.loadMore()
+            guard !Task.isCancelled, model.results?.continuationToken != token else { return }
+        }
     }
 
     private func loadProgress(for videos: [Video]) async {

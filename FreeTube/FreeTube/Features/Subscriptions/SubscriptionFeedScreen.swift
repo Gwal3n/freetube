@@ -25,6 +25,7 @@ struct SubscriptionFeedScreen: View {
     @State private var failedChannelsExpanded = false
     @State private var isCustomDurationPresented = false
     @State private var isWatchFilterPresented = false
+    @State private var lastFilteredPrefetchKey: String?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
@@ -49,10 +50,27 @@ struct SubscriptionFeedScreen: View {
 
                 ForEach(filteredVideos) { video in
                     feedRow(video)
+                        .onAppear {
+                            guard watchFilter != .all || durationFilter != .all,
+                                  filteredVideos.count >= 12,
+                                  filteredVideos.suffix(5).contains(where: { $0.id == video.id }),
+                                  model.canLoadMore,
+                                  !model.isLoadingMore,
+                                  !model.isRefreshing else { return }
+                            let key = automaticLoadKey
+                            guard lastFilteredPrefetchKey != key else { return }
+                            lastFilteredPrefetchKey = key
+                            Task {
+                                await model.loadMore()
+                                await fillFilteredFeed()
+                            }
+                        }
                 }
 
                 if filteredVideos.isEmpty && !model.videos.isEmpty && model.canLoadMore {
-                    Text("No loaded videos match. Load more to check the next page.")
+                    Text(model.isLoadingMore
+                         ? "Finding matching videos…"
+                         : "No loaded videos match. Load more to check the next page.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -61,7 +79,12 @@ struct SubscriptionFeedScreen: View {
 
                 if model.canLoadMore {
                     Button {
-                        Task { await model.loadMore() }
+                        Task {
+                            await model.loadMore()
+                            if watchFilter != .all || durationFilter != .all {
+                                await fillFilteredFeed()
+                            }
+                        }
                     } label: {
                         Group {
                             if model.isLoadingMore {
@@ -113,6 +136,8 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .refreshable { await model.refresh() }
+            .task(id: filteredFillKey) { await fillFilteredFeed() }
+            .onChange(of: filteredFillKey) { _, _ in lastFilteredPrefetchKey = nil }
             .overlay {
                 if !model.hasLoaded {
                     MediaListPlaceholder()
@@ -205,6 +230,10 @@ struct SubscriptionFeedScreen: View {
         "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes)"
     }
 
+    private var filteredFillKey: String {
+        "\(model.firstPageRevision):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes)"
+    }
+
     private var watchFilter: FeedWatchFilter {
         FeedWatchFilter(rawValue: watchFilterRaw) ?? .all
     }
@@ -221,6 +250,46 @@ struct SubscriptionFeedScreen: View {
                     minimumMinutes: customMinimumMinutes,
                     maximumMinutes: customMaximumMinutes
                 )
+        }
+    }
+
+    /// Feed pagination reads cached videos, but sparse filters still need several cache pages to
+    /// show a useful first screen. Stop after a bounded batch; explicit Load more can continue it.
+    private func fillFilteredFeed() async {
+        let selectedWatch = watchFilter
+        let selectedDuration = durationFilter
+        let minimum = customMinimumMinutes
+        let maximum = customMaximumMinutes
+        guard selectedWatch != .all || selectedDuration != .all else { return }
+        let revision = model.firstPageRevision
+        let targetCount = 12
+        let maximumPages = 10
+
+        for _ in 0..<maximumPages {
+            while model.isRefreshing || model.isLoadingMore {
+                do { try await Task.sleep(for: .milliseconds(100)) }
+                catch { return }
+            }
+            guard !Task.isCancelled,
+                  model.firstPageRevision == revision,
+                  watchFilter == selectedWatch,
+                  durationFilter == selectedDuration,
+                  customMinimumMinutes == minimum,
+                  customMaximumMinutes == maximum,
+                  model.canLoadMore else { return }
+            let visibleCount = model.videos.filter { video in
+                selectedWatch.includes(model.watchStatuses[video.id])
+                    && selectedDuration.includes(
+                        video.duration,
+                        minimumMinutes: minimum,
+                        maximumMinutes: maximum
+                    )
+            }.count
+            if visibleCount >= targetCount { return }
+
+            let previousCount = model.videos.count
+            await model.loadMore()
+            guard !Task.isCancelled, model.videos.count > previousCount else { return }
         }
     }
 

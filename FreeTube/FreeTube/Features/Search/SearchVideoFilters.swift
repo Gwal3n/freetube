@@ -3,7 +3,7 @@ import Foundation
 /// Presentation-only filters for the video section of a submitted search. Search itself and
 /// its continuation token remain untouched; missing metadata is excluded only when that filter
 /// is active. Upload-age presets are approximate because YouTube returns relative text here.
-struct SearchVideoFilters {
+struct SearchVideoFilters: Equatable {
     struct NumericRange: Equatable {
         let minimum: Int
         /// Nil means no upper limit.

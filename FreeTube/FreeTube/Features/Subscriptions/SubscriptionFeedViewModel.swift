@@ -13,6 +13,8 @@ final class SubscriptionFeedViewModel {
     private(set) var refreshedChannels = 0
     private(set) var refreshChannelCount = 0
     private(set) var hasLoaded = false
+    /// Changes after a fresh first page is committed, but not while paginating that page.
+    private(set) var firstPageRevision = 0
     private(set) var failedChannels: [LocalSubscription] = []
     private(set) var isRefreshWarningDismissed = false
     private(set) var canLoadMore = false
@@ -120,6 +122,7 @@ final class SubscriptionFeedViewModel {
     private func loadCache() async {
         cacheGeneration += 1
         let generation = cacheGeneration
+        let isFirstPage = visibleLimit == pageSize
         let channelIDs = selectedGroupID.flatMap { id in
             groups.groups.first(where: { $0.id == id })?.channelIDs
         }
@@ -136,5 +139,6 @@ final class SubscriptionFeedViewModel {
         playbackProgress = watchSummary.progress
         watchStatuses = watchSummary.statuses
         lastRefreshAt = refreshDate
+        if isFirstPage { firstPageRevision &+= 1 }
     }
 }
