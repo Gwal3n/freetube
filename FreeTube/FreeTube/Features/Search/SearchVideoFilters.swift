@@ -4,6 +4,30 @@ import Foundation
 /// its continuation token remain untouched; missing metadata is excluded only when that filter
 /// is active. Upload-age presets are approximate because YouTube returns relative text here.
 struct SearchVideoFilters {
+    struct NumericRange: Equatable {
+        let minimum: Int
+        /// Nil means no upper limit.
+        let maximum: Int?
+
+        func includes(_ value: Int) -> Bool {
+            value >= minimum && (maximum.map { value <= $0 } ?? true)
+        }
+    }
+
+    struct DateRange: Equatable {
+        let firstDay: Date
+        let lastDay: Date
+
+        func includes(_ date: Date) -> Bool {
+            let calendar = Calendar.autoupdatingCurrent
+            let start = calendar.startOfDay(for: firstDay)
+            guard let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: lastDay)) else {
+                return false
+            }
+            return date >= start && date < end
+        }
+    }
+
     enum Watch: String, CaseIterable, Identifiable {
         case all, hideWatched, hideUnwatched, onlyPartial, onlyFinished
 
@@ -31,7 +55,7 @@ struct SearchVideoFilters {
     }
 
     enum Uploaded: String, CaseIterable, Identifiable {
-        case anytime, pastDay, pastWeek, pastMonth, pastYear
+        case anytime, pastDay, pastWeek, pastMonth, pastYear, custom
 
         var id: String { rawValue }
 
@@ -42,6 +66,7 @@ struct SearchVideoFilters {
             case .pastWeek: "Past week"
             case .pastMonth: "Past month"
             case .pastYear: "Past year"
+            case .custom: "Custom date range…"
             }
         }
 
@@ -52,10 +77,18 @@ struct SearchVideoFilters {
             case .pastWeek: 604_800
             case .pastMonth: 2_629_746
             case .pastYear: 31_556_952
+            case .custom: nil
             }
         }
 
-        func includes(_ video: Video, now: Date) -> Bool {
+        func includes(_ video: Video, now: Date, customRange: DateRange?) -> Bool {
+            if self == .custom {
+                guard let customRange else { return false }
+                let estimated = video.publishedAt
+                    ?? Self.estimatedDate(from: video.publishedRelative, relativeTo: now)
+                guard let estimated else { return false }
+                return customRange.includes(estimated)
+            }
             guard let maximumAge else { return true }
             let estimated = video.publishedAt
                 ?? Self.estimatedDate(from: video.publishedRelative, relativeTo: now)
@@ -82,7 +115,7 @@ struct SearchVideoFilters {
     }
 
     enum Length: String, CaseIterable, Identifiable {
-        case any, underFourMinutes, fourToTwentyMinutes, overTwentyMinutes
+        case any, underFourMinutes, fourToTwentyMinutes, overTwentyMinutes, custom
 
         var id: String { rawValue }
 
@@ -92,10 +125,11 @@ struct SearchVideoFilters {
             case .underFourMinutes: "Under 4 minutes"
             case .fourToTwentyMinutes: "4–20 minutes"
             case .overTwentyMinutes: "Over 20 minutes"
+            case .custom: "Custom duration…"
             }
         }
 
-        func includes(_ duration: TimeInterval?) -> Bool {
+        func includes(_ duration: TimeInterval?, customRange: NumericRange?) -> Bool {
             guard self != .any else { return true }
             guard let duration, duration.isFinite, duration > 0 else { return false }
             return switch self {
@@ -103,12 +137,16 @@ struct SearchVideoFilters {
             case .underFourMinutes: duration < 240
             case .fourToTwentyMinutes: duration >= 240 && duration <= 1200
             case .overTwentyMinutes: duration > 1200
+            case .custom: customRange.map {
+                duration >= Double($0.minimum) * 60
+                    && ($0.maximum.map { maximum in duration <= Double(maximum) * 60 } ?? true)
+            } ?? false
             }
         }
     }
 
     enum Views: String, CaseIterable, Identifiable {
-        case any, underTenThousand, tenToHundredThousand, hundredThousandToMillion, overMillion
+        case any, underTenThousand, tenToHundredThousand, hundredThousandToMillion, overMillion, custom
 
         var id: String { rawValue }
 
@@ -119,10 +157,11 @@ struct SearchVideoFilters {
             case .tenToHundredThousand: "10K–100K views"
             case .hundredThousandToMillion: "100K–1M views"
             case .overMillion: "1M+ views"
+            case .custom: "Custom view range…"
             }
         }
 
-        func includes(_ count: Int?) -> Bool {
+        func includes(_ count: Int?, customRange: NumericRange?) -> Bool {
             guard self != .any else { return true }
             guard let count, count >= 0 else { return false }
             return switch self {
@@ -131,6 +170,7 @@ struct SearchVideoFilters {
             case .tenToHundredThousand: count >= 10_000 && count < 100_000
             case .hundredThousandToMillion: count >= 100_000 && count < 1_000_000
             case .overMillion: count >= 1_000_000
+            case .custom: customRange?.includes(count) ?? false
             }
         }
     }
@@ -139,6 +179,9 @@ struct SearchVideoFilters {
     var uploaded: Uploaded = .anytime
     var length: Length = .any
     var views: Views = .any
+    var customUploadedRange: DateRange? = nil
+    var customLengthRange: NumericRange? = nil
+    var customViewsRange: NumericRange? = nil
 
     var isActive: Bool {
         watch != .all || uploaded != .anytime || length != .any || views != .any
@@ -146,8 +189,8 @@ struct SearchVideoFilters {
 
     func includes(_ video: Video, status: WatchHistoryStatus?, now: Date) -> Bool {
         watch.includes(status)
-            && uploaded.includes(video, now: now)
-            && length.includes(video.duration)
-            && views.includes(video.viewCount)
+            && uploaded.includes(video, now: now, customRange: customUploadedRange)
+            && length.includes(video.duration, customRange: customLengthRange)
+            && views.includes(video.viewCount, customRange: customViewsRange)
     }
 }

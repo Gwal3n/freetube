@@ -6,6 +6,11 @@ import UIKit
 /// presentation and the history-upsert submit callback.
 @available(iOS 17.0, *)
 struct SearchContent: View {
+    private enum CustomRange: String, Identifiable {
+        case uploaded, length, views
+        var id: String { rawValue }
+    }
+
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
     let onOpenDestination: (AppNavigationRequest.Destination) -> Void
@@ -20,6 +25,7 @@ struct SearchContent: View {
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
+    @State private var customRange: CustomRange?
     @State private var showingClearSearchHistoryConfirmation = false
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -67,6 +73,31 @@ struct SearchContent: View {
             videoFilters = SearchVideoFilters()
         }
         .errorToast($model.errorState)
+        .sheet(item: $customRange) { range in
+            switch range {
+            case .uploaded:
+                SearchDateRangeSheet(range: videoFilters.customUploadedRange) { selected in
+                    videoFilters.customUploadedRange = selected
+                    videoFilters.uploaded = .custom
+                }
+            case .length:
+                SearchNumericRangeSheet(
+                    title: "Duration Range", unit: "Minutes",
+                    range: videoFilters.customLengthRange
+                ) { selected in
+                    videoFilters.customLengthRange = selected
+                    videoFilters.length = .custom
+                }
+            case .views:
+                SearchNumericRangeSheet(
+                    title: "View Count Range", unit: "Views",
+                    range: videoFilters.customViewsRange
+                ) { selected in
+                    videoFilters.customViewsRange = selected
+                    videoFilters.views = .custom
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -248,7 +279,11 @@ struct SearchContent: View {
             Menu("Uploaded (approximate)") {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
                     Button {
-                        videoFilters.uploaded = option
+                        if option == .custom {
+                            customRange = .uploaded
+                        } else {
+                            videoFilters.uploaded = option
+                        }
                     } label: {
                         if videoFilters.uploaded == option {
                             Label(option.title, systemImage: "checkmark")
@@ -261,7 +296,11 @@ struct SearchContent: View {
             Menu("Length") {
                 ForEach(SearchVideoFilters.Length.allCases) { option in
                     Button {
-                        videoFilters.length = option
+                        if option == .custom {
+                            customRange = .length
+                        } else {
+                            videoFilters.length = option
+                        }
                     } label: {
                         if videoFilters.length == option {
                             Label(option.title, systemImage: "checkmark")
@@ -274,7 +313,11 @@ struct SearchContent: View {
             Menu("Views") {
                 ForEach(SearchVideoFilters.Views.allCases) { option in
                     Button {
-                        videoFilters.views = option
+                        if option == .custom {
+                            customRange = .views
+                        } else {
+                            videoFilters.views = option
+                        }
                     } label: {
                         if videoFilters.views == option {
                             Label(option.title, systemImage: "checkmark")

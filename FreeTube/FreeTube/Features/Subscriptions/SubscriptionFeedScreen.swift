@@ -24,6 +24,7 @@ struct SubscriptionFeedScreen: View {
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
     @State private var isCustomDurationPresented = false
+    @State private var isWatchFilterPresented = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
@@ -225,18 +226,10 @@ struct SubscriptionFeedScreen: View {
 
     private var filterMenu: some View {
         Menu {
-            Menu("Watch status") {
-                ForEach(FeedWatchFilter.allCases) { option in
-                    Button {
-                        watchFilterRaw = option.rawValue
-                    } label: {
-                        if watchFilter == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
+            Button {
+                isWatchFilterPresented = true
+            } label: {
+                Label("Watch status", systemImage: "eye")
             }
             Menu("Duration") {
                 ForEach(FeedDurationFilter.allCases) { option in
@@ -277,6 +270,41 @@ struct SubscriptionFeedScreen: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Feed filters")
         .accessibilityValue(watchFilter == .all && durationFilter == .all ? "Off" : "On")
+        .popover(isPresented: $isWatchFilterPresented, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Watch status")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                ForEach(FeedWatchFilter.allCases) { option in
+                    Button {
+                        watchFilterRaw = option.rawValue
+                        isWatchFilterPresented = false
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(option.title)
+                            Spacer(minLength: 8)
+                            if watchFilter == option {
+                                Image(systemName: "checkmark")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    if option != FeedWatchFilter.allCases.last {
+                        Divider().padding(.leading, 16)
+                    }
+                }
+            }
+            .frame(width: 270)
+            .padding(.bottom, 6)
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     private var automaticRefreshTaskKey: String {
