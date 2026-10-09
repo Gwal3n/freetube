@@ -13,6 +13,7 @@ struct PlayerPlaylistPanel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.openURL) private var openURL
+    @State private var blocklist = VideoBlocklist.shared
 
     let isPresented: Bool
     let isLandscape: Bool
@@ -332,7 +333,7 @@ struct PlayerPlaylistPanel: View {
         ScrollView {
             let items = player.queue.items
             LazyVStack(spacing: 2) {
-                ForEach(items.indices, id: \.self) { index in
+                ForEach(items.indices.filter { !blocklist.blocks(items[$0]) }, id: \.self) { index in
                     row(items[index], index: index)
                         .id(index)
                 }

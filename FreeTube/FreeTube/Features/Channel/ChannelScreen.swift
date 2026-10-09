@@ -5,6 +5,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct ChannelScreen: View {
     @State private var model: ChannelViewModel
+    @State private var blocklist = VideoBlocklist.shared
     @State private var selectedTab: ChannelProfileTab = .videos
     @State private var videoSort: ChannelVideoSort = .newest
     @State private var showingGroupPicker = false
@@ -401,6 +402,17 @@ struct ChannelScreen: View {
                     }
                     Link(destination: url) {
                         Label("Open in browser", systemImage: "safari")
+                    }
+                    Divider()
+                    Button {
+                        if blocklist.blocks(channel) {
+                            blocklist.unblock(channel)
+                        } else {
+                            blocklist.block(channel)
+                        }
+                    } label: {
+                        Label(blocklist.blocks(channel) ? "Unblock channel" : "Block channel",
+                              systemImage: blocklist.blocks(channel) ? "hand.raised.slash" : "hand.raised")
                     }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
@@ -811,7 +823,7 @@ struct ChannelScreen: View {
 
     private func availableTabs(for details: ChannelDetails) -> [ChannelProfileTab] {
         var tabs: [ChannelProfileTab] = [.videos]
-        if showShortsTab,
+        if showShortsTab, !blocklist.hideShorts,
            (!details.shorts.items.isEmpty || details.shorts.continuationToken != nil) {
             tabs.append(.shorts)
         }
@@ -889,13 +901,25 @@ struct ChannelScreen: View {
         emptyTitle: String,
         kind: ChannelViewModel.Tab
     ) -> some View {
-        if videos.isEmpty {
-            ContentUnavailableView(emptyTitle, systemImage: "play.rectangle")
+        let visibleVideos = videos.filter { !blocklist.blocks($0) }
+        if visibleVideos.isEmpty && canLoadMore(kind: kind) {
+            Button("Load more videos") {
+                Task {
+                    if kind == .allVideos {
+                        await model.loadMoreVideos(sort: videoSort)
+                    } else {
+                        await model.loadMore(for: kind)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 64)
+        } else if visibleVideos.isEmpty {
+            ContentUnavailableView(videos.isEmpty ? emptyTitle : "No Unblocked Videos", systemImage: "play.rectangle")
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 64)
         } else {
             LazyVStack(spacing: 10) {
-                ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
+                ForEach(Array(visibleVideos.enumerated()), id: \.element.id) { index, video in
                     // No tap suppression needed any more: the enclosing scroll views cancel
                     // touches in their subviews once a scroll begins, so a swipe can no longer
                     // arrive here as a tap.
@@ -904,7 +928,7 @@ struct ChannelScreen: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 3)
-                    .onAppear { prefetchIfNeeded(index: index, total: videos.count, kind: kind) }
+                    .onAppear { prefetchIfNeeded(index: index, total: visibleVideos.count, kind: kind) }
                 }
                 if canLoadMore(kind: kind) { loadingFooter(kind: kind) }
             }
@@ -913,13 +937,19 @@ struct ChannelScreen: View {
 
     @ViewBuilder
     private func playlistRows(_ playlists: [Playlist]) -> some View {
-        if playlists.isEmpty {
+        let visiblePlaylists = playlists.filter { !blocklist.blocks($0) }
+        if visiblePlaylists.isEmpty && model.canLoadMore(for: .playlists) {
+            Button("Load more playlists") {
+                Task { await model.loadMore(for: .playlists) }
+            }
+            .frame(maxWidth: .infinity, minHeight: 64)
+        } else if visiblePlaylists.isEmpty {
             ContentUnavailableView("No Playlists", systemImage: "rectangle.stack")
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 64)
         } else {
             LazyVStack(spacing: 10) {
-                ForEach(Array(playlists.enumerated()), id: \.element.id) { index, playlist in
+                ForEach(Array(visiblePlaylists.enumerated()), id: \.element.id) { index, playlist in
                     NavigationLink {
                         PlaylistScreen(playlistID: playlist.id)
                     } label: {
@@ -928,7 +958,7 @@ struct ChannelScreen: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 3)
-                    .onAppear { prefetchIfNeeded(index: index, total: playlists.count, kind: .playlists) }
+                    .onAppear { prefetchIfNeeded(index: index, total: visiblePlaylists.count, kind: .playlists) }
                 }
                 if model.canLoadMore(for: .playlists) { loadingFooter(kind: .playlists) }
             }

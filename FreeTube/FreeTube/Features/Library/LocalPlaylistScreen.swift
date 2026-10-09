@@ -9,6 +9,7 @@ struct LocalPlaylistScreen: View {
 
     let playlistID: String
     @State private var details: LocalPlaylistDetails?
+    @State private var blocklist = VideoBlocklist.shared
     @State private var hasLoaded = false
     @State private var showsNavigationTitle = false
     @State private var isDetailsExpanded = false
@@ -103,6 +104,14 @@ struct LocalPlaylistScreen: View {
             if let details, details.videos.isEmpty {
                 ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
                     .allowsHitTesting(false)
+            } else if let details, editingMode == nil, searchText.isEmpty,
+                      visibleVideos(in: details).isEmpty {
+                ContentUnavailableView(
+                    "Playlist Videos Hidden",
+                    systemImage: "hand.raised",
+                    description: Text("Change blocked content in Settings to see them again.")
+                )
+                .allowsHitTesting(false)
             } else if let details, !searchText.isEmpty, visibleVideos(in: details).isEmpty {
                 ContentUnavailableView.search(text: searchText)
                     .allowsHitTesting(false)
@@ -198,12 +207,14 @@ struct LocalPlaylistScreen: View {
     }
 
     private func visibleVideos(in details: LocalPlaylistDetails) -> [Video] {
+        // Edit mode must retain the source order so native move offsets still map to storage.
+        if editingMode != nil { return details.videos }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return details.videos }
-        return details.videos.filter {
-            $0.title.localizedStandardContains(query)
-                || $0.channelName.localizedStandardContains(query)
-                || $0.id.localizedStandardContains(query)
+        return details.videos.filter { video in
+            !blocklist.blocks(video)
+                && (query.isEmpty || video.title.localizedStandardContains(query)
+                    || video.channelName.localizedStandardContains(query)
+                    || video.id.localizedStandardContains(query))
         }
     }
 
@@ -228,15 +239,15 @@ struct LocalPlaylistScreen: View {
     private func localActionToolbar(_ local: LocalPlaylistDetails) -> some View {
         HStack(spacing: 10) {
             PlaylistHeaderActionButton(title: "Play all", systemImage: "play.fill") {
-                guard let first = local.videos.first else { return }
+                guard let first = local.videos.first(where: { !blocklist.blocks($0) }) else { return }
                 player.loadPlaylist(local.playbackDetails, startAt: first, origin: .local)
             }
-            .disabled(local.videos.isEmpty || editingMode != nil)
+            .disabled(!local.videos.contains(where: { !blocklist.blocks($0) }) || editingMode != nil)
             PlaylistHeaderActionButton(title: "Shuffle", systemImage: "shuffle") {
-                guard let random = local.videos.randomElement() else { return }
+                guard let random = local.videos.filter({ !blocklist.blocks($0) }).randomElement() else { return }
                 player.loadPlaylist(local.playbackDetails, startAt: random, shuffled: true, origin: .local)
             }
-            .disabled(local.videos.isEmpty || editingMode != nil)
+            .disabled(!local.videos.contains(where: { !blocklist.blocks($0) }) || editingMode != nil)
             Spacer(minLength: 0)
             if editingMode == nil { localMoreMenu(local) }
         }

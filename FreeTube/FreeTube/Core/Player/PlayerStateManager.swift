@@ -731,7 +731,8 @@ final class PlayerStateManager {
     /// Inserts a user-selected search result immediately after the current queue item without
     /// interrupting playback. The queue remains local and recommendation loading stays unchanged.
     func enqueueNext(_ video: Video) {
-        guard let currentVideo, video.id != currentVideo.id else { return }
+        guard let currentVideo, video.id != currentVideo.id,
+              !VideoBlocklist.shared.blocks(video) else { return }
         manualQueue.removeAll { $0.id == video.id }
         manualQueue.insert(video, at: 0)
         persistManualQueue()
@@ -741,6 +742,7 @@ final class PlayerStateManager {
 
     func enqueue(_ video: Video) {
         guard video.id != currentVideo?.id,
+              !VideoBlocklist.shared.blocks(video),
               !manualQueue.contains(where: { $0.id == video.id }) else { return }
         manualQueue.append(video)
         persistManualQueue()
@@ -806,16 +808,22 @@ final class PlayerStateManager {
 
     func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
         guard !offsets.isEmpty else { return }
-        let videos = offsets.sorted().map { manualQueue[$0] }
+        var visible = manualQueue.filter { !VideoBlocklist.shared.blocks($0) }
+        guard offsets.allSatisfy({ visible.indices.contains($0) }) else { return }
+        let videos = offsets.sorted().map { visible[$0] }
         for index in offsets.sorted(by: >) {
-            manualQueue.remove(at: index)
+            visible.remove(at: index)
         }
         let removedBeforeDestination = offsets.filter { $0 < destination }.count
         let insertionIndex = min(
             max(0, destination - removedBeforeDestination),
-            manualQueue.endIndex
+            visible.endIndex
         )
-        manualQueue.insert(contentsOf: videos, at: insertionIndex)
+        visible.insert(contentsOf: videos, at: insertionIndex)
+        var reordered = visible.makeIterator()
+        manualQueue = manualQueue.map { item in
+            VideoBlocklist.shared.blocks(item) ? item : (reordered.next() ?? item)
+        }
         persistManualQueue()
     }
 
@@ -1070,9 +1078,12 @@ final class PlayerStateManager {
 
     func playNext() {
         log.info("playNext() — queue size=\(self.queue.items.count, privacy: .public) currentIndex=\(self.queue.currentIndex, privacy: .public)")
-        if playbackHistoryIndex + 1 < playbackHistory.count {
-            playbackHistoryIndex += 1
-            let item = playbackHistory[playbackHistoryIndex]
+        if playbackHistoryIndex + 1 < playbackHistory.count,
+           let nextIndex = ((playbackHistoryIndex + 1)..<playbackHistory.count).first(where: {
+               !VideoBlocklist.shared.blocks(playbackHistory[$0].video)
+           }) {
+            playbackHistoryIndex = nextIndex
+            let item = playbackHistory[nextIndex]
             load(
                 item.video,
                 skipRecommendations: item.skipRecommendations,
@@ -1082,11 +1093,11 @@ final class PlayerStateManager {
             )
             return
         }
-        if let next = manualQueue.first {
+        if let next = manualQueue.first(where: { !VideoBlocklist.shared.blocks($0) }) {
             playManualQueueItem(next, expandPlayer: false)
             return
         }
-        if let next = queue.advance() {
+        if let next = nextUnblockedQueueVideo() {
             load(next, skipRecommendations: !queueAcceptsRecommendations, expandPlayer: false)
             return
         }
@@ -1096,7 +1107,7 @@ final class PlayerStateManager {
         // refill behind us.
         guard queueAcceptsRecommendations,
               queue.repeatMode == .off,
-              let seed = queue.items.last else {
+              let seed = currentVideo ?? queue.items.last else {
             log.notice("playNext: queue at end, no recs refill (acceptsRecs=\(self.queueAcceptsRecommendations, privacy: .public), repeat=\(String(describing: self.queue.repeatMode), privacy: .public))")
             return
         }
@@ -1109,10 +1120,20 @@ final class PlayerStateManager {
                 self.log.notice("playNext: refill produced no new items, giving up")
                 return
             }
-            if let next = self.queue.advance() {
+            if let next = self.nextUnblockedQueueVideo() {
                 self.load(next, skipRecommendations: !self.queueAcceptsRecommendations, expandPlayer: false)
             }
         }
+    }
+
+    /// Previously queued videos can become blocked while Settings is open. Skip them without
+    /// changing the currently playing item or looping forever under repeat-all/one.
+    private func nextUnblockedQueueVideo() -> Video? {
+        for _ in 0..<queue.items.count {
+            guard let next = queue.advance() else { return nil }
+            if !VideoBlocklist.shared.blocks(next) { return next }
+        }
+        return nil
     }
 
     func playPrevious() {
@@ -1121,8 +1142,11 @@ final class PlayerStateManager {
             log.notice("playPrevious: at start of playback history")
             return
         }
-        playbackHistoryIndex -= 1
-        let item = playbackHistory[playbackHistoryIndex]
+        guard let previousIndex = stride(from: playbackHistoryIndex - 1, through: 0, by: -1).first(where: {
+            !VideoBlocklist.shared.blocks(playbackHistory[$0].video)
+        }) else { return }
+        playbackHistoryIndex = previousIndex
+        let item = playbackHistory[previousIndex]
         load(
             item.video,
             skipRecommendations: item.skipRecommendations,
@@ -1140,7 +1164,8 @@ final class PlayerStateManager {
         shuffled: Bool = false,
         origin: PlaylistPlaybackOrigin = .youtube
     ) {
-        let videos = shuffled ? details.videos.shuffled() : details.videos
+        let allowed = details.videos.filter { !VideoBlocklist.shared.blocks($0) }
+        let videos = shuffled ? allowed.shuffled() : allowed
         guard videos.contains(where: { $0.id == video.id }) else { return }
         queue.isShuffleOn = false
         queue.replace(with: videos)
@@ -1163,14 +1188,16 @@ final class PlayerStateManager {
         guard playbackSessionID == expectedSessionID,
               currentVideo?.id == videoID,
               activePlaylist == nil,
-              let index = details.videos.firstIndex(where: { $0.id == videoID }) else { return }
+              let index = details.videos.filter({ !VideoBlocklist.shared.blocks($0) })
+                .firstIndex(where: { $0.id == videoID }) else { return }
+        let visibleVideos = details.videos.filter { !VideoBlocklist.shared.blocks($0) }
         recommendationTask?.cancel()
         recommendationTask = nil
         recommendationBacklog = []
         recommendationContinuationToken = nil
         playlistRecommendations = []
         queue.isShuffleOn = false
-        queue.replace(with: details.videos, startAt: index)
+        queue.replace(with: visibleVideos, startAt: index)
         if let currentVideo { queue.updateVideo(currentVideo) }
         queueAcceptsRecommendations = false
         activePlaylist = details.playlist
@@ -1178,7 +1205,7 @@ final class PlayerStateManager {
         playlistContinuationToken = details.continuationToken
         if playbackHistory.indices.contains(playbackHistoryIndex) {
             playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
-                video: currentVideo ?? details.videos[index],
+                video: currentVideo ?? visibleVideos[index],
                 skipRecommendations: true,
                 preservesPlaylistPosition: false
             )
@@ -1205,7 +1232,9 @@ final class PlayerStateManager {
         recommendationTask?.cancel()
         recommendationTask = nil
 
-        let suggestions = playlistRecommendations.filter { $0.id != currentVideo.id }
+        let suggestions = playlistRecommendations.filter {
+            $0.id != currentVideo.id && !VideoBlocklist.shared.blocks($0)
+        }
         activePlaylist = nil
         activePlaylistOrigin = nil
         playlistRecommendations = []
@@ -1253,7 +1282,9 @@ final class PlayerStateManager {
             let page = try await playlistService.fetchMore(continuation: token)
             guard activePlaylist?.id == playlistID else { return }
             let existing = Set(queue.items.map(\.id))
-            queue.append(contentsOf: page.videos.filter { !existing.contains($0.id) })
+            queue.append(contentsOf: page.videos.filter {
+                !existing.contains($0.id) && !VideoBlocklist.shared.blocks($0)
+            })
             playlistContinuationToken = page.continuationToken
         } catch {
             log.notice("Playlist continuation failed: \(String(describing: error), privacy: .public)")
@@ -2032,8 +2063,9 @@ final class PlayerStateManager {
     private func fillQueueWithRecommendations(for seed: Video) async {
         let targetUpcomingCount = min(max(preferences.upNextInitialCount, 3), 15)
         let upcomingCount = activePlaylist != nil
-            ? min(targetUpcomingCount, playlistRecommendations.count)
-            : queue.availableUpcomingCount(limit: targetUpcomingCount)
+            ? min(targetUpcomingCount, playlistRecommendations.filter { !VideoBlocklist.shared.blocks($0) }.count)
+            : min(targetUpcomingCount, queue.items.dropFirst(queue.currentIndex + 1)
+                .filter { !VideoBlocklist.shared.blocks($0) }.count)
         guard upcomingCount < targetUpcomingCount else {
             log.debug("Recommendation refill skipped for \(seed.id, privacy: .public): \(upcomingCount, privacy: .public) upcoming items remain")
             return
@@ -2049,7 +2081,9 @@ final class PlayerStateManager {
             installVideoDetails(info, for: seed.id)
             let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
             let needed = targetUpcomingCount - upcomingCount
-            let fresh = info.recommended.filter { !existingIDs.contains($0.id) }
+            let fresh = info.recommended.filter {
+                !existingIDs.contains($0.id) && !VideoBlocklist.shared.blocks($0)
+            }
             let toAppend = Array(fresh.prefix(needed))
             recommendationBacklog = Array(fresh.dropFirst(toAppend.count))
             recommendationContinuationToken = info.recommendedContinuationToken
@@ -2077,6 +2111,8 @@ final class PlayerStateManager {
         isLoadingMoreRecommendations = true
         defer { isLoadingMoreRecommendations = false }
 
+        recommendationBacklog.removeAll { VideoBlocklist.shared.blocks($0) }
+
         if !recommendationBacklog.isEmpty {
             let page = Array(recommendationBacklog.prefix(5))
             recommendationBacklog.removeFirst(page.count)
@@ -2094,7 +2130,9 @@ final class PlayerStateManager {
             let page = try await videoService.fetchRecommendedVideos(continuation: token)
             guard !Task.isCancelled, currentVideo?.id == videoID else { return }
             let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
-            let fresh = page.videos.filter { !existingIDs.contains($0.id) }
+            let fresh = page.videos.filter {
+                !existingIDs.contains($0.id) && !VideoBlocklist.shared.blocks($0)
+            }
             let visible = Array(fresh.prefix(5))
             recommendationBacklog = Array(fresh.dropFirst(visible.count))
             recommendationContinuationToken = page.continuationToken

@@ -8,6 +8,7 @@ struct AddVideoToPlaylistSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = AddVideoToPlaylistViewModel()
+    @State private var blocklist = VideoBlocklist.shared
 
     var body: some View {
         NavigationStack {
@@ -94,7 +95,7 @@ struct AddVideoToPlaylistSheet: View {
                         loadMoreButton
                     }
                 } else {
-                    ForEach(model.videos) { video in
+                    ForEach(model.videos.filter { !blocklist.blocks($0) }) { video in
                         Button {
                             Task { await toggle(video) }
                         } label: {

@@ -94,6 +94,7 @@ private struct VideoActionsContent: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
+    @State private var blocklist = VideoBlocklist.shared
 
     init(
         video: Video,
@@ -191,6 +192,14 @@ private struct VideoActionsContent: View {
             addToPlaylistVideo = video
         } label: {
             Label("Save to local playlist", systemImage: "bookmark")
+        }
+        if !video.channelID.isEmpty || !video.channelName.isEmpty {
+            Divider()
+            Button {
+                blocklist.blockChannel(id: video.channelID, name: video.channelName)
+            } label: {
+                Label("Block channel", systemImage: "hand.raised")
+            }
         }
         if DownloadManager.shared.localFile(for: video.id) != nil {
             Divider()

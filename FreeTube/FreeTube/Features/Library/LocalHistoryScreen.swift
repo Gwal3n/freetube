@@ -11,6 +11,7 @@ struct LocalHistoryScreen: View {
     let mode: Mode
     @Environment(PlayerStateManager.self) private var player
     @State private var entries: [WatchHistorySnapshot] = []
+    @State private var blocklist = VideoBlocklist.shared
     @State private var isLoading = false
     @State private var isRefreshing = false
     @State private var historyRevision = 0
@@ -43,7 +44,15 @@ struct LocalHistoryScreen: View {
             } else if visibleEntries.isEmpty && !hasMore {
                 ScrollView {
                     Group {
-                        if mode == .continueWatching {
+                        if !entries.isEmpty && entries.allSatisfy({
+                            blocklist.blocks(title: $0.title, channelID: $0.channelID, channelName: $0.channelName)
+                        }) {
+                            ContentUnavailableView(
+                                "History Hidden",
+                                systemImage: "hand.raised",
+                                description: Text("Change blocked content in Settings to see these videos again.")
+                            )
+                        } else if mode == .continueWatching {
                             ContentUnavailableView(
                                 "Nothing to Resume",
                                 systemImage: "play.circle",
@@ -100,6 +109,12 @@ struct LocalHistoryScreen: View {
                             Text(dayTitle(group.day))
                         }
                     }
+                    if visibleEntries.isEmpty && hasMore {
+                        Button("Load more history") {
+                            Task { await loadMore() }
+                        }
+                        .disabled(isLoading || isRefreshing)
+                    }
                 }
                 .listStyle(.plain)
                 .refreshable { await refreshHistory() }
@@ -138,7 +153,9 @@ struct LocalHistoryScreen: View {
     }
 
     private var visibleEntries: [WatchHistorySnapshot] {
-        let source = searchText.isEmpty ? entries : searchResults
+        let source = (searchText.isEmpty ? entries : searchResults).filter {
+            !blocklist.blocks(title: $0.title, channelID: $0.channelID, channelName: $0.channelName)
+        }
         return mode == .continueWatching
             ? source.filter { $0.resumableProgress != nil }
             : source

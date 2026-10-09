@@ -14,6 +14,7 @@ struct ChannelTabScreen: View {
     let model: ChannelViewModel
 
     @Environment(PlayerStateManager.self) private var player
+    @State private var blocklist = VideoBlocklist.shared
     @State private var videoSort: ChannelVideoSort = .newest
 
     /// How many rows from the bottom we trigger pagination. 5 keeps the next page warm before the
@@ -57,18 +58,18 @@ struct ChannelTabScreen: View {
         guard let details = model.details else { return [] }
         switch kind {
         case .allVideos:
-            return model.videos(for: videoSort)
+            return model.videos(for: videoSort).filter { !blocklist.blocks($0) }
         case .shorts:
-            return details.shorts.items
+            return details.shorts.items.filter { !blocklist.blocks($0) }
         case .directs:
-            return details.directs.items
+            return details.directs.items.filter { !blocklist.blocks($0) }
         case .playlists:
             return []
         }
     }
 
     private var playlists: [Playlist] {
-        model.details?.playlists.items ?? []
+        (model.details?.playlists.items ?? []).filter { !blocklist.blocks($0) }
     }
 
     // MARK: - Lists
@@ -78,6 +79,11 @@ struct ChannelTabScreen: View {
         if kind == .allVideos, videos.isEmpty,
            (!model.hasLoadedVideos(for: videoSort) || model.isLoadingVideos(for: videoSort)) {
             MediaListPlaceholder()
+        } else if videos.isEmpty && canLoadMoreCurrentContent {
+            List {
+                Button("Load more") { Task { await loadMoreCurrentContent() } }
+            }
+            .listStyle(.plain)
         } else if videos.isEmpty {
             ContentUnavailableView(
                 "Nothing Here",
@@ -101,7 +107,12 @@ struct ChannelTabScreen: View {
 
     @ViewBuilder
     private func playlistList(_ playlists: [Playlist]) -> some View {
-        if playlists.isEmpty {
+        if playlists.isEmpty && model.canLoadMore(for: kind) {
+            List {
+                Button("Load more") { Task { await loadMoreCurrentContent() } }
+            }
+            .listStyle(.plain)
+        } else if playlists.isEmpty {
             ContentUnavailableView(
                 "No Playlists",
                 systemImage: "rectangle.stack",

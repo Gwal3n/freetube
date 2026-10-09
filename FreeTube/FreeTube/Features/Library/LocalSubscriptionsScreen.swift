@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LocalSubscriptionsScreen: View {
     @State private var store = LocalSubscriptionStore.shared
+    @State private var blocklist = VideoBlocklist.shared
     @State private var showingClearConfirmation = false
     @State private var refreshError: String?
     @State private var isRefreshing = false
@@ -29,7 +30,15 @@ struct LocalSubscriptionsScreen: View {
                     )
                 )
             } else if visibleSubscriptions.isEmpty {
-                ContentUnavailableView.search(text: searchText)
+                if searchText.isEmpty {
+                    ContentUnavailableView(
+                        "No Unblocked Subscriptions",
+                        systemImage: "hand.raised",
+                        description: Text("Change blocked channels in Settings to see them here again.")
+                    )
+                } else {
+                    ContentUnavailableView.search(text: searchText)
+                }
             } else {
                 ScrollViewReader { scrollProxy in
                     HStack(spacing: 0) {
@@ -112,10 +121,10 @@ struct LocalSubscriptionsScreen: View {
     }
 
     private var visibleSubscriptions: [LocalSubscription] {
-        guard !searchText.isEmpty else { return store.subscriptions }
-        return store.subscriptions.filter {
-            $0.name.localizedStandardContains(searchText)
-                || $0.id.localizedStandardContains(searchText)
+        return store.subscriptions.filter { subscription in
+            !blocklist.blocks(subscription.channel)
+                && (searchText.isEmpty || subscription.name.localizedStandardContains(searchText)
+                    || subscription.id.localizedStandardContains(searchText))
         }
     }
 

@@ -7,6 +7,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerQueueSections: View {
     @Environment(PlayerStateManager.self) private var player
+    @State private var blocklist = VideoBlocklist.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let showsUpNext: Bool
@@ -25,7 +26,7 @@ struct PlayerQueueSections: View {
     @ViewBuilder
     var body: some View {
         Group {
-            if !player.manualQueue.isEmpty || showsUpNext {
+            if !visibleManualQueue.isEmpty || showsUpNext {
                 VStack(alignment: .leading, spacing: 8) {
                     manualQueuePanel
                     if showsUpNext {
@@ -43,7 +44,7 @@ struct PlayerQueueSections: View {
 
     @ViewBuilder
     private var manualQueuePanel: some View {
-        if !player.manualQueue.isEmpty {
+        if !visibleManualQueue.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 0) {
                     Button {
@@ -53,7 +54,7 @@ struct PlayerQueueSections: View {
                     } label: {
                         PlayerSectionHeading(
                             title: "Queue",
-                            detail: "\(player.manualQueue.count)",
+                            detail: "\(visibleManualQueue.count)",
                             isExpanded: isManualQueueExpanded,
                             showsDisclosureIndicator: false
                         )
@@ -64,7 +65,7 @@ struct PlayerQueueSections: View {
                         Button {
                             var seen = Set<String>()
                             queueToSave = ([player.currentVideo].compactMap { $0 } + player.manualQueue)
-                                .filter { seen.insert($0.id).inserted }
+                                .filter { !blocklist.blocks($0) && seen.insert($0.id).inserted }
                             showingSaveQueue = true
                         } label: {
                             Label("Save queue to playlist", systemImage: "text.badge.plus")
@@ -103,7 +104,7 @@ struct PlayerQueueSections: View {
 
                 if isManualQueueExpanded {
                     List {
-                        ForEach(player.manualQueue) { video in
+                        ForEach(visibleManualQueue) { video in
                             queueRow(
                                 video,
                                 onPlay: { player.playManualQueueItem(video) },
@@ -133,7 +134,7 @@ struct PlayerQueueSections: View {
     // MARK: - Sizing
 
     private var manualQueueListHeight: CGFloat {
-        CGFloat(max(1, player.manualQueue.count)) * queueRowFootprint + 32
+        CGFloat(max(1, visibleManualQueue.count)) * queueRowFootprint + 32
     }
 
     private var queueListHeight: CGFloat {
@@ -143,9 +144,14 @@ struct PlayerQueueSections: View {
     }
 
     private var allUpNextVideos: [Video] {
-        player.activePlaylist == nil
+        let items = player.activePlaylist == nil
             ? player.queue.items.filter { $0.id != player.currentVideo?.id }
             : player.playlistRecommendations
+        return items.filter { !blocklist.blocks($0) }
+    }
+
+    private var visibleManualQueue: [Video] {
+        player.manualQueue.filter { !blocklist.blocks($0) }
     }
 
     private var displayedUpNextVideos: [Video] {

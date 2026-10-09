@@ -94,6 +94,7 @@ final class AppBackupService {
             validChannelIDs: Set(backup.subscriptions.map(\.id))
         )
         restoreSettings(backup.settings)
+        VideoBlocklist.shared.reload()
     }
 
     private func replaceSwiftData(_ backup: AppBackup) {
@@ -143,6 +144,7 @@ final class AppBackupService {
     private static let settingKeys: Set<String> = [
         "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appFontPreset",
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval",
+        "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
         "concurrentFragments", "formattedCaptions",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",

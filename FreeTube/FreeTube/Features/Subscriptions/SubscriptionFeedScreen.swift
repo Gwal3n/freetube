@@ -7,6 +7,7 @@ struct SubscriptionFeedScreen: View {
     @Environment(AppVisitState.self) private var appVisitState
     @State private var model = SubscriptionFeedViewModel()
     @State private var groups = LocalSubscriptionGroupStore.shared
+    @State private var blocklist = VideoBlocklist.shared
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var handledNavigationRequestID: UUID?
     @Environment(PlayerStateManager.self) private var player
@@ -53,7 +54,7 @@ struct SubscriptionFeedScreen: View {
                 ForEach(filteredVideos) { video in
                     feedRow(video)
                         .onAppear {
-                            guard watchFilter != .all || durationFilter != .all,
+                            guard watchFilter != .all || durationFilter != .all || blocklist.rules.isActive,
                                   filteredVideos.count >= 12,
                                   filteredVideos.suffix(5).contains(where: { $0.id == video.id }),
                                   model.canLoadMore,
@@ -83,7 +84,7 @@ struct SubscriptionFeedScreen: View {
                     Button {
                         Task {
                             await model.loadMore()
-                            if watchFilter != .all || durationFilter != .all {
+                            if watchFilter != .all || durationFilter != .all || blocklist.rules.isActive {
                                 await fillFilteredFeed()
                             }
                         }
@@ -100,7 +101,7 @@ struct SubscriptionFeedScreen: View {
                     .disabled(model.isLoadingMore || model.isRefreshing)
                     .id(automaticLoadKey)
                     .onAppear {
-                        guard watchFilter == .all,
+                        guard watchFilter == .all, !blocklist.rules.isActive,
                               durationFilter == .all,
                               !model.isRefreshing,
                               lastAutomaticLoadKey != automaticLoadKey else { return }
@@ -229,11 +230,11 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var automaticLoadKey: String {
-        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes)"
+        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
     }
 
     private var filteredFillKey: String {
-        "\(model.firstPageRevision):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes)"
+        "\(model.firstPageRevision):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
     }
 
     private var watchFilter: FeedWatchFilter {
@@ -246,7 +247,8 @@ struct SubscriptionFeedScreen: View {
 
     private var filteredVideos: [Video] {
         model.videos.filter { video in
-            watchFilter.includes(model.watchStatuses[video.id])
+            !blocklist.blocks(video)
+                && watchFilter.includes(model.watchStatuses[video.id])
                 && durationFilter.includes(
                     video.duration,
                     minimumMinutes: customMinimumMinutes,
@@ -262,7 +264,8 @@ struct SubscriptionFeedScreen: View {
         let selectedDuration = durationFilter
         let minimum = customMinimumMinutes
         let maximum = customMaximumMinutes
-        guard selectedWatch != .all || selectedDuration != .all else { return }
+        let blockingRevision = blocklist.revision
+        guard selectedWatch != .all || selectedDuration != .all || blocklist.rules.isActive else { return }
         let revision = model.firstPageRevision
         let targetCount = 12
         let maximumPages = 10
@@ -278,9 +281,11 @@ struct SubscriptionFeedScreen: View {
                   durationFilter == selectedDuration,
                   customMinimumMinutes == minimum,
                   customMaximumMinutes == maximum,
+                  blocklist.revision == blockingRevision,
                   model.canLoadMore else { return }
             let visibleCount = model.videos.filter { video in
-                selectedWatch.includes(model.watchStatuses[video.id])
+                !blocklist.blocks(video)
+                    && selectedWatch.includes(model.watchStatuses[video.id])
                     && selectedDuration.includes(
                         video.duration,
                         minimumMinutes: minimum,

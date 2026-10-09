@@ -10,6 +10,7 @@ struct SearchContent: View {
         let resultsRevision: Int
         let filters: SearchVideoFilters
         let isExpanded: Bool
+        let blockingRevision: Int
     }
 
     private struct FilterPageKey: Equatable {
@@ -39,6 +40,7 @@ struct SearchContent: View {
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
+    @State private var blocklist = VideoBlocklist.shared
     @State private var customRange: CustomRange?
     @State private var lastFilteredPrefetch: FilterPageKey?
     @State private var showingClearSearchHistoryConfirmation = false
@@ -120,8 +122,11 @@ struct SearchContent: View {
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
         let now = Date.now
+        let visibleChannels = results.channels.filter { !blocklist.blocks($0) }
+        let visiblePlaylists = results.playlists.filter { !blocklist.blocks($0) }
+        let unblockedVideos = results.videos.filter { !blocklist.blocks($0) }
         let visibleVideos = results.videos.filter {
-            videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
+            !blocklist.blocks($0) && videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
         }
         if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
             ContentUnavailableView(
@@ -129,12 +134,19 @@ struct SearchContent: View {
                 systemImage: "magnifyingglass",
                 description: Text("No results were found for “\(model.submittedQuery ?? model.query)”.")
             )
+        } else if visibleChannels.isEmpty && visiblePlaylists.isEmpty &&
+                    unblockedVideos.isEmpty && results.continuationToken == nil {
+            ContentUnavailableView(
+                "No Unblocked Results",
+                systemImage: "hand.raised",
+                description: Text("All loaded results match your blocked content rules.")
+            )
         } else {
             List {
-                if !results.channels.isEmpty {
+                if !visibleChannels.isEmpty {
                     Section {
                         if areChannelsExpanded {
-                            ForEach(results.channels) { channel in
+                            ForEach(visibleChannels) { channel in
                                 Button {
                                     onOpenDestination(.channel(channel.id))
                                 } label: {
@@ -148,15 +160,15 @@ struct SearchContent: View {
                     } header: {
                         collapsibleHeader(
                             "Channels",
-                            count: results.channels.count,
+                            count: visibleChannels.count,
                             isExpanded: $areChannelsExpanded
                         )
                     }
                 }
-                if !results.playlists.isEmpty {
+                if !visiblePlaylists.isEmpty {
                     Section {
                         if arePlaylistsExpanded {
-                            ForEach(results.playlists) { playlist in
+                            ForEach(visiblePlaylists) { playlist in
                                 PlaylistRow(
                                     playlist: playlist,
                                     onTap: {
@@ -170,7 +182,7 @@ struct SearchContent: View {
                             }
                         }
                     } header: {
-                        collapsibleHeader("Playlists", count: results.playlists.count, isExpanded: $arePlaylistsExpanded)
+                        collapsibleHeader("Playlists", count: visiblePlaylists.count, isExpanded: $arePlaylistsExpanded)
                     }
                 }
                 if !results.videos.isEmpty {
@@ -180,7 +192,7 @@ struct SearchContent: View {
                                 VStack(spacing: 8) {
                                     Group {
                                         if results.continuationToken == nil {
-                                            Text("No videos match these filters")
+                                            Text("No videos match your filters or blocking rules")
                                         } else {
                                             Text(model.isLoading
                                                  ? "Finding matching videos…"
@@ -188,16 +200,18 @@ struct SearchContent: View {
                                         }
                                     }
                                     .foregroundStyle(.secondary)
-                                    Button("Reset Filters") {
-                                        videoFilters = SearchVideoFilters()
+                                    if videoFilters.isActive {
+                                        Button("Reset Filters") {
+                                            videoFilters = SearchVideoFilters()
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                                 .font(.subheadline)
                                 .frame(maxWidth: .infinity, minHeight: 76)
                                 .listRowSeparator(.hidden)
                             }
-                            let lookaheadIDs = Set((videoFilters.isActive ? visibleVideos : results.videos)
+                            let lookaheadIDs = Set((videoFilters.isActive || blocklist.rules.isActive ? visibleVideos : unblockedVideos)
                                 .suffix(5).map(\.id))
                             ForEach(visibleVideos) { video in
                                 VideoRow(
@@ -217,7 +231,7 @@ struct SearchContent: View {
                                           results.continuationToken != nil,
                                           !model.paginationFailed,
                                           !model.isLoading else { return }
-                                    if videoFilters.isActive {
+                                    if videoFilters.isActive || blocklist.rules.isActive {
                                         // The bounded fill owns sparse first pages. Once there
                                         // are enough visible rows, scrolling near their end can
                                         // prefetch the next page without a repeated button tap.
@@ -226,7 +240,8 @@ struct SearchContent: View {
                                             request: .init(
                                                 resultsRevision: model.resultsRevision,
                                                 filters: videoFilters,
-                                                isExpanded: areVideosExpanded
+                                                isExpanded: areVideosExpanded,
+                                                blockingRevision: blocklist.revision
                                             ),
                                             loadedCount: results.videos.count
                                         )
@@ -235,7 +250,7 @@ struct SearchContent: View {
                                     }
                                     Task {
                                         await model.loadMore()
-                                        if videoFilters.isActive { await fillFilteredResults() }
+                                        if videoFilters.isActive || blocklist.rules.isActive { await fillFilteredResults() }
                                     }
                                 }
                             }
@@ -252,14 +267,15 @@ struct SearchContent: View {
                     MediaPaginationFooter(isLoading: model.isLoading, isRetry: model.paginationFailed) {
                         Task {
                             await model.loadMore()
-                            if videoFilters.isActive { await fillFilteredResults() }
+                            if videoFilters.isActive || blocklist.rules.isActive { await fillFilteredResults() }
                         }
                     }
                     .listRowSeparator(.hidden)
                     .onAppear {
                         // The bounded filtered fill owns sparse pages. Ordinary unfiltered
                         // browsing retains its existing automatic footer pagination.
-                        guard !videoFilters.isActive, !model.paginationFailed else { return }
+                        guard !videoFilters.isActive, !blocklist.rules.isActive,
+                              !model.paginationFailed else { return }
                         Task { await model.loadMore() }
                     }
                 }
@@ -270,7 +286,8 @@ struct SearchContent: View {
             .task(id: FilterFillRequest(
                 resultsRevision: model.resultsRevision,
                 filters: videoFilters,
-                isExpanded: areVideosExpanded
+                isExpanded: areVideosExpanded,
+                blockingRevision: blocklist.revision
             )) {
                 await fillFilteredResults()
             }
@@ -415,7 +432,8 @@ struct SearchContent: View {
     /// of YouTube requests. A later explicit Load more starts another bounded batch.
     private func fillFilteredResults() async {
         let filters = videoFilters
-        guard filters.isActive, areVideosExpanded,
+        let blockingRevision = blocklist.revision
+        guard (filters.isActive || blocklist.rules.isActive), areVideosExpanded,
               let query = model.submittedQuery else { return }
         let revision = model.resultsRevision
         let targetCount = 12
@@ -428,6 +446,7 @@ struct SearchContent: View {
             }
             guard !Task.isCancelled,
                   filters == videoFilters,
+                  blocklist.revision == blockingRevision,
                   areVideosExpanded,
                   model.resultsRevision == revision,
                   model.submittedQuery == query,
@@ -444,12 +463,13 @@ struct SearchContent: View {
                     videoIDs: results.videos.map(\.id)
                 )
                 guard !Task.isCancelled, filters == videoFilters,
+                      blocklist.revision == blockingRevision,
                       model.resultsRevision == revision else { return }
                 statuses = summary.statuses
             }
             let now = Date.now
             let visibleCount = results.videos.filter {
-                filters.includes($0, status: statuses[$0.id], now: now)
+                !blocklist.blocks($0) && filters.includes($0, status: statuses[$0.id], now: now)
             }.count
             if visibleCount >= targetCount { return }
 

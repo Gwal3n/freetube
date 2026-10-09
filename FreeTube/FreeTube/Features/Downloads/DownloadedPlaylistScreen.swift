@@ -7,6 +7,7 @@ struct DownloadedPlaylistScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @State private var coordinator = PlaylistDownloadCoordinator.shared
     @State private var downloads = DownloadsStore.shared
+    @State private var blocklist = VideoBlocklist.shared
 
     let playlistID: String
 
@@ -20,12 +21,14 @@ struct DownloadedPlaylistScreen: View {
         List {
             if let manifest {
                 Section {
-                    ForEach(manifest.videos.indices, id: \.self) { index in
+                    ForEach(manifest.videos.indices.filter { !blocklist.blocks(manifest.videos[$0]) }, id: \.self) { index in
                         let video = manifest.videos[index]
                         let available = availableIDs.contains(video.id)
                         Button {
                             guard available else { return }
-                            let offlineVideos = manifest.videos.filter { availableIDs.contains($0.id) }
+                            let offlineVideos = manifest.videos.filter {
+                                availableIDs.contains($0.id) && !blocklist.blocks($0)
+                            }
                             let details = PlaylistDetails(
                                 playlist: Playlist(
                                     id: manifest.id,
@@ -67,7 +70,8 @@ struct DownloadedPlaylistScreen: View {
                         .disabled(!available)
                     }
                 } header: {
-                    Text("\(availableIDs.intersection(Set(manifest.videos.map(\.id))).count) of \(manifest.videos.count) downloaded")
+                    let visibleVideos = manifest.videos.filter { !blocklist.blocks($0) }
+                    Text("\(visibleVideos.filter { availableIDs.contains($0.id) }.count) of \(visibleVideos.count) downloaded")
                 }
             }
         }

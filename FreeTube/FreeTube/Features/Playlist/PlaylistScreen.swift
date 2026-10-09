@@ -10,6 +10,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel
+    @State private var blocklist = VideoBlocklist.shared
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -198,14 +199,12 @@ struct PlaylistScreen: View {
     private func actionToolbar(_ details: PlaylistDetails) -> some View {
         HStack(spacing: 10) {
             PlaylistHeaderActionButton(title: "Play all", systemImage: "play.fill") {
-                guard !details.videos.isEmpty else { return }
-                if let first = details.videos.first {
+                if let first = details.videos.first(where: { !blocklist.blocks($0) }) {
                     player.loadPlaylist(details, startAt: first)
                 }
             }
             PlaylistHeaderActionButton(title: "Shuffle", systemImage: "shuffle") {
-                guard !details.videos.isEmpty else { return }
-                if let first = details.videos.randomElement() {
+                if let first = details.videos.filter({ !blocklist.blocks($0) }).randomElement() {
                     player.loadPlaylist(details, startAt: first, shuffled: true)
                 }
             }
@@ -272,11 +271,11 @@ struct PlaylistScreen: View {
     @ViewBuilder
     private func videosList(_ details: PlaylistDetails) -> some View {
         let query = searchQuery
-        let videos = isSearching
+        let videos = (isSearching
             ? details.videos.filter {
                 $0.title.localizedStandardContains(query) || $0.channelName.localizedStandardContains(query)
             }
-            : details.videos
+            : details.videos).filter { !blocklist.blocks($0) }
         if details.videos.isEmpty && !model.isLoadingMore && !model.canLoadMore && !isSearching {
             ContentUnavailableView(
                 "No Videos",

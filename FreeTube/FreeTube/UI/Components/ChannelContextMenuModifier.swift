@@ -7,6 +7,7 @@ struct ChannelContextMenuModifier: ViewModifier {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.openURL) private var openURL
     private let subscriptions = LocalSubscriptionStore.shared
+    @State private var blocklist = VideoBlocklist.shared
 
     func body(content: Content) -> some View {
         content.contextMenu {
@@ -32,6 +33,16 @@ struct ChannelContextMenuModifier: ViewModifier {
                     subscriptions.contains(channel.id) ? "Unsubscribe" : "Subscribe",
                     systemImage: subscriptions.contains(channel.id) ? "person.badge.minus" : "person.badge.plus"
                 )
+            }
+            Button {
+                if blocklist.blocks(channel) {
+                    blocklist.unblock(channel)
+                } else {
+                    blocklist.block(channel)
+                }
+            } label: {
+                Label(blocklist.blocks(channel) ? "Unblock channel" : "Block channel",
+                      systemImage: blocklist.blocks(channel) ? "hand.raised.slash" : "hand.raised")
             }
         } preview: {
             ChannelContextPreview(channel: channel)

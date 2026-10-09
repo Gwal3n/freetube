@@ -102,6 +102,12 @@ struct SettingsScreen: View {
                         }
                     }
                     .tint(.white)
+                    NavigationLink {
+                        VideoBlockingSettingsScreen()
+                    } label: {
+                        navigationLabel("Blocked content", systemImage: "hand.raised")
+                    }
+                    .tint(.white)
                 }
 
                 Section {

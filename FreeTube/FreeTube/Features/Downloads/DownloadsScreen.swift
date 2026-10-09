@@ -11,6 +11,7 @@ struct DownloadsScreen: View {
     /// the store rebuilds `entries` from the Documents root on launch and after every
     /// `DownloadsStore.didChange` notification (posted by the download writers).
     @State private var store = DownloadsStore.shared
+    @State private var blocklist = VideoBlocklist.shared
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
     @Environment(PlayerStateManager.self) private var player
     @State private var path: [AppNavigationRequest.Destination] = []
@@ -54,6 +55,7 @@ struct DownloadsScreen: View {
     /// Active in-flight downloads.
     private var inProgress: [DownloadTaskSnapshot] {
         model.manager.activeTasks.filter { snapshot in
+            guard !blocklist.blocks(title: snapshot.title, channelID: nil, channelName: nil) else { return false }
             guard !playlistMemberIDs.contains(snapshot.videoID) else { return false }
             guard matchesSearch(snapshot.title, snapshot.videoID) else { return false }
             switch snapshot.state {
@@ -72,12 +74,17 @@ struct DownloadsScreen: View {
                 !playlistMemberIDs.contains(entry.videoID)
             }
             .map(SavedItem.init(from:))
+            .filter { !blocklist.blocks(title: $0.title, channelID: nil, channelName: $0.channelName) }
             .filter { matchesSearch($0.title, $0.channelName, $0.videoID) })
     }
 
     private var visiblePlaylists: [PlaylistDownloadManifest] {
         playlistDownloads.manifests
-            .filter { matchesSearch($0.title) }
+            .filter { manifest in
+                matchesSearch(manifest.title)
+                    && !blocklist.blocks(title: manifest.title, channelID: nil, channelName: nil)
+                    && manifest.videos.contains(where: { !blocklist.blocks($0) })
+            }
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
@@ -145,7 +152,7 @@ struct DownloadsScreen: View {
                         let downloadedIDs = downloadedVideoIDs
                         ForEach(visiblePlaylists) { manifest in
                             let downloadedCount = manifest.videos.reduce(0) {
-                                $0 + (downloadedIDs.contains($1.id) ? 1 : 0)
+                                $0 + (downloadedIDs.contains($1.id) && !blocklist.blocks($1) ? 1 : 0)
                             }
                             DownloadedPlaylistRow(
                                 manifest: manifest,
@@ -195,13 +202,23 @@ struct DownloadsScreen: View {
                 if !savedItems.isEmpty || (!isSearching && playlistDownloads.manifests.isEmpty && inProgress.isEmpty) {
                     Section {
                         if savedItems.isEmpty && !isSearching {
-                            ContentUnavailableView(
-                                "No Downloads",
-                                systemImage: "arrow.down.circle",
-                                description: Text("Download a video from the player or a link to watch it offline.")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .listRowBackground(Color.clear)
+                            if totalCount > 0 {
+                                ContentUnavailableView(
+                                    "Downloads Hidden",
+                                    systemImage: "hand.raised",
+                                    description: Text("Change blocked content in Settings to see saved files again.")
+                                )
+                                .frame(maxWidth: .infinity)
+                                .listRowBackground(Color.clear)
+                            } else {
+                                ContentUnavailableView(
+                                    "No Downloads",
+                                    systemImage: "arrow.down.circle",
+                                    description: Text("Download a video from the player or a link to watch it offline.")
+                                )
+                                .frame(maxWidth: .infinity)
+                                .listRowBackground(Color.clear)
+                            }
                         }
                         ForEach(savedItems) { item in
                             savedItemRow(item)

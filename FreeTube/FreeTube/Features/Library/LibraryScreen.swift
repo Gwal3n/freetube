@@ -16,6 +16,7 @@ struct LibraryScreen: View {
     @State private var recentVideos: [WatchHistorySnapshot] = []
     @State private var resumableVideos: [WatchHistorySnapshot] = []
     @State private var localSubscriptions = LocalSubscriptionStore.shared
+    @State private var blocklist = VideoBlocklist.shared
     @State private var localPlaylistCount: Int?
     @State private var externalDestination: AppNavigationRequest.Destination?
     @State private var rootIsVisible = false
@@ -119,7 +120,9 @@ struct LibraryScreen: View {
 
     private var shelfEntries: [WatchHistorySnapshot] {
         let source = libraryShelfContent == .continueWatching ? resumableVideos : recentVideos
-        return Array(source.prefix(max(3, min(recentLibraryVideoCount, 12))))
+        return Array(source.filter {
+            !blocklist.blocks(title: $0.title, channelID: $0.channelID, channelName: $0.channelName)
+        }.prefix(max(3, min(recentLibraryVideoCount, 12))))
     }
 
     @ViewBuilder
