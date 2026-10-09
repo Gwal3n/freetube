@@ -324,11 +324,7 @@ struct SearchContent: View {
                     }
                 }
             } label: {
-                if videoFilters.watch == .all {
-                    Text("Watch history")
-                } else {
-                    Label("Watch history", systemImage: "checkmark")
-                }
+                Text("Watch history")
             }
             Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
@@ -347,11 +343,7 @@ struct SearchContent: View {
                     }
                 }
             } label: {
-                if videoFilters.uploaded == .anytime {
-                    Text("Upload date")
-                } else {
-                    Label("Upload date", systemImage: "checkmark")
-                }
+                Text("Upload date")
             }
             Menu {
                 ForEach(SearchVideoFilters.Length.allCases) { option in
@@ -370,11 +362,7 @@ struct SearchContent: View {
                     }
                 }
             } label: {
-                if videoFilters.length == .any {
-                    Text("Length")
-                } else {
-                    Label("Length", systemImage: "checkmark")
-                }
+                Text("Length")
             }
             Menu {
                 ForEach(SearchVideoFilters.Views.allCases) { option in
@@ -393,25 +381,25 @@ struct SearchContent: View {
                     }
                 }
             } label: {
-                if videoFilters.views == .any {
-                    Text("Views")
-                } else {
-                    Label("Views", systemImage: "checkmark")
-                }
+                Text("Views")
             }
-            if videoFilters.isActive {
-                Divider()
-                Button("Reset Filters") {
-                    videoFilters = SearchVideoFilters()
-                }
+            Divider()
+            Button("Reset Filters") {
+                videoFilters = SearchVideoFilters()
             }
+            .disabled(!videoFilters.isActive)
         } label: {
-            Image(systemName: videoFilters.isActive
-                ? "line.3.horizontal.decrease.circle.fill"
-                : "line.3.horizontal.decrease")
+            Image(systemName: "line.3.horizontal.decrease")
                 .font(.subheadline)
                 .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .fill(.primary)
+                        .frame(width: 5, height: 5)
+                        .padding(8)
+                        .opacity(videoFilters.isActive ? 1 : 0)
+                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

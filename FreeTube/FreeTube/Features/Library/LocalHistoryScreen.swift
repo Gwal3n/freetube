@@ -12,6 +12,8 @@ struct LocalHistoryScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @State private var entries: [WatchHistorySnapshot] = []
     @State private var isLoading = false
+    @State private var isRefreshing = false
+    @State private var historyRevision = 0
     @State private var hasLoaded = false
     @State private var hasMore = true
     @State private var searchText = ""
@@ -33,21 +35,31 @@ struct LocalHistoryScreen: View {
             if !hasLoaded {
                 MediaListPlaceholder()
             } else if !searchText.isEmpty && visibleEntries.isEmpty {
-                ContentUnavailableView.search(text: searchText)
-            } else if visibleEntries.isEmpty && !hasMore {
-                if mode == .continueWatching {
-                    ContentUnavailableView(
-                        "Nothing to Resume",
-                        systemImage: "play.circle",
-                        description: Text("Partially watched videos will appear here.")
-                    )
-                } else {
-                    ContentUnavailableView(
-                        "No Local History",
-                        systemImage: "clock.arrow.circlepath",
-                        description: Text("Videos you watch will appear here on this device.")
-                    )
+                ScrollView {
+                    ContentUnavailableView.search(text: searchText)
+                        .containerRelativeFrame(.vertical)
                 }
+                .refreshable { await refreshHistory() }
+            } else if visibleEntries.isEmpty && !hasMore {
+                ScrollView {
+                    Group {
+                        if mode == .continueWatching {
+                            ContentUnavailableView(
+                                "Nothing to Resume",
+                                systemImage: "play.circle",
+                                description: Text("Partially watched videos will appear here.")
+                            )
+                        } else {
+                            ContentUnavailableView(
+                                "No Local History",
+                                systemImage: "clock.arrow.circlepath",
+                                description: Text("Videos you watch will appear here on this device.")
+                            )
+                        }
+                    }
+                    .containerRelativeFrame(.vertical)
+                }
+                .refreshable { await refreshHistory() }
             } else {
                 List {
                     ForEach(dayGroups, id: \.day) { group in
@@ -90,6 +102,7 @@ struct LocalHistoryScreen: View {
                     }
                 }
                 .listStyle(.plain)
+                .refreshable { await refreshHistory() }
             }
         }
         .navigationTitle(mode == .continueWatching
@@ -171,17 +184,51 @@ struct LocalHistoryScreen: View {
         }
     }
 
+    /// Re-read the first page without blanking the list. An older pagination request may still
+    /// complete after the refresh starts, so its revision must no longer be allowed to append.
+    private func refreshHistory() async {
+        historyRevision &+= 1
+        let revision = historyRevision
+        isRefreshing = true
+        isLoading = false
+        defer {
+            if historyRevision == revision { isRefreshing = false }
+        }
+
+        let page = await PersistenceWriter.shared.fetchWatchHistory(offset: 0, limit: pageSize)
+        guard !Task.isCancelled, historyRevision == revision else { return }
+        entries = page
+        hasMore = page.count == pageSize
+        hasLoaded = true
+
+        let query = searchText
+        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let results = await PersistenceWriter.shared.searchWatchHistory(query)
+            guard !Task.isCancelled, historyRevision == revision else { return }
+            if searchText == query { searchResults = results }
+        }
+
+        isRefreshing = false
+        if mode == .continueWatching && hasMore &&
+            entries.filter({ $0.resumableProgress != nil }).count < 20 {
+            await loadMore()
+        }
+    }
+
     private func loadMore() async {
-        guard !isLoading, hasMore else { return }
+        guard !isLoading, !isRefreshing, hasMore else { return }
+        let revision = historyRevision
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if historyRevision == revision { isLoading = false }
+        }
         var newlyResumable = 0
         repeat {
             let page = await PersistenceWriter.shared.fetchWatchHistory(
                 offset: entries.count,
                 limit: pageSize
             )
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, historyRevision == revision else { return }
             let existingIDs = Set(entries.map(\.videoID))
             let newEntries = page.filter { !existingIDs.contains($0.videoID) }
             entries.append(contentsOf: newEntries)
