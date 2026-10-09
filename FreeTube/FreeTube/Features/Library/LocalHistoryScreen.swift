@@ -34,94 +34,7 @@ struct LocalHistoryScreen: View {
     }
 
     var body: some View {
-        Group {
-            if !hasLoaded {
-                MediaListPlaceholder()
-            } else if !searchText.isEmpty && visibleEntries.isEmpty {
-                ScrollView {
-                    ContentUnavailableView.search(text: searchText)
-                        .containerRelativeFrame(.vertical)
-                }
-                .refreshable { await refreshHistory() }
-            } else if visibleEntries.isEmpty && !hasMore {
-                ScrollView {
-                    Group {
-                        if !entries.isEmpty && entries.allSatisfy({
-                            blocklist.blocks(title: $0.title, channelID: $0.channelID, channelName: $0.channelName)
-                        }) {
-                            ContentUnavailableView(
-                                "History Hidden",
-                                systemImage: "hand.raised",
-                                description: Text("Change blocked content in Settings to see these videos again.")
-                            )
-                        } else if mode == .continueWatching {
-                            ContentUnavailableView(
-                                "Nothing to Resume",
-                                systemImage: "play.circle",
-                                description: Text("Partially watched videos will appear here.")
-                            )
-                        } else {
-                            ContentUnavailableView(
-                                "No Local History",
-                                systemImage: "clock.arrow.circlepath",
-                                description: Text("Videos you watch will appear here on this device.")
-                            )
-                        }
-                    }
-                    .containerRelativeFrame(.vertical)
-                }
-                .refreshable { await refreshHistory() }
-            } else {
-                List {
-                    ForEach(dayGroups, id: \.day) { group in
-                        Section {
-                            ForEach(group.entries) { entry in
-                                let video = video(from: entry)
-                                VideoRow(
-                                    video: video,
-                                    accessory: .actions(offersPlayNext: true),
-                                    playbackProgress: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
-                                        ? entry.resumableProgress : nil,
-                                    onOpenChannel: {
-                                        if let channelID = entry.channelID, !channelID.isEmpty {
-                                            channelToOpen = channelID
-                                        } else {
-                                            Task {
-                                                channelToOpen = await channelNavigation.channelID(for: entry.videoID)
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    historyPlayback.open(entry, video: video, player: player)
-                                }
-                                .swipeActions {
-                                    Button(role: .destructive) {
-                                        Task { await remove(entry) }
-                                    } label: {
-                                        Label("Remove", systemImage: "trash")
-                                    }
-                                }
-                                .onAppear {
-                                    if searchText.isEmpty && entry.videoID == visibleEntries.last?.videoID {
-                                        Task { await loadMore() }
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text(dayTitle(group.day))
-                        }
-                    }
-                    if visibleEntries.isEmpty && hasMore {
-                        Button("Load more history") {
-                            Task { await loadMore() }
-                        }
-                        .disabled(isLoading || isRefreshing)
-                    }
-                }
-                .listStyle(.plain)
-                .refreshable { await refreshHistory() }
-            }
-        }
+        historyContent
         .navigationTitle(mode == .continueWatching
                          ? String(localized: "Continue Watching")
                          : String(localized: "Local History"))
@@ -171,6 +84,106 @@ struct LocalHistoryScreen: View {
             let results = await PersistenceWriter.shared.searchWatchHistory(searchText)
             guard !Task.isCancelled else { return }
             searchResults = results
+        }
+    }
+
+    @ViewBuilder
+    private var historyContent: some View {
+        Group {
+            if !hasLoaded {
+                MediaListPlaceholder()
+            } else if !searchText.isEmpty && visibleEntries.isEmpty {
+                ScrollView {
+                    ContentUnavailableView.search(text: searchText)
+                        .containerRelativeFrame(.vertical)
+                }
+                .refreshable { await refreshHistory() }
+            } else if visibleEntries.isEmpty && !hasMore {
+                ScrollView {
+                    Group {
+                        if !entries.isEmpty && entries.allSatisfy({
+                            blocklist.blocks(title: $0.title, channelID: $0.channelID, channelName: $0.channelName)
+                        }) {
+                            ContentUnavailableView(
+                                "History Hidden",
+                                systemImage: "hand.raised",
+                                description: Text("Change blocked content in Settings to see these videos again.")
+                            )
+                        } else if mode == .continueWatching {
+                            ContentUnavailableView(
+                                "Nothing to Resume",
+                                systemImage: "play.circle",
+                                description: Text("Partially watched videos will appear here.")
+                            )
+                        } else {
+                            ContentUnavailableView(
+                                "No Local History",
+                                systemImage: "clock.arrow.circlepath",
+                                description: Text("Videos you watch will appear here on this device.")
+                            )
+                        }
+                    }
+                    .containerRelativeFrame(.vertical)
+                }
+                .refreshable { await refreshHistory() }
+            } else {
+                historyList
+            }
+        }
+    }
+
+    private var historyList: some View {
+        List {
+            ForEach(dayGroups, id: \.day) { group in
+                Section {
+                    ForEach(group.entries) { entry in
+                        historyRow(entry)
+                    }
+                } header: {
+                    Text(dayTitle(group.day))
+                }
+            }
+            if visibleEntries.isEmpty && hasMore {
+                Button("Load more history") {
+                    Task { await loadMore() }
+                }
+                .disabled(isLoading || isRefreshing)
+            }
+        }
+        .listStyle(.plain)
+        .refreshable { await refreshHistory() }
+    }
+
+    private func historyRow(_ entry: WatchHistorySnapshot) -> some View {
+        let video = video(from: entry)
+        let showsProgress = showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+        return VideoRow(
+            video: video,
+            accessory: .actions(offersPlayNext: true),
+            playbackProgress: showsProgress ? entry.resumableProgress : nil,
+            onOpenChannel: {
+                if let channelID = entry.channelID, !channelID.isEmpty {
+                    channelToOpen = channelID
+                } else {
+                    Task {
+                        channelToOpen = await channelNavigation.channelID(for: entry.videoID)
+                    }
+                }
+            }
+        ) {
+            historyPlayback.open(entry, video: video, player: player)
+        }
+        .swipeActions {
+            Button(role: .destructive) {
+                Task { await remove(entry) }
+            } label: {
+                Label("Remove", systemImage: "trash")
+            }
+        }
+        .onAppear {
+            if searchText.isEmpty && entry.videoID == visibleEntries.last?.videoID {
+                Task { await loadMore() }
+            }
         }
     }
 
