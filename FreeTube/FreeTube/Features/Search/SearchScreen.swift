@@ -18,6 +18,8 @@ struct SearchContent: View {
     @State private var areVideosExpanded = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @State private var progressByVideoID: [String: Double] = [:]
+    @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
+    @State private var videoFilters = SearchVideoFilters()
     @State private var showingClearSearchHistoryConfirmation = false
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -62,12 +64,17 @@ struct SearchContent: View {
             arePlaylistsExpanded = false
             areChannelsExpanded = true
             areVideosExpanded = true
+            videoFilters = SearchVideoFilters()
         }
         .errorToast($model.errorState)
     }
 
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
+        let now = Date.now
+        let visibleVideos = results.videos.filter {
+            videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
+        }
         if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
             ContentUnavailableView(
                 "No Results",
@@ -121,8 +128,27 @@ struct SearchContent: View {
                 if !results.videos.isEmpty {
                     Section {
                         if areVideosExpanded {
+                            if visibleVideos.isEmpty {
+                                VStack(spacing: 8) {
+                                    Group {
+                                        if results.continuationToken == nil {
+                                            Text("No videos match these filters")
+                                        } else {
+                                            Text("No loaded videos match. Load more to check the next page.")
+                                        }
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    Button("Reset Filters") {
+                                        videoFilters = SearchVideoFilters()
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity, minHeight: 76)
+                                .listRowSeparator(.hidden)
+                            }
                             let lookaheadIDs = Set(results.videos.suffix(5).map(\.id))
-                            ForEach(results.videos) { video in
+                            ForEach(visibleVideos) { video in
                                 VideoRow(
                                     video: video,
                                     accessory: .actions(offersPlayNext: true),
@@ -136,7 +162,8 @@ struct SearchContent: View {
                                     player.load(video)
                                 }
                                 .onAppear {
-                                    guard lookaheadIDs.contains(video.id),
+                                    guard !videoFilters.isActive,
+                                          lookaheadIDs.contains(video.id),
                                           results.continuationToken != nil,
                                           !model.paginationFailed,
                                           !model.isLoading else { return }
@@ -145,7 +172,11 @@ struct SearchContent: View {
                             }
                         }
                     } header: {
-                        collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
+                        HStack(spacing: 0) {
+                            collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
+                                .frame(maxWidth: .infinity)
+                            videoFilterMenu
+                        }
                     }
                 }
                 if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {
@@ -154,7 +185,9 @@ struct SearchContent: View {
                     }
                     .listRowSeparator(.hidden)
                     .onAppear {
-                        guard !model.paginationFailed else { return }
+                        // Local filters can hide entire pages. Keep continuation explicit so a
+                        // selective filter never burns through every search page on its own.
+                        guard !videoFilters.isActive, !model.paginationFailed else { return }
                         Task { await model.loadMore() }
                     }
                 }
@@ -197,18 +230,90 @@ struct SearchContent: View {
         .accessibilityValue(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
     }
 
+    private var videoFilterMenu: some View {
+        Menu {
+            Menu("Watch history") {
+                ForEach(SearchVideoFilters.Watch.allCases) { option in
+                    Button {
+                        videoFilters.watch = option
+                    } label: {
+                        if videoFilters.watch == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+            Menu("Uploaded (approximate)") {
+                ForEach(SearchVideoFilters.Uploaded.allCases) { option in
+                    Button {
+                        videoFilters.uploaded = option
+                    } label: {
+                        if videoFilters.uploaded == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+            Menu("Length") {
+                ForEach(SearchVideoFilters.Length.allCases) { option in
+                    Button {
+                        videoFilters.length = option
+                    } label: {
+                        if videoFilters.length == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+            Menu("Views") {
+                ForEach(SearchVideoFilters.Views.allCases) { option in
+                    Button {
+                        videoFilters.views = option
+                    } label: {
+                        if videoFilters.views == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+            if videoFilters.isActive {
+                Divider()
+                Button("Reset Filters") {
+                    videoFilters = SearchVideoFilters()
+                }
+            }
+        } label: {
+            Image(systemName: videoFilters.isActive
+                ? "line.3.horizontal.decrease.circle.fill"
+                : "line.3.horizontal.decrease")
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter search videos")
+        .accessibilityValue(videoFilters.isActive ? "On" : "Off")
+    }
+
     private func progressLookupID(for videos: [Video]) -> String {
         "\(showHistoryProgressBars):" + videos.map(\.id).joined(separator: ",")
     }
 
     private func loadProgress(for videos: [Video]) async {
-        guard showHistoryProgressBars else {
-            progressByVideoID = [:]
-            return
-        }
-        progressByVideoID = await PersistenceWriter.shared.watchProgress(
-            videoIDs: videos.map(\.id)
-        )
+        let ids = videos.map(\.id)
+        let summary = await PersistenceWriter.shared.watchHistorySummary(videoIDs: ids)
+        guard !Task.isCancelled, model.results?.videos.map(\.id) == ids else { return }
+        watchStatusByVideoID = summary.statuses
+        progressByVideoID = showHistoryProgressBars ? summary.progress : [:]
     }
 
     @ViewBuilder

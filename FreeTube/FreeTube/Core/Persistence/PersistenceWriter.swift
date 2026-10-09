@@ -228,15 +228,15 @@ actor PersistenceWriter {
         return result
     }
 
-    /// One history pass supplies both the card progress bars and Feed-only watch filters.
+    /// One history pass supplies both card progress bars and browse watch-status filters.
     /// A missing key means the video has no local history entry.
-    func feedWatchSummary(videoIDs: [String]) -> FeedWatchSummary {
-        var summary = FeedWatchSummary()
+    func watchHistorySummary(videoIDs: [String]) -> WatchHistorySummary {
+        var summary = WatchHistorySummary()
         for videoID in Set(videoIDs) {
             let target = videoID
             let descriptor = FetchDescriptor<WatchHistoryEntry>(predicate: #Predicate { $0.videoID == target })
             guard let entry = try? modelContext.fetch(descriptor).first else { continue }
-            summary.statuses[videoID] = entry.feedWatchStatus
+            summary.statuses[videoID] = entry.watchStatus
             if let progress = entry.resumableProgress {
                 summary.progress[videoID] = progress
             }

@@ -16,18 +16,18 @@ final class WatchHistoryTests: XCTestCase {
         XCTAssertNil(snapshot(position: 195, duration: 200).resumableProgress)
     }
 
-    func testFeedWatchStatusSeparatesPartialAndFinished() {
+    func testWatchStatusSeparatesPartialAndFinished() {
         let entry = WatchHistoryEntry(
             videoID: "video", title: "Video", channelName: "Channel",
             thumbnailURL: nil, lastPosition: 60, duration: 240
         )
-        XCTAssertEqual(entry.feedWatchStatus, .partial)
+        XCTAssertEqual(entry.watchStatus, .partial)
 
         entry.lastPosition = 230
-        XCTAssertEqual(entry.feedWatchStatus, .finished)
+        XCTAssertEqual(entry.watchStatus, .finished)
 
         entry.lastPosition = 0
-        XCTAssertEqual(entry.feedWatchStatus, .watched)
+        XCTAssertEqual(entry.watchStatus, .watched)
     }
 
     func testShortVideoIsNotFinishedJustBecauseItIsWithinThirtySecondsOfTheEnd() {
@@ -35,7 +35,7 @@ final class WatchHistoryTests: XCTestCase {
             videoID: "short", title: "Short", channelName: "Channel",
             thumbnailURL: nil, lastPosition: 10, duration: 30
         )
-        XCTAssertEqual(entry.feedWatchStatus, .partial)
+        XCTAssertEqual(entry.watchStatus, .partial)
     }
 
     func testHistorySnapshotDecodesOldBackupWithoutChannelID() throws {

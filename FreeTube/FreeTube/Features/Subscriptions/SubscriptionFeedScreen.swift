@@ -427,7 +427,7 @@ private enum FeedWatchFilter: String, CaseIterable, Identifiable {
         }
     }
 
-    func includes(_ status: FeedWatchStatus?) -> Bool {
+    func includes(_ status: WatchHistoryStatus?) -> Bool {
         switch self {
         case .all: true
         case .hideWatched: status == nil
