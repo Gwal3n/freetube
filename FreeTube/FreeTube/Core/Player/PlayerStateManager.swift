@@ -851,7 +851,7 @@ final class PlayerStateManager {
     }
 
     func setPlaybackRate(_ rate: Double) {
-        let boundedRate = min(max(rate, 0.25), 2)
+        let boundedRate = min(max(rate, PlaybackSpeedPresets.minimumRate), PlaybackSpeedPresets.maximumRate)
         player.defaultRate = Float(boundedRate)
         playbackRate = boundedRate
         if isPlaying { player.rate = Float(boundedRate) }

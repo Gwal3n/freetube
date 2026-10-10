@@ -45,7 +45,7 @@ struct CustomPlaybackSpeedsScreen: View {
                 .disabled(PlaybackSpeedPresets.parse(speedText) == nil)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Enter 0.25× to 2×, with up to two decimal places.")
+            Text("Enter 0.25× to 5×, with up to two decimal places.")
         }
     }
 

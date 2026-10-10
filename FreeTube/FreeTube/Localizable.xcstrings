@@ -37,13 +37,13 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Свои скорости" } }
       }
     },
-    "Enter 0.25× to 2×, with up to two decimal places." : {
+    "Enter 0.25× to 5×, with up to two decimal places." : {
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "0,25× bis 2× mit höchstens zwei Nachkommastellen eingeben." } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter 0.25× to 2×, with up to two decimal places." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Introduce de 0,25× a 2×, con hasta dos decimales." } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Saisissez de 0,25× à 2×, avec deux décimales au maximum." } },
-        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите от 0,25× до 2×, не более двух знаков после запятой." } }
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "0,25× bis 5× mit höchstens zwei Nachkommastellen eingeben." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter 0.25× to 5×, with up to two decimal places." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Introduce de 0,25× a 5×, con hasta dos decimales." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Saisissez de 0,25× à 5×, avec deux décimales au maximum." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите от 0,25× до 5×, не более двух знаков после запятой." } }
       }
     },
     "No custom speeds" : {
