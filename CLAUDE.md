@@ -158,6 +158,20 @@ Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
 `AVPlayerItem.preferredMaximumResolution` from `preferredQuality.heightCap` so the user's quality
 setting still bounds ABR variant selection. `.auto` stays uncapped.
 
+**High-speed experiment (`experiment/high-speed-progressive`).** Normal playback still resolves
+HLS first. An unsupported rate above 2x triggers `PlaybackResolver.resolveForFastPlayback`, which
+uses a separate memory-only progressive cache and never falls back to HLS or starts a download.
+The existing item continues at up to 2x while `FastPlaybackPreparation` prepares the MP4 in a
+paused, muted, viewless AVPlayer probe. Accept only a ready item with fast-forward support and
+the required audio/video tracks. Detach it from the probe before installing it in the sole visible
+AVQueuePlayer, then seek to the position at handoff and restore current play/pause intent.
+Use spectral audio pitch correction for high rates. Menu and hold requests share this path;
+releasing a hold cancels unfinished preparation, and replacing/dismissing the video invalidates
+the entire transaction. Failed extraction or validation keeps the working stream at up to 2x.
+Successful progressive playback stays on that fixed-resolution source for the rest of the video,
+even after lowering the rate. No new dependencies, persistent signed URLs, or download side effects.
+The selected base rate is saved explicitly; transient AVPlayer defaults and holds never write it.
+
 **Playback starts optimistically.** `resolveAndPlay` installs the candidate, sets
 `loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`. This
 is purely about perceived latency: warm resolution is ~0.4s but AVPlayer readiness is ~2s, i.e. ~80%

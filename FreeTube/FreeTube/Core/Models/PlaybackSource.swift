@@ -23,6 +23,7 @@ enum PlaybackStrategy: String, Sendable, Hashable {
     case b5iIOS = "b5i-ios"
     case b5iTVHTML5 = "b5i-tvhtml5"
     case native = "native-youtubekit"
+    case nativeProgressive = "native-progressive-experiment"
 }
 
 struct PlaybackCandidate: Sendable {
@@ -61,4 +62,7 @@ protocol PlaybackResolving {
         quality: VideoQuality,
         excluding strategies: Set<PlaybackStrategy>
     ) async throws -> PlaybackCandidate
+
+    /// Resolves a file-style source for AVPlayer's rates above 2x. HLS is not a fallback here.
+    func resolveForFastPlayback(video: Video, quality: VideoQuality) async throws -> PlaybackCandidate
 }

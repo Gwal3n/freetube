@@ -9,6 +9,18 @@ enum PlaybackSpeedPresets {
     static let quickRates: [Double] = [0.5, 1, 1.25, 1.5, 2]
     static let settingsRates: [Double] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
+    static func bounded(_ rate: Double) -> Double {
+        guard rate.isFinite else { return 1 }
+        return min(max(rate, minimumRate), maximumRate)
+    }
+
+    /// Before readiness AVPlayer cannot report fast-forward support. Keep normal playback safe
+    /// until a ready item has explicitly advertised that capability.
+    static func supportedRate(_ rate: Double, canPlayFastForward: Bool) -> Double {
+        let rate = bounded(rate)
+        return canPlayFastForward ? rate : min(rate, 2)
+    }
+
     static func parse(_ text: String) -> Double? {
         let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")

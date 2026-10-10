@@ -19,6 +19,7 @@ struct PlayerTopControls: View {
     let isFullscreen: Bool
     let isAudioOnly: Bool
     let isSwitchingAudioMode: Bool
+    let isPreparingFastPlayback: Bool
     let sleepTimerOption: SleepTimerOption
     let captionsModel: PlayerCaptionsModel
     let onSetPlaybackRate: (Double) -> Void
@@ -278,7 +279,12 @@ struct PlayerTopControls: View {
         Menu {
             speedChoices
         } label: {
-            Text(rateLabel(playbackRate))
+            HStack(spacing: 4) {
+                if isPreparingFastPlayback {
+                    ProgressView().tint(.white).controlSize(.mini)
+                }
+                Text(rateLabel(playbackRate))
+            }
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
                 .frame(minWidth: 44, minHeight: 44)

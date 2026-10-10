@@ -15,6 +15,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var onSeekAbsolute: (TimeInterval) -> Void
     private var onSeekPreview: (TimeInterval?) -> Void
     private var onTogglePlayback: () -> Void
+    private var onHoldSpeedChange: (Double?) -> Double
+    private var effectivePlaybackRate: Double
     private var onToggleControls: () -> Void
     private var onRestoreFromPictureInPicture: () -> Void
     private var gestures: [UIGestureRecognizer] = []
@@ -38,8 +40,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var horizontalSeekTarget: TimeInterval?
     private var horizontalSeekDuration: TimeInterval?
     private var horizontalSeekPeakVelocity: CGFloat = 0
-    private var rateBeforeBoost: Float?
-    private var wasPausedBeforeBoost = false
+    private var isHoldingForSpeed = false
     private var holdForSpeedEnabled: Bool
     private var holdSpeedRate: Float
     private var lastPiPDismissalRequest: Int
@@ -50,6 +51,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         pipDismissalRequest: Int,
         holdForSpeedEnabled: Bool,
         holdSpeedRate: Double,
+        effectivePlaybackRate: Double,
+        onHoldSpeedChange: @escaping (Double?) -> Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
@@ -61,6 +64,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.lastPiPDismissalRequest = pipDismissalRequest
         self.holdForSpeedEnabled = holdForSpeedEnabled
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
+        self.effectivePlaybackRate = effectivePlaybackRate
+        self.onHoldSpeedChange = onHoldSpeedChange
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
@@ -88,6 +93,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         holdForSpeedEnabled: Bool,
         holdSpeedRate: Double,
+        effectivePlaybackRate: Double,
+        onHoldSpeedChange: @escaping (Double?) -> Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
@@ -97,7 +104,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     ) {
         self.player = player
         if self.holdForSpeedEnabled != holdForSpeedEnabled {
-            if !holdForSpeedEnabled, rateBeforeBoost != nil {
+            if !holdForSpeedEnabled, isHoldingForSpeed {
                 restorePlaybackRateIfNeeded()
                 hideFeedback()
             }
@@ -105,6 +112,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             longPressGesture?.isEnabled = holdForSpeedEnabled
         }
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
+        let speedChanged = abs(self.effectivePlaybackRate - effectivePlaybackRate) > 0.001
+        self.effectivePlaybackRate = effectivePlaybackRate
+        self.onHoldSpeedChange = onHoldSpeedChange
+        if isHoldingForSpeed, speedChanged { showHoldSpeedFeedback() }
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
@@ -299,22 +310,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             guard holdForSpeedEnabled,
                   let player,
                   player.currentItem?.status == .readyToPlay else { return }
-            wasPausedBeforeBoost = player.timeControlStatus == .paused
-            rateBeforeBoost = player.rate > 0 ? player.rate : player.defaultRate
-            if wasPausedBeforeBoost {
-                player.playImmediately(atRate: holdSpeedRate)
-            } else {
-                player.rate = holdSpeedRate
-            }
-            log.info("Hold recognized; temporary rate=\(self.holdSpeedRate, privacy: .public)x")
+            isHoldingForSpeed = true
+            effectivePlaybackRate = onHoldSpeedChange(Double(holdSpeedRate))
+            log.info("Hold recognized; requested=\(self.holdSpeedRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            showFeedback(
-                PlaybackSpeedPresets.label(Double(holdSpeedRate)),
-                horizontalFraction: 0.5,
-                verticalFraction: 0.10,
-                compact: true,
-                automaticallyHide: false
-            )
+            showHoldSpeedFeedback()
         case .ended, .cancelled, .failed:
             restorePlaybackRateIfNeeded()
             log.info("Hold ended; restored playback rate")
@@ -415,15 +415,19 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func restorePlaybackRateIfNeeded() {
-        guard let priorRate = rateBeforeBoost else { return }
-        rateBeforeBoost = nil
-        guard let player else { return }
-        if wasPausedBeforeBoost {
-            player.pause()
-        } else if player.timeControlStatus != .paused {
-            player.rate = priorRate
-        }
-        wasPausedBeforeBoost = false
+        guard isHoldingForSpeed else { return }
+        isHoldingForSpeed = false
+        effectivePlaybackRate = onHoldSpeedChange(nil)
+    }
+
+    private func showHoldSpeedFeedback() {
+        showFeedback(
+            PlaybackSpeedPresets.label(effectivePlaybackRate),
+            horizontalFraction: 0.5,
+            verticalFraction: 0.10,
+            compact: true,
+            automaticallyHide: false
+        )
     }
 
     private static func validatedHoldRate(_ rate: Double) -> Float {

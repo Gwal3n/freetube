@@ -8,6 +8,7 @@ import FreeTubeStreamKit
 /// processing happen on the device, and signed URLs are cached in memory for at most 30 minutes.
 protocol NativeStreamServicing: Sendable {
     func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
+    func resolveProgressive(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -20,8 +21,18 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
 
     /// Returns an HLS, progressive video, or audio-only URL suitable for `AVPlayer`.
     func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult {
+        try await resolve(video: video, quality: quality, progressiveOnly: false)
+    }
+
+    /// Experimental high-rate path. Never accepts an HLS playlist or downloads a file.
+    func resolveProgressive(video: Video, quality: VideoQuality) async throws -> NativeStreamResult {
+        guard !video.isLive else { throw YouTubeServiceError.streamExtractionFailed }
+        return try await resolve(video: video, quality: quality, progressiveOnly: true)
+    }
+
+    private func resolve(video: Video, quality: VideoQuality, progressiveOnly: Bool) async throws -> NativeStreamResult {
         let videoID = video.id
-        let cacheKey = "native-\(quality.rawValue)"
+        let cacheKey = "native-\(progressiveOnly ? "progressive-" : "")\(quality.rawValue)"
         if let cached = await cache.getEntry(videoID: videoID, formatID: cacheKey) {
             log.debug("Native stream cache hit for \(videoID, privacy: .public)")
             return NativeStreamResult(
@@ -35,7 +46,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         }
 
         let startedAt = Date()
-        log.info("Resolving native stream for \(videoID, privacy: .public) at \(quality.rawValue, privacy: .public) live=\(video.isLive, privacy: .public)")
+        log.info("Resolving native stream for \(videoID, privacy: .public) at \(quality.rawValue, privacy: .public) live=\(video.isLive, privacy: .public) progressiveOnly=\(progressiveOnly, privacy: .public)")
         let youtube = YouTube(videoID: videoID, methods: [.local])
 
         do {
@@ -48,7 +59,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             // the ~5.4s native resolution. In practice its output was then discarded and this very
             // HLS URL played instead, so the whole pass was dead weight. Audio-only cannot use the
             // video-bearing master directly; select its separate audio rendition when available.
-            if quality == .audioOnly,
+            if !progressiveOnly, quality == .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 do {
                     if let audio = try await NativeHLSDownloadService().preferredAudioPlaylistURL(from: hls) {
@@ -82,7 +93,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 }
             }
 
-            if quality != .audioOnly,
+            if !progressiveOnly, quality != .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
                 let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
@@ -118,22 +129,27 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 selected = streams
                     .filterAudioOnly()
                     .filter(\.isNativelyPlayable)
+                    .filter { !progressiveOnly || $0.fileExtension == .m4a || $0.fileExtension == .mp4 }
                     .highestAudioBitrateStream()
             } else {
                 let heightCap = quality.heightCap ?? 1080
                 selected = streams
                     .filterVideoAndAudio()
                     .filter(\.isNativelyPlayable)
+                    .filter { !progressiveOnly || $0.fileExtension == .mp4 }
                     .filter { ($0.videoResolution ?? .max) <= heightCap }
                     .highestResolutionStream()
             }
 
             if let selected {
-                let storyboard = await storyboard(from: youtube, videoID: videoID)
-                let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
-                let originalTitle = (try? await youtube.metadata)?.title
-                let mimeType = quality == .audioOnly && selected.fileExtension == .m4a
-                    ? "audio/mp4" : nil
+                // The active HLS item already supplied these fields. A high-rate source switch
+                // must not pay for extra metadata requests or reset captions/chapters.
+                let storyboard: VideoStoryboard? = progressiveOnly ? nil : await storyboard(from: youtube, videoID: videoID)
+                let captionTracks: [VideoCaptionTrack] = progressiveOnly ? [] : await sourceCaptionTracks(from: youtube, videoID: videoID)
+                let originalTitle: String? = progressiveOnly ? nil : (try? await youtube.metadata)?.title
+                let mimeType: String? = progressiveOnly
+                    ? (quality == .audioOnly ? "audio/mp4" : "video/mp4")
+                    : (quality == .audioOnly && selected.fileExtension == .m4a ? "audio/mp4" : nil)
                 await cache.set(
                     videoID: videoID, formatID: cacheKey, url: selected.url,
                     storyboard: storyboard, captionTracks: captionTracks,

@@ -158,6 +158,15 @@ struct FullScreenPlayer: View {
                         pipDismissalRequest: player.pipDismissalRequest,
                         holdForSpeedEnabled: holdForSpeedEnabled,
                         holdSpeedRate: holdSpeedRate,
+                        effectivePlaybackRate: player.effectivePlaybackRate,
+                        onHoldSpeedChange: { rate in
+                            if let rate {
+                                player.beginTemporaryPlaybackRate(rate)
+                            } else {
+                                player.endTemporaryPlaybackRate()
+                            }
+                            return player.effectivePlaybackRate
+                        },
                         onSeekRelative: { seconds in
                             player.seekRelative(by: seconds)
                         },
@@ -276,7 +285,8 @@ struct FullScreenPlayer: View {
                                 isAutoplayEnabled: autoplayNext,
                                 isFullscreen: isLandscape || portraitFullscreenActive,
                                 isAudioOnly: player.isAudioOnly,
-                                isSwitchingAudioMode: player.isSwitchingAudioMode,
+                                isSwitchingAudioMode: player.isSwitchingAudioMode || player.isPreparingFastPlayback,
+                                isPreparingFastPlayback: player.isPreparingFastPlayback,
                                 sleepTimerOption: player.sleepTimerOption,
                                 captionsModel: captionsModel,
                                 onSetPlaybackRate: { rate in

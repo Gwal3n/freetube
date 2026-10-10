@@ -104,6 +104,17 @@ final class PlaybackResolver: PlaybackResolving {
         throw PlaybackResolverError.noRemainingCandidates
     }
 
+    /// Separate from normal resolution so a high-rate request cannot silently return the same
+    /// HLS stream that already reported `canPlayFastForward == false`.
+    func resolveForFastPlayback(video: Video, quality: VideoQuality) async throws -> PlaybackCandidate {
+        log.info("Resolving progressive fast-playback candidate for \(video.id, privacy: .public)")
+        let result = try await nativeStreams.resolveProgressive(video: video, quality: quality)
+        return PlaybackCandidate(
+            source: .direct(result.url), strategy: .nativeProgressive,
+            mimeTypeOverride: result.mimeTypeOverride
+        )
+    }
+
     private static func pickStreamURL(from info: VideoInfo, quality: VideoQuality) -> URL? {
         if quality == .audioOnly {
             return info.formats
