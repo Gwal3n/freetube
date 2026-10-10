@@ -1,6 +1,78 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add custom speed" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeit hinzufügen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add custom speed" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadir velocidad personalizada" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter une vitesse personnalisée" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавить свою скорость" } }
+      }
+    },
+    "Custom speed" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeit" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom speed" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Velocidad personalizada" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vitesse personnalisée" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Своя скорость" } }
+      }
+    },
+    "Custom speed…" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeit…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom speed…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Velocidad personalizada…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vitesse personnalisée…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Своя скорость…" } }
+      }
+    },
+    "Custom speeds" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeiten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom speeds" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Velocidades personalizadas" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vitesses personnalisées" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Свои скорости" } }
+      }
+    },
+    "Enter 0.25× to 2×, with up to two decimal places." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "0,25× bis 2× mit höchstens zwei Nachkommastellen eingeben." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter 0.25× to 2×, with up to two decimal places." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Introduce de 0,25× a 2×, con hasta dos decimales." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Saisissez de 0,25× à 2×, avec deux décimales au maximum." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите от 0,25× до 2×, не более двух знаков после запятой." } }
+      }
+    },
+    "No custom speeds" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Keine eigenen Geschwindigkeiten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No custom speeds" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay velocidades personalizadas" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune vitesse personnalisée" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет своих скоростей" } }
+      }
+    },
+    "Saved speeds appear in the player’s speed menu and in the default speed picker." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherte Geschwindigkeiten erscheinen im Player-Menü und bei der Standardgeschwindigkeit." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved speeds appear in the player’s speed menu and in the default speed picker." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Las velocidades guardadas aparecen en el menú del reproductor y en la velocidad predeterminada." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les vitesses enregistrées apparaissent dans le menu du lecteur et le choix de vitesse par défaut." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранённые скорости доступны в меню плеера и при выборе скорости по умолчанию." } }
+      }
+    },
+    "Set Speed" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Geschwindigkeit festlegen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Set Speed" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Establecer velocidad" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Définir la vitesse" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Установить скорость" } }
+      }
+    },
     "Best" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Beste" } },

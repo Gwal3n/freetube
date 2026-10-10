@@ -5,6 +5,9 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerTopControls: View {
     @AppStorage("playerMoreMenuDividers") private var moreMenuDividersRaw = ""
+    @AppStorage("customPlaybackSpeeds") private var savedRatesRaw = ""
+    @State private var isEnteringCustomSpeed = false
+    @State private var customSpeedText = ""
 
     let controls: [PlayerTopControl]
     let overflowControls: [PlayerTopControl]
@@ -39,6 +42,19 @@ struct PlayerTopControls: View {
             .defaultScrollAnchor(.trailing)
         }
         .buttonStyle(.plain)
+        .alert("Custom speed", isPresented: $isEnteringCustomSpeed) {
+            TextField("Speed", text: $customSpeedText)
+                .keyboardType(.decimalPad)
+            Button("Set Speed") {
+                if let rate = PlaybackSpeedPresets.parse(customSpeedText) {
+                    onSetPlaybackRate(rate)
+                }
+            }
+            .disabled(PlaybackSpeedPresets.parse(customSpeedText) == nil)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter 0.25× to 2×, with up to two decimal places.")
+        }
     }
 
     /// Keep the familiar single row when it fits. With more controls than a narrow video can
@@ -301,8 +317,9 @@ struct PlayerTopControls: View {
         }
     }
 
+    @ViewBuilder
     private var speedChoices: some View {
-        ForEach([0.5, 1, 1.25, 1.5, 2], id: \.self) { rate in
+        ForEach(availableSpeedRates, id: \.self) { rate in
             Button {
                 onSetPlaybackRate(rate)
             } label: {
@@ -313,6 +330,15 @@ struct PlayerTopControls: View {
                 }
             }
         }
+        Divider()
+        Button("Custom speed…") {
+            customSpeedText = playbackRate.formatted(.number.precision(.fractionLength(0...2)))
+            isEnteringCustomSpeed = true
+        }
+    }
+
+    private var availableSpeedRates: [Double] {
+        Array(Set(PlaybackSpeedPresets.quickRates + PlaybackSpeedPresets.decode(savedRatesRaw))).sorted()
     }
 
     private var qualityChoices: some View {
@@ -332,6 +358,6 @@ struct PlayerTopControls: View {
     }
 
     private func rateLabel(_ rate: Double) -> String {
-        rate == 1 ? "1×" : "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
+        PlaybackSpeedPresets.label(rate)
     }
 }

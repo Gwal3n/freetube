@@ -87,10 +87,11 @@ struct UserPreferences {
     /// balance for cellular and consumer Wi-Fi. Values above 8 risk YouTube rate-limiting.
     @AppStorage("concurrentFragments") var concurrentFragments: Int = 4
     /// Persisted playback rate (1.0 = normal speed). Mirrors `AVPlayer.defaultRate`, which is the
-    /// value `AVPlayerViewController`'s built-in speed menu writes when the user picks 0.5×/1.5×/2×.
+    /// value changed by the player's speed menu, including one-off custom rates.
     /// `PlayerStateManager` reads this on init and observes the player's `defaultRate` to write
-    /// changes back here — so a relaunch picks up where the last session left off.
+    /// changes back here, so a relaunch picks up where the last session left off.
     @AppStorage("playbackRate") var playbackRate: Double = 1.0
+    @AppStorage("customPlaybackSpeeds") var customPlaybackSpeedsRaw: String = ""
     @AppStorage("showLibraryShelf") var showLibraryShelf: Bool = true
     @AppStorage("showContinueWatchingMenu") var showContinueWatchingMenu: Bool = true
     @AppStorage("libraryShelfContent") var libraryShelfContentRaw: String = LibraryShelfContent.continueWatching.rawValue

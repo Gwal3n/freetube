@@ -5,6 +5,7 @@ struct SettingsScreen: View {
     let onClose: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("customPlaybackSpeeds") private var savedPlaybackSpeedsRaw = ""
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -30,13 +31,19 @@ struct SettingsScreen: View {
                         }
                     }
                     Picker("Default playback speed", selection: Bindable(model).playbackRate) {
-                        ForEach([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0], id: \.self) { rate in
-                            Text(verbatim: rate == 1 ? "Normal" : "\(rate.formatted())×").tag(rate)
+                        ForEach(defaultPlaybackRates, id: \.self) { rate in
+                            Text(verbatim: rate == 1 ? "Normal" : PlaybackSpeedPresets.label(rate)).tag(rate)
                         }
                     }
                     .onChange(of: model.playbackRate) { _, rate in
                         player.setPlaybackRate(rate)
                     }
+                    NavigationLink {
+                        CustomPlaybackSpeedsScreen()
+                    } label: {
+                        navigationLabel("Custom speeds", systemImage: "speedometer")
+                    }
+                    .tint(.white)
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
                         Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
@@ -358,6 +365,11 @@ struct SettingsScreen: View {
         }
     }
 
+    private var defaultPlaybackRates: [Double] {
+        Array(Set(PlaybackSpeedPresets.settingsRates +
+                  PlaybackSpeedPresets.decode(savedPlaybackSpeedsRaw) + [model.playbackRate])).sorted()
+    }
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     }
@@ -372,7 +384,7 @@ struct SettingsScreen: View {
         return revision
     }
 
-    private func navigationLabel(_ title: String, systemImage: String) -> some View {
+    private func navigationLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
         .foregroundStyle(.primary)
     }
