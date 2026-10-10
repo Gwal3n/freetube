@@ -1771,38 +1771,56 @@ final class PlayerStateManager {
             // or persist a file. Extensionless signed URLs need their actual media types.
             let videoAsset = AVURLAsset(url: videoURL, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])
             let audioAsset = AVURLAsset(url: audioURL, options: [AVURLAssetOverrideMIMETypeKey: "audio/mp4"])
-            guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
-                  let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first else {
-                throw YouTubeServiceError.streamExtractionFailed
+            var stage = "video-track"
+            do {
+                guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first else {
+                    throw YouTubeServiceError.streamExtractionFailed
+                }
+                stage = "audio-track"
+                guard let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first else {
+                    throw YouTubeServiceError.streamExtractionFailed
+                }
+                stage = "video-duration"
+                let videoDuration = try await videoAsset.load(.duration)
+                stage = "audio-duration"
+                let audioDuration = try await audioAsset.load(.duration)
+                stage = "duration-validation"
+                guard videoDuration.isValid, audioDuration.isValid,
+                      videoDuration.seconds.isFinite, audioDuration.seconds.isFinite,
+                      videoDuration.seconds > 0, audioDuration.seconds > 0 else {
+                    throw YouTubeServiceError.streamExtractionFailed
+                }
+                let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
+                let composition = AVMutableComposition()
+                stage = "composition-tracks"
+                guard let compositionVideo = composition.addMutableTrack(
+                    withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
+                ), let compositionAudio = composition.addMutableTrack(
+                    withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
+                ) else {
+                    throw YouTubeServiceError.streamExtractionFailed
+                }
+                stage = "video-insertion"
+                try compositionVideo.insertTimeRange(
+                    CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
+                )
+                stage = "audio-insertion"
+                try compositionAudio.insertTimeRange(
+                    CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
+                )
+                stage = "preferred-transform"
+                compositionVideo.preferredTransform = try await videoTrack.load(.preferredTransform)
+                stage = "composition-copy"
+                guard let playbackComposition = composition.copy() as? AVComposition else {
+                    throw YouTubeServiceError.streamExtractionFailed
+                }
+                log.info("Prepared paired video/audio composition duration=\(videoDuration.seconds, privacy: .public)s")
+                return AVPlayerItem(asset: playbackComposition)
+            } catch {
+                let nsError = error as NSError
+                log.notice("Paired source preparation failed stage=\(stage, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
+                throw error
             }
-            let videoDuration = try await videoAsset.load(.duration)
-            let audioDuration = try await audioAsset.load(.duration)
-            guard videoDuration.isValid, audioDuration.isValid,
-                  videoDuration.seconds.isFinite, audioDuration.seconds.isFinite,
-                  videoDuration.seconds > 0, audioDuration.seconds > 0 else {
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-            let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
-            let composition = AVMutableComposition()
-            guard let compositionVideo = composition.addMutableTrack(
-                withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
-            ), let compositionAudio = composition.addMutableTrack(
-                withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
-            ) else {
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-            try compositionVideo.insertTimeRange(
-                CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
-            )
-            try compositionAudio.insertTimeRange(
-                CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
-            )
-            compositionVideo.preferredTransform = try await videoTrack.load(.preferredTransform)
-            guard let playbackComposition = composition.copy() as? AVComposition else {
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-            log.info("Prepared paired video/audio composition duration=\(videoDuration.seconds, privacy: .public)s")
-            return AVPlayerItem(asset: playbackComposition)
         }
         guard case .direct(let url) = candidate.source,
               let mimeType = candidate.mimeTypeOverride else {

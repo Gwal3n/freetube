@@ -357,6 +357,22 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             log.notice("Native visionOS HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(fastStartedAt), privacy: .public)s")
         }
 
+        let visitorStartedAt = Date()
+        do {
+            if let probe = try await youtube.probeVisionOSHLSWithVisitorData() {
+                log.info("Native visionOS visitor HLS probe for \(videoID, privacy: .public) manifest=\(probe.manifestURL != nil, privacy: .public) status=\(probe.playabilityStatus ?? "unknown", privacy: .public) idMatch=\(probe.matchesVideoID, privacy: .public) elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
+                if let url = probe.manifestURL { return url }
+            } else {
+                log.info("Native visionOS visitor HLS probe skipped for \(videoID, privacy: .public): no visitor data elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try Task.checkCancellation()
+            let nsError = error as NSError
+            log.notice("Native visionOS visitor HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
+        }
+
         if !isLive {
             let iosStartedAt = Date()
             do {

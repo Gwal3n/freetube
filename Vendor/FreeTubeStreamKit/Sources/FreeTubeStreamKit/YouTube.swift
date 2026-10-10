@@ -369,18 +369,40 @@ public class YouTube {
         try await probeHLS(client: .visionOS, timeoutInterval: 8)
     }
 
+    /// Isolates the anonymous visitor ID from the full player context: no signature timestamp,
+    /// player script, or web player request. A cache hit avoids even the watch-page request.
+    public func probeVisionOSHLSWithVisitorData() async throws -> HLSProbe? {
+        let visitorData: String?
+        if let cached = _playerContext {
+            visitorData = cached.ytcfg.visitorData
+        } else if let cached = await PlayerContextCache.shared.current {
+            visitorData = cached.ytcfg.visitorData
+        } else {
+            let html = try await watchHTML
+            visitorData = try Extraction.extractYtCfg(from: html).visitorData
+        }
+        guard let visitorData, !visitorData.isEmpty else { return nil }
+        let config = Extraction.YtCfg(
+            VISITOR_DATA: visitorData, INNERTUBE_CONTEXT: nil, WEB_PLAYER_CONTEXT_CONFIGS: nil
+        )
+        return try await probeHLS(client: .visionOS, timeoutInterval: 6, ytcfg: config)
+    }
+
     /// Used only when visionOS has no HLS URL. iOS live manifests may require a PO token, so
     /// callers should reserve this probe for on-demand videos.
     public func probeIOSHLS() async throws -> HLSProbe {
         try await probeHLS(client: .ios, timeoutInterval: 6)
     }
 
-    private func probeHLS(client: InnerTube.ClientType, timeoutInterval: TimeInterval) async throws -> HLSProbe {
+    private func probeHLS(
+        client: InnerTube.ClientType, timeoutInterval: TimeInterval,
+        ytcfg: Extraction.YtCfg? = nil
+    ) async throws -> HLSProbe {
         let emptyConfig = Extraction.YtCfg(
             VISITOR_DATA: nil, INNERTUBE_CONTEXT: nil, WEB_PLAYER_CONTEXT_CONFIGS: nil
         )
         let response = try await InnerTube(
-            client: client, signatureTimestamp: nil, ytcfg: emptyConfig
+            client: client, signatureTimestamp: nil, ytcfg: ytcfg ?? emptyConfig
         ).player(videoID: videoID, timeoutInterval: timeoutInterval)
         let matchesVideoID = response.videoDetails?.videoId == videoID
         let candidateURL = matchesVideoID
