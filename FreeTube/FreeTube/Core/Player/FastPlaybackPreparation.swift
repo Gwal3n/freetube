@@ -23,7 +23,8 @@ final class FastPlaybackPreparation {
     init(item: AVPlayerItem) {
         self.item = item
         probe.isMuted = true
-        item.audioTimePitchAlgorithm = .spectral
+        // Spoken video is easier to follow with Apple's voice-oriented pitch processor.
+        item.audioTimePitchAlgorithm = .timeDomain
     }
 
     func prepare(audioOnly: Bool) async throws -> AVPlayerItem {

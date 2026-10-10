@@ -165,7 +165,7 @@ The existing item continues at up to 2x while `FastPlaybackPreparation` prepares
 paused, muted, viewless AVPlayer probe. Accept only a ready item with fast-forward support and
 the required audio/video tracks. Detach it from the probe before installing it in the sole visible
 AVQueuePlayer, then seek to the position at handoff and restore current play/pause intent.
-Use spectral audio pitch correction for high rates. Menu and hold requests share this path;
+Use time-domain audio pitch correction for high rates, as speech quality is the priority. Menu and hold requests share this path;
 releasing a hold cancels unfinished preparation, and replacing/dismissing the video invalidates
 the entire transaction. Failed extraction or validation keeps the working stream at up to 2x.
 Successful progressive playback stays on that fixed-resolution source for the rest of the video,

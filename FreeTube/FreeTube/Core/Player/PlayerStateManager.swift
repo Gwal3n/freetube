@@ -880,6 +880,9 @@ final class PlayerStateManager {
         preferences.playbackRate = boundedRate
         if boundedRate > 2, !isPreparingFastPlayback { fastPlaybackFailed = false }
         reconcilePlaybackRate()
+        if let item = player.currentItem, item.status == .readyToPlay {
+            log.info("Playback speed applied: selected=\(self.playbackRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x actual=\(self.player.rate, privacy: .public)x canPlayFastForward=\(item.canPlayFastForward, privacy: .public) pitch=\(item.audioTimePitchAlgorithm, privacy: .public)")
+        }
     }
 
     /// Hold and menu speeds share the same capability checks and progressive-source experiment.
@@ -946,10 +949,10 @@ final class PlayerStateManager {
         effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(requestedTransportRate, canPlayFastForward: supportsFastPlayback)
         let baseRate = Float(PlaybackSpeedPresets.supportedRate(playbackRate, canPlayFastForward: supportsFastPlayback))
         if player.defaultRate != baseRate { player.defaultRate = baseRate }
-        if supportsFastPlayback, requestedTransportRate > 2, item?.audioTimePitchAlgorithm != .spectral {
-            // Spectral pitch correction explicitly supports rates well beyond 2x. Keep it for
-            // this item's lifetime rather than repeatedly rebuilding audio processing on holds.
-            item?.audioTimePitchAlgorithm = .spectral
+        if supportsFastPlayback, requestedTransportRate > 2, item?.audioTimePitchAlgorithm != .timeDomain {
+            // Time-domain pitch correction is designed for voice and supports these rates.
+            // Keep it for the item's lifetime rather than rebuilding processing on every hold.
+            item?.audioTimePitchAlgorithm = .timeDomain
         }
         if isPlaying, !isInstallingFastPlayback, player.rate != Float(effectivePlaybackRate) {
             player.rate = Float(effectivePlaybackRate)
