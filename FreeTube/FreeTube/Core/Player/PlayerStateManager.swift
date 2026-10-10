@@ -200,6 +200,7 @@ final class PlayerStateManager {
     private var readinessToken = 0
     private var itemErrorLogObservation: NSObjectProtocol?
     private var itemAccessLogObservation: NSObjectProtocol?
+    private var lastAccessLogAt = Date.distantPast
     private var playerErrorObservation: NSKeyValueObservation?
     private var defaultRateObservation: NSKeyValueObservation?
     private var sponsorBlockTask: Task<Void, Never>?
@@ -852,6 +853,9 @@ final class PlayerStateManager {
 
     func setPlaybackRate(_ rate: Double) {
         let boundedRate = min(max(rate, PlaybackSpeedPresets.minimumRate), PlaybackSpeedPresets.maximumRate)
+        if boundedRate > 2, let item = player.currentItem {
+            log.info("Fast playback requested: rate=\(boundedRate, privacy: .public) itemReady=\(item.status == .readyToPlay, privacy: .public) canPlayFastForward=\(item.canPlayFastForward, privacy: .public)")
+        }
         player.defaultRate = Float(boundedRate)
         playbackRate = boundedRate
         if isPlaying { player.rate = Float(boundedRate) }
@@ -1652,6 +1656,7 @@ final class PlayerStateManager {
         itemPresentationSizeObservation?.invalidate()
         itemLoadedTimeRangesObservation?.invalidate()
         bufferedRanges = []
+        lastAccessLogAt = .distantPast
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
 
@@ -1664,6 +1669,7 @@ final class PlayerStateManager {
                 case .readyToPlay:
                     let preparationTime = self.itemLoadStartedAt.map { Date().timeIntervalSince($0) } ?? 0
                     self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
+                    self.log.info("AVPlayerItem fast playback: canPlayFastForward=\(item.canPlayFastForward, privacy: .public) defaultRate=\(self.player.defaultRate, privacy: .public) audioPitchAlgorithm=\(item.audioTimePitchAlgorithm, privacy: .public)")
                     self.logAudioDiagnostics(for: item)
                     self.itemLoadStartedAt = nil
                     self.finishReadiness(.ready, for: item)
@@ -1719,10 +1725,19 @@ final class PlayerStateManager {
             object: item,
             queue: .main
         ) { [weak self, weak item] _ in
-            guard let entry = item?.accessLog()?.events.last else { return }
-            // Access-log URIs and server addresses may contain signed playback credentials. Only
-            // record aggregate ABR measurements needed to diagnose low-quality HLS renditions.
-            self?.log.info("AVPlayerItem access-log: indicatedBitrate=\(entry.indicatedBitrate, privacy: .public) indicatedAverageBitrate=\(entry.indicatedAverageBitrate, privacy: .public) averageAudioBitrate=\(entry.averageAudioBitrate, privacy: .public) averageVideoBitrate=\(entry.averageVideoBitrate, privacy: .public) observedBitrate=\(entry.observedBitrate, privacy: .public) switchBitrate=\(entry.switchBitrate, privacy: .public) downloadedDuration=\(entry.segmentsDownloadedDuration, privacy: .public)s watchedDuration=\(entry.durationWatched, privacy: .public)s droppedFrames=\(entry.numberOfDroppedVideoFrames, privacy: .public) stalls=\(entry.numberOfStalls, privacy: .public)")
+            Task { @MainActor in
+                guard let self, let item, self.player.currentItem === item else { return }
+                // Some HLS streams post this notification dozens of times per second above 2x.
+                // Each AppLog entry also schedules a main-thread file write when diagnostics are on.
+                // A periodic snapshot preserves bitrate/stall evidence without flooding playback.
+                let now = Date()
+                guard now.timeIntervalSince(self.lastAccessLogAt) >= 5 else { return }
+                self.lastAccessLogAt = now
+                guard let entry = item.accessLog()?.events.last else { return }
+                // Access-log URIs and server addresses may contain signed playback credentials. Only
+                // record aggregate ABR measurements needed to diagnose low-quality HLS renditions.
+                self.log.info("AVPlayerItem access-log: indicatedBitrate=\(entry.indicatedBitrate, privacy: .public) indicatedAverageBitrate=\(entry.indicatedAverageBitrate, privacy: .public) averageAudioBitrate=\(entry.averageAudioBitrate, privacy: .public) averageVideoBitrate=\(entry.averageVideoBitrate, privacy: .public) observedBitrate=\(entry.observedBitrate, privacy: .public) switchBitrate=\(entry.switchBitrate, privacy: .public) downloadedDuration=\(entry.segmentsDownloadedDuration, privacy: .public)s watchedDuration=\(entry.durationWatched, privacy: .public)s droppedFrames=\(entry.numberOfDroppedVideoFrames, privacy: .public) stalls=\(entry.numberOfStalls, privacy: .public)")
+            }
         }
     }
 
