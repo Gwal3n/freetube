@@ -19,6 +19,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var onRestoreFromPictureInPicture: () -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var continuationTapGesture: UITapGestureRecognizer?
+    private var longPressGesture: UILongPressGestureRecognizer?
     private var twoFingerTapGesture: UITapGestureRecognizer?
     private var singleTapGesture: UITapGestureRecognizer?
     private var horizontalPanGesture: UIPanGestureRecognizer?
@@ -39,12 +40,16 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var horizontalSeekPeakVelocity: CGFloat = 0
     private var rateBeforeBoost: Float?
     private var wasPausedBeforeBoost = false
+    private var holdForSpeedEnabled: Bool
+    private var holdSpeedRate: Float
     private var lastPiPDismissalRequest: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
     init(
         player: AVPlayer,
         pipDismissalRequest: Int,
+        holdForSpeedEnabled: Bool,
+        holdSpeedRate: Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
@@ -54,6 +59,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     ) {
         self.player = player
         self.lastPiPDismissalRequest = pipDismissalRequest
+        self.holdForSpeedEnabled = holdForSpeedEnabled
+        self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
@@ -79,6 +86,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     func update(
         player: AVPlayer,
+        holdForSpeedEnabled: Bool,
+        holdSpeedRate: Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
@@ -87,6 +96,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onRestoreFromPictureInPicture: @escaping () -> Void
     ) {
         self.player = player
+        if self.holdForSpeedEnabled != holdForSpeedEnabled {
+            if !holdForSpeedEnabled, rateBeforeBoost != nil {
+                restorePlaybackRateIfNeeded()
+                hideFeedback()
+            }
+            self.holdForSpeedEnabled = holdForSpeedEnabled
+            longPressGesture?.isEnabled = holdForSpeedEnabled
+        }
+        self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
@@ -119,6 +137,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         longPress.delaysTouchesBegan = false
         longPress.delaysTouchesEnded = false
         longPress.delegate = self
+        longPress.isEnabled = holdForSpeedEnabled
 
         let horizontalPan = UIPanGestureRecognizer(target: self, action: #selector(didPanHorizontally(_:)))
         horizontalPan.maximumNumberOfTouches = 1
@@ -154,6 +173,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         singleTap.require(toFail: horizontalPan)
 
         continuationTapGesture = continuationTap
+        longPressGesture = longPress
         twoFingerTapGesture = twoFingerTap
         singleTapGesture = singleTap
         horizontalPanGesture = horizontalPan
@@ -188,6 +208,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         }
         gestures.removeAll()
         continuationTapGesture = nil
+        longPressGesture = nil
         twoFingerTapGesture = nil
         singleTapGesture = nil
         horizontalPanGesture = nil
@@ -275,19 +296,20 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     @objc private func didLongPress(_ gesture: UILongPressGestureRecognizer) {
         switch gesture.state {
         case .began:
-            guard let player,
+            guard holdForSpeedEnabled,
+                  let player,
                   player.currentItem?.status == .readyToPlay else { return }
             wasPausedBeforeBoost = player.timeControlStatus == .paused
             rateBeforeBoost = player.rate > 0 ? player.rate : player.defaultRate
             if wasPausedBeforeBoost {
-                player.playImmediately(atRate: 2)
+                player.playImmediately(atRate: holdSpeedRate)
             } else {
-                player.rate = 2
+                player.rate = holdSpeedRate
             }
-            log.info("Hold recognized; temporary rate=2x")
+            log.info("Hold recognized; temporary rate=\(self.holdSpeedRate, privacy: .public)x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showFeedback(
-                "2×",
+                PlaybackSpeedPresets.label(Double(holdSpeedRate)),
                 horizontalFraction: 0.5,
                 verticalFraction: 0.10,
                 compact: true,
@@ -404,6 +426,11 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         wasPausedBeforeBoost = false
     }
 
+    private static func validatedHoldRate(_ rate: Double) -> Float {
+        guard rate.isFinite else { return 2 }
+        return Float(min(max(rate, PlaybackSpeedPresets.minimumRate), PlaybackSpeedPresets.maximumRate))
+    }
+
     private func beginSeekSession(with interval: TimeInterval, isForward: Bool) {
         seekSessionTotal = interval
         // Once the initial double tap succeeds, count every following tap individually. Keeping
@@ -513,7 +540,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                 ? CGSize(width: compactTextWidth, height: 26)
                 : CGSize(width: 150, height: 38)
             : compact
-                ? CGSize(width: 52, height: 26)
+                ? CGSize(width: compactTextWidth, height: 26)
                 : CGSize(width: 68, height: 38)
         let center = CGPoint(
             x: view.bounds.width * horizontalFraction,

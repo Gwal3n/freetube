@@ -62,6 +62,8 @@ struct FullScreenPlayer: View {
     @AppStorage("captionBackgroundEnabled") private var captionBackgroundEnabled = true
     @AppStorage("captionTextScale") private var captionTextScale = 1.0
     @AppStorage("formattedCaptions") private var formattedCaptions = true
+    @AppStorage("holdForSpeedEnabled") private var holdForSpeedEnabled = true
+    @AppStorage("holdSpeedRate") private var holdSpeedRate = 2.0
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
     @AppStorage("playerControlLayout") private var playerControlLayoutRaw = ""
@@ -154,6 +156,8 @@ struct FullScreenPlayer: View {
                         PlayerSurface(
                         player: player.player,
                         pipDismissalRequest: player.pipDismissalRequest,
+                        holdForSpeedEnabled: holdForSpeedEnabled,
+                        holdSpeedRate: holdSpeedRate,
                         onSeekRelative: { seconds in
                             player.seekRelative(by: seconds)
                         },

@@ -20,6 +20,8 @@ struct SettingsScreen: View {
     /// "Are you sure?" confirmation for the destructive Clear-all-logs button.
     @State private var showingClearLogsConfirmation = false
     @State private var showingClearHistoryConfirmation = false
+    @State private var showingHoldSpeedEditor = false
+    @State private var holdSpeedText = ""
 
     var body: some View {
         NavigationStack {
@@ -44,6 +46,18 @@ struct SettingsScreen: View {
                         navigationLabel("Custom speeds", systemImage: "speedometer")
                     }
                     .tint(.white)
+                    Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
+                    Button {
+                        holdSpeedText = model.holdSpeedRate.formatted(.number.precision(.fractionLength(0...2)))
+                        showingHoldSpeedEditor = true
+                    } label: {
+                        LabeledContent("Hold speed") {
+                            Text(verbatim: PlaybackSpeedPresets.label(model.holdSpeedRate))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(.primary)
+                    .disabled(!model.holdForSpeedEnabled)
                     Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
                         Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
@@ -362,6 +376,19 @@ struct SettingsScreen: View {
             } message: {
                 Text("This removes watch history stored by FreeTube on this device.")
             }
+        }
+        .alert("Hold speed", isPresented: $showingHoldSpeedEditor) {
+            TextField("Speed", text: $holdSpeedText)
+                .keyboardType(.decimalPad)
+            Button("Set Speed") {
+                if let rate = PlaybackSpeedPresets.parse(holdSpeedText) {
+                    model.holdSpeedRate = rate
+                }
+            }
+            .disabled(PlaybackSpeedPresets.parse(holdSpeedText) == nil)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter 0.25× to 5×, with up to two decimal places.")
         }
     }
 

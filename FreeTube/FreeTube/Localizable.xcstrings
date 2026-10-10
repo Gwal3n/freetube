@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Hold for speed" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Für Tempo gedrückt halten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hold for speed" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Mantener pulsado para cambiar la velocidad" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Maintenir pour accélérer" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удерживать для изменения скорости" } }
+      }
+    },
+    "Hold speed" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Tempo beim Halten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hold speed" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Velocidad al mantener pulsado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vitesse du maintien" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скорость при удержании" } }
+      }
+    },
     "Add custom speed" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeit hinzufügen" } },

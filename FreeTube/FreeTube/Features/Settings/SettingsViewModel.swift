@@ -36,6 +36,12 @@ final class SettingsViewModel {
     var playbackRate: Double {
         didSet { preferences.playbackRate = playbackRate }
     }
+    var holdForSpeedEnabled: Bool {
+        didSet { preferences.holdForSpeedEnabled = holdForSpeedEnabled }
+    }
+    var holdSpeedRate: Double {
+        didSet { preferences.holdSpeedRate = holdSpeedRate }
+    }
     var deArrowTitles: Bool {
         didSet { preferences.deArrowTitles = deArrowTitles }
     }
@@ -85,6 +91,8 @@ final class SettingsViewModel {
         self.recentLibraryVideoCount = preferences.recentLibraryVideoCount
         self.libraryShelfContent = preferences.libraryShelfContent
         self.playbackRate = preferences.playbackRate
+        self.holdForSpeedEnabled = preferences.holdForSpeedEnabled
+        self.holdSpeedRate = preferences.holdSpeedRate
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails

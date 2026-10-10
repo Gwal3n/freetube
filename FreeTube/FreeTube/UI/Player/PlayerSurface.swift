@@ -8,6 +8,8 @@ import UIKit
 struct PlayerSurface: UIViewControllerRepresentable {
     let player: AVPlayer
     let pipDismissalRequest: Int
+    let holdForSpeedEnabled: Bool
+    let holdSpeedRate: Double
     var onSeekRelative: (TimeInterval) -> Void
     var onSeekAbsolute: (TimeInterval) -> Void
     var onSeekPreview: (TimeInterval?) -> Void
@@ -25,6 +27,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
         PlayerGestureCoordinator(
             player: player,
             pipDismissalRequest: pipDismissalRequest,
+            holdForSpeedEnabled: holdForSpeedEnabled,
+            holdSpeedRate: holdSpeedRate,
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
@@ -72,6 +76,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
         )
         context.coordinator.update(
             player: player,
+            holdForSpeedEnabled: holdForSpeedEnabled,
+            holdSpeedRate: holdSpeedRate,
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
