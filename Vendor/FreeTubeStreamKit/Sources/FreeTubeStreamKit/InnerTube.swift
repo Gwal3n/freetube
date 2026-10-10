@@ -122,12 +122,12 @@ class InnerTube {
         ]
     }
 
-    private func callAPI<D: Encodable, T: Decodable>(endpoint: String, query: [URLQueryItem], object: D) async throws -> T {
+    private func callAPI<D: Encodable, T: Decodable>(endpoint: String, query: [URLQueryItem], object: D, timeoutInterval: TimeInterval? = nil) async throws -> T {
         let data = try JSONEncoder().encode(object)
-        return try await callAPI(endpoint: endpoint, query: query, data: data)
+        return try await callAPI(endpoint: endpoint, query: query, data: data, timeoutInterval: timeoutInterval)
     }
 
-    private func callAPI<T: Decodable>(endpoint: String, query: [URLQueryItem], data: Data) async throws -> T {
+    private func callAPI<T: Decodable>(endpoint: String, query: [URLQueryItem], data: Data, timeoutInterval: TimeInterval? = nil) async throws -> T {
 
         var urlComponents = URLComponents(string: endpoint)!
         urlComponents.queryItems = query
@@ -135,6 +135,7 @@ class InnerTube {
         var request = URLRequest(url: urlComponents.url!)
         request.httpMethod = "post"
         request.httpBody = data
+        if let timeoutInterval { request.timeoutInterval = timeoutInterval }
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue(ytcfg.userAgent ?? "Mozilla/5.0", forHTTPHeaderField: "User-Agent")
         request.addValue("en-US,en", forHTTPHeaderField: "accept-language")
@@ -308,14 +309,14 @@ class InnerTube {
         return PlayerRequest(context: context, videoId: videoID, params: playerParams, playbackContext: playbackContext)
     }
 
-    func player(videoID: String) async throws -> VideoInfo {
+    func player(videoID: String, timeoutInterval: TimeInterval? = nil) async throws -> VideoInfo {
         let endpoint = baseURL + "/player"
         let query = [
             URLQueryItem(name: "key", value: apiKey),
             URLQueryItem(name: "prettyPrint", value: "false")
         ].filter { !($0.value?.isEmpty ?? true) }
         let request = playerRequest(forVideoID: videoID)
-        return try await callAPI(endpoint: endpoint, query: query, object: request)
+        return try await callAPI(endpoint: endpoint, query: query, object: request, timeoutInterval: timeoutInterval)
     }
 
     // TODO: change result type

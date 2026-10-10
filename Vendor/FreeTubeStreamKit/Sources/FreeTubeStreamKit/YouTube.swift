@@ -18,6 +18,19 @@ public class YouTube {
 
     private var _videoInfos: [InnerTube.VideoInfo]?
     private var _visionOSVideoInfo: InnerTube.VideoInfo?
+    private var _hasFastHLSResponse = false
+
+    /// URL-free diagnostics for the legacy player clients, exposed to the app's log facade.
+    public struct PlayerClientOutcome: Sendable {
+        public let clientName: String
+        public let playabilityStatus: String?
+        public let hasHLSManifest: Bool
+        public let matchesVideoID: Bool
+        public let errorDomain: String?
+        public let errorCode: Int?
+    }
+
+    public private(set) var playerClientOutcomes: [PlayerClientOutcome] = []
 
     private var _watchHTML: String?
     private var _embedHTML: String?
@@ -343,6 +356,50 @@ public class YouTube {
         }
     }
 
+    /// Minimal HLS-only player request. Unlike `videoInfos`, this does not fetch the watch page,
+    /// player JavaScript, or the web client. A caller must fall back to `livestreams` if no usable
+    /// manifest is returned; signature deciphering still uses the full player context.
+    public struct VisionOSHLSProbe: Sendable {
+        public let manifestURL: URL?
+        public let playabilityStatus: String?
+        public let matchesVideoID: Bool
+    }
+
+    public func probeVisionOSHLS() async throws -> VisionOSHLSProbe {
+        let emptyConfig = Extraction.YtCfg(
+            VISITOR_DATA: nil, INNERTUBE_CONTEXT: nil, WEB_PLAYER_CONTEXT_CONFIGS: nil
+        )
+        let response = try await InnerTube(
+            client: .visionOS, signatureTimestamp: nil, ytcfg: emptyConfig
+        ).player(videoID: videoID, timeoutInterval: 8)
+        let matchesVideoID = response.videoDetails?.videoId == videoID
+        let candidateURL = matchesVideoID
+            ? response.streamingData?.hlsManifestUrl.flatMap { URL(string: $0) }
+            : nil
+        let playable = response.playabilityStatus?.status.map { $0 == "OK" } ?? true
+        let url = playable && candidateURL?.scheme == "https" && candidateURL?.host != nil
+            ? candidateURL : nil
+        if url != nil {
+            _visionOSVideoInfo = response
+            _videoInfos = [response]
+            _hasFastHLSResponse = true
+        }
+        return VisionOSHLSProbe(
+            manifestURL: url,
+            playabilityStatus: response.playabilityStatus?.status,
+            matchesVideoID: matchesVideoID
+        )
+    }
+
+    /// When the HLS response cannot serve an audio-only request, let progressive extraction
+    /// inspect the full legacy client set instead of being confined to the fast visionOS result.
+    public func discardFastHLSProbe() {
+        guard _hasFastHLSResponse else { return }
+        _videoInfos = nil
+        _visionOSVideoInfo = nil
+        _hasFastHLSResponse = false
+    }
+
     /// Returns a list of live streams - currently only HLS supported
     /// - Note: Currently doesn't respect `method` set. It always uses `.local`
     public var livestreams: [Livestream] {
@@ -433,16 +490,6 @@ public class YouTube {
                 return cached
             }
 
-            // try extracting video infos from watch html directly as well
-            let watchVideoInfoTask = Task<InnerTube.VideoInfo?, Never> { [log] in
-                do {
-                    return nil //try await Extraction.getVideoInfo(fromHTML: watchHTML)  // (temporarily disabled)
-                } catch let error {
-                    os_log("Couldn't extract video info from main watch html: %{public}@", log: log, type: .debug, error.localizedDescription)
-                    return nil
-                }
-            }
-
             let signatureTimestamp = try await signatureTimestamp
             let ytcfg = try await ytcfg
 
@@ -463,20 +510,29 @@ public class YouTube {
             var errors = [Error]()
 
             for (index, result) in results.enumerated() {
+                let clientName = innertubeClients[index].rawValue
                 switch result {
                 case .success(let innertubeResponse):
+                    playerClientOutcomes.append(PlayerClientOutcome(
+                        clientName: clientName,
+                        playabilityStatus: innertubeResponse.playabilityStatus?.status,
+                        hasHLSManifest: innertubeResponse.streamingData?.hlsManifestUrl != nil,
+                        matchesVideoID: innertubeResponse.videoDetails?.videoId == videoID,
+                        errorDomain: nil, errorCode: nil
+                    ))
                     if index == 0, innertubeResponse.videoDetails?.videoId == videoID {
                         _visionOSVideoInfo = innertubeResponse
                     }
                     videoInfos.append(innertubeResponse)
                 case .failure(let error):
+                    let nsError = error as NSError
+                    playerClientOutcomes.append(PlayerClientOutcome(
+                        clientName: clientName, playabilityStatus: nil,
+                        hasHLSManifest: false, matchesVideoID: false,
+                        errorDomain: nsError.domain, errorCode: nsError.code
+                    ))
                     errors.append(error)
                 }
-            }
-
-            // append potentially extracted video info (with least priority)
-            if let watchVideoInfo = await watchVideoInfoTask.value {
-                videoInfos.append(watchVideoInfo)
             }
 
             // remove video infos with incorrect videoID
@@ -490,6 +546,7 @@ public class YouTube {
             }
 
             _videoInfos = videoInfos
+            _hasFastHLSResponse = false
             return videoInfos
         }
     }

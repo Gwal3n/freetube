@@ -42,7 +42,8 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         if let cached = await cache.getEntry(videoID: videoID, formatID: cacheKey),
            let audioURL = cached.audioURL {
             return NativeStreamResult(
-                url: cached.url, audioURL: audioURL, storyboard: cached.storyboard,
+                url: cached.url, audioURL: audioURL, mediaKind: cached.mediaKind,
+                storyboard: cached.storyboard,
                 captionTracks: cached.captionTracks,
                 originalAudioLanguageCode: cached.originalAudioLanguageCode,
                 originalTitle: cached.originalTitle,
@@ -53,6 +54,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         let youtube = YouTube(videoID: videoID, methods: [.local])
         do {
             let streams = try await youtube.streams
+            logLegacyClientOutcomes(from: youtube, videoID: videoID)
             return try await pairedResult(
                 from: streams, youtube: youtube, videoID: videoID, quality: quality,
                 cacheKey: cacheKey, includeMetadata: true, startedAt: startedAt
@@ -61,6 +63,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             throw CancellationError()
         } catch {
             let nsError = error as NSError
+            logLegacyClientOutcomes(from: youtube, videoID: videoID)
             log.notice("Native paired extraction failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
@@ -74,6 +77,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             return NativeStreamResult(
                 url: cached.url,
                 audioURL: cached.audioURL,
+                mediaKind: cached.mediaKind,
                 storyboard: cached.storyboard,
                 captionTracks: cached.captionTracks,
                 originalAudioLanguageCode: cached.originalAudioLanguageCode,
@@ -87,9 +91,9 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         let youtube = YouTube(videoID: videoID, methods: [.local])
 
         do {
-            // HLS first, for live and on-demand alike. `livestreams` only reads `hlsManifestUrl`
-            // off the InnerTube player response, so it shares the same round-trip `streams` needs
-            // but — crucially — never runs the JavaScriptCore signature/n-parameter solver.
+            // HLS first, for live and on-demand alike. The fast probe reads `hlsManifestUrl`
+            // from one visionOS player response; the legacy `livestreams` path follows when
+            // necessary. Neither path runs the JavaScriptCore signature/n-parameter solver.
             //
             // That solver re-parses the entire ~2.5 MB player.js once per InnerTube client (twice
             // normally, three times when no progressive format turns up), which measured at ~4s of
@@ -108,6 +112,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                             videoID: videoID,
                             formatID: cacheKey,
                             url: audio,
+                            mediaKind: .hls,
                             storyboard: storyboard,
                             captionTracks: captionTracks,
                             originalTitle: originalTitle,
@@ -116,6 +121,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                         log.info("Resolved native audio HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
                         return NativeStreamResult(
                             url: audio,
+                            mediaKind: .hls,
                             storyboard: storyboard,
                             captionTracks: captionTracks,
                             originalTitle: originalTitle,
@@ -134,7 +140,9 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
                 let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
+                let audioLanguageStartedAt = Date()
                 let originalAudioLanguageCode = try? await youtube.originalAudioLanguageCode
+                log.info("Native source-audio lookup for \(videoID, privacy: .public) took \(Date().timeIntervalSince(audioLanguageStartedAt), privacy: .public)s")
                 // The already-fetched player response carries videoDetails.title. Browsing
                 // responses can instead contain a title translated for the device locale.
                 let originalTitle = (try? await youtube.metadata)?.title
@@ -142,6 +150,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                     videoID: videoID,
                     formatID: cacheKey,
                     url: hls,
+                    mediaKind: .hls,
                     storyboard: storyboard,
                     captionTracks: captionTracks,
                     originalAudioLanguageCode: originalAudioLanguageCode,
@@ -153,6 +162,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 log.info("Resolved native HLS for \(videoID, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 return NativeStreamResult(
                     url: hls,
+                    mediaKind: .hls,
                     storyboard: storyboard,
                     captionTracks: captionTracks,
                     originalAudioLanguageCode: originalAudioLanguageCode,
@@ -160,7 +170,11 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 )
             }
 
+            if quality == .audioOnly, !progressiveOnly {
+                youtube.discardFastHLSProbe()
+            }
             let streams = try await youtube.streams
+            logLegacyClientOutcomes(from: youtube, videoID: videoID)
             let selected: FreeTubeStreamKit.Stream?
             if quality == .audioOnly {
                 selected = streams
@@ -184,11 +198,12 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 let storyboard: VideoStoryboard? = progressiveOnly ? nil : await storyboard(from: youtube, videoID: videoID)
                 let captionTracks: [VideoCaptionTrack] = progressiveOnly ? [] : await sourceCaptionTracks(from: youtube, videoID: videoID)
                 let originalTitle: String? = progressiveOnly ? nil : (try? await youtube.metadata)?.title
-                let mimeType: String? = progressiveOnly
-                    ? (quality == .audioOnly ? "audio/mp4" : "video/mp4")
-                    : (quality == .audioOnly && selected.fileExtension == .m4a ? "audio/mp4" : nil)
+                let mimeType: String? = quality == .audioOnly
+                    ? ((selected.fileExtension == .m4a || selected.fileExtension == .mp4) ? "audio/mp4" : nil)
+                    : (selected.fileExtension == .mp4 ? "video/mp4" : nil)
                 await cache.set(
                     videoID: videoID, formatID: cacheKey, url: selected.url,
+                    mediaKind: .direct,
                     storyboard: storyboard, captionTracks: captionTracks,
                     originalTitle: originalTitle,
                     mimeTypeOverride: mimeType
@@ -196,6 +211,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 log.info("Resolved native progressive stream for \(videoID, privacy: .public) height=\(selected.videoResolution ?? 0, privacy: .public) audioCodec=\(String(describing: selected.audioCodec), privacy: .public) bitrate=\(selected.bitrate ?? 0, privacy: .public) averageBitrate=\(selected.averageBitrate ?? 0, privacy: .public) container=\(selected.fileExtension.rawValue, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 return NativeStreamResult(
                     url: selected.url,
+                    mediaKind: .direct,
                     storyboard: storyboard,
                     captionTracks: captionTracks,
                     originalTitle: originalTitle,
@@ -215,7 +231,9 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            log.notice("Native extraction failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
+            let nsError = error as NSError
+            logLegacyClientOutcomes(from: youtube, videoID: videoID)
+            log.notice("Native extraction failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
     }
@@ -254,6 +272,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         let originalTitle: String? = includeMetadata ? (try? await youtube.metadata)?.title : nil
         await cache.set(
             videoID: videoID, formatID: cacheKey, url: video.url, audioURL: audio.url,
+            mediaKind: .paired,
             storyboard: storyboard, captionTracks: captionTracks,
             originalAudioLanguageCode: originalAudioLanguageCode, originalTitle: originalTitle,
             mimeTypeOverride: "video/mp4"
@@ -262,7 +281,8 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         if includeMetadata && cacheKey != "native-paired-\(quality.rawValue)" {
             await cache.set(
                 videoID: videoID, formatID: "native-paired-\(quality.rawValue)",
-                url: video.url, audioURL: audio.url, storyboard: storyboard,
+                url: video.url, audioURL: audio.url, mediaKind: .paired,
+                storyboard: storyboard,
                 captionTracks: captionTracks,
                 originalAudioLanguageCode: originalAudioLanguageCode,
                 originalTitle: originalTitle, mimeTypeOverride: "video/mp4"
@@ -270,7 +290,8 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         }
         log.info("Resolved native paired streams for \(videoID, privacy: .public) height=\(video.videoResolution ?? 0, privacy: .public) audioBitrate=\(audio.bitrate ?? 0, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
         return NativeStreamResult(
-            url: video.url, audioURL: audio.url, storyboard: storyboard,
+            url: video.url, audioURL: audio.url, mediaKind: .paired,
+            storyboard: storyboard,
             captionTracks: captionTracks,
             originalAudioLanguageCode: originalAudioLanguageCode,
             originalTitle: originalTitle, mimeTypeOverride: "video/mp4"
@@ -316,20 +337,46 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         }
     }
 
-    /// Reads the player response's HLS manifest URL without triggering signature deciphering.
+    /// Tries a context-free visionOS player request before the legacy multi-client resolver.
     ///
     /// Returns `nil` instead of throwing when the extractor can't produce one, so a video that
     /// genuinely has no HLS variant still falls through to progressive selection rather than
     /// failing the whole resolution. Cancellation is rethrown so a rapid video switch still
     /// unwinds immediately.
     private func hlsManifestURL(from youtube: YouTube, videoID: String) async throws -> URL? {
+        let fastStartedAt = Date()
         do {
-            return try await youtube.livestreams.first?.url
+            let probe = try await youtube.probeVisionOSHLS()
+            log.info("Native visionOS HLS probe for \(videoID, privacy: .public) manifest=\(probe.manifestURL != nil, privacy: .public) status=\(probe.playabilityStatus ?? "unknown", privacy: .public) idMatch=\(probe.matchesVideoID, privacy: .public) elapsed=\(Date().timeIntervalSince(fastStartedAt), privacy: .public)s")
+            if let url = probe.manifestURL { return url }
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            log.notice("Native HLS probe found nothing for \(videoID, privacy: .public); trying progressive selection")
+            try Task.checkCancellation()
+            let nsError = error as NSError
+            log.notice("Native visionOS HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(fastStartedAt), privacy: .public)s")
+        }
+
+        let fallbackStartedAt = Date()
+        do {
+            let url = try await youtube.livestreams.first?.url
+            logLegacyClientOutcomes(from: youtube, videoID: videoID)
+            log.info("Native legacy HLS fallback for \(videoID, privacy: .public) manifest=\(url != nil, privacy: .public) elapsed=\(Date().timeIntervalSince(fallbackStartedAt), privacy: .public)s")
+            return url
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try Task.checkCancellation()
+            let nsError = error as NSError
+            logLegacyClientOutcomes(from: youtube, videoID: videoID)
+            log.notice("Native legacy HLS fallback failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(fallbackStartedAt), privacy: .public)s")
             return nil
+        }
+    }
+
+    private func logLegacyClientOutcomes(from youtube: YouTube, videoID: String) {
+        for outcome in youtube.playerClientOutcomes {
+            log.info("Native client=\(outcome.clientName, privacy: .public) video=\(videoID, privacy: .public) status=\(outcome.playabilityStatus ?? "unknown", privacy: .public) hls=\(outcome.hasHLSManifest, privacy: .public) idMatch=\(outcome.matchesVideoID, privacy: .public) error=\(outcome.errorDomain ?? "none", privacy: .public)/\(outcome.errorCode ?? 0, privacy: .public)")
         }
     }
 }

@@ -503,7 +503,7 @@ final class DownloadManager {
             let resolved = try await NativeStreamService().resolve(video: video, quality: quality)
             try Task.checkCancellation()
             try await downloadResolvedSource(
-                resolved.url,
+                resolved,
                 to: destination,
                 audioOnly: quality == .audioOnly,
                 quality: quality,
@@ -536,7 +536,7 @@ final class DownloadManager {
                 do {
                     let refreshed = try await NativeStreamService().resolve(video: video, quality: quality)
                     try await downloadResolvedSource(
-                        refreshed.url,
+                        refreshed,
                         to: destination,
                         audioOnly: quality == .audioOnly,
                         quality: quality,
@@ -1151,24 +1151,61 @@ final class DownloadManager {
         }
     }
 
-    /// Materializes the native source used by playback. Audio-only resolution returns a direct
-    /// progressive media URL, not an HLS manifest, so it uses a file-backed direct transfer.
-    /// Video continues through the HLS transfer service. Neither path needs embedded Python.
+    /// Materializes the native source used by playback. HLS, direct MP4, and separate MP4/M4A
+    /// streams have distinct transfer paths; treating a video-only URL as a complete file would
+    /// fail final validation and needlessly invoke the embedded Python fallback.
     private func downloadResolvedSource(
-        _ source: URL,
+        _ source: NativeStreamResult,
         to destination: URL,
         audioOnly: Bool,
         quality: VideoQuality,
         video: Video,
         snapshotID: String
     ) async throws {
-        if audioOnly {
+        if source.mediaKind == .paired {
+            guard let audioURL = source.audioURL else {
+                throw YouTubeServiceError.streamExtractionFailed
+            }
+            guard !audioOnly else { throw YouTubeServiceError.streamExtractionFailed }
+            let temporaryVideo = destination.deletingPathExtension().appendingPathExtension("native.video.mp4")
+            let temporaryAudio = destination.deletingPathExtension().appendingPathExtension("native.audio.m4a")
+            defer {
+                try? FileManager.default.removeItem(at: temporaryVideo)
+                try? FileManager.default.removeItem(at: temporaryAudio)
+            }
+            phaseByVideoID[video.id] = "video"
+            try await downloadStream(
+                from: source.url, to: temporaryVideo, videoID: video.id,
+                snapshotID: snapshotID, title: video.title,
+                sendTVClientUserAgent: false, sourceLabel: "native-video"
+            )
+            try Task.checkCancellation()
+            phaseByVideoID[video.id] = "audio"
+            try await downloadStream(
+                from: audioURL, to: temporaryAudio, videoID: video.id,
+                snapshotID: snapshotID, title: video.title,
+                sendTVClientUserAgent: false, sourceLabel: "native-audio"
+            )
+            try Task.checkCancellation()
+            phaseByVideoID[video.id] = "muxing"
+            let exit = await FFmpegRunner.shared.run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
+                "-i", temporaryVideo.path, "-i", temporaryAudio.path,
+                "-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                "-movflags", "+faststart", destination.path
+            ])
+            try Task.checkCancellation()
+            guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
+            return
+        }
+
+        if audioOnly, source.mediaKind == .direct {
             log.info("native-download[\(video.id, privacy: .public)] direct progressive audio transfer")
             phaseByVideoID[video.id] = "audio"
             let temporaryAudio = destination.deletingPathExtension().appendingPathExtension("audio.m4a")
             defer { try? FileManager.default.removeItem(at: temporaryAudio) }
             try await downloadStream(
-                from: source,
+                from: source.url,
                 to: temporaryAudio,
                 videoID: video.id,
                 snapshotID: snapshotID,
@@ -1191,10 +1228,21 @@ final class DownloadManager {
             guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
             return
         }
+
+        if source.mediaKind == .direct {
+            phaseByVideoID[video.id] = "stream"
+            try await downloadStream(
+                from: source.url, to: destination, videoID: video.id,
+                snapshotID: snapshotID, title: video.title,
+                sendTVClientUserAgent: false, sourceLabel: "native-video"
+            )
+            return
+        }
+
         let fragmentCount = max(1, min(16, preferences.concurrentFragments))
         log.info("native-download[\(video.id, privacy: .public)] native HLS transfer concurrency=\(fragmentCount, privacy: .public)")
         try await NativeHLSDownloadService().download(
-            manifestURL: source,
+            manifestURL: source.url,
             destination: destination,
             maximumHeight: quality.heightCap ?? 1080,
             audioOnly: audioOnly,

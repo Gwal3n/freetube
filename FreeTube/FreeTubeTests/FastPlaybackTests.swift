@@ -92,10 +92,15 @@ final class FastPlaybackTests: XCTestCase {
         let videoURL = URL(string: "https://example.com/video.mp4")!
         let audioURL = URL(string: "https://example.com/audio.m4a")!
         await cache.set(videoID: "testvideo01", formatID: "native-paired-auto",
-                        url: videoURL, audioURL: audioURL)
+                        url: videoURL, audioURL: audioURL, mediaKind: .paired)
         let entry = await cache.getEntry(videoID: "testvideo01", formatID: "native-paired-auto")
         XCTAssertEqual(entry?.url, videoURL)
         XCTAssertEqual(entry?.audioURL, audioURL)
+        XCTAssertEqual(entry?.mediaKind, .paired)
+        XCTAssertEqual(
+            NativeStreamResult(url: videoURL, audioURL: audioURL, storyboard: nil).mediaKind,
+            .paired
+        )
         await cache.purge()
         let purged = await cache.getEntry(videoID: "testvideo01", formatID: "native-paired-auto")
         XCTAssertNil(purged)

@@ -2,12 +2,12 @@
 
 This is a source snapshot of
 [`alexeichhorn/YouTubeKit`](https://github.com/alexeichhorn/YouTubeKit) release
-`0.4.9` (`e5b7d0396ce12bf3444f0d209e8436c83373b7af`), with only the Swift package,
-product, and target names changed to `FreeTubeStreamKit`.
+`0.4.9` (`e5b7d0396ce12bf3444f0d209e8436c83373b7af`). The Swift package,
+product, and target names were changed to `FreeTubeStreamKit`, with the local changes below.
 
 The rename lets FreeTube use this stream extractor alongside the unrelated
 `b5i/YouTubeKit` package, which exports the same package and module name and is
-still used by the app's feeds, account, and metadata services.
+still used by the app's feeds and metadata services.
 
 Source-level changes:
 
@@ -23,6 +23,11 @@ Source-level changes:
   unwrap of `URL(string:)` with a thrown `YouTubeKitError.extractError`.
 - `Extraction.YtCfg` and its nested types gained `Sendable` so the cache can
   return a decoded config across its actor boundary.
+- `YouTube.probeVisionOSHLS()` requests a visionOS HLS manifest without loading
+  watch HTML, player JavaScript, or the web client. It caches a valid response
+  for nearby metadata reads; callers retain the full extractor as fallback.
+  The probe uses a request-specific timeout, and legacy player requests expose
+  URL-free per-client diagnostics to the app log.
 
 When re-pulling upstream, reapply these rather than discarding them; the caching
 change is the difference between ~2s and ~0.3s per playback resolution.

@@ -61,7 +61,8 @@ final class PlaybackResolver: PlaybackResolving {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                log.notice("Native resolver failed for \(videoID, privacy: .public)")
+                let nsError = error as NSError
+                log.notice("Native resolver failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
             }
         }
 
@@ -75,7 +76,8 @@ final class PlaybackResolver: PlaybackResolving {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                log.notice("Native paired fallback unavailable for \(videoID, privacy: .public)")
+                let nsError = error as NSError
+                log.notice("Native paired fallback unavailable for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
             }
         }
 
@@ -89,9 +91,13 @@ final class PlaybackResolver: PlaybackResolving {
                         storyboard: info.storyboard, originalTitle: info.video.title
                     )
                 }
+                log.notice("b5i iOS returned no playable URL for \(videoID, privacy: .public) hls=\(info.streamingURL != nil, privacy: .public) formats=\(info.formats.count, privacy: .public)")
             } catch is CancellationError {
                 throw CancellationError()
-            } catch {}
+            } catch {
+                let nsError = error as NSError
+                log.notice("b5i iOS failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
+            }
         }
 
         if !strategies.contains(.b5iTVHTML5) {
@@ -104,9 +110,13 @@ final class PlaybackResolver: PlaybackResolving {
                         storyboard: info.storyboard, originalTitle: info.video.title
                     )
                 }
+                log.notice("b5i TVHTML5 returned no playable URL for \(videoID, privacy: .public) hls=\(info.streamingURL != nil, privacy: .public) formats=\(info.formats.count, privacy: .public)")
             } catch is CancellationError {
                 throw CancellationError()
-            } catch {}
+            } catch {
+                let nsError = error as NSError
+                log.notice("b5i TVHTML5 failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
+            }
         }
 
         log.notice("No playable stream remained for \(videoID, privacy: .public)")
