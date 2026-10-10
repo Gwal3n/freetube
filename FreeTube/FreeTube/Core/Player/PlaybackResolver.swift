@@ -54,19 +54,28 @@ final class PlaybackResolver: PlaybackResolving {
         if !strategies.contains(.native) {
             do {
                 let result = try await nativeStreams.resolve(video: video, quality: quality)
-                return PlaybackCandidate(
-                    source: .direct(result.url),
-                    strategy: .native,
-                    storyboard: result.storyboard,
-                    captionTracks: result.captionTracks,
-                    originalAudioLanguageCode: result.originalAudioLanguageCode,
-                    originalTitle: result.originalTitle,
-                    mimeTypeOverride: result.mimeTypeOverride
-                )
+                let strategy: PlaybackStrategy = result.audioURL == nil ? .native : .nativePaired
+                if !strategies.contains(strategy) {
+                    return Self.nativeCandidate(result, strategy: strategy)
+                }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 log.notice("Native resolver failed for \(videoID, privacy: .public)")
+            }
+        }
+
+        // If a native HLS item was rejected by AVPlayer, try the separate MP4/M4A tracks
+        // before the b5i endpoints. This work is never part of a successful HLS launch.
+        if strategies.contains(.native), !strategies.contains(.nativePaired),
+           !video.isLive, quality != .audioOnly {
+            do {
+                let result = try await nativeStreams.resolvePaired(video: video, quality: quality)
+                return Self.nativeCandidate(result, strategy: .nativePaired)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                log.notice("Native paired fallback unavailable for \(videoID, privacy: .public)")
             }
         }
 
@@ -109,9 +118,21 @@ final class PlaybackResolver: PlaybackResolving {
     func resolveForFastPlayback(video: Video, quality: VideoQuality) async throws -> PlaybackCandidate {
         log.info("Resolving progressive fast-playback candidate for \(video.id, privacy: .public)")
         let result = try await nativeStreams.resolveProgressive(video: video, quality: quality)
+        return Self.nativeCandidate(result, strategy: result.audioURL == nil ? .nativeProgressive : .nativePaired)
+    }
+
+    private static func nativeCandidate(_ result: NativeStreamResult, strategy: PlaybackStrategy) -> PlaybackCandidate {
+        let source: PlaybackSource
+        if let audioURL = result.audioURL {
+            source = .composite(video: result.url, audio: audioURL)
+        } else {
+            source = .direct(result.url)
+        }
         return PlaybackCandidate(
-            source: .direct(result.url), strategy: .nativeProgressive,
-            mimeTypeOverride: result.mimeTypeOverride
+            source: source, strategy: strategy, storyboard: result.storyboard,
+            captionTracks: result.captionTracks,
+            originalAudioLanguageCode: result.originalAudioLanguageCode,
+            originalTitle: result.originalTitle, mimeTypeOverride: result.mimeTypeOverride
         )
     }
 

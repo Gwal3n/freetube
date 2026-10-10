@@ -13,6 +13,7 @@ actor StreamURLCache {
 
     private struct Entry {
         let url: URL
+        let audioURL: URL?
         let storyboard: VideoStoryboard?
         let captionTracks: [VideoCaptionTrack]
         let originalAudioLanguageCode: String?
@@ -36,20 +37,21 @@ actor StreamURLCache {
     func getEntry(
         videoID: String,
         formatID: String
-    ) -> (url: URL, storyboard: VideoStoryboard?, captionTracks: [VideoCaptionTrack], originalAudioLanguageCode: String?, originalTitle: String?, mimeTypeOverride: String?)? {
+    ) -> (url: URL, audioURL: URL?, storyboard: VideoStoryboard?, captionTracks: [VideoCaptionTrack], originalAudioLanguageCode: String?, originalTitle: String?, mimeTypeOverride: String?)? {
         let key = Key(videoID: videoID, formatID: formatID)
         guard let entry = entries[key] else { return nil }
         if entry.expiresAt < .now {
             entries[key] = nil
             return nil
         }
-        return (entry.url, entry.storyboard, entry.captionTracks, entry.originalAudioLanguageCode, entry.originalTitle, entry.mimeTypeOverride)
+        return (entry.url, entry.audioURL, entry.storyboard, entry.captionTracks, entry.originalAudioLanguageCode, entry.originalTitle, entry.mimeTypeOverride)
     }
 
     func set(
         videoID: String,
         formatID: String,
         url: URL,
+        audioURL: URL? = nil,
         storyboard: VideoStoryboard? = nil,
         captionTracks: [VideoCaptionTrack] = [],
         originalAudioLanguageCode: String? = nil,
@@ -59,6 +61,7 @@ actor StreamURLCache {
         let key = Key(videoID: videoID, formatID: formatID)
         entries[key] = Entry(
             url: url,
+            audioURL: audioURL,
             storyboard: storyboard,
             captionTracks: captionTracks,
             originalAudioLanguageCode: originalAudioLanguageCode,

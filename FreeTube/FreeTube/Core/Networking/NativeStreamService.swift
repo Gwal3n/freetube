@@ -9,6 +9,7 @@ import FreeTubeStreamKit
 protocol NativeStreamServicing: Sendable {
     func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolveProgressive(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
+    func resolvePaired(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -30,6 +31,41 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         return try await resolve(video: video, quality: quality, progressiveOnly: true)
     }
 
+    /// Tries separate native MP4 video and M4A audio after an HLS candidate was rejected.
+    /// This is a distinct fallback so the fast HLS-first launch does not decipher streams.
+    func resolvePaired(video: Video, quality: VideoQuality) async throws -> NativeStreamResult {
+        guard !video.isLive, quality != .audioOnly else {
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+        let videoID = video.id
+        let cacheKey = "native-paired-\(quality.rawValue)"
+        if let cached = await cache.getEntry(videoID: videoID, formatID: cacheKey),
+           let audioURL = cached.audioURL {
+            return NativeStreamResult(
+                url: cached.url, audioURL: audioURL, storyboard: cached.storyboard,
+                captionTracks: cached.captionTracks,
+                originalAudioLanguageCode: cached.originalAudioLanguageCode,
+                originalTitle: cached.originalTitle,
+                mimeTypeOverride: cached.mimeTypeOverride
+            )
+        }
+        let startedAt = Date()
+        let youtube = YouTube(videoID: videoID, methods: [.local])
+        do {
+            let streams = try await youtube.streams
+            return try await pairedResult(
+                from: streams, youtube: youtube, videoID: videoID, quality: quality,
+                cacheKey: cacheKey, includeMetadata: true, startedAt: startedAt
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let nsError = error as NSError
+            log.notice("Native paired extraction failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+    }
+
     private func resolve(video: Video, quality: VideoQuality, progressiveOnly: Bool) async throws -> NativeStreamResult {
         let videoID = video.id
         let cacheKey = "native-\(progressiveOnly ? "progressive-" : "")\(quality.rawValue)"
@@ -37,6 +73,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             log.debug("Native stream cache hit for \(videoID, privacy: .public)")
             return NativeStreamResult(
                 url: cached.url,
+                audioURL: cached.audioURL,
                 storyboard: cached.storyboard,
                 captionTracks: cached.captionTracks,
                 originalAudioLanguageCode: cached.originalAudioLanguageCode,
@@ -166,6 +203,13 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
                 )
             }
 
+            if quality != .audioOnly, !video.isLive {
+                return try await pairedResult(
+                    from: streams, youtube: youtube, videoID: videoID, quality: quality,
+                    cacheKey: cacheKey, includeMetadata: !progressiveOnly, startedAt: startedAt
+                )
+            }
+
             log.notice("Native extractor returned no playable stream for \(videoID, privacy: .public) after \(Date().timeIntervalSince(startedAt), privacy: .public)s")
             throw YouTubeServiceError.streamExtractionFailed
         } catch is CancellationError {
@@ -174,6 +218,63 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             log.notice("Native extraction failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
+    }
+
+    /// Selects a native-decodable video-only/audio-only pair without downloading or muxing files.
+    private func pairedResult(
+        from streams: [FreeTubeStreamKit.Stream], youtube: YouTube, videoID: String,
+        quality: VideoQuality, cacheKey: String, includeMetadata: Bool, startedAt: Date
+    ) async throws -> NativeStreamResult {
+        let heightCap = quality.heightCap ?? 1080
+        let video = streams.filterVideoOnly()
+            .filter { $0.isNativelyPlayable && $0.fileExtension == .mp4 }
+            .filter { ($0.videoResolution ?? .max) <= heightCap }
+            .sorted {
+                let leftHeight = $0.videoResolution ?? 0
+                let rightHeight = $1.videoResolution ?? 0
+                if leftHeight != rightHeight { return leftHeight > rightHeight }
+                let leftAVC: Bool
+                if case .some(.avc1) = $0.videoCodec { leftAVC = true } else { leftAVC = false }
+                let rightAVC: Bool
+                if case .some(.avc1) = $1.videoCodec { rightAVC = true } else { rightAVC = false }
+                if leftAVC != rightAVC { return leftAVC }
+                return ($0.bitrate ?? 0) > ($1.bitrate ?? 0)
+            }
+            .first
+        let audio = streams.filterAudioOnly()
+            .filter { $0.isNativelyPlayable && ($0.fileExtension == .m4a || $0.fileExtension == .mp4) }
+            .highestAudioBitrateStream()
+        guard let video, let audio else {
+            log.notice("Native extractor returned no native MP4/M4A pair for \(videoID, privacy: .public)")
+            throw YouTubeServiceError.streamExtractionFailed
+        }
+        let storyboard: VideoStoryboard? = includeMetadata ? await storyboard(from: youtube, videoID: videoID) : nil
+        let captionTracks: [VideoCaptionTrack] = includeMetadata ? await sourceCaptionTracks(from: youtube, videoID: videoID) : []
+        let originalAudioLanguageCode: String? = includeMetadata ? (try? await youtube.originalAudioLanguageCode) : nil
+        let originalTitle: String? = includeMetadata ? (try? await youtube.metadata)?.title : nil
+        await cache.set(
+            videoID: videoID, formatID: cacheKey, url: video.url, audioURL: audio.url,
+            storyboard: storyboard, captionTracks: captionTracks,
+            originalAudioLanguageCode: originalAudioLanguageCode, originalTitle: originalTitle,
+            mimeTypeOverride: "video/mp4"
+        )
+        // A later HLS rejection can reuse a pair already extracted by the normal path.
+        if includeMetadata && cacheKey != "native-paired-\(quality.rawValue)" {
+            await cache.set(
+                videoID: videoID, formatID: "native-paired-\(quality.rawValue)",
+                url: video.url, audioURL: audio.url, storyboard: storyboard,
+                captionTracks: captionTracks,
+                originalAudioLanguageCode: originalAudioLanguageCode,
+                originalTitle: originalTitle, mimeTypeOverride: "video/mp4"
+            )
+        }
+        log.info("Resolved native paired streams for \(videoID, privacy: .public) height=\(video.videoResolution ?? 0, privacy: .public) audioBitrate=\(audio.bitrate ?? 0, privacy: .public) in \(Date().timeIntervalSince(startedAt), privacy: .public)s")
+        return NativeStreamResult(
+            url: video.url, audioURL: audio.url, storyboard: storyboard,
+            captionTracks: captionTracks,
+            originalAudioLanguageCode: originalAudioLanguageCode,
+            originalTitle: originalTitle, mimeTypeOverride: "video/mp4"
+        )
     }
 
     private func sourceCaptionTracks(from youtube: YouTube, videoID: String) async -> [VideoCaptionTrack] {

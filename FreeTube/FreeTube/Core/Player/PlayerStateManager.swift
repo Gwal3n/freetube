@@ -1006,7 +1006,7 @@ final class PlayerStateManager {
         do {
             let candidate = try await resolver.resolveForFastPlayback(video: video, quality: quality)
             try Task.checkCancellation()
-            let preparation = FastPlaybackPreparation(item: makePlayerItem(for: candidate))
+            let preparation = FastPlaybackPreparation(item: try await makePlayerItem(for: candidate))
             replacement = try await preparation.prepare(audioOnly: quality == .audioOnly)
         } catch {
             guard !Task.isCancelled, fastPlaybackGeneration == generation,
@@ -1170,7 +1170,15 @@ final class PlayerStateManager {
         let wasPlaying = isPlaying
         let currentTime = player.currentTime().seconds
         let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
-        let replacement = makePlayerItem(for: candidate)
+        let replacement: AVPlayerItem
+        do {
+            replacement = try await makePlayerItem(for: candidate)
+        } catch {
+            log.notice("Audio mode switch candidate could not be prepared: \(Self.describe(itemError: error), privacy: .public)")
+            return
+        }
+        guard !Task.isCancelled, audioModeSwitchGeneration == generation,
+              currentVideo?.id == video.id, player.currentItem === previousItem else { return }
         applyQualityCap(to: replacement, quality: quality)
         pause()
         resumeAfterAudioSwitch = wasPlaying
@@ -1757,7 +1765,45 @@ final class PlayerStateManager {
     /// Extensionless remote audio URLs need the resolved container type. A selected HLS audio
     /// rendition is a playlist, not an MP4; carry its MIME type with the candidate so switching
     /// modes never makes AVPlayer parse the new source as the old format.
-    private func makePlayerItem(for candidate: PlaybackCandidate) -> AVPlayerItem {
+    private func makePlayerItem(for candidate: PlaybackCandidate) async throws -> AVPlayerItem {
+        if case .composite(let videoURL, let audioURL) = candidate.source {
+            // AVMutableComposition references both remote tracks. It does not download, mux,
+            // or persist a file. Extensionless signed URLs need their actual media types.
+            let videoAsset = AVURLAsset(url: videoURL, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])
+            let audioAsset = AVURLAsset(url: audioURL, options: [AVURLAssetOverrideMIMETypeKey: "audio/mp4"])
+            guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
+                  let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first else {
+                throw YouTubeServiceError.streamExtractionFailed
+            }
+            let videoDuration = try await videoAsset.load(.duration)
+            let audioDuration = try await audioAsset.load(.duration)
+            guard videoDuration.isValid, audioDuration.isValid,
+                  videoDuration.seconds.isFinite, audioDuration.seconds.isFinite,
+                  videoDuration.seconds > 0, audioDuration.seconds > 0 else {
+                throw YouTubeServiceError.streamExtractionFailed
+            }
+            let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
+            let composition = AVMutableComposition()
+            guard let compositionVideo = composition.addMutableTrack(
+                withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
+            ), let compositionAudio = composition.addMutableTrack(
+                withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
+            ) else {
+                throw YouTubeServiceError.streamExtractionFailed
+            }
+            try compositionVideo.insertTimeRange(
+                CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
+            )
+            try compositionAudio.insertTimeRange(
+                CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
+            )
+            compositionVideo.preferredTransform = try await videoTrack.load(.preferredTransform)
+            guard let playbackComposition = composition.copy() as? AVComposition else {
+                throw YouTubeServiceError.streamExtractionFailed
+            }
+            log.info("Prepared paired video/audio composition duration=\(videoDuration.seconds, privacy: .public)s")
+            return AVPlayerItem(asset: playbackComposition)
+        }
         guard case .direct(let url) = candidate.source,
               let mimeType = candidate.mimeTypeOverride else {
             return AVPlayerItem(url: candidate.source.url)
@@ -2054,7 +2100,18 @@ final class PlayerStateManager {
             }
 
             log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-            let item = makePlayerItem(for: candidate)
+            let item: AVPlayerItem
+            do {
+                item = try await makePlayerItem(for: candidate)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled, currentVideo?.id == video.id else { return }
+                log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(Self.describe(itemError: error), privacy: .public)")
+                excludedStrategies.insert(candidate.strategy)
+                continue
+            }
+            guard !Task.isCancelled, currentVideo?.id == video.id else { return }
             applyQualityCap(to: item)
             itemLoadStartedAt = Date()
             loadItem(item, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
@@ -2278,7 +2335,7 @@ final class PlayerStateManager {
         switch strategy {
         case .b5iIOS, .b5iTVHTML5:
             return .seconds(4)
-        case .localFile, .native, .nativeProgressive:
+        case .localFile, .native, .nativePaired, .nativeProgressive:
             return .seconds(12)
         }
     }

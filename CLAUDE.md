@@ -145,11 +145,11 @@ If a feature seems to need data without a clear mapping above, stop and ask befo
 
 ## 7. Playback pipeline (critical)
 
-Playback is stream-first. `PlayerStateManager` calls `PlaybackResolver`, installs the returned URL
-in an `AVPlayerItem`, and never imports either extraction library itself. Resolution order is:
+Playback is stream-first. `PlayerStateManager` calls `PlaybackResolver`, creates an `AVPlayerItem`
+from the returned source, and never imports either extraction library itself. Resolution order is:
 
 1. **Existing local file.** `DownloadManager.localFile(for:)` wins immediately, preserving offline playback.
-2. **Native local extraction, HLS-first.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It reads the InnerTube player response's `hlsManifestUrl` **before** touching `youtube.streams`, for live and on-demand alike. That path never runs the JavaScriptCore signature/n-parameter solver, which re-parses the whole ~2.5 MB player.js once per InnerTube client and was costing ~4s per play for a result the resolver then discarded in favour of this same HLS URL. For `audioOnly`, it selects a separate audio media playlist from the HLS master; the master itself includes video and cannot serve as an audio-only source. Progressive selection is the fallback when HLS is unavailable or lacks a separate audio rendition. The dependency's hosted remote extractor is never enabled. Candidates are AVPlayer-validated.
+2. **Native local extraction, HLS-first.** `NativeStreamService` uses `FreeTubeStreamKit` with `methods: [.local]`. It reads the InnerTube player response's `hlsManifestUrl` **before** touching `youtube.streams`, for live and on-demand alike. That path never runs the JavaScriptCore signature/n-parameter solver, which re-parses the whole ~2.5 MB player.js once per InnerTube client and was costing ~4s per play for a result the resolver then discarded in favour of this same HLS URL. For `audioOnly`, it selects a separate audio media playlist from the HLS master; the master itself includes video and cannot serve as an audio-only source. Progressive selection is the fallback when HLS is unavailable or lacks a separate audio rendition. If no combined stream is available, native MP4 video-only and M4A audio-only URLs are paired in an in-memory `AVMutableComposition`; a rejected HLS candidate also tries this pair before b5i. The dependency's hosted remote extractor is never enabled. Candidates are AVPlayer-validated.
    The same cached player response also supplies `playerStoryboardSpecRenderer`; the native result carries that dependency-neutral storyboard with the stream candidate, so previews require no second player request. Its VISIONOS response also supplies source caption tracks. Carry their short-lived URLs in the same in-memory candidate/cache and fetch JSON3 or TTML cues only when selected. Do not decode custom InnerTube JSON through b5i's `VideoInfosResponse`, which expects watch-page HTML.
 3. **b5i direct streams, validated by AVPlayer.** `PlaybackResolver` produces iOS and then TVHTML5 HLS/progressive candidates through `VideoService`. These sit *behind* the native resolver: for ordinary VOD, `VideoInfosResponse` reports no HLS URL and its formats carry metadata without usable URLs (upstream documents that real URLs require `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running them first spent ~1.5s per play on candidates that could not be produced. `PlayerStateManager` only accepts a candidate after its `AVPlayerItem` reaches `.readyToPlay`; failure or a four-second readiness timeout advances to the next strategy.
 4. **Failure without a side-effect download.** If every direct resolver fails, playback reports a stream failure. It must not start an offline download. Explicit Download actions remain unchanged and continue to call `DownloadManager` directly.
@@ -162,7 +162,7 @@ setting still bounds ABR variant selection. `.auto` stays uncapped.
 HLS first. An unsupported rate above 2x triggers `PlaybackResolver.resolveForFastPlayback`, which
 uses a separate memory-only progressive cache and never falls back to HLS or starts a download.
 The existing item continues at up to 2x while `FastPlaybackPreparation` prepares the MP4 in a
-paused, muted, viewless AVPlayer probe. Accept only a ready item with fast-forward support and
+paused, muted, viewless AVPlayer probe. It can use a combined MP4 or the paired MP4/M4A composition. Accept only a ready item with fast-forward support and
 the required audio/video tracks. Detach it from the probe before installing it in the sole visible
 AVQueuePlayer, then seek to the position at handoff and restore current play/pause intent.
 Use time-domain audio pitch correction for high rates, as speech quality is the priority. Menu and hold requests share this path;
@@ -210,11 +210,12 @@ the player also checks the selected video ID before installing a result.
 enum PlaybackSource {
     case direct(URL)
     case localFile(URL)
+    case composite(video: URL, audio: URL)
 }
 ```
 
-`AVQueuePlayer` accepts both cases identically; the player consumes `PlaybackSource.url`. A returned
-URL is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
+`PlayerStateManager` builds a direct `AVPlayerItem` for single URLs and composes the separate
+tracks for `.composite`. A returned source is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
 and a rejected strategy is excluded before requesting the next candidate.
 
 ---

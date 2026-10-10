@@ -23,6 +23,7 @@ enum PlaybackStrategy: String, Sendable, Hashable {
     case b5iIOS = "b5i-ios"
     case b5iTVHTML5 = "b5i-tvhtml5"
     case native = "native-youtubekit"
+    case nativePaired = "native-paired-streams"
     case nativeProgressive = "native-progressive-experiment"
 }
 
