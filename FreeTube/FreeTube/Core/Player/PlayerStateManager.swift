@@ -1819,6 +1819,13 @@ final class PlayerStateManager {
             } catch {
                 let nsError = error as NSError
                 log.notice("Paired source preparation failed stage=\(stage, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
+                if stage == "video-track" {
+                    // Probe just the response and first byte after AVFoundation rejects the URL.
+                    // The signed URL never appears in the log and this does not delay playback.
+                    Task { [weak self, videoURL] in
+                        await self?.diagnoseRemoteVideoTrack(videoURL)
+                    }
+                }
                 throw error
             }
         }
@@ -1829,6 +1836,23 @@ final class PlayerStateManager {
         let asset = AVURLAsset(url: url, options: [AVURLAssetOverrideMIMETypeKey: mimeType])
         log.info("Remote candidate MIME override=\(mimeType, privacy: .public)")
         return AVPlayerItem(asset: asset)
+    }
+
+    private func diagnoseRemoteVideoTrack(_ url: URL) async {
+        var request = URLRequest(url: url)
+        request.setValue("bytes=0-1023", forHTTPHeaderField: "Range")
+        request.httpShouldHandleCookies = false
+        request.timeoutInterval = 5
+        do {
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+            var iterator = bytes.makeAsyncIterator()
+            let firstByte = try await iterator.next()
+            let http = response as? HTTPURLResponse
+            log.notice("Paired video HTTP probe status=\(http?.statusCode ?? 0, privacy: .public) mime=\(response.mimeType ?? "unknown", privacy: .public) range=\(http?.value(forHTTPHeaderField: "Content-Range") != nil, privacy: .public) length=\(response.expectedContentLength, privacy: .public) body=\(firstByte != nil, privacy: .public)")
+        } catch {
+            let nsError = error as NSError
+            log.notice("Paired video HTTP probe failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
+        }
     }
 
     /// Swap the player to a new item using the `AVQueuePlayer`-correct pattern. `replaceCurrentItem`

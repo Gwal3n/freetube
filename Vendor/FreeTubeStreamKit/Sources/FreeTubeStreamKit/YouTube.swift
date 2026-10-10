@@ -356,8 +356,7 @@ public class YouTube {
         }
     }
 
-    /// Minimal HLS-only player request. Unlike `videoInfos`, this does not fetch the watch page,
-    /// player JavaScript, or the web client. A caller must fall back to `livestreams` if no usable
+    /// Minimal HLS-only player response. A caller must fall back to `livestreams` if no usable
     /// manifest is returned; signature deciphering still uses the full player context.
     public struct HLSProbe: Sendable {
         public let manifestURL: URL?
@@ -365,13 +364,9 @@ public class YouTube {
         public let matchesVideoID: Bool
     }
 
-    public func probeVisionOSHLS() async throws -> HLSProbe {
-        try await probeHLS(client: .visionOS, timeoutInterval: 8)
-    }
-
-    /// Isolates the anonymous visitor ID from the full player context: no signature timestamp,
-    /// player script, or web player request. A cache hit avoids even the watch-page request.
-    public func probeVisionOSHLSWithVisitorData() async throws -> HLSProbe? {
+    /// Uses only an anonymous visitor ID from the cached context or watch page. It does not
+    /// load the player script or send a signature timestamp or web player request.
+    public func probeVisionOSHLS() async throws -> HLSProbe? {
         let visitorData: String?
         if let cached = _playerContext {
             visitorData = cached.ytcfg.visitorData

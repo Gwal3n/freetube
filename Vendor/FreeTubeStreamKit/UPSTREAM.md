@@ -23,11 +23,10 @@ Source-level changes:
   unwrap of `URL(string:)` with a thrown `YouTubeKitError.extractError`.
 - `Extraction.YtCfg` and its nested types gained `Sendable` so the cache can
   return a decoded config across its actor boundary.
-- `YouTube.probeVisionOSHLS()` and `probeIOSHLS()` request an HLS manifest without
-  loading watch HTML, player JavaScript, or the web client. A separate
-  `probeVisionOSHLSWithVisitorData()` tests the same visionOS request with only
-  anonymous visitor data from the cached context or watch page, not the script
-  or signature timestamp. These probes cache a valid response for nearby
+- `YouTube.probeVisionOSHLS()` requests an HLS manifest with only anonymous
+  visitor data from the cached context or watch page, not the script or
+  signature timestamp. `probeIOSHLS()` requests a manifest without loading
+  watch HTML, player JavaScript, or the web client. These probes cache a valid response for nearby
   metadata reads; callers retain the full extractor as fallback. They use
   request-specific timeouts, and legacy player requests expose URL-free
   per-client diagnostics to the app log. The iOS client profile follows

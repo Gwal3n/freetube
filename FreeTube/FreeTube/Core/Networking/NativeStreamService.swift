@@ -337,40 +337,27 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         }
     }
 
-    /// Tries a context-free visionOS player request before the legacy multi-client resolver.
+    /// Tries a visitor-backed visionOS request before the other clients or full player context.
     ///
     /// Returns `nil` instead of throwing when the extractor can't produce one, so a video that
     /// genuinely has no HLS variant still falls through to progressive selection rather than
     /// failing the whole resolution. Cancellation is rethrown so a rapid video switch still
     /// unwinds immediately.
     private func hlsManifestURL(from youtube: YouTube, videoID: String, isLive: Bool) async throws -> URL? {
-        let fastStartedAt = Date()
-        do {
-            let probe = try await youtube.probeVisionOSHLS()
-            log.info("Native visionOS HLS probe for \(videoID, privacy: .public) manifest=\(probe.manifestURL != nil, privacy: .public) status=\(probe.playabilityStatus ?? "unknown", privacy: .public) idMatch=\(probe.matchesVideoID, privacy: .public) elapsed=\(Date().timeIntervalSince(fastStartedAt), privacy: .public)s")
-            if let url = probe.manifestURL { return url }
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            try Task.checkCancellation()
-            let nsError = error as NSError
-            log.notice("Native visionOS HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(fastStartedAt), privacy: .public)s")
-        }
-
         let visitorStartedAt = Date()
         do {
-            if let probe = try await youtube.probeVisionOSHLSWithVisitorData() {
-                log.info("Native visionOS visitor HLS probe for \(videoID, privacy: .public) manifest=\(probe.manifestURL != nil, privacy: .public) status=\(probe.playabilityStatus ?? "unknown", privacy: .public) idMatch=\(probe.matchesVideoID, privacy: .public) elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
+            if let probe = try await youtube.probeVisionOSHLS() {
+                log.info("Native visionOS HLS probe for \(videoID, privacy: .public) visitor=true manifest=\(probe.manifestURL != nil, privacy: .public) status=\(probe.playabilityStatus ?? "unknown", privacy: .public) idMatch=\(probe.matchesVideoID, privacy: .public) elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
                 if let url = probe.manifestURL { return url }
             } else {
-                log.info("Native visionOS visitor HLS probe skipped for \(videoID, privacy: .public): no visitor data elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
+                log.info("Native visionOS HLS probe skipped for \(videoID, privacy: .public): no visitor data elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
             }
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             try Task.checkCancellation()
             let nsError = error as NSError
-            log.notice("Native visionOS visitor HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
+            log.notice("Native visionOS HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(visitorStartedAt), privacy: .public)s")
         }
 
         if !isLive {
