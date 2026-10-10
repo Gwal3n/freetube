@@ -1006,8 +1006,21 @@ final class PlayerStateManager {
         do {
             let candidate = try await resolver.resolveForFastPlayback(video: video, quality: quality)
             try Task.checkCancellation()
+            // A remote composition of separate video/audio tracks has repeatedly stalled in
+            // AVFoundation's paused probe. Keep the working HLS stream instead of entering a
+            // long preparation that cannot demonstrate >2x capability on device.
+            guard case .direct = candidate.source else {
+                log.notice("Fast playback requires a direct progressive item; paired remote tracks are unavailable")
+                throw FastPlaybackPreparation.Failure.unsupportedRate
+            }
             let preparation = FastPlaybackPreparation(item: try await makePlayerItem(for: candidate))
-            replacement = try await preparation.prepare(audioOnly: quality == .audioOnly)
+            let preparedAsset = try await preparation.prepare(audioOnly: quality == .audioOnly)
+            try Task.checkCancellation()
+            // Never insert the probe's AVPlayerItem into the visible AVQueuePlayer. The two
+            // players may still overlap internally after detachment and AVFoundation throws an
+            // uncaught Objective-C exception if they are given the same item.
+            replacement = AVPlayerItem(asset: preparedAsset)
+            replacement.audioTimePitchAlgorithm = .timeDomain
         } catch {
             guard !Task.isCancelled, fastPlaybackGeneration == generation,
                   playbackSessionID == session else { return }

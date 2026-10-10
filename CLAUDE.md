@@ -161,10 +161,13 @@ setting still bounds ABR variant selection. `.auto` stays uncapped.
 **High-speed experiment (`experiment/high-speed-progressive`).** Normal playback still resolves
 HLS first. An unsupported rate above 2x triggers `PlaybackResolver.resolveForFastPlayback`, which
 uses a separate memory-only progressive cache and never falls back to HLS or starts a download.
-The existing item continues at up to 2x while `FastPlaybackPreparation` prepares the MP4 in a
-paused, muted, viewless AVPlayer probe. It can use a combined MP4 or the paired MP4/M4A composition. Accept only a ready item with fast-forward support and
-the required audio/video tracks. Detach it from the probe before installing it in the sole visible
-AVQueuePlayer, then seek to the position at handoff and restore current play/pause intent.
+The existing item continues at up to 2x while `FastPlaybackPreparation` prepares a direct MP4 in a
+paused, muted, viewless AVPlayer probe. Paired remote MP4/M4A compositions are currently rejected
+for this high-speed experiment: device logs show that their probe stalls or times out, and they have
+not demonstrated >2x playback. Accept only a ready item with fast-forward support and the required
+audio/video tracks. Never transfer the probe's `AVPlayerItem` to the visible player: AVFoundation
+crashes when one item is associated with two players, even after detachment. Create a distinct item
+from the prepared asset, then seek to the position at handoff and restore current play/pause intent.
 Use time-domain audio pitch correction for high rates, as speech quality is the priority. Menu and hold requests share this path;
 releasing a hold cancels unfinished preparation, and replacing/dismissing the video invalidates
 the entire transaction. Failed extraction or validation keeps the working stream at up to 2x.

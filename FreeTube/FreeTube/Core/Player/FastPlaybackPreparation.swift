@@ -3,7 +3,9 @@ import Foundation
 
 /// Prepares an experimental progressive item without replacing or pausing the working HLS item.
 /// The silent, paused probe has no view or audio session; it is detached before the real player
-/// adopts the item. Readiness, failure, timeout, and cancellation share one completion funnel.
+/// adopts a separate item made from the same asset. An AVPlayerItem itself cannot move between
+/// two AVPlayer instances, even after the probe removes it. Readiness, failure, timeout, and
+/// cancellation share one completion funnel.
 @available(iOS 17.0, *)
 @MainActor
 final class FastPlaybackPreparation {
@@ -27,7 +29,7 @@ final class FastPlaybackPreparation {
         item.audioTimePitchAlgorithm = .timeDomain
     }
 
-    func prepare(audioOnly: Bool) async throws -> AVPlayerItem {
+    func prepare(audioOnly: Bool) async throws -> AVAsset {
         try Task.checkCancellation()
         defer {
             observation?.invalidate()
@@ -65,7 +67,7 @@ final class FastPlaybackPreparation {
             guard !video.isEmpty else { throw Failure.missingTracks }
         }
         try Task.checkCancellation()
-        return item
+        return item.asset
     }
 
     private func checkReadiness() {
