@@ -26,6 +26,7 @@ struct LocalPlaylistScreen: View {
     @State private var playlistExportDocument = JSONDocument(data: Data())
     @State private var playlistExportError: String?
     @State private var searchText = ""
+    @State private var videoSort: LocalPlaylistVideoSort = .custom
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
@@ -58,7 +59,7 @@ struct LocalPlaylistScreen: View {
                                 selectedVideoIDs.insert(video.id)
                             }
                         } else if editingMode == nil {
-                            player.loadPlaylist(details.playbackDetails, startAt: video, origin: .local)
+                            player.loadPlaylist(playbackDetails(for: details), startAt: video, origin: .local)
                         }
                     }
                     .swipeActions {
@@ -212,12 +213,21 @@ struct LocalPlaylistScreen: View {
         // Edit mode must retain the source order so native move offsets still map to storage.
         if editingMode != nil { return details.videos }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return details.videos.filter { video in
+        return videoSort.ordered(details.videos).filter { video in
             !blocklist.blocks(video)
                 && (query.isEmpty || video.title.localizedStandardContains(query)
                     || video.channelName.localizedStandardContains(query)
                     || video.id.localizedStandardContains(query))
         }
+    }
+
+    private func playbackDetails(for local: LocalPlaylistDetails) -> PlaylistDetails {
+        let original = local.playbackDetails
+        return PlaylistDetails(
+            playlist: original.playlist,
+            videos: videoSort.ordered(original.videos),
+            continuationToken: original.continuationToken
+        )
     }
 
     private func reload() async {
@@ -241,13 +251,14 @@ struct LocalPlaylistScreen: View {
     private func localActionToolbar(_ local: LocalPlaylistDetails) -> some View {
         HStack(spacing: 10) {
             PlaylistHeaderActionButton(title: "Play all", systemImage: "play.fill") {
-                guard let first = local.videos.first(where: { !blocklist.blocks($0) }) else { return }
-                player.loadPlaylist(local.playbackDetails, startAt: first, origin: .local)
+                let playback = playbackDetails(for: local)
+                guard let first = playback.videos.first(where: { !blocklist.blocks($0) }) else { return }
+                player.loadPlaylist(playback, startAt: first, origin: .local)
             }
             .disabled(!local.videos.contains(where: { !blocklist.blocks($0) }) || editingMode != nil)
             PlaylistHeaderActionButton(title: "Shuffle", systemImage: "shuffle") {
                 guard let random = local.videos.filter({ !blocklist.blocks($0) }).randomElement() else { return }
-                player.loadPlaylist(local.playbackDetails, startAt: random, shuffled: true, origin: .local)
+                player.loadPlaylist(playbackDetails(for: local), startAt: random, shuffled: true, origin: .local)
             }
             .disabled(!local.videos.contains(where: { !blocklist.blocks($0) }) || editingMode != nil)
             Spacer(minLength: 0)
@@ -258,6 +269,12 @@ struct LocalPlaylistScreen: View {
 
     private func localMoreMenu(_ local: LocalPlaylistDetails) -> some View {
         Menu {
+            Picker("Sort videos", selection: $videoSort) {
+                ForEach(LocalPlaylistVideoSort.allCases) { sort in
+                    Text(sort.title).tag(sort)
+                }
+            }
+            Divider()
             Button {
                 showingEditor = true
             } label: {
@@ -324,6 +341,7 @@ struct LocalPlaylistScreen: View {
 
     private func beginEditing() {
         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+            videoSort = .custom
             selectedVideoIDs.removeAll()
             editingMode = .playlist
             editMode = .active

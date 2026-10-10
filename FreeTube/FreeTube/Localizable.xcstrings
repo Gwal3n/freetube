@@ -1,6 +1,33 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Custom order" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Reihenfolge" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom order" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Orden personalizado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ordre personnalisé" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Свой порядок" } }
+      }
+    },
+    "Title (A–Z)" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Titel (A–Z)" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Title (A–Z)" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Título (A–Z)" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Titre (A–Z)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Название (А–Я)" } }
+      }
+    },
+    "Length (shortest first)" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Länge (kürzeste zuerst)" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Length (shortest first)" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Duración (más cortos primero)" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Durée (plus courtes d’abord)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Длительность (сначала короткие)" } }
+      }
+    },
     "Hold for speed" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Für Tempo gedrückt halten" } },
