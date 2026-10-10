@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Best" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Beste" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Best" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Mejores" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Meilleurs" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Лучшие" } }
+      }
+    },
     "Save current moment" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Aktuellen Moment speichern" } },

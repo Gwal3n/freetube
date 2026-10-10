@@ -125,9 +125,9 @@ struct CommentsSection: View {
                             Task { await model.selectSortingMode(mode) }
                         } label: {
                             if mode.isSelected {
-                                Label(mode.label, systemImage: "checkmark")
+                                Label(sortLabel(for: mode), systemImage: "checkmark")
                             } else {
-                                Text(mode.label)
+                                Text(sortLabel(for: mode))
                             }
                         }
                     }
@@ -164,7 +164,14 @@ struct CommentsSection: View {
     }
 
     private var selectedSortingModeLabel: String {
-        model.sortingModes.first(where: \.isSelected)?.label ?? ""
+        guard let selected = model.sortingModes.first(where: \.isSelected) else { return "" }
+        return sortLabel(for: selected)
+    }
+
+    private func sortLabel(for mode: CommentSortingMode) -> String {
+        // YouTube's first sort is its default top-ranked ordering. Keep its token untouched;
+        // only present a shorter label in our menu.
+        mode.id == model.sortingModes.first?.id ? String(localized: "Best") : mode.label
     }
 
     private var normalizedCountText: String? {

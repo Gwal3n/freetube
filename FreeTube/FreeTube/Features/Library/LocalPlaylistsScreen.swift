@@ -172,13 +172,6 @@ struct LocalPlaylistsScreen: View {
                 ForEach(items) { playlist in
                     playlistLink(playlist, availableIDs: availableIDs)
                 }
-                .onDelete { offsets in
-                    let ids = offsets.compactMap { items.indices.contains($0) ? items[$0].id : nil }
-                    Task {
-                        for id in ids { await service.delete(id: id) }
-                        await reload()
-                    }
-                }
                 .onMove { source, destination in
                     guard searchText.isEmpty else { return }
                     movePlaylists(

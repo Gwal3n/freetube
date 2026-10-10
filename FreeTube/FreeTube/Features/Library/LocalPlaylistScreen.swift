@@ -144,6 +144,8 @@ struct LocalPlaylistScreen: View {
                         }
                         .accessibilityLabel("Add Video")
                     }
+                    Button("Edit") { beginEditing() }
+                        .disabled(details == nil)
                 }
             }
         }
@@ -260,11 +262,6 @@ struct LocalPlaylistScreen: View {
                 showingEditor = true
             } label: {
                 Label("Edit Details", systemImage: "square.and.pencil")
-            }
-            Button {
-                beginEditing()
-            } label: {
-                Label("Edit Playlist", systemImage: "list.bullet")
             }
             Button {
                 Task { await exportPlaylist() }
