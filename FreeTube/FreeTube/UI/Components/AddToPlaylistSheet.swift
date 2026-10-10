@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Device-local playlist picker used everywhere a video exposes Save.
+/// Device-local Save sheet for a video's current moment or local playlists, and for queue saving.
 @available(iOS 17.0, *)
 struct AddToPlaylistSheet: View {
     let videos: [Video]
     let savesQueue: Bool
+    @Environment(PlayerStateManager.self) private var player
     @Environment(\.dismiss) private var dismiss
     @State private var playlists: [LocalPlaylistSnapshot] = []
     @State private var containingIDs = Set<String>()
@@ -13,6 +14,9 @@ struct AddToPlaylistSheet: View {
     @State private var isCreating = false
     @State private var isSavingNewPlaylist = false
     @State private var isLoading = true
+    @State private var showsSavedMomentNotice = false
+    @State private var savedMomentNoticeGeneration = 0
+    @State private var savedMomentFeedbackCount = 0
     @FocusState private var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
@@ -30,6 +34,19 @@ struct AddToPlaylistSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                if canSaveCurrentMoment {
+                    Section {
+                        Button(action: saveCurrentMoment) {
+                            Label("Save current moment", systemImage: "bookmark")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.orange)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 if isCreating {
                     Section {
                         HStack(spacing: 10) {
@@ -78,7 +95,7 @@ struct AddToPlaylistSheet: View {
                 playlistSection("Personal", playlists: personalPlaylists)
             }
             .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isCreating)
-            .navigationTitle(savesQueue ? "Save queue" : "Save to playlist")
+            .navigationTitle(savesQueue ? "Save queue" : "Save")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -91,6 +108,39 @@ struct AddToPlaylistSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(hasPendingWrites)
+        .overlay(alignment: .bottom) {
+            if showsSavedMomentNotice {
+                TransientNoticePill(title: Text("Moment saved"), systemImage: "checkmark", onUndo: nil)
+                    .padding(.bottom, 12)
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(reduceMotion ? nil : InterfaceMotion.notice, value: showsSavedMomentNotice)
+        .sensoryFeedback(.success, trigger: savedMomentFeedbackCount)
+    }
+
+    private var canSaveCurrentMoment: Bool {
+        guard !savesQueue, let video = videos.first else { return false }
+        return !video.isLive && player.currentVideo?.id == video.id
+            && video.youtubeShareURL(at: 0) != nil
+    }
+
+    private func saveCurrentMoment() {
+        guard canSaveCurrentMoment, let video = videos.first,
+              SavedMomentStore.shared.add(video: video, time: player.elapsed) != nil else { return }
+        savedMomentFeedbackCount &+= 1
+        savedMomentNoticeGeneration &+= 1
+        let generation = savedMomentNoticeGeneration
+        withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+            showsSavedMomentNotice = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1400))
+            guard savedMomentNoticeGeneration == generation else { return }
+            withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
+                showsSavedMomentNotice = false
+            }
+        }
     }
 
     @ViewBuilder

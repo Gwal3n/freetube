@@ -23,15 +23,19 @@ struct PlayerActionBar: View {
     let onSaveToPlaylist: () -> Void
     let onCopyURL: () -> Void
     let onCopyURLAtCurrentTime: () -> Void
-    let onSaveCurrentMoment: () -> Void
     let onShareDownloadedFile: () -> Void
     let onDownload: () -> Void
     let onDownloadChoice: (VideoQuality) -> Void
+    @State private var savedMomentStore = SavedMomentStore.shared
+
+    private var isSaved: Bool {
+        isSavedToPlaylist || savedMomentStore.hasMoments(for: video.id)
+    }
 
     var body: some View {
         HStack(spacing: 4) {
             Button(action: onSaveToPlaylist) {
-                Image(systemName: isSavedToPlaylist ? "bookmark.fill" : "bookmark")
+                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                     .font(.title3.weight(.semibold))
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Rectangle())
@@ -39,8 +43,8 @@ struct PlayerActionBar: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
-            .accessibilityLabel("Save to playlist")
-            .accessibilityValue(isSavedToPlaylist ? "Saved" : "Not saved")
+            .accessibilityLabel("Save")
+            .accessibilityValue(isSaved ? "Saved" : "Not saved")
 
             Menu {
                 if let watchURL {
@@ -56,11 +60,6 @@ struct PlayerActionBar: View {
                 }
                 Button(action: onCopyURLAtCurrentTime) {
                     Label("Copy URL at current time", systemImage: "clock")
-                }
-                if !video.isLive, video.youtubeShareURL(at: 0) != nil {
-                    Button(action: onSaveCurrentMoment) {
-                        Label("Save this moment", systemImage: "bookmark")
-                    }
                 }
                 if downloadedFileURL != nil {
                     Button(action: onShareDownloadedFile) {

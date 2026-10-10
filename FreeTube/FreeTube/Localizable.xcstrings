@@ -1,6 +1,60 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Save current moment" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Aktuellen Moment speichern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save current moment" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Guardar momento actual" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Enregistrer ce moment" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранить текущий момент" } }
+      }
+    },
+    "Rename moment" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Moment umbenennen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename moment" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Renombrar momento" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Renommer le moment" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переименовать момент" } }
+      }
+    },
+    "Moment actions" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Momentaktionen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Moment actions" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Acciones del momento" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Actions du moment" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Действия с моментом" } }
+      }
+    },
+    "Rename" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Umbenennen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Renombrar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Renommer" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переименовать" } }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Nombre" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nom" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Название" } }
+      }
+    },
+    "Open the video at its latest position" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Video an der letzten Position öffnen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open the video at its latest position" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir el vídeo en la última posición" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir la vidéo à la dernière position" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Открыть видео с последней позиции" } }
+      }
+    },
     "Moment saved" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Moment gespeichert" } },

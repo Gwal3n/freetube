@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A video's saved timestamps belong beside its other player details, not only in global History.
+/// A video's saved timestamps belong beside its player details as well as in Library.
 /// The store is observed here so saving a moment does not invalidate the entire player panel.
 @available(iOS 17.0, *)
 struct SavedMomentsSection: View {
@@ -10,6 +10,8 @@ struct SavedMomentsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var store = SavedMomentStore.shared
     @State private var isExpanded = false
+    @State private var momentToRename: SavedMoment?
+    @State private var editedLabel = ""
 
     private var videoMoments: [SavedMoment] {
         store.moments(for: videoID)
@@ -37,31 +39,70 @@ struct SavedMomentsSection: View {
                 if isExpanded {
                     ForEach(moments) { moment in
                         let label = moment.label ?? String(localized: "Saved moment")
-                        Button {
-                            onSeek(moment.time)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "bookmark.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(verbatim: label)
-                                    .font(.subheadline)
-                                    .lineLimit(1)
-                                Spacer(minLength: 8)
-                                Text(verbatim: moment.timestampText)
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
+                        HStack(spacing: 0) {
+                            Button {
+                                onSeek(moment.time)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "bookmark.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(verbatim: label)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 8)
+                                    Text(verbatim: moment.timestampText)
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                .foregroundStyle(.primary)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                             }
-                            .foregroundStyle(.primary)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(verbatim: "\(label), \(moment.timestampText)"))
+
+                            Menu {
+                                Button {
+                                    editedLabel = moment.label ?? ""
+                                    momentToRename = moment
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    store.remove(id: moment.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Moment actions")
                         }
-                        .buttonStyle(.plain)
                         .padding(.horizontal, 20)
-                        .accessibilityLabel(Text(verbatim: "\(label), \(moment.timestampText)"))
                     }
                     .transition(.opacity)
                 }
+            }
+            .alert("Rename moment", isPresented: Binding(
+                get: { momentToRename != nil },
+                set: { if !$0 { momentToRename = nil } }
+            )) {
+                TextField("Name", text: $editedLabel)
+                Button("Save") {
+                    if let momentToRename {
+                        store.rename(id: momentToRename.id, label: editedLabel)
+                    }
+                    momentToRename = nil
+                }
+                Button("Cancel", role: .cancel) { momentToRename = nil }
+            } message: {
+                Text("Leave blank to use the video title.")
             }
         }
     }

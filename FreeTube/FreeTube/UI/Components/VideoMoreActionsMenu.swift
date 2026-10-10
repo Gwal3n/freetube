@@ -18,8 +18,10 @@ struct VideoMoreActionsMenu: View {
     var onRemoveFromUpNext: (() -> Void)? = nil
     var onOpenChannel: (() -> Void)? = nil
 
+    @Environment(PlayerStateManager.self) private var player
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
+    @State private var savedMomentsVideo: Video?
     @State private var downloadModel: PlayerActionsModel?
 
     init(video: Video, offersPlayNext: Bool = false, onRemoveFromUpNext: (() -> Void)? = nil, onOpenChannel: (() -> Void)? = nil) {
@@ -40,7 +42,8 @@ struct VideoMoreActionsMenu: View {
                 onOpenChannel: onOpenChannel,
                 onDownload: startDownload,
                 shareFileURL: $shareFileURL,
-                addToPlaylistVideo: $addToPlaylistVideo
+                addToPlaylistVideo: $addToPlaylistVideo,
+                savedMomentsVideo: $savedMomentsVideo
             )
         } label: {
             Image(systemName: "ellipsis")
@@ -64,6 +67,13 @@ struct VideoMoreActionsMenu: View {
         }
         .sheet(item: $addToPlaylistVideo) { video in
             AddToPlaylistSheet(video: video)
+        }
+        .sheet(item: $savedMomentsVideo) { video in
+            SavedMomentsSheet(video: video) { selectedVideo in
+                let preservesPlaylist = player.activePlaylist != nil
+                    && player.queue.items.contains(where: { $0.id == selectedVideo.id })
+                player.load(selectedVideo, skipRecommendations: preservesPlaylist)
+            }
         }
         .errorToast(Binding(
             get: { downloadModel?.downloadError },
@@ -91,6 +101,7 @@ private struct VideoActionsContent: View {
     let onDownload: (VideoQuality) -> Void
     @Binding var shareFileURL: URL?
     @Binding var addToPlaylistVideo: Video?
+    @Binding var savedMomentsVideo: Video?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
@@ -106,7 +117,8 @@ private struct VideoActionsContent: View {
         onOpenChannel: (() -> Void)?,
         onDownload: @escaping (VideoQuality) -> Void,
         shareFileURL: Binding<URL?>,
-        addToPlaylistVideo: Binding<Video?>
+        addToPlaylistVideo: Binding<Video?>,
+        savedMomentsVideo: Binding<Video?>
     ) {
         self.video = video
         self.offersPlay = offersPlay
@@ -117,6 +129,7 @@ private struct VideoActionsContent: View {
         self.onDownload = onDownload
         _shareFileURL = shareFileURL
         _addToPlaylistVideo = addToPlaylistVideo
+        _savedMomentsVideo = savedMomentsVideo
     }
 
     @ViewBuilder
@@ -192,7 +205,7 @@ private struct VideoActionsContent: View {
         Button {
             addToPlaylistVideo = video
         } label: {
-            Label("Save to local playlist", systemImage: "bookmark")
+            Label("Save", systemImage: "bookmark")
         }
         savedMomentsMenu
         if !video.channelID.isEmpty || !video.channelName.isEmpty {
@@ -223,23 +236,9 @@ private struct VideoActionsContent: View {
 
     @ViewBuilder
     private var savedMomentsMenu: some View {
-        let videoMoments = savedMomentStore.moments(for: video.id)
-        if !videoMoments.isEmpty {
-            Menu {
-                ForEach(videoMoments) { moment in
-                    Button {
-                        let preservesPlaylist = player.activePlaylist != nil
-                            && player.queue.items.contains(where: { $0.id == video.id })
-                        player.load(video, skipRecommendations: preservesPlaylist, startAt: moment.time)
-                    } label: {
-                        Label {
-                            Text(verbatim: moment.label.map { "\(moment.timestampText) · \($0)" }
-                                ?? moment.timestampText)
-                        } icon: {
-                            Image(systemName: "play")
-                        }
-                    }
-                }
+        if savedMomentStore.hasMoments(for: video.id) {
+            Button {
+                savedMomentsVideo = video
             } label: {
                 Label("Saved moments", systemImage: "bookmark.fill")
             }
@@ -264,8 +263,10 @@ private struct VideoContextMenuModifier: ViewModifier {
     let onMarkComplete: (() -> Void)?
     let onRemoveFromHistory: (() -> Void)?
 
+    @Environment(PlayerStateManager.self) private var player
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
+    @State private var savedMomentsVideo: Video?
     @State private var downloadModel: PlayerActionsModel?
 
     func body(content: Content) -> some View {
@@ -280,7 +281,8 @@ private struct VideoContextMenuModifier: ViewModifier {
                     onOpenChannel: onOpenChannel,
                     onDownload: startDownload,
                     shareFileURL: $shareFileURL,
-                    addToPlaylistVideo: $addToPlaylistVideo
+                    addToPlaylistVideo: $addToPlaylistVideo,
+                    savedMomentsVideo: $savedMomentsVideo
                 )
                 if onMarkComplete != nil || onRemoveFromHistory != nil {
                     Divider()
@@ -308,6 +310,13 @@ private struct VideoContextMenuModifier: ViewModifier {
             }
             .sheet(item: $addToPlaylistVideo) { video in
                 AddToPlaylistSheet(video: video)
+            }
+            .sheet(item: $savedMomentsVideo) { video in
+                SavedMomentsSheet(video: video) { selectedVideo in
+                    let preservesPlaylist = player.activePlaylist != nil
+                        && player.queue.items.contains(where: { $0.id == selectedVideo.id })
+                    player.load(selectedVideo, skipRecommendations: preservesPlaylist)
+                }
             }
             .errorToast(Binding(
                 get: { downloadModel?.downloadError },

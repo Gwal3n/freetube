@@ -12,6 +12,7 @@ struct VideoThumbnail: View {
     var compactBadge = false
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var savedMomentStore = SavedMomentStore.shared
 
     var body: some View {
         KFImage(video.thumbnailURL)
@@ -33,6 +34,15 @@ struct VideoThumbnail: View {
                         .frame(width: size.width, height: size.height)
                         .clipped()
                         .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if savedMomentStore.hasMoments(for: video.id) {
+                    Circle()
+                        .fill(.orange)
+                        .frame(width: compactBadge ? 7 : 8, height: compactBadge ? 7 : 8)
+                        .overlay(Circle().strokeBorder(.black.opacity(0.65), lineWidth: 1))
+                        .padding(compactBadge ? 5 : 7)
                 }
             }
             .overlay(alignment: .bottomTrailing) {

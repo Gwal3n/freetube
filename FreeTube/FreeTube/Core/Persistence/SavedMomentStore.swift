@@ -59,6 +59,10 @@ final class SavedMomentStore {
         moments.filter { $0.video.id == videoID }.sorted { $0.time < $1.time }
     }
 
+    func hasMoments(for videoID: String) -> Bool {
+        moments.contains { $0.video.id == videoID }
+    }
+
     func remove(id: UUID) {
         moments.removeAll { $0.id == id }
         persist()

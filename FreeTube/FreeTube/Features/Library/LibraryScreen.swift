@@ -3,10 +3,11 @@ import UIKit
 
 /// Device-local library following NewPipe's account-free model. Remote channel and playlist
 /// destinations remain available when linked from other parts of the app, but this root owns
-/// only history, subscriptions, and playlists persisted on this device.
+/// only history, saved moments, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
+    @Environment(PlayerStateManager.self) private var player
     @AppStorage("showLibraryShelf") private var showLibraryShelf = true
     @AppStorage("showContinueWatchingMenu") private var showContinueWatchingMenu = true
     @AppStorage("libraryShelfContent") private var libraryShelfContentRaw = LibraryShelfContent.continueWatching.rawValue
@@ -16,6 +17,7 @@ struct LibraryScreen: View {
     @State private var recentVideos: [WatchHistorySnapshot] = []
     @State private var resumableVideos: [WatchHistorySnapshot] = []
     @State private var localSubscriptions = LocalSubscriptionStore.shared
+    @State private var savedMomentStore = SavedMomentStore.shared
     @State private var blocklist = VideoBlocklist.shared
     @State private var localPlaylistCount: Int?
     @State private var externalDestination: AppNavigationRequest.Destination?
@@ -139,6 +141,21 @@ struct LibraryScreen: View {
                 )
             }
             .tint(.white)
+
+            if !savedMomentStore.moments.isEmpty {
+                NavigationLink {
+                    SavedMomentsScreen { moment in
+                        player.load(moment.video)
+                    }
+                } label: {
+                    LibraryDestinationRow(
+                        title: "Saved moments",
+                        subtitle: countSubtitle(savedMomentStore.moments.count, noun: "moment"),
+                        systemImage: "bookmark"
+                    )
+                }
+                .tint(.white)
+            }
 
             if showContinueWatchingMenu {
                 NavigationLink {

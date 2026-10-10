@@ -42,6 +42,7 @@ struct PlayerPlaylistPanel: View {
     @State private var savedNoticeIsRemoval = false
     @State private var savedNoticeGeneration = 0
     @State private var showsLeaveConfirmation = false
+    @State private var momentSheetVideo: Video?
     private let localPlaylistService = LocalPlaylistService()
 
     private var playlist: Playlist? { player.activePlaylist }
@@ -115,6 +116,13 @@ struct PlayerPlaylistPanel: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The current video will keep playing with regular recommendations.")
+        }
+        .sheet(item: $momentSheetVideo) { video in
+            SavedMomentsSheet(video: video) { selectedVideo in
+                let preservesPlaylist = player.activePlaylist != nil
+                    && player.queue.items.contains(where: { $0.id == selectedVideo.id })
+                player.load(selectedVideo, skipRecommendations: preservesPlaylist)
+            }
         }
     }
 
@@ -415,31 +423,20 @@ struct PlayerPlaylistPanel: View {
             }
             .buttonStyle(.plain)
             .overlay(alignment: .trailing) {
-                playlistMomentMenu(video: video, moments: moments)
+                playlistMomentButton(video: video, count: moments.count)
             }
             .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isCurrent)
         }
     }
 
     @ViewBuilder
-    private func playlistMomentMenu(video: Video, moments: [SavedMoment]) -> some View {
-        if !moments.isEmpty {
-            Menu {
-                ForEach(moments) { moment in
-                    Button {
-                        player.load(video, skipRecommendations: true, startAt: moment.time)
-                    } label: {
-                        Label {
-                            Text(verbatim: moment.label.map { "\(moment.timestampText) · \($0)" }
-                                ?? moment.timestampText)
-                        } icon: {
-                            Image(systemName: "play")
-                        }
-                    }
-                }
+    private func playlistMomentButton(video: Video, count: Int) -> some View {
+        if count > 0 {
+            Button {
+                momentSheetVideo = video
             } label: {
                 Label {
-                    Text(verbatim: String(moments.count))
+                    Text(verbatim: String(count))
                 } icon: {
                     Image(systemName: "bookmark.fill")
                 }
@@ -450,7 +447,7 @@ struct PlayerPlaylistPanel: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Saved moments")
-            .accessibilityValue(Text(verbatim: String(moments.count)))
+            .accessibilityValue(Text(verbatim: String(count)))
             .padding(.trailing, 12)
         }
     }

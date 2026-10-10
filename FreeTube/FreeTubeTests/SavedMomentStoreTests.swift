@@ -58,6 +58,8 @@ final class SavedMomentStoreTests: XCTestCase {
 
         XCTAssertEqual(store.moments(for: "dQw4w9WgXcQ").map(\.time), [20, 80])
         XCTAssertEqual(store.moments(for: "9bZkp7q19f0").map(\.time), [10])
+        XCTAssertTrue(store.hasMoments(for: "dQw4w9WgXcQ"))
+        XCTAssertFalse(store.hasMoments(for: "unwatchedID"))
     }
 
     private func testVideo(id: String = "dQw4w9WgXcQ") -> Video {
