@@ -279,6 +279,7 @@ struct FullScreenPlayer: View {
                                 controls: controlLayout.onPlayer,
                                 overflowControls: controlLayout.moreMenu,
                                 playbackRate: player.playbackRate,
+                                effectivePlaybackRate: player.effectivePlaybackRate,
                                 playbackQuality: player.playbackQuality,
                                 isMuted: player.isMuted,
                                 isLooping: player.isLoopingCurrentVideo,

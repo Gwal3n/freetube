@@ -12,6 +12,7 @@ struct PlayerTopControls: View {
     let controls: [PlayerTopControl]
     let overflowControls: [PlayerTopControl]
     let playbackRate: Double
+    let effectivePlaybackRate: Double
     let playbackQuality: VideoQuality
     let isMuted: Bool
     let isLooping: Bool
@@ -166,7 +167,7 @@ struct PlayerTopControls: View {
             Menu {
                 speedChoices
             } label: {
-                Label("Speed: \(rateLabel(playbackRate))", systemImage: control.systemImage)
+                Label("Speed: \(rateLabel(effectivePlaybackRate))", systemImage: control.systemImage)
             }
         case .quality:
             Menu {
@@ -283,7 +284,7 @@ struct PlayerTopControls: View {
                 if isPreparingFastPlayback {
                     ProgressView().tint(.white).controlSize(.mini)
                 }
-                Text(rateLabel(playbackRate))
+                Text(rateLabel(effectivePlaybackRate))
             }
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
@@ -291,7 +292,11 @@ struct PlayerTopControls: View {
                 .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
         }
         .accessibilityLabel("Playback speed")
-        .accessibilityValue(rateLabel(playbackRate))
+        .accessibilityValue(
+            isPreparingFastPlayback
+                ? "\(rateLabel(effectivePlaybackRate)), preparing faster playback"
+                : rateLabel(effectivePlaybackRate)
+        )
     }
 
     private var sleepTimerMenu: some View {
@@ -325,11 +330,16 @@ struct PlayerTopControls: View {
 
     @ViewBuilder
     private var speedChoices: some View {
+        if isPreparingFastPlayback {
+            Button("Preparing faster playback…") {}
+                .disabled(true)
+            Divider()
+        }
         ForEach(availableSpeedRates, id: \.self) { rate in
             Button {
                 onSetPlaybackRate(rate)
             } label: {
-                if abs(playbackRate - rate) < 0.01 {
+                if abs(effectivePlaybackRate - rate) < 0.01 {
                     Label(rateLabel(rate), systemImage: "checkmark")
                 } else {
                     Text(rateLabel(rate))
