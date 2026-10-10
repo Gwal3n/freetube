@@ -2485,7 +2485,7 @@ final class PlayerStateManager {
             artist: video.channelName,
             duration: duration,
             elapsed: elapsed,
-            rate: isPlaying ? effectivePlaybackRate : 0.0,
+            rate: isPlaying ? Float(effectivePlaybackRate) : 0.0,
             artwork: currentArtwork
         )
     }

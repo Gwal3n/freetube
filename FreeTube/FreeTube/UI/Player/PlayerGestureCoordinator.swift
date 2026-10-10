@@ -329,7 +329,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         switch gesture.state {
         case .began:
-            guard rateBeforeBoost == nil else {
+            guard !isHoldingForSpeed else {
                 resetHorizontalSeek()
                 return
             }
@@ -347,7 +347,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             horizontalSeekPeakVelocity = 0
             onSeekPreview(horizontalSeekStart)
         case .changed:
-            guard rateBeforeBoost == nil else {
+            guard !isHoldingForSpeed else {
                 onSeekPreview(nil)
                 resetHorizontalSeek()
                 return
