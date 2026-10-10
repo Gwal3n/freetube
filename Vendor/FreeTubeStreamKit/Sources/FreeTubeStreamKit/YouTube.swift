@@ -359,19 +359,29 @@ public class YouTube {
     /// Minimal HLS-only player request. Unlike `videoInfos`, this does not fetch the watch page,
     /// player JavaScript, or the web client. A caller must fall back to `livestreams` if no usable
     /// manifest is returned; signature deciphering still uses the full player context.
-    public struct VisionOSHLSProbe: Sendable {
+    public struct HLSProbe: Sendable {
         public let manifestURL: URL?
         public let playabilityStatus: String?
         public let matchesVideoID: Bool
     }
 
-    public func probeVisionOSHLS() async throws -> VisionOSHLSProbe {
+    public func probeVisionOSHLS() async throws -> HLSProbe {
+        try await probeHLS(client: .visionOS, timeoutInterval: 8)
+    }
+
+    /// Used only when visionOS has no HLS URL. iOS live manifests may require a PO token, so
+    /// callers should reserve this probe for on-demand videos.
+    public func probeIOSHLS() async throws -> HLSProbe {
+        try await probeHLS(client: .ios, timeoutInterval: 6)
+    }
+
+    private func probeHLS(client: InnerTube.ClientType, timeoutInterval: TimeInterval) async throws -> HLSProbe {
         let emptyConfig = Extraction.YtCfg(
             VISITOR_DATA: nil, INNERTUBE_CONTEXT: nil, WEB_PLAYER_CONTEXT_CONFIGS: nil
         )
         let response = try await InnerTube(
-            client: .visionOS, signatureTimestamp: nil, ytcfg: emptyConfig
-        ).player(videoID: videoID, timeoutInterval: 8)
+            client: client, signatureTimestamp: nil, ytcfg: emptyConfig
+        ).player(videoID: videoID, timeoutInterval: timeoutInterval)
         let matchesVideoID = response.videoDetails?.videoId == videoID
         let candidateURL = matchesVideoID
             ? response.streamingData?.hlsManifestUrl.flatMap { URL(string: $0) }
@@ -380,11 +390,11 @@ public class YouTube {
         let url = playable && candidateURL?.scheme == "https" && candidateURL?.host != nil
             ? candidateURL : nil
         if url != nil {
-            _visionOSVideoInfo = response
+            if client == .visionOS { _visionOSVideoInfo = response }
             _videoInfos = [response]
             _hasFastHLSResponse = true
         }
-        return VisionOSHLSProbe(
+        return HLSProbe(
             manifestURL: url,
             playabilityStatus: response.playabilityStatus?.status,
             matchesVideoID: matchesVideoID

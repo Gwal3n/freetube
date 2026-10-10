@@ -23,11 +23,12 @@ Source-level changes:
   unwrap of `URL(string:)` with a thrown `YouTubeKitError.extractError`.
 - `Extraction.YtCfg` and its nested types gained `Sendable` so the cache can
   return a decoded config across its actor boundary.
-- `YouTube.probeVisionOSHLS()` requests a visionOS HLS manifest without loading
-  watch HTML, player JavaScript, or the web client. It caches a valid response
-  for nearby metadata reads; callers retain the full extractor as fallback.
-  The probe uses a request-specific timeout, and legacy player requests expose
-  URL-free per-client diagnostics to the app log.
+- `YouTube.probeVisionOSHLS()` and `probeIOSHLS()` request an HLS manifest without
+  loading watch HTML, player JavaScript, or the web client. They cache a valid
+  response for nearby metadata reads; callers retain the full extractor as
+  fallback. The probes use request-specific timeouts, and legacy player requests
+  expose URL-free per-client diagnostics to the app log. The iOS client profile
+  follows yt-dlp's 21.26.4 definition (October 2026).
 
 When re-pulling upstream, reapply these rather than discarding them; the caching
 change is the difference between ~2s and ~0.3s per playback resolution.

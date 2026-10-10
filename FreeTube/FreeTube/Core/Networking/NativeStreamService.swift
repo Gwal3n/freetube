@@ -101,7 +101,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             // HLS URL played instead, so the whole pass was dead weight. Audio-only cannot use the
             // video-bearing master directly; select its separate audio rendition when available.
             if !progressiveOnly, quality == .audioOnly,
-               let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
+               let hls = try await hlsManifestURL(from: youtube, videoID: videoID, isLive: video.isLive) {
                 do {
                     if let audio = try await NativeHLSDownloadService().preferredAudioPlaylistURL(from: hls) {
                         let storyboard = await storyboard(from: youtube, videoID: videoID)
@@ -137,7 +137,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             }
 
             if !progressiveOnly, quality != .audioOnly,
-               let hls = try await hlsManifestURL(from: youtube, videoID: videoID) {
+               let hls = try await hlsManifestURL(from: youtube, videoID: videoID, isLive: video.isLive) {
                 let storyboard = await storyboard(from: youtube, videoID: videoID)
                 let captionTracks = await sourceCaptionTracks(from: youtube, videoID: videoID)
                 let audioLanguageStartedAt = Date()
@@ -343,7 +343,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
     /// genuinely has no HLS variant still falls through to progressive selection rather than
     /// failing the whole resolution. Cancellation is rethrown so a rapid video switch still
     /// unwinds immediately.
-    private func hlsManifestURL(from youtube: YouTube, videoID: String) async throws -> URL? {
+    private func hlsManifestURL(from youtube: YouTube, videoID: String, isLive: Bool) async throws -> URL? {
         let fastStartedAt = Date()
         do {
             let probe = try await youtube.probeVisionOSHLS()
@@ -355,6 +355,21 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
             try Task.checkCancellation()
             let nsError = error as NSError
             log.notice("Native visionOS HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(fastStartedAt), privacy: .public)s")
+        }
+
+        if !isLive {
+            let iosStartedAt = Date()
+            do {
+                let probe = try await youtube.probeIOSHLS()
+                log.info("Native iOS HLS probe for \(videoID, privacy: .public) manifest=\(probe.manifestURL != nil, privacy: .public) status=\(probe.playabilityStatus ?? "unknown", privacy: .public) idMatch=\(probe.matchesVideoID, privacy: .public) elapsed=\(Date().timeIntervalSince(iosStartedAt), privacy: .public)s")
+                if let url = probe.manifestURL { return url }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                try Task.checkCancellation()
+                let nsError = error as NSError
+                log.notice("Native iOS HLS probe failed for \(videoID, privacy: .public): \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public) elapsed=\(Date().timeIntervalSince(iosStartedAt), privacy: .public)s")
+            }
         }
 
         let fallbackStartedAt = Date()
