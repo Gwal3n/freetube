@@ -1112,6 +1112,10 @@ final class PlayerStateManager {
         let time = player.currentTime().seconds
         let position = time.isFinite && time >= 0 ? time : elapsed
         switchPosition = position
+        let originalSeekableEnd = originalItem.seekableTimeRanges
+            .map { CMTimeRangeGetEnd($0.timeRangeValue).seconds }
+            .filter { $0.isFinite && $0 >= 0 }
+            .max()
         let previousSize = videoPresentationSize
         resumeAfterFastPlaybackSwitch = isPlaying
         isInstallingFastPlayback = true
@@ -1132,7 +1136,11 @@ final class PlayerStateManager {
             let replacementDuration = replacement.duration.seconds
             if originalDuration.isFinite, replacementDuration.isFinite,
                abs(originalDuration - replacementDuration) > 2 {
-                log.notice("Fast playback source duration mismatch: original=\(originalDuration, privacy: .public)s replacement=\(replacementDuration, privacy: .public)s")
+                // A shorter HLS timeline may be a truncated stream, a partial seekable window,
+                // or a different timebase. Do not scale the handoff seek without independent
+                // evidence: doing so could jump to the wrong scene. Keep enough URL-free facts
+                // here to distinguish those cases from the next device log.
+                log.notice("Fast playback timeline discrepancy: hls=\(originalDuration, privacy: .public)s seekableEnd=\(originalSeekableEnd ?? -1, privacy: .public)s metadata=\(video.duration ?? -1, privacy: .public)s prepared=\(replacementDuration, privacy: .public)s handoff=\(position, privacy: .public)s")
             }
             await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: replacement)
             guard !Task.isCancelled, fastPlaybackGeneration == generation, playbackSessionID == session,
@@ -2626,6 +2634,7 @@ final class PlayerStateManager {
             Task { @MainActor in
                 guard let endedItem = notification.object as? AVPlayerItem,
                       endedItem === self.player.currentItem else { return }
+                self.log.info("Playback reached item end: sourceDuration=\(endedItem.duration.seconds, privacy: .public)s metadataDuration=\(self.currentVideo?.duration ?? -1, privacy: .public)s")
                 self.isPlaying = false
                 self.hasEnded = true
                 self.elapsed = self.duration
