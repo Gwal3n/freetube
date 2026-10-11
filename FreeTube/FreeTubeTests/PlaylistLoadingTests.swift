@@ -9,6 +9,24 @@ final class PlaylistLoadingTests: XCTestCase {
         XCTAssertEqual(Mappers.channelName(from: "Zeta Explained"), "Zeta Explained")
     }
 
+    func testPlaylistDurationsIncludeHoursAndRejectLiveLabels() {
+        XCTAssertEqual(Mappers.duration(from: "1:02:03"), 3_723)
+        XCTAssertEqual(Mappers.duration(from: "12:34"), 754)
+        XCTAssertNil(Mappers.duration(from: "LIVE"))
+        XCTAssertNil(Mappers.duration(from: "1:60"))
+        XCTAssertNil(Mappers.duration(from: ""))
+    }
+
+    func testPlaylistLengthSortKeepsUnknownDurationsLastInBothDirections() {
+        let videos = [
+            video(id: "unknown", duration: nil),
+            video(id: "long", duration: 3_723),
+            video(id: "short", duration: 754)
+        ]
+        XCTAssertEqual(LocalPlaylistVideoSort.length.ordered(videos).map(\.id), ["short", "long", "unknown"])
+        XCTAssertEqual(LocalPlaylistVideoSort.lengthLongest.ordered(videos).map(\.id), ["long", "short", "unknown"])
+    }
+
     func testFailedLoadCanRetryAndClearsItsError() async {
         let service = RetryPlaylistService(failingAttempt: 1)
         let model = PlaylistViewModel(playlistID: "playlist", service: service)
@@ -70,6 +88,14 @@ final class PlaylistLoadingTests: XCTestCase {
         XCTAssertEqual(details?.videos.map(\.id), ["first", "middle", "last"])
         XCTAssertNil(details?.continuationToken)
         XCTAssertEqual(service.requestedTokens, ["page-2", "page-3"])
+    }
+
+    private func video(id: String, duration: TimeInterval?) -> Video {
+        Video(
+            id: id, title: id, channelID: "", channelName: "Channel",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: duration, viewCount: nil,
+            publishedAt: nil, descriptionSnippet: nil, isLive: false, isShort: false
+        )
     }
 }
 

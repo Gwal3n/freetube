@@ -15,7 +15,10 @@ enum Mappers {
     // MARK: - Videos
 
     static func video(from yt: YTVideo) -> Video {
-        let duration = yt.timeLengthSeconds.map { TimeInterval($0) }
+        // The pinned YouTubeKit timeLengthSeconds parser rejects three-part timestamps such as
+        // "1:02:03", which are common in playlists. Parse its display value here so the badge
+        // and local-playlist length sort use the same reliable duration.
+        let duration = Self.duration(from: yt.timeLength)
         // YouTubeKit returns an empty thumbnail array for some channel listings (notably Shorts
         // lockup view models when YouTube changes the JSON path). Falling back to the canonical
         // CDN URL keyed by videoId guarantees a working image — `hqdefault.jpg` is always served
@@ -38,6 +41,21 @@ enum Mappers {
             isLive: yt.timeLength?.localizedCaseInsensitiveCompare("live") == .orderedSame,
             isShort: false
         )
+    }
+
+    static func duration(from timeLength: String?) -> TimeInterval? {
+        guard let timeLength else { return nil }
+        let parts = timeLength.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ":", omittingEmptySubsequences: false)
+        guard (1...3).contains(parts.count) else { return nil }
+        var seconds = 0
+        for (index, part) in parts.enumerated() {
+            guard let value = Int(part), value >= 0,
+                  (index == 0 || value < 60),
+                  seconds <= (Int.max - value) / 60 else { return nil }
+            seconds = seconds * 60 + value
+        }
+        return seconds > 0 ? TimeInterval(seconds) : nil
     }
 
     static func channelName(from raw: String?) -> String {

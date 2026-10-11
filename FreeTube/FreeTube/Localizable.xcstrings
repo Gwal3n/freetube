@@ -28,6 +28,15 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Длительность (сначала короткие)" } }
       }
     },
+    "Length (longest first)" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Länge (längste zuerst)" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Length (longest first)" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Duración (más largos primero)" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Durée (plus longues d’abord)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Длительность (сначала длинные)" } }
+      }
+    },
     "Hold for speed" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Für Tempo gedrückt halten" } },

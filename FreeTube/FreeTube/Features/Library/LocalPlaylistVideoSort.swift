@@ -7,6 +7,7 @@ enum LocalPlaylistVideoSort: String, CaseIterable, Identifiable {
     case custom
     case title
     case length
+    case lengthLongest
 
     var id: Self { self }
 
@@ -15,6 +16,7 @@ enum LocalPlaylistVideoSort: String, CaseIterable, Identifiable {
         case .custom: "Custom order"
         case .title: "Title (A–Z)"
         case .length: "Length (shortest first)"
+        case .lengthLongest: "Length (longest first)"
         }
     }
 
@@ -29,12 +31,13 @@ enum LocalPlaylistVideoSort: String, CaseIterable, Identifiable {
                 let comparison = left.element.title.localizedStandardCompare(right.element.title)
                 return comparison == .orderedSame
                     ? left.offset < right.offset : comparison == .orderedAscending
-            case .length:
+            case .length, .lengthLongest:
                 let leftDuration = usableDuration(left.element.duration)
                 let rightDuration = usableDuration(right.element.duration)
                 if let leftDuration, let rightDuration {
                     return leftDuration == rightDuration
-                        ? left.offset < right.offset : leftDuration < rightDuration
+                        ? left.offset < right.offset
+                        : self == .length ? leftDuration < rightDuration : leftDuration > rightDuration
                 }
                 if leftDuration != nil { return true }
                 if rightDuration != nil { return false }
