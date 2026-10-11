@@ -28,7 +28,7 @@ struct LocalPlaylistsScreen: View {
     }
 
     var body: some View {
-        List(selection: $selectedPlaylistIDs) {
+        List(selection: editMode.isEditing ? $selectedPlaylistIDs : nil) {
             playlistSection("Personal", items: personalPlaylists, savedFromYouTube: false)
             playlistSection("Saved from YouTube", items: savedPlaylists, savedFromYouTube: true)
         }

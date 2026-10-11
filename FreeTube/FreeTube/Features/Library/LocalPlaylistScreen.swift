@@ -37,7 +37,7 @@ struct LocalPlaylistScreen: View {
     }
 
     var body: some View {
-        List(selection: $selectedVideoIDs) {
+        List(selection: editingMode != nil ? $selectedVideoIDs : nil) {
             if let details {
                 Section {
                     playlistHeader(details)
@@ -147,6 +147,9 @@ struct LocalPlaylistScreen: View {
                     }
                     Button("Edit") { beginEditing() }
                         .disabled(details == nil)
+                    if let details {
+                        localMoreMenu(details)
+                    }
                 }
             }
         }
@@ -262,7 +265,6 @@ struct LocalPlaylistScreen: View {
             }
             .disabled(!local.videos.contains(where: { !blocklist.blocks($0) }) || editingMode != nil)
             Spacer(minLength: 0)
-            if editingMode == nil { localMoreMenu(local) }
         }
         .padding(.horizontal)
     }
@@ -305,13 +307,8 @@ struct LocalPlaylistScreen: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.footnote.weight(.bold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                .contentShape(Rectangle())
         }
         .accessibilityLabel("More playlist actions")
     }

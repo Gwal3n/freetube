@@ -93,6 +93,13 @@ struct PlaylistScreen: View {
         // Let artwork show through initially, then restore native bar material when the
         // scrolled-away playlist name becomes the compact navigation title.
         .toolbarBackground(isSearching || showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let details = model.details {
+                    moreMenu(details)
+                }
+            }
+        }
         .task { await model.load() }
         .task(id: "\(model.details?.playlist.id ?? ""):\(searchQuery)") {
             let query = searchQuery
@@ -193,8 +200,8 @@ struct PlaylistScreen: View {
 
     // MARK: - Glass toolbar
 
-    /// Horizontal row of capsule pills with `.ultraThinMaterial` backdrops. Three primary
-    /// actions on the left, a `Menu` for secondary actions on the right.
+    /// Horizontal row of primary actions on the artwork. Secondary actions live in the native
+    /// navigation toolbar so they remain available after the artwork scrolls away.
     @ViewBuilder
     private func actionToolbar(_ details: PlaylistDetails) -> some View {
         HStack(spacing: 10) {
@@ -216,13 +223,11 @@ struct PlaylistScreen: View {
             .disabled(isPlaylistDownloadActive(details.playlist.id)
                 || (details.videos.isEmpty && details.continuationToken == nil))
             Spacer(minLength: 0)
-            moreMenu(details)
         }
         .padding(.horizontal)
     }
 
-    /// "More actions" pill — same capsule chrome as the primary actions, just with an ellipsis
-    /// icon. Hosts the secondary menu (open in browser / favorite / copy URL).
+    /// Native toolbar menu for secondary actions (open in browser / save / copy URL).
     @ViewBuilder
     private func moreMenu(_ details: PlaylistDetails) -> some View {
         Menu {
@@ -255,13 +260,8 @@ struct PlaylistScreen: View {
             .disabled(isSavingLocally)
         } label: {
             Image(systemName: "ellipsis")
-                .font(.footnote.weight(.bold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                .contentShape(Rectangle())
         }
         .accessibilityLabel("More playlist actions")
     }
