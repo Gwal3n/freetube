@@ -19,6 +19,7 @@ final class FastPlaybackLocalFileService {
         case insufficientSpace
         case invalidResponse(Int)
         case missingTracks
+        case missingPlayableTail
         case exportUnavailable
         case exportFailed
     }
@@ -124,6 +125,7 @@ final class FastPlaybackLocalFileService {
     static func prepare(
         videoURL: URL,
         audioURL: URL,
+        referenceDuration: TimeInterval?,
         onProgress: @escaping ProgressHandler
     ) async throws -> URL {
         try Task.checkCancellation()
@@ -181,7 +183,39 @@ final class FastPlaybackLocalFileService {
             throw Failure.missingTracks
         }
         log.info("Fast playback source durations: video=\(videoDuration.seconds, privacy: .public)s audio=\(audioDuration.seconds, privacy: .public)s")
-        let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
+        let sourceEnd = min(videoDuration.seconds, audioDuration.seconds)
+        var outputDuration = videoDuration
+        if let referenceDuration, referenceDuration.isFinite, referenceDuration > 10,
+           abs(sourceEnd - referenceDuration) > max(2, referenceDuration * 0.05) {
+            // Never swap to a timeline whose length disagrees with the working player unless
+            // we can prove the apparent extra duration contains no video or audio samples.
+            guard sourceEnd > referenceDuration * 1.8,
+                  sourceEnd < referenceDuration * 2.2 else {
+                log.notice("Fast playback source timeline differs from working stream: reference=\(referenceDuration, privacy: .public)s source=\(sourceEnd, privacy: .public)s")
+                throw Failure.missingPlayableTail
+            }
+            let firstUnexpectedSample = referenceDuration + 1
+            let videoHasExtraSamples = try containsSamples(
+                in: videoAsset, track: videoTrack,
+                startingAt: firstUnexpectedSample, endingAt: videoDuration.seconds
+            )
+            let audioHasExtraSamples = try containsSamples(
+                in: audioAsset, track: audioTrack,
+                startingAt: firstUnexpectedSample, endingAt: audioDuration.seconds
+            )
+            log.info("Fast playback extra-sample probe: reference=\(referenceDuration, privacy: .public)s video=\(videoHasExtraSamples, privacy: .public) audio=\(audioHasExtraSamples, privacy: .public)")
+            // The container can advertise twice the real duration even when its samples
+            // stop at the HLS endpoint. Requiring both tracks near that endpoint prevents
+            // an abrupt cut of genuine content with a different timeline.
+            guard !videoHasExtraSamples, !audioHasExtraSamples,
+                  try containsSamples(in: videoAsset, track: videoTrack, endingAt: referenceDuration),
+                  try containsSamples(in: audioAsset, track: audioTrack, endingAt: referenceDuration) else {
+                throw Failure.missingPlayableTail
+            }
+            outputDuration = CMTime(seconds: referenceDuration, preferredTimescale: 600)
+            log.notice("Fast playback trimmed empty media tail to \(referenceDuration, privacy: .public)s")
+        }
+        let audioEnd = CMTimeCompare(outputDuration, audioDuration) <= 0 ? outputDuration : audioDuration
         try Task.checkCancellation()
         let composition = AVMutableComposition()
         guard let composedVideo = composition.addMutableTrack(
@@ -192,7 +226,7 @@ final class FastPlaybackLocalFileService {
             throw Failure.missingTracks
         }
         try composedVideo.insertTimeRange(
-            CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
+            CMTimeRange(start: .zero, duration: outputDuration), of: videoTrack, at: .zero
         )
         try composedAudio.insertTimeRange(
             CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
@@ -217,10 +251,21 @@ final class FastPlaybackLocalFileService {
         guard !finalVideoTracks.isEmpty, !finalAudioTracks.isEmpty else {
             throw Failure.missingTracks
         }
-        let outputBytes = try fileSize(at: outputFile)
-        if let outputDuration = try? await finalAsset.load(.duration) {
-            log.info("Fast playback mux duration=\(outputDuration.seconds, privacy: .public)s")
+        let finalDuration = try await finalAsset.load(.duration)
+        guard finalDuration.seconds.isFinite, finalDuration.seconds > 0 else {
+            throw Failure.missingPlayableTail
         }
+        let finalVideoHasTail = try containsSamples(
+            in: finalAsset, track: finalVideoTracks[0], endingAt: finalDuration.seconds
+        )
+        let finalAudioHasTail = try containsSamples(
+            in: finalAsset, track: finalAudioTracks[0], endingAt: finalDuration.seconds
+        )
+        log.info("Fast playback output tail probe: duration=\(finalDuration.seconds, privacy: .public)s video=\(finalVideoHasTail, privacy: .public) audio=\(finalAudioHasTail, privacy: .public)")
+        guard finalVideoHasTail, finalAudioHasTail else { throw Failure.missingPlayableTail }
+        log.info("Fast playback output tail validated at \(finalDuration.seconds, privacy: .public)s")
+        let outputBytes = try fileSize(at: outputFile)
+        log.info("Fast playback mux duration=\(finalDuration.seconds, privacy: .public)s")
         log.info("Fast playback temporary preparation completed: output=\(outputBytes, privacy: .public) bytes elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s")
         completed = true
         return outputFile
@@ -323,6 +368,42 @@ final class FastPlaybackLocalFileService {
     private static func fileSize(at url: URL) throws -> Int64 {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    /// Check actual compressed samples, not just container headers or a track's advertised range.
+    /// A source with a long empty edit can report a valid duration and pass AVPlayer readiness,
+    /// yet render black after its last video sample. A supplied start checks the whole remaining
+    /// interval so trimming cannot silently discard media between the reference and file end.
+    private static func containsSamples(
+        in asset: AVAsset,
+        track: AVAssetTrack,
+        startingAt requestedStart: TimeInterval? = nil,
+        endingAt end: TimeInterval
+    ) throws -> Bool {
+        guard end.isFinite, end > 0 else { return false }
+        let start = requestedStart ?? max(0, end - min(4, end / 2))
+        guard start.isFinite, start >= 0, start < end else { return false }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        guard reader.canAdd(output) else { throw Failure.missingPlayableTail }
+        reader.add(output)
+        reader.timeRange = CMTimeRange(
+            start: CMTime(seconds: start, preferredTimescale: 600),
+            duration: CMTime(seconds: end - start, preferredTimescale: 600)
+        )
+        guard reader.startReading() else {
+            throw reader.error ?? Failure.missingPlayableTail
+        }
+        defer { reader.cancelReading() }
+        while let sample = output.copyNextSampleBuffer() {
+            let timestamp = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+            if CMSampleBufferGetNumSamples(sample) > 0,
+               timestamp.isFinite, timestamp >= start - 0.1, timestamp <= end {
+                return true
+            }
+        }
+        if reader.status == .failed { throw reader.error ?? Failure.missingPlayableTail }
+        return false
     }
 
     private static func declaredSize(of url: URL) -> Int64? {

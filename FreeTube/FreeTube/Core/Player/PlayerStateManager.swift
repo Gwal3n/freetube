@@ -1075,7 +1075,8 @@ final class PlayerStateManager {
                 scheduleFastPlaybackTimeout(after: .seconds(1_200), generation: generation)
                 log.info("Preparing temporary local file for fast playback of \(video.id, privacy: .public)")
                 let localFile = try await FastPlaybackLocalFileService.prepare(
-                    videoURL: videoURL, audioURL: audioURL
+                    videoURL: videoURL, audioURL: audioURL,
+                    referenceDuration: originalItem.duration.seconds
                 ) { [weak self] update in
                     guard let self, self.fastPlaybackGeneration == generation,
                           self.playbackSessionID == session else { return }
