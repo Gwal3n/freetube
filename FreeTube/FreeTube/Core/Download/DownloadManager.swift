@@ -1108,7 +1108,7 @@ final class DownloadManager {
         var usedRanges = false
         if sourceLabel == "native-audio", let declaredLength, declaredLength > 64 * 1024 {
             do {
-                usedRanges = try await RangedAudioDownloadService.download(
+                usedRanges = try await RangedMediaDownloadService.download(
                     request: request, to: destination, totalBytes: declaredLength,
                     onProgress: reportProgress
                 )

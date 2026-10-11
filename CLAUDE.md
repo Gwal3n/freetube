@@ -164,7 +164,7 @@ which uses a separate memory-only progressive cache and never falls back to HLS.
 continues at up to 2x while an alternative is prepared. A direct MP4 is checked in a paused,
 muted, viewless AVPlayer probe. Paired remote MP4/M4A tracks, which stalled when probed directly
 on device, are downloaded into an app-owned temporary directory, muxed to a local MP4 without
-re-encoding, then probed. Its audio transfer reuses the validated ranged downloader when the
+re-encoding, then probed. Both media transfers reuse the validated ranged downloader when the
 source advertises its length, with the ordinary file transfer as fallback. This has a single
 combined-byte progress bar, a Cancel control, an input cap of
 1 GB or less on low-storage devices, and a 200 MB storage reserve. It does not enter Downloads;

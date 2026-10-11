@@ -255,25 +255,27 @@ final class FastPlaybackLocalFileService {
             }
         }
 
-        // The normal audio downloader already avoids Googlevideo's slow single-response pacing
-        // with validated byte ranges. Fast-playback preparation must use the same transport.
+        // A single long-lived media response can be paced close to playback speed. Use the
+        // validated ranged transport for both tracks, retaining the single-request fallback.
         var usedRanges = false
-        if case .audio = phase, let declaredLength, declaredLength > 64 * 1024 {
+        if let declaredLength, declaredLength > 64 * 1024 {
             do {
-                usedRanges = try await RangedAudioDownloadService.download(
+                usedRanges = try await RangedMediaDownloadService.download(
                     request: request, to: destination, totalBytes: declaredLength,
                     onProgress: reportProgress
                 )
                 if !usedRanges {
-                    log.info("Fast playback audio range probe unsupported; using one request")
+                    log.info("Fast playback \(phase.rawValue, privacy: .public) range probe unsupported; using one request")
                 }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 let nsError = error as NSError
-                log.notice("Fast playback audio range transfer failed: \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public); retrying as one request")
+                log.notice("Fast playback \(phase.rawValue, privacy: .public) range transfer failed: \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public); retrying as one request")
                 try? FileManager.default.removeItem(at: destination)
             }
+        } else {
+            log.info("Fast playback \(phase.rawValue, privacy: .public) has no usable declared length; using one request")
         }
 
         if !usedRanges {

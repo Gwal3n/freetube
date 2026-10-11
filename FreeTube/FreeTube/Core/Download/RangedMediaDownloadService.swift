@@ -1,11 +1,11 @@
 import Foundation
 
-/// Fetches a known-size progressive audio stream in a few independent byte ranges. Some media
-/// servers pace a single long-lived response close to playback speed; bounded parallel ranges
-/// avoid making an 18 MB audio file take many minutes. A server that ignores Range returns nil
-/// from the probe, allowing the caller to use its existing single-request transfer instead.
+/// Fetches a known-size progressive media stream in validated independent byte ranges. Some
+/// servers pace one long-lived response close to playback speed; bounded parallel ranges avoid
+/// making audio or video transfers take the full media duration. A server that ignores Range
+/// returns false from the probe, allowing the caller to use its single-request fallback.
 @available(iOS 17.0, *)
-nonisolated enum RangedAudioDownloadService {
+nonisolated enum RangedMediaDownloadService {
     private static let probeLength: Int64 = 64 * 1024
     private static let chunkLength: Int64 = 1024 * 1024
     private static let maximumConcurrentChunks = 4
