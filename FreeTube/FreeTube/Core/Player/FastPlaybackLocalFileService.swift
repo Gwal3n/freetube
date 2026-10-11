@@ -248,20 +248,51 @@ final class FastPlaybackLocalFileService {
             throw DirectFileDownloadService.Failure.sizeLimitExceeded
         }
         progress.emit(phase)
-        let response = try await DirectFileDownloadService.download(
-            request: request, to: destination,
-            expectedSizeHint: declaredLength, maximumBytes: maximumBytes
-        ) { written, expected in
+        let startedAt = Date()
+        let reportProgress: @Sendable (Int64, Int64) -> Void = { written, expected in
             Task { @MainActor in
                 progress.report(phase, written: written, expected: expected > 0 ? expected : nil)
             }
         }
-        guard (200..<300).contains(response.statusCode) else {
-            throw Failure.invalidResponse(response.statusCode)
+
+        // The normal audio downloader already avoids Googlevideo's slow single-response pacing
+        // with validated byte ranges. Fast-playback preparation must use the same transport.
+        var usedRanges = false
+        if case .audio = phase, let declaredLength, declaredLength > 64 * 1024 {
+            do {
+                usedRanges = try await RangedAudioDownloadService.download(
+                    request: request, to: destination, totalBytes: declaredLength,
+                    onProgress: reportProgress
+                )
+                if !usedRanges {
+                    log.info("Fast playback audio range probe unsupported; using one request")
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let nsError = error as NSError
+                log.notice("Fast playback audio range transfer failed: \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public); retrying as one request")
+                try? FileManager.default.removeItem(at: destination)
+            }
+        }
+
+        if !usedRanges {
+            try Task.checkCancellation()
+            let response = try await DirectFileDownloadService.download(
+                request: request, to: destination,
+                expectedSizeHint: declaredLength, maximumBytes: maximumBytes,
+                onProgress: reportProgress
+            )
+            guard (200..<300).contains(response.statusCode) else {
+                throw Failure.invalidResponse(response.statusCode)
+            }
         }
         let transferredBytes = try fileSize(at: destination)
+        if let declaredLength, transferredBytes != declaredLength {
+            log.notice("Fast playback \(phase.rawValue, privacy: .public) declared \(declaredLength, privacy: .public) bytes but received \(transferredBytes, privacy: .public); validating media before use")
+        }
         progress.completed(phase, bytes: transferredBytes)
-        log.info("Fast playback \(phase.rawValue, privacy: .public) completed: \(transferredBytes, privacy: .public) bytes")
+        log.info("Fast playback \(phase.rawValue, privacy: .public) completed: \(transferredBytes, privacy: .public) bytes in \(Date().timeIntervalSince(startedAt), privacy: .public)s mode=\(usedRanges ? "ranges" : "single", privacy: .public)")
         try Task.checkCancellation()
     }
 
