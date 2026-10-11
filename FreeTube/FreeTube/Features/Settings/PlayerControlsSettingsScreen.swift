@@ -105,6 +105,7 @@ struct PlayerControlsSettingsScreen: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .tint(.green)
                 }
             }
         }

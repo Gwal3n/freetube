@@ -82,13 +82,13 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Своя скорость…" } }
       }
     },
-    "Custom speeds" : {
+    "Playback speeds" : {
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeiten" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom speeds" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Velocidades personalizadas" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vitesses personnalisées" } },
-        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Свои скорости" } }
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Wiedergabegeschwindigkeiten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback speeds" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Velocidades de reproducción" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vitesses de lecture" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скорости воспроизведения" } }
       }
     },
     "Enter 0.25× to 5×, with up to two decimal places." : {
@@ -100,22 +100,13 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите от 0,25× до 5×, не более двух знаков после запятой." } }
       }
     },
-    "No custom speeds" : {
+    "Speeds appear in the player and default speed picker. 1× cannot be removed." : {
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Keine eigenen Geschwindigkeiten" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No custom speeds" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay velocidades personalizadas" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune vitesse personnalisée" } },
-        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет своих скоростей" } }
-      }
-    },
-    "Saved speeds appear in the player’s speed menu and in the default speed picker." : {
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherte Geschwindigkeiten erscheinen im Player-Menü und bei der Standardgeschwindigkeit." } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved speeds appear in the player’s speed menu and in the default speed picker." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Las velocidades guardadas aparecen en el menú del reproductor y en la velocidad predeterminada." } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les vitesses enregistrées apparaissent dans le menu du lecteur et le choix de vitesse par défaut." } },
-        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранённые скорости доступны в меню плеера и при выборе скорости по умолчанию." } }
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Diese Geschwindigkeiten erscheinen im Player und bei der Standardgeschwindigkeit. 1× kann nicht entfernt werden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Speeds appear in the player and default speed picker. 1× cannot be removed." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Estas velocidades aparecen en el reproductor y en la selección predeterminada. No se puede quitar 1×." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ces vitesses figurent dans le lecteur et le choix par défaut. La vitesse 1× ne peut pas être supprimée." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Эти скорости доступны в плеере и в выборе скорости по умолчанию. 1× нельзя удалить." } }
       }
     },
     "Set Speed" : {

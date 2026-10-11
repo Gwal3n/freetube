@@ -5,7 +5,8 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerTopControls: View {
     @AppStorage("playerMoreMenuDividers") private var moreMenuDividersRaw = ""
-    @AppStorage("customPlaybackSpeeds") private var savedRatesRaw = ""
+    @AppStorage("playbackSpeedChoices") private var savedRatesRaw = ""
+    @AppStorage("customPlaybackSpeeds") private var legacyCustomRatesRaw = ""
     @State private var isEnteringCustomSpeed = false
     @State private var customSpeedText = ""
 
@@ -354,7 +355,10 @@ struct PlayerTopControls: View {
     }
 
     private var availableSpeedRates: [Double] {
-        Array(Set(PlaybackSpeedPresets.quickRates + PlaybackSpeedPresets.decode(savedRatesRaw))).sorted()
+        PlaybackSpeedPresets.availableRates(
+            savedRaw: savedRatesRaw,
+            legacyCustomRaw: legacyCustomRatesRaw
+        )
     }
 
     private var qualityChoices: some View {

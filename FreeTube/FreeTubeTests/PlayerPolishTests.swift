@@ -4,6 +4,17 @@ import CoreGraphics
 
 @MainActor
 final class PlayerPolishTests: XCTestCase {
+    func testPlaybackSpeedChoicesMigrateCustomSpeedsAndKeepNormalRate() {
+        let initial = PlaybackSpeedPresets.availableRates(savedRaw: "", legacyCustomRaw: "3")
+        XCTAssertTrue(initial.contains(0.25))
+        XCTAssertTrue(initial.contains(1))
+        XCTAssertTrue(initial.contains(3))
+
+        let edited = PlaybackSpeedPresets.availableRates(savedRaw: "0.5;3", legacyCustomRaw: "4")
+        XCTAssertEqual(edited, [0.5, 1, 3])
+        XCTAssertEqual(PlaybackSpeedPresets.availableRates(savedRaw: "1", legacyCustomRaw: ""), [1])
+    }
+
     func testSleepTimerOptionsHaveOnlyTimedDurationsWhereExpected() {
         XCTAssertNil(SleepTimerOption.off.duration)
         XCTAssertNil(SleepTimerOption.endOfVideo.duration)

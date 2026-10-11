@@ -5,7 +5,8 @@ struct SettingsScreen: View {
     let onClose: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
-    @AppStorage("customPlaybackSpeeds") private var savedPlaybackSpeedsRaw = ""
+    @AppStorage("playbackSpeedChoices") private var savedPlaybackSpeedsRaw = ""
+    @AppStorage("customPlaybackSpeeds") private var legacyCustomPlaybackSpeedsRaw = ""
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -40,10 +41,15 @@ struct SettingsScreen: View {
                     .onChange(of: model.defaultPlaybackRate) { _, rate in
                         player.setPlaybackRate(rate)
                     }
+                    .onChange(of: savedPlaybackSpeedsRaw) { _, _ in
+                        if !defaultPlaybackRates.contains(model.defaultPlaybackRate) {
+                            model.defaultPlaybackRate = 1
+                        }
+                    }
                     NavigationLink {
-                        CustomPlaybackSpeedsScreen()
+                        CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
                     } label: {
-                        navigationLabel("Custom speeds", systemImage: "speedometer")
+                        navigationLabel("Playback speeds", systemImage: "speedometer")
                     }
                     .tint(.white)
                     Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
@@ -393,8 +399,10 @@ struct SettingsScreen: View {
     }
 
     private var defaultPlaybackRates: [Double] {
-        Array(Set(PlaybackSpeedPresets.settingsRates +
-                  PlaybackSpeedPresets.decode(savedPlaybackSpeedsRaw) + [model.defaultPlaybackRate])).sorted()
+        PlaybackSpeedPresets.availableRates(
+            savedRaw: savedPlaybackSpeedsRaw,
+            legacyCustomRaw: legacyCustomPlaybackSpeedsRaw
+        )
     }
 
     private var appVersion: String {

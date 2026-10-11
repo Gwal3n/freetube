@@ -2,31 +2,32 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct CustomPlaybackSpeedsScreen: View {
-    @AppStorage("customPlaybackSpeeds") private var savedRatesRaw = ""
+    @Binding var defaultPlaybackRate: Double
+    @AppStorage("playbackSpeedChoices") private var savedRatesRaw = ""
+    @AppStorage("customPlaybackSpeeds") private var legacyCustomRatesRaw = ""
     @State private var isAddingSpeed = false
     @State private var speedText = ""
 
     private var savedRates: [Double] {
-        PlaybackSpeedPresets.decode(savedRatesRaw)
+        PlaybackSpeedPresets.availableRates(
+            savedRaw: savedRatesRaw,
+            legacyCustomRaw: legacyCustomRatesRaw
+        )
     }
 
     var body: some View {
         List {
             Section {
-                if savedRates.isEmpty {
-                    Text("No custom speeds")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(savedRates, id: \.self) { rate in
-                        Text(verbatim: PlaybackSpeedPresets.label(rate))
-                    }
-                    .onDelete(perform: deleteSpeeds)
+                ForEach(savedRates, id: \.self) { rate in
+                    Text(verbatim: PlaybackSpeedPresets.label(rate))
+                        .deleteDisabled(rate == 1)
                 }
+                .onDelete(perform: deleteSpeeds)
             } footer: {
-                Text("Saved speeds appear in the player’s speed menu and in the default speed picker.")
+                Text("Speeds appear in the player and default speed picker. 1× cannot be removed.")
             }
         }
-        .navigationTitle("Custom speeds")
+        .navigationTitle("Playback speeds")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -57,6 +58,10 @@ struct CustomPlaybackSpeedsScreen: View {
     private func deleteSpeeds(at offsets: IndexSet) {
         var rates = savedRates
         rates.remove(atOffsets: offsets)
-        savedRatesRaw = PlaybackSpeedPresets.encode(rates)
+        let remaining = Array(Set(rates + [1])).sorted()
+        savedRatesRaw = PlaybackSpeedPresets.encode(remaining)
+        if !remaining.contains(defaultPlaybackRate) {
+            defaultPlaybackRate = 1
+        }
     }
 }
