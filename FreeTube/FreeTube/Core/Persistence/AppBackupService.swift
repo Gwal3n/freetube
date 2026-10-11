@@ -167,6 +167,8 @@ final class AppBackupService {
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview",
         "showContinueWatchingMenu", "showHistoryProgressBars", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
+        "sponsorBlockExclusiveAccessBehavior", "sponsorBlockPreviewBehavior",
+        "sponsorBlockMusicOfftopicBehavior", "sponsorBlockFillerBehavior",
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
         "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount"

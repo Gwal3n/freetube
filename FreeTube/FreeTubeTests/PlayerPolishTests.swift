@@ -15,6 +15,26 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(PlaybackSpeedPresets.availableRates(savedRaw: "1", legacyCustomRaw: ""), [1])
     }
 
+    func testAdditionalSponsorBlockCategoriesAreOptionalSkipSegments() {
+        let categories: [SponsorBlockCategory] = [
+            .exclusiveAccess, .preview, .musicOfftopic, .filler
+        ]
+        XCTAssertEqual(categories.map(\.rawValue), [
+            "exclusive_access", "preview", "music_offtopic", "filler"
+        ])
+        for category in categories {
+            XCTAssertTrue(SponsorBlockCategory.allCases.contains(category))
+            XCTAssertEqual(SponsorBlockBehavior.choices(for: category), [
+                .disabled, .showOnly, .autoSkip
+            ])
+        }
+    }
+
+    func testDownloadQualityCapsIncludeFourK() {
+        XCTAssertEqual(VideoQuality.p1440.heightCap, 1440)
+        XCTAssertEqual(VideoQuality.p2160.heightCap, 2160)
+    }
+
     func testSleepTimerOptionsHaveOnlyTimedDurationsWhereExpected() {
         XCTAssertNil(SleepTimerOption.off.duration)
         XCTAssertNil(SleepTimerOption.endOfVideo.duration)

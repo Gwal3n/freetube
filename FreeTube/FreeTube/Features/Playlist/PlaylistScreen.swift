@@ -216,9 +216,7 @@ struct PlaylistScreen: View {
                 }
             }
             PlaylistHeaderActionButton(title: downloadActionTitle(for: details.playlist.id), systemImage: "arrow.down.circle.fill") {
-                let preferred = UserPreferences().preferredQuality
-                let downloadQuality: VideoQuality = (preferred.heightCap ?? 1080) > 1080 ? .p1080 : preferred
-                playlistDownloads.start(details, quality: downloadQuality)
+                playlistDownloads.start(details, quality: UserPreferences().preferredQuality)
             }
             .disabled(isPlaylistDownloadActive(details.playlist.id)
                 || (details.videos.isEmpty && details.continuationToken == nil))

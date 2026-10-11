@@ -1,6 +1,42 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Exclusive access" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Exklusiver Zugang" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Exclusive access" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Acceso exclusivo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Accès exclusif" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Эксклюзивный доступ" } }
+      }
+    },
+    "Previews" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Vorschauen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previews" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Avances" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aperçus" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Анонсы" } }
+      }
+    },
+    "Non-music sections" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Abschnitte ohne Musik" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Non-music sections" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Secciones sin música" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passages sans musique" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Фрагменты без музыки" } }
+      }
+    },
+    "Filler" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Füllmaterial" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filler" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Relleno" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Remplissage" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Заполнители" } }
+      }
+    },
     "Custom order" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Reihenfolge" } },

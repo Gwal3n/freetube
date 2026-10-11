@@ -500,7 +500,7 @@ final class DownloadManager {
                 id: snapshotID, videoID: video.id, title: video.title,
                 state: .downloading(progress: 0), createdAt: .now
             ))
-            let resolved = try await NativeStreamService().resolve(video: video, quality: quality)
+            let resolved = try await resolveNativeDownloadSource(video: video, quality: quality)
             try Task.checkCancellation()
             try await downloadResolvedSource(
                 resolved,
@@ -533,8 +533,9 @@ final class DownloadManager {
             if NativeHLSDownloadService.isAuthorizationFailure(error) {
                 log.notice("native-download[\(video.id, privacy: .public)] authorization failed; invalidating the signed URL and resolving once more")
                 await StreamURLCache.shared.remove(videoID: video.id, formatID: "native-\(quality.rawValue)")
+                await StreamURLCache.shared.remove(videoID: video.id, formatID: "native-paired-\(quality.rawValue)")
                 do {
-                    let refreshed = try await NativeStreamService().resolve(video: video, quality: quality)
+                    let refreshed = try await resolveNativeDownloadSource(video: video, quality: quality)
                     try await downloadResolvedSource(
                         refreshed,
                         to: destination,
@@ -1151,6 +1152,27 @@ final class DownloadManager {
         }
     }
 
+    /// An explicit 1440p/2160p request gets first chance at separate native MP4/M4A streams.
+    /// A playable HLS master can have a lower ceiling, so accepting it first would silently
+    /// prevent a higher-resolution download even when a paired stream is available. Ordinary
+    /// downloads retain the faster HLS-first path; failure here falls back to that same path.
+    private func resolveNativeDownloadSource(video: Video, quality: VideoQuality) async throws -> NativeStreamResult {
+        let service = NativeStreamService()
+        if !video.isLive, (quality.heightCap ?? 0) > 1080 {
+            do {
+                let source = try await service.resolvePaired(video: video, quality: quality)
+                log.info("native-download[\(video.id, privacy: .public)] selected high-resolution paired source")
+                return source
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let nsError = error as NSError
+                log.notice("native-download[\(video.id, privacy: .public)] high-resolution pair unavailable; trying HLS: \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
+            }
+        }
+        return try await service.resolve(video: video, quality: quality)
+    }
+
     /// Materializes the native source used by playback. HLS, direct MP4, and separate MP4/M4A
     /// streams have distinct transfer paths; treating a video-only URL as a complete file would
     /// fail final validation and needlessly invoke the embedded Python fallback.
@@ -1294,6 +1316,12 @@ final class DownloadManager {
             guard playable, seconds.isFinite, seconds > 0, hasExpectedTracks else {
                 log.error("yt-dlp[\(videoID, privacy: .public)] validation: playable=\(playable, privacy: .public) duration=\(seconds, privacy: .public) videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
                 throw YouTubeServiceError.streamExtractionFailed
+            }
+            if let videoTrack = videoTracks.first,
+               let size = try? await videoTrack.load(.naturalSize),
+               size.width.isFinite, size.height.isFinite,
+               abs(size.width) < 100_000, abs(size.height) < 100_000 {
+                log.info("yt-dlp[\(videoID, privacy: .public)] output video dimensions=\(Int(size.width), privacy: .public)x\(Int(size.height), privacy: .public)")
             }
             log.info("yt-dlp[\(videoID, privacy: .public)] validation passed: size=\(size.int64Value, privacy: .public) duration=\(seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
         } catch {

@@ -105,9 +105,13 @@ struct UserPreferences {
     @AppStorage("sponsorBlockOutro") var sponsorBlockOutro: Bool = false
     @AppStorage("sponsorBlockSponsorBehavior") var sponsorBlockSponsorBehaviorRaw: String = SponsorBlockBehavior.autoSkip.rawValue
     @AppStorage("sponsorBlockSelfPromotionBehavior") var sponsorBlockSelfPromotionBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockExclusiveAccessBehavior") var sponsorBlockExclusiveAccessBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockInteractionBehavior") var sponsorBlockInteractionBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockIntroBehavior") var sponsorBlockIntroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockOutroBehavior") var sponsorBlockOutroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockPreviewBehavior") var sponsorBlockPreviewBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockMusicOfftopicBehavior") var sponsorBlockMusicOfftopicBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockFillerBehavior") var sponsorBlockFillerBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
 
     var preferredQuality: VideoQuality {
@@ -182,9 +186,13 @@ struct UserPreferences {
         switch category {
         case .sponsor: raw = sponsorBlockSponsorBehaviorRaw
         case .selfPromotion: raw = sponsorBlockSelfPromotionBehaviorRaw
+        case .exclusiveAccess: raw = sponsorBlockExclusiveAccessBehaviorRaw
         case .interaction: raw = sponsorBlockInteractionBehaviorRaw
         case .intro: raw = sponsorBlockIntroBehaviorRaw
         case .outro: raw = sponsorBlockOutroBehaviorRaw
+        case .preview: raw = sponsorBlockPreviewBehaviorRaw
+        case .musicOfftopic: raw = sponsorBlockMusicOfftopicBehaviorRaw
+        case .filler: raw = sponsorBlockFillerBehaviorRaw
         case .highlight: raw = sponsorBlockHighlightBehaviorRaw
         }
         return SponsorBlockBehavior(rawValue: raw) ?? .disabled
@@ -194,9 +202,13 @@ struct UserPreferences {
         switch category {
         case .sponsor: sponsorBlockSponsorBehaviorRaw = behavior.rawValue
         case .selfPromotion: sponsorBlockSelfPromotionBehaviorRaw = behavior.rawValue
+        case .exclusiveAccess: sponsorBlockExclusiveAccessBehaviorRaw = behavior.rawValue
         case .interaction: sponsorBlockInteractionBehaviorRaw = behavior.rawValue
         case .intro: sponsorBlockIntroBehaviorRaw = behavior.rawValue
         case .outro: sponsorBlockOutroBehaviorRaw = behavior.rawValue
+        case .preview: sponsorBlockPreviewBehaviorRaw = behavior.rawValue
+        case .musicOfftopic: sponsorBlockMusicOfftopicBehaviorRaw = behavior.rawValue
+        case .filler: sponsorBlockFillerBehaviorRaw = behavior.rawValue
         case .highlight: sponsorBlockHighlightBehaviorRaw = behavior.rawValue
         }
     }

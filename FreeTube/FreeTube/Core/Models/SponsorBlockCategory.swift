@@ -4,9 +4,13 @@ import Foundation
 enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable, Sendable {
     case sponsor
     case selfPromotion = "selfpromo"
+    case exclusiveAccess = "exclusive_access"
     case interaction
     case intro
     case outro
+    case preview
+    case musicOfftopic = "music_offtopic"
+    case filler
     case highlight = "poi_highlight"
 
     var id: String { rawValue }
@@ -15,9 +19,13 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
         switch self {
         case .sponsor: return String(localized: "Sponsors")
         case .selfPromotion: return String(localized: "Self-promotion")
+        case .exclusiveAccess: return String(localized: "Exclusive access")
         case .interaction: return String(localized: "Interaction reminders")
         case .intro: return String(localized: "Intros")
         case .outro: return String(localized: "Outros")
+        case .preview: return String(localized: "Previews")
+        case .musicOfftopic: return String(localized: "Non-music sections")
+        case .filler: return String(localized: "Filler")
         case .highlight: return String(localized: "Highlights")
         }
     }
