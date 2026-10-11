@@ -61,8 +61,7 @@ final class PlayerStateManager {
     /// Actual requested transport rate, capped at 2x until a ready item supports fast-forward.
     private(set) var effectivePlaybackRate: Double
     private(set) var isPreparingFastPlayback = false
-    private(set) var fastPlaybackPreparationPhase: FastPlaybackLocalFileService.Phase?
-    private(set) var fastPlaybackPreparationProgress: Double?
+    private(set) var fastPlaybackPreparation: FastPlaybackLocalFileService.ProgressUpdate?
     private(set) var playbackQuality: VideoQuality
     private(set) var sleepTimerOption: SleepTimerOption = .off
     var isAudioOnly: Bool { playbackQuality == .audioOnly }
@@ -936,8 +935,7 @@ final class PlayerStateManager {
             return
         }
         isPreparingFastPlayback = true
-        fastPlaybackPreparationPhase = .resolving
-        fastPlaybackPreparationProgress = nil
+        fastPlaybackPreparation = .init(phase: .resolving, completedBytes: 0, totalBytes: nil)
         fastPlaybackGeneration &+= 1
         let generation = fastPlaybackGeneration
         let session = playbackSessionID
@@ -984,8 +982,7 @@ final class PlayerStateManager {
         fastPlaybackTimeoutTask?.cancel()
         fastPlaybackTimeoutTask = nil
         isPreparingFastPlayback = false
-        fastPlaybackPreparationPhase = nil
-        fastPlaybackPreparationProgress = nil
+        fastPlaybackPreparation = nil
     }
 
     func cancelPendingFastPlayback() {
@@ -1017,8 +1014,7 @@ final class PlayerStateManager {
     private func failFastPlayback(message: String) {
         fastPlaybackFailed = true
         fastPlaybackUserRequested = false
-        fastPlaybackPreparationPhase = nil
-        fastPlaybackPreparationProgress = nil
+        fastPlaybackPreparation = nil
         if playbackRate > 2 {
             playbackRate = 2
             preferences.playbackRate = 2
@@ -1059,8 +1055,7 @@ final class PlayerStateManager {
                 fastPlaybackTimeoutTask?.cancel()
                 fastPlaybackTimeoutTask = nil
                 isPreparingFastPlayback = false
-                fastPlaybackPreparationPhase = nil
-                fastPlaybackPreparationProgress = nil
+                fastPlaybackPreparation = nil
                 isInstallingFastPlayback = false
                 resumeAfterFastPlaybackSwitch = nil
             }
@@ -1080,11 +1075,10 @@ final class PlayerStateManager {
                 log.info("Preparing temporary local file for fast playback of \(video.id, privacy: .public)")
                 let localFile = try await FastPlaybackLocalFileService.prepare(
                     videoURL: videoURL, audioURL: audioURL
-                ) { [weak self] phase, progress in
+                ) { [weak self] update in
                     guard let self, self.fastPlaybackGeneration == generation,
                           self.playbackSessionID == session else { return }
-                    self.fastPlaybackPreparationPhase = phase
-                    self.fastPlaybackPreparationProgress = progress
+                    self.fastPlaybackPreparation = update
                 }
                 preparedLocalFile = localFile
                 itemToProbe = AVPlayerItem(url: localFile)
@@ -1133,6 +1127,12 @@ final class PlayerStateManager {
               playbackSessionID == session, player.currentItem === replacement else { return }
 
         if case .ready = readiness, replacement.canPlayFastForward {
+            let originalDuration = originalItem.duration.seconds
+            let replacementDuration = replacement.duration.seconds
+            if originalDuration.isFinite, replacementDuration.isFinite,
+               abs(originalDuration - replacementDuration) > 2 {
+                log.notice("Fast playback source duration mismatch: original=\(originalDuration, privacy: .public)s replacement=\(replacementDuration, privacy: .public)s")
+            }
             await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: replacement)
             guard !Task.isCancelled, fastPlaybackGeneration == generation, playbackSessionID == session,
                   player.currentItem === replacement else { return }

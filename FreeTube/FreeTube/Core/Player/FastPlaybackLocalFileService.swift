@@ -23,7 +23,85 @@ final class FastPlaybackLocalFileService {
         case exportFailed
     }
 
-    typealias ProgressHandler = @MainActor @Sendable (Phase, Double?) -> Void
+    struct ProgressUpdate: Sendable {
+        let phase: Phase
+        let completedBytes: Int64
+        let totalBytes: Int64?
+
+        var fraction: Double? {
+            guard let totalBytes, totalBytes > 0 else { return nil }
+            return min(1, max(0, Double(completedBytes) / Double(totalBytes)))
+        }
+    }
+
+    typealias ProgressHandler = @MainActor @Sendable (ProgressUpdate) -> Void
+
+    /// The indicator has one byte counter for the complete video + audio transfer. `clen`
+    /// can supply both sizes before either transfer starts; if it does not, the indicator
+    /// stays indeterminate until the second size is known rather than showing a false percentage.
+    @MainActor
+    private final class ProgressAccumulator {
+        private let onProgress: ProgressHandler
+        private var videoBytes: Int64 = 0
+        private var audioBytes: Int64 = 0
+        private var expectedVideoBytes: Int64?
+        private var expectedAudioBytes: Int64?
+        private var videoDone = false
+        private var audioDone = false
+
+        init(videoURL: URL, audioURL: URL, onProgress: @escaping ProgressHandler) {
+            self.onProgress = onProgress
+            expectedVideoBytes = FastPlaybackLocalFileService.declaredSize(of: videoURL)
+            expectedAudioBytes = FastPlaybackLocalFileService.declaredSize(of: audioURL)
+        }
+
+        func report(_ phase: Phase, written: Int64, expected: Int64?) {
+            switch phase {
+            case .video:
+                guard !videoDone else { return }
+                videoBytes = max(videoBytes, written)
+                if let expected, expected > 0 { expectedVideoBytes = expected }
+            case .audio:
+                guard !audioDone else { return }
+                audioBytes = max(audioBytes, written)
+                if let expected, expected > 0 { expectedAudioBytes = expected }
+            case .resolving, .finishing:
+                break
+            }
+            emit(phase)
+        }
+
+        func completed(_ phase: Phase, bytes: Int64) {
+            switch phase {
+            case .video:
+                videoDone = true
+                videoBytes = bytes
+                expectedVideoBytes = bytes
+            case .audio:
+                audioDone = true
+                audioBytes = bytes
+                expectedAudioBytes = bytes
+            case .resolving, .finishing:
+                break
+            }
+            emit(phase)
+        }
+
+        func emit(_ phase: Phase) {
+            let total: Int64?
+            if let expectedVideoBytes, let expectedAudioBytes,
+               expectedVideoBytes <= Int64.max - expectedAudioBytes {
+                total = expectedVideoBytes + expectedAudioBytes
+            } else {
+                total = nil
+            }
+            onProgress(ProgressUpdate(
+                phase: phase,
+                completedBytes: videoBytes + audioBytes,
+                totalBytes: total
+            ))
+        }
+    }
 
     /// Keep enough space for both input files and their exported copy. This is a per-request
     /// ceiling, not a persistent cache: iOS may remove temporary files after app termination.
@@ -49,6 +127,10 @@ final class FastPlaybackLocalFileService {
         onProgress: @escaping ProgressHandler
     ) async throws -> URL {
         try Task.checkCancellation()
+        let progress = ProgressAccumulator(
+            videoURL: videoURL, audioURL: audioURL, onProgress: onProgress
+        )
+        progress.emit(.video)
         let startedAt = Date()
         let workDirectory = rootDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -73,18 +155,18 @@ final class FastPlaybackLocalFileService {
 
         try await transfer(
             videoURL, to: videoFile, maximumBytes: mediaLimit,
-            phase: .video, onProgress: onProgress
+            phase: .video, progress: progress
         )
         try Task.checkCancellation()
         let videoBytes = try fileSize(at: videoFile)
         guard videoBytes < mediaLimit else { throw Failure.insufficientSpace }
         try await transfer(
             audioURL, to: audioFile, maximumBytes: mediaLimit - videoBytes,
-            phase: .audio, onProgress: onProgress
+            phase: .audio, progress: progress
         )
         try Task.checkCancellation()
 
-        onProgress(.finishing, nil)
+        progress.emit(.finishing)
         let videoAsset = AVURLAsset(url: videoFile)
         let audioAsset = AVURLAsset(url: audioFile)
         guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
@@ -98,6 +180,7 @@ final class FastPlaybackLocalFileService {
               videoDuration.seconds > 0, audioDuration.seconds > 0 else {
             throw Failure.missingTracks
         }
+        log.info("Fast playback source durations: video=\(videoDuration.seconds, privacy: .public)s audio=\(audioDuration.seconds, privacy: .public)s")
         let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
         try Task.checkCancellation()
         let composition = AVMutableComposition()
@@ -125,7 +208,7 @@ final class FastPlaybackLocalFileService {
         exporter.outputURL = outputFile
         exporter.outputFileType = .mp4
         exporter.shouldOptimizeForNetworkUse = false
-        try await export(exporter, onProgress: onProgress)
+        try await export(exporter)
         try Task.checkCancellation()
         guard try fileSize(at: outputFile) > 1_024 else { throw Failure.exportFailed }
         let finalAsset = AVURLAsset(url: outputFile)
@@ -135,6 +218,9 @@ final class FastPlaybackLocalFileService {
             throw Failure.missingTracks
         }
         let outputBytes = try fileSize(at: outputFile)
+        if let outputDuration = try? await finalAsset.load(.duration) {
+            log.info("Fast playback mux duration=\(outputDuration.seconds, privacy: .public)s")
+        }
         log.info("Fast playback temporary preparation completed: output=\(outputBytes, privacy: .public) bytes elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s")
         completed = true
         return outputFile
@@ -151,45 +237,35 @@ final class FastPlaybackLocalFileService {
         to destination: URL,
         maximumBytes: Int64,
         phase: Phase,
-        onProgress: @escaping ProgressHandler
+        progress: ProgressAccumulator
     ) async throws {
         var request = URLRequest(url: source)
         request.httpShouldHandleCookies = false
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 60
-        let declaredLength = URLComponents(url: source, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int64.init)
+        let declaredLength = declaredSize(of: source)
         if let declaredLength, declaredLength > maximumBytes {
             throw DirectFileDownloadService.Failure.sizeLimitExceeded
         }
-        onProgress(phase, nil)
+        progress.emit(phase)
         let response = try await DirectFileDownloadService.download(
             request: request, to: destination,
             expectedSizeHint: declaredLength, maximumBytes: maximumBytes
         ) { written, expected in
             Task { @MainActor in
-                onProgress(phase, expected > 0 ? min(1, Double(written) / Double(expected)) : nil)
+                progress.report(phase, written: written, expected: expected > 0 ? expected : nil)
             }
         }
         guard (200..<300).contains(response.statusCode) else {
             throw Failure.invalidResponse(response.statusCode)
         }
         let transferredBytes = try fileSize(at: destination)
+        progress.completed(phase, bytes: transferredBytes)
         log.info("Fast playback \(phase.rawValue, privacy: .public) completed: \(transferredBytes, privacy: .public) bytes")
         try Task.checkCancellation()
     }
 
-    private static func export(
-        _ exporter: AVAssetExportSession,
-        onProgress: @escaping ProgressHandler
-    ) async throws {
-        let progressTask = Task { @MainActor in
-            while !Task.isCancelled {
-                onProgress(.finishing, Double(exporter.progress))
-                try? await Task.sleep(for: .milliseconds(250))
-            }
-        }
-        defer { progressTask.cancel() }
+    private static func export(_ exporter: AVAssetExportSession) async throws {
         try Task.checkCancellation()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -214,5 +290,12 @@ final class FastPlaybackLocalFileService {
     private static func fileSize(at url: URL) throws -> Int64 {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    private static func declaredSize(of url: URL) -> Int64? {
+        guard let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "clen" })?.value,
+              let size = Int64(value), size > 0 else { return nil }
+        return size
     }
 }

@@ -5,29 +5,40 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct FastPlaybackProgressOverlay: View {
     let requestedRate: Double
-    let phase: FastPlaybackLocalFileService.Phase
-    let progress: Double?
+    let preparation: FastPlaybackLocalFileService.ProgressUpdate
     let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            if let progress {
-                ProgressView(value: progress)
-                    .tint(.white)
-                    .frame(width: 36)
-            } else {
-                ProgressView()
-                    .tint(.white)
-                    .controlSize(.mini)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text("Preparing \(PlaybackSpeedPresets.label(requestedRate)) playback")
                     .font(.caption.weight(.semibold))
-                Text(phaseText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+
+                if let fraction = preparation.fraction {
+                    ProgressView(value: fraction)
+                        .tint(.white)
+                        .progressViewStyle(.linear)
+                } else {
+                    ProgressView()
+                        .tint(.white)
+                        .progressViewStyle(.linear)
+                }
+
+                HStack(spacing: 4) {
+                    Text(preparation.phase.rawValue)
+                    Spacer(minLength: 4)
+                    if let totalBytes = preparation.totalBytes {
+                        Text("\(formatted(preparation.completedBytes)) / \(formatted(totalBytes))")
+                            .monospacedDigit()
+                    } else if preparation.completedBytes > 0 {
+                        Text("\(formatted(preparation.completedBytes)) downloaded")
+                            .monospacedDigit()
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
+            .frame(width: 215)
 
             Button(action: onCancel) {
                 Image(systemName: "xmark")
@@ -46,10 +57,7 @@ struct FastPlaybackProgressOverlay: View {
         .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 
-    private var phaseText: String {
-        if let progress {
-            return "\(phase.rawValue) \(Int((progress * 100).rounded()))%"
-        }
-        return phase.rawValue
+    private func formatted(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 }

@@ -374,11 +374,10 @@ struct FullScreenPlayer: View {
                             .opacity(max(0, 1 - collapseProgress * 2.5))
                     }
                     if !isFloating,
-                       let phase = player.fastPlaybackPreparationPhase {
+                       let preparation = player.fastPlaybackPreparation {
                         FastPlaybackProgressOverlay(
                             requestedRate: player.playbackRate,
-                            phase: phase,
-                            progress: player.fastPlaybackPreparationProgress,
+                            preparation: preparation,
                             onCancel: { player.cancelPendingFastPlayback() }
                         )
                         .position(
