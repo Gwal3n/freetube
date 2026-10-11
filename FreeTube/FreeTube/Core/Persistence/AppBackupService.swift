@@ -168,6 +168,7 @@ final class AppBackupService {
         "showContinueWatchingMenu", "showHistoryProgressBars", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
         "sponsorBlockExclusiveAccessBehavior", "sponsorBlockPreviewBehavior",
+        "sponsorBlockHookBehavior", "sponsorBlockChapterBehavior",
         "sponsorBlockMusicOfftopicBehavior", "sponsorBlockFillerBehavior",
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",

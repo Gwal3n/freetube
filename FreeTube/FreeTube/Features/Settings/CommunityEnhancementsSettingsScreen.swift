@@ -26,7 +26,7 @@ struct CommunityEnhancementsSettingsScreen: View {
             } header: {
                 Text("Categories")
             } footer: {
-                Text("Show only adds a timeline marker. Ask offers to jump to the video's highlight when one is available.")
+                Text("Show only marks skip segments on the timeline. Community chapters appear in the chapter list, and full-video labels mark the whole timeline. Ask offers to jump to a highlight.")
             }
             .disabled(!model.sponsorBlockEnabled)
 

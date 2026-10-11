@@ -81,7 +81,16 @@ struct SponsorBlockTimeline: View {
                     }
                     Capsule().fill(.red).frame(width: width * progress, height: 4)
 
-                    ForEach(segments, id: \.id) { segment in
+                    // Full-video labels are annotations, never a seek target. Keep their slim
+                    // stripe below the progress track so the red playback position stays clear.
+                    if segments.contains(where: { $0.category == .exclusiveAccess }) {
+                        Capsule()
+                            .fill(color(for: .exclusiveAccess))
+                            .frame(width: width, height: 2)
+                            .offset(y: 5)
+                    }
+
+                    ForEach(segments.filter { $0.category != .chapter && $0.category != .exclusiveAccess }, id: \.id) { segment in
                         let segmentWidth = width * fraction(for: segment.endTime - segment.startTime)
                         RoundedRectangle(cornerRadius: 1)
                             .fill(color(for: segment.category))
@@ -178,9 +187,11 @@ struct SponsorBlockTimeline: View {
         case .intro: return .cyan
         case .outro: return .blue
         case .preview: return Color(red: 0, green: 143.0 / 255, blue: 214.0 / 255)
+        case .hook: return Color(red: 1, green: 128.0 / 255, blue: 0)
         case .musicOfftopic: return Color(red: 1, green: 153.0 / 255, blue: 0)
         case .filler: return Color(red: 115.0 / 255, green: 0, blue: 1)
         case .highlight: return .purple
+        case .chapter: return .white
         }
     }
 

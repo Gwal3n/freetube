@@ -21,12 +21,14 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
         let uuid: String
         let category: String
         let actionType: String?
+        let description: String?
 
         private enum CodingKeys: String, CodingKey {
             case segment
             case uuid = "UUID"
             case category
             case actionType
+            case description
         }
     }
 
@@ -77,30 +79,54 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
         }
         guard data.count <= 1_048_576 else { throw URLError(.cannotDecodeContentData) }
 
+        let result = try Self.decodeSegments(data, videoID: videoID, categories: categories)
+        if !result.isEmpty { cache.setObject(CacheEntry(segments: result), forKey: cacheKey) }
+        return result
+    }
+
+    /// Keeps SponsorBlock's chapter and full-video actions distinct from skippable ranges.
+    static func decodeSegments(
+        _ data: Data,
+        videoID: String,
+        categories: Set<SponsorBlockCategory>
+    ) throws -> [SponsorBlockSegment] {
         let payload = try JSONDecoder().decode([VideoPayload].self, from: data)
-        let allowed = Set(categoryValues)
         let result = payload
             .first(where: { $0.videoID == videoID })?
             .segments
             .compactMap { item -> SponsorBlockSegment? in
                 guard item.segment.count == 2,
-                      allowed.contains(item.category),
                       let category = SponsorBlockCategory(rawValue: item.category),
-                      item.actionType == nil || item.actionType == "skip" ||
-                        (category == .highlight && item.actionType == "poi") else { return nil }
+                      categories.contains(category) else { return nil }
                 let start = item.segment[0]
                 let end = item.segment[1]
-                guard start.isFinite, end.isFinite, start >= 0,
-                      (category == .highlight ? end >= start : end > start) else { return nil }
+                guard start.isFinite, end.isFinite, start >= 0 else { return nil }
+                let title: String?
+                switch category {
+                case .exclusiveAccess:
+                    guard item.actionType == "full", start == 0, end == 0 else { return nil }
+                    title = nil
+                case .highlight:
+                    guard item.actionType == "poi", end == start else { return nil }
+                    title = nil
+                case .chapter:
+                    guard item.actionType == "chapter", end > start,
+                          let description = item.description?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !description.isEmpty else { return nil }
+                    title = description
+                default:
+                    guard (item.actionType == nil || item.actionType == "skip"), end > start else { return nil }
+                    title = nil
+                }
                 return SponsorBlockSegment(
                     id: item.uuid,
                     startTime: start,
                     endTime: end,
-                    category: category
+                    category: category,
+                    title: title
                 )
             }
             .sorted { $0.startTime < $1.startTime } ?? []
-        if !result.isEmpty { cache.setObject(CacheEntry(segments: result), forKey: cacheKey) }
         return result
     }
 }

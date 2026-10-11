@@ -9,9 +9,11 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
     case intro
     case outro
     case preview
+    case hook
     case musicOfftopic = "music_offtopic"
     case filler
     case highlight = "poi_highlight"
+    case chapter
 
     var id: String { rawValue }
 
@@ -24,9 +26,11 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
         case .intro: return String(localized: "Intros")
         case .outro: return String(localized: "Outros")
         case .preview: return String(localized: "Previews")
+        case .hook: return String(localized: "Hooks and greetings")
         case .musicOfftopic: return String(localized: "Non-music sections")
         case .filler: return String(localized: "Filler")
         case .highlight: return String(localized: "Highlights")
+        case .chapter: return String(localized: "Community chapters")
         }
     }
 }
@@ -49,6 +53,10 @@ enum SponsorBlockBehavior: String, CaseIterable, Identifiable, Sendable {
     }
 
     static func choices(for category: SponsorBlockCategory) -> [SponsorBlockBehavior] {
-        category == .highlight ? [.disabled, .showOnly, .ask] : [.disabled, .showOnly, .autoSkip]
+        switch category {
+        case .highlight: return [.disabled, .showOnly, .ask]
+        case .exclusiveAccess, .chapter: return [.disabled, .showOnly]
+        default: return [.disabled, .showOnly, .autoSkip]
+        }
     }
 }

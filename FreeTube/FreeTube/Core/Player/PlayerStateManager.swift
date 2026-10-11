@@ -71,6 +71,8 @@ final class PlayerStateManager {
     private(set) var sponsorBlockNotice: SponsorBlockNotice?
     private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
     private(set) var chapters: [VideoChapter] = []
+    private var youtubeChapters: [VideoChapter] = []
+    private var communityChapters: [VideoChapter] = []
     private(set) var storyboard: VideoStoryboard?
     /// Source tracks from the accepted playback response; signed URLs remain memory-only.
     private(set) var captionTracks: [VideoCaptionTrack] = []
@@ -312,7 +314,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
         clearSponsorBlockState()
-        chapters = []
+        clearChapterState()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
@@ -365,7 +367,7 @@ final class PlayerStateManager {
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
-        chapters = []
+        clearChapterState()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
@@ -477,7 +479,7 @@ final class PlayerStateManager {
         recommendationTask?.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
-        chapters = []
+        clearChapterState()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
@@ -617,7 +619,8 @@ final class PlayerStateManager {
             ))
         }
         if !info.chapters.isEmpty {
-            chapters = info.chapters
+            youtubeChapters = info.chapters
+            updateDisplayedChapters()
         }
         if let resolvedStoryboard = info.storyboard {
             storyboard = resolvedStoryboard
@@ -1653,7 +1656,7 @@ final class PlayerStateManager {
         contentPrefetchTask?.cancel()
         contentPrefetchTask = nil
         clearSponsorBlockState()
-        chapters = []
+        clearChapterState()
         storyboard = nil
         captionTracks = []
         recommendationBacklog = []
@@ -1766,6 +1769,17 @@ final class PlayerStateManager {
         removeSponsorBlockBoundaryObservers()
         sponsorBlockSegments = segments
         handledSponsorBlockSegmentIDs.removeAll()
+        var chapterStarts = Set<TimeInterval>()
+        communityChapters = segments.compactMap { segment in
+            guard segment.category == .chapter,
+                  let title = segment.title,
+                  chapterStarts.insert(segment.startTime).inserted else { return nil }
+            return VideoChapter(
+                title: title, startTime: segment.startTime,
+                timeDescription: nil, thumbnailURL: nil
+            )
+        }
+        updateDisplayedChapters()
 
         for segment in segments where shouldObserveSponsorBlockSegment(segment) {
             let boundary = NSValue(time: CMTime(seconds: segment.startTime, preferredTimescale: 600))
@@ -1793,7 +1807,10 @@ final class PlayerStateManager {
 
         // The lookup may finish after playback has already entered a segment. Boundary observers
         // cannot fire retroactively, so evaluate the current position once immediately.
-        if let current = segments.first(where: { elapsed >= $0.startTime && elapsed < $0.endTime }) {
+        if let current = segments.first(where: {
+            shouldObserveSponsorBlockSegment($0)
+                && elapsed >= $0.startTime && elapsed < $0.endTime
+        }) {
             handleSponsorBlockSegment(current, enteredAt: elapsed)
         }
     }
@@ -1801,6 +1818,9 @@ final class PlayerStateManager {
     private func shouldObserveSponsorBlockSegment(_ segment: SponsorBlockSegment) -> Bool {
         let behavior = preferences.sponsorBlockBehavior(for: segment.category)
         return behavior == .autoSkip
+            && segment.category != .exclusiveAccess
+            && segment.category != .highlight
+            && segment.category != .chapter
     }
 
     private func handleSponsorBlockSegment(at time: TimeInterval) {
@@ -1816,9 +1836,8 @@ final class PlayerStateManager {
         _ segment: SponsorBlockSegment,
         enteredAt explicitEntryTime: TimeInterval? = nil
     ) {
-        let behavior = preferences.sponsorBlockBehavior(for: segment.category)
         guard preferences.sponsorBlockEnabled,
-              behavior != .disabled,
+              shouldObserveSponsorBlockSegment(segment),
               !handledSponsorBlockSegmentIDs.contains(segment.id),
               currentVideo != nil else { return }
         let currentTime = explicitEntryTime ?? player.currentTime().seconds
@@ -1826,7 +1845,6 @@ final class PlayerStateManager {
               currentTime >= segment.startTime - 0.5,
               currentTime < segment.endTime - 0.1 else { return }
 
-        guard behavior == .autoSkip else { return }
         handledSponsorBlockSegmentIDs.insert(segment.id)
         sponsorBlockNoticeTask?.cancel()
 
@@ -1863,6 +1881,18 @@ final class PlayerStateManager {
         sponsorBlockSegments = []
         handledSponsorBlockSegmentIDs.removeAll()
         removeSponsorBlockBoundaryObservers()
+    }
+
+    private func clearChapterState() {
+        youtubeChapters = []
+        communityChapters = []
+        chapters = []
+    }
+
+    private func updateDisplayedChapters() {
+        // Community chapters are a separate optional source. If none were submitted, retain
+        // YouTube chapters; neither source is mixed with the other or used for automatic seeks.
+        chapters = communityChapters.isEmpty ? youtubeChapters : communityChapters
     }
 
     private func removeSponsorBlockBoundaryObservers() {

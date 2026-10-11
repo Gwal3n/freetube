@@ -110,9 +110,11 @@ struct UserPreferences {
     @AppStorage("sponsorBlockIntroBehavior") var sponsorBlockIntroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockOutroBehavior") var sponsorBlockOutroBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockPreviewBehavior") var sponsorBlockPreviewBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    @AppStorage("sponsorBlockHookBehavior") var sponsorBlockHookBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockMusicOfftopicBehavior") var sponsorBlockMusicOfftopicBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockFillerBehavior") var sponsorBlockFillerBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
+    @AppStorage("sponsorBlockChapterBehavior") var sponsorBlockChapterBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
 
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
@@ -191,11 +193,16 @@ struct UserPreferences {
         case .intro: raw = sponsorBlockIntroBehaviorRaw
         case .outro: raw = sponsorBlockOutroBehaviorRaw
         case .preview: raw = sponsorBlockPreviewBehaviorRaw
+        case .hook: raw = sponsorBlockHookBehaviorRaw
         case .musicOfftopic: raw = sponsorBlockMusicOfftopicBehaviorRaw
         case .filler: raw = sponsorBlockFillerBehaviorRaw
         case .highlight: raw = sponsorBlockHighlightBehaviorRaw
+        case .chapter: raw = sponsorBlockChapterBehaviorRaw
         }
-        return SponsorBlockBehavior(rawValue: raw) ?? .disabled
+        let behavior = SponsorBlockBehavior(rawValue: raw) ?? .disabled
+        // Earlier builds offered Auto skip for full-video labels. Preserve that user's enabled
+        // choice without ever seeking to the end of a video or treating chapters as skip ranges.
+        return SponsorBlockBehavior.choices(for: category).contains(behavior) ? behavior : .showOnly
     }
 
     mutating func setSponsorBlockBehavior(_ behavior: SponsorBlockBehavior, for category: SponsorBlockCategory) {
@@ -207,9 +214,11 @@ struct UserPreferences {
         case .intro: sponsorBlockIntroBehaviorRaw = behavior.rawValue
         case .outro: sponsorBlockOutroBehaviorRaw = behavior.rawValue
         case .preview: sponsorBlockPreviewBehaviorRaw = behavior.rawValue
+        case .hook: sponsorBlockHookBehaviorRaw = behavior.rawValue
         case .musicOfftopic: sponsorBlockMusicOfftopicBehaviorRaw = behavior.rawValue
         case .filler: sponsorBlockFillerBehaviorRaw = behavior.rawValue
         case .highlight: sponsorBlockHighlightBehaviorRaw = behavior.rawValue
+        case .chapter: sponsorBlockChapterBehaviorRaw = behavior.rawValue
         }
     }
 

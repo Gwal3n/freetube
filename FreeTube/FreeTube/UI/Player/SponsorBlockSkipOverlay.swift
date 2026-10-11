@@ -76,9 +76,11 @@ struct SponsorBlockSkipOverlay: View {
         case .intro: return .cyan
         case .outro: return .blue
         case .preview: return Color(red: 0, green: 143.0 / 255, blue: 214.0 / 255)
+        case .hook: return Color(red: 1, green: 128.0 / 255, blue: 0)
         case .musicOfftopic: return Color(red: 1, green: 153.0 / 255, blue: 0)
         case .filler: return Color(red: 115.0 / 255, green: 0, blue: 1)
         case .highlight: return .purple
+        case .chapter: return .white
         }
     }
 }

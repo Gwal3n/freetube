@@ -15,19 +15,33 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(PlaybackSpeedPresets.availableRates(savedRaw: "1", legacyCustomRaw: ""), [1])
     }
 
-    func testAdditionalSponsorBlockCategoriesAreOptionalSkipSegments() {
-        let categories: [SponsorBlockCategory] = [
-            .exclusiveAccess, .preview, .musicOfftopic, .filler
-        ]
-        XCTAssertEqual(categories.map(\.rawValue), [
-            "exclusive_access", "preview", "music_offtopic", "filler"
-        ])
-        for category in categories {
-            XCTAssertTrue(SponsorBlockCategory.allCases.contains(category))
-            XCTAssertEqual(SponsorBlockBehavior.choices(for: category), [
-                .disabled, .showOnly, .autoSkip
-            ])
-        }
+    func testSponsorBlockCategoriesRespectTheirActionTypes() {
+        XCTAssertEqual(Set(SponsorBlockCategory.allCases.map(\.rawValue)), Set([
+            "sponsor", "selfpromo", "exclusive_access", "interaction", "intro", "outro",
+            "preview", "hook", "music_offtopic", "filler", "poi_highlight", "chapter"
+        ]))
+        XCTAssertEqual(SponsorBlockBehavior.choices(for: .hook), [.disabled, .showOnly, .autoSkip])
+        XCTAssertEqual(SponsorBlockBehavior.choices(for: .exclusiveAccess), [.disabled, .showOnly])
+        XCTAssertEqual(SponsorBlockBehavior.choices(for: .chapter), [.disabled, .showOnly])
+        XCTAssertEqual(SponsorBlockBehavior.choices(for: .highlight), [.disabled, .showOnly, .ask])
+    }
+
+    func testSponsorBlockDecodesSkipFullVideoAndCommunityChapterActions() throws {
+        let json = """
+            [{"videoID":"abc12345678","segments":[
+                {"segment":[1,9],"UUID":"hook","category":"hook","actionType":"skip"},
+                {"segment":[0,0],"UUID":"full","category":"exclusive_access","actionType":"full"},
+                {"segment":[10,20],"UUID":"chapter","category":"chapter","actionType":"chapter","description":"Opening"},
+                {"segment":[0,10],"UUID":"bad-full","category":"exclusive_access","actionType":"skip"},
+                {"segment":[20,30],"UUID":"bad-chapter","category":"chapter","actionType":"skip"}
+            ]}]
+            """
+        let segments = try SponsorBlockService.decodeSegments(
+            Data(json.utf8), videoID: "abc12345678", categories: Set(SponsorBlockCategory.allCases)
+        )
+        XCTAssertEqual(Set(segments.map(\.id)), ["hook", "full", "chapter"])
+        XCTAssertEqual(segments.first(where: { $0.id == "chapter" })?.title, "Opening")
+        XCTAssertEqual(segments.first(where: { $0.id == "full" })?.endTime, 0)
     }
 
     func testDownloadQualityCapsIncludeFourK() {

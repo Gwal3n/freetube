@@ -332,7 +332,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   observers without blocking stream resolution. Duration categories independently support Disabled,
   Show only (timeline marker), or Automatically skip. `poi_highlight` is a point marker and instead
   supports Disabled, Show only, or Ask; Ask presents a five-second prompt to jump to that timestamp
-  as soon as the lookup returns. Manual seeks
+  as soon as the lookup returns. `exclusive_access` is a full-video label, not a skip range: it
+  supports Disabled or Show only and marks the full timeline below the progress track. `chapter`
+  also supports Disabled or Show only; when enabled and submitted for a video, its named chapters
+  replace YouTube chapters in the existing chapter browser, with YouTube chapters retained as the
+  fallback. `hook` is an ordinary duration category. Manual seeks
   immediately evaluate their destination, and rewinding before a handled segment rearms it. Undo
   returns to the settled manual-seek position when the user landed inside a segment, while normal
   boundary skips return to the segment start; Undo is deliberately exempt from rearming so it can

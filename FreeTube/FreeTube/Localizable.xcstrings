@@ -1,6 +1,33 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Hooks and greetings" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Aufhänger und Begrüßungen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hooks and greetings" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ganchos y saludos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Accroches et salutations" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Вступления и приветствия" } }
+      }
+    },
+    "Community chapters" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Community-Kapitel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Community chapters" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Capítulos de la comunidad" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chapitres de la communauté" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Главы сообщества" } }
+      }
+    },
+    "Show only marks skip segments on the timeline. Community chapters appear in the chapter list, and full-video labels mark the whole timeline. Ask offers to jump to a highlight." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Nur anzeigen markiert überspringbare Abschnitte auf der Zeitleiste. Community-Kapitel erscheinen in der Kapitelliste, Labels für das ganze Video markieren die gesamte Zeitleiste. Fragen bietet einen Sprung zum Highlight an." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show only marks skip segments on the timeline. Community chapters appear in the chapter list, and full-video labels mark the whole timeline. Ask offers to jump to a highlight." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar solo marca los segmentos en la barra. Los capítulos de la comunidad aparecen en la lista y las etiquetas de vídeo completo marcan toda la barra. Preguntar ofrece saltar a un destacado." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher seulement marque les segments sur la barre. Les chapitres communautaires apparaissent dans la liste et les étiquettes de vidéo entière marquent toute la barre. Demander propose de passer à un temps fort." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Только показывать отмечает сегменты на шкале. Главы сообщества появляются в списке, а метки всего видео отмечают всю шкалу. Спрашивать предлагает перейти к интересному моменту." } }
+      }
+    },
     "Exclusive access" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Exklusiver Zugang" } },
