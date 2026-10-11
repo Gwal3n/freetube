@@ -506,7 +506,14 @@ struct FullScreenPlayer: View {
                           prefetchVideoDetails,
                           let video = player.currentVideo else { return }
                     detailsModel.loadIfNeeded(for: video, player: player)
-            }
+                }
+                .onChange(of: player.hasEnded) { _, hasEnded in
+                    // The final frame stays visible when autoplay is off. Reveal Replay and
+                    // leave it visible instead of retaining the playback auto-hide state.
+                    if hasEnded {
+                        controlsVisibility.show(isPlaying: false, reduceMotion: reduceMotion)
+                    }
+                }
             if !isFloating, let video = player.currentVideo, !usesPortraitFullscreen {
                 panel(
                     video,

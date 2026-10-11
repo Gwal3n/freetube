@@ -70,9 +70,16 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
             if model.isRefreshing {
                 Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
             } else if let lastRefreshAt = model.lastRefreshAt {
-                ViewThatFits(in: .horizontal) {
-                    Text("Updated \(relativeAge(since: lastRefreshAt))")
-                    Text(verbatim: relativeAge(since: lastRefreshAt))
+                if referenceDate.timeIntervalSince(lastRefreshAt) < 3_600 {
+                    ViewThatFits(in: .horizontal) {
+                        Text("Updated <1h ago")
+                        Text(verbatim: "<1h")
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        Text("Updated \(hourlyAge(since: lastRefreshAt))")
+                        Text(verbatim: hourlyAge(since: lastRefreshAt))
+                    }
                 }
             }
         }
@@ -100,5 +107,11 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = style
         return formatter.localizedString(for: date, relativeTo: referenceDate)
+    }
+
+    private func hourlyAge(since date: Date) -> String {
+        let elapsedHours = floor(max(0, referenceDate.timeIntervalSince(date)) / 3_600)
+        let roundedDate = referenceDate.addingTimeInterval(-elapsedHours * 3_600)
+        return relativeAge(since: roundedDate)
     }
 }
