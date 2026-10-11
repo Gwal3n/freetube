@@ -168,12 +168,13 @@ re-encoding, then probed. Both media transfers reuse the validated ranged downlo
 source advertises its length, with the ordinary file transfer as fallback. This has a single
 combined-byte progress bar, a Cancel control, an input cap of
 1 GB or less on low-storage devices, and a 200 MB storage reserve. It does not enter Downloads;
-before accepting the temporary mux, compressed samples must exist near its advertised end. A
-source duration that materially disagrees with the working HLS item is currently rejected, not
-trimmed: the cause of the observed 2x discrepancy has not been established. The diagnostic logs
-record source track ranges, non-secret URL duration hints, and whether compressed samples exist
-near or beyond the HLS endpoint. Keep the working source while investigating; container duration
-and AVPlayer readiness alone did not prevent a black screen. Inputs are removed after
+before accepting the temporary mux, compressed samples must exist near its advertised end. Device
+logs showed a specific doubled-timeline case: both adaptive source URLs declared the same duration
+as the working HLS item and video metadata, but AVFoundation reported twice that duration for
+both downloaded tracks; their compressed samples stopped at the URL-declared endpoint. Only when
+both URL hints, the HLS duration, the 2x discrepancy, and sample probes agree does preparation
+use the URL durations for composition. Other mismatches are rejected, and the exported duration
+and sample tails are checked before swapping. Inputs are removed after
 muxing, the output is removed on video replacement/dismissal, and
 abandoned files are removed on next launch. Normal playback and holds never initiate this transfer,
 nor does a saved high-speed preference on a newly opened video. Accept only a ready item with

@@ -186,31 +186,51 @@ final class FastPlaybackLocalFileService {
         log.info("Fast playback source durations: video=\(videoDuration.seconds, privacy: .public)s audio=\(audioDuration.seconds, privacy: .public)s")
         let videoRange = try await videoTrack.load(.timeRange)
         let audioRange = try await audioTrack.load(.timeRange)
-        log.info("Fast playback source timing: videoTrack=\(videoRange.start.seconds, privacy: .public)..\(CMTimeRangeGetEnd(videoRange).seconds, privacy: .public)s audioTrack=\(audioRange.start.seconds, privacy: .public)..\(CMTimeRangeGetEnd(audioRange).seconds, privacy: .public)s URLDurations=\(durationHint(of: videoURL) ?? -1, privacy: .public)/\(durationHint(of: audioURL) ?? -1, privacy: .public)s")
+        let videoHint = durationHint(of: videoURL)
+        let audioHint = durationHint(of: audioURL)
+        log.info("Fast playback source timing: videoTrack=\(videoRange.start.seconds, privacy: .public)..\(CMTimeRangeGetEnd(videoRange).seconds, privacy: .public)s audioTrack=\(audioRange.start.seconds, privacy: .public)..\(CMTimeRangeGetEnd(audioRange).seconds, privacy: .public)s URLDurations=\(videoHint ?? -1, privacy: .public)/\(audioHint ?? -1, privacy: .public)s")
         let sourceEnd = min(videoDuration.seconds, audioDuration.seconds)
+        var videoEnd = videoDuration
+        var audioEnd = audioDuration
         if let referenceDuration, referenceDuration.isFinite, referenceDuration > 10,
            abs(sourceEnd - referenceDuration) > max(2, referenceDuration * 0.05) {
-            // Diagnostic only: the doubled duration may be a bad source, a media-header/edit
-            // issue, or an AVFoundation interpretation issue. Do not guess by trimming it.
-            let firstUnexpectedSample = referenceDuration + 1
+            // YouTube's URLs and the working HLS item independently agree on the length,
+            // while AVFoundation can report a doubled range for these adaptive files. Only
+            // use the URL durations if both tracks are proven to end there; never blindly halve.
+            guard let videoHint, let audioHint,
+                  sourceEnd > referenceDuration * 1.8,
+                  sourceEnd < referenceDuration * 2.2,
+                  abs(videoHint - referenceDuration) <= max(2, referenceDuration * 0.02),
+                  abs(audioHint - referenceDuration) <= max(2, referenceDuration * 0.02),
+                  abs(videoDuration.seconds - videoHint * 2) <= max(2, videoHint * 0.02),
+                  abs(audioDuration.seconds - audioHint * 2) <= max(2, audioHint * 0.02) else {
+                log.notice("Fast playback timeline mismatch lacks matching source-duration evidence: reference=\(referenceDuration, privacy: .public)s source=\(sourceEnd, privacy: .public)s")
+                throw Failure.timelineMismatch
+            }
             let videoHasExtraSamples = try containsSamples(
                 in: videoAsset, track: videoTrack,
-                startingAt: firstUnexpectedSample, endingAt: videoDuration.seconds
+                startingAt: videoHint + 1, endingAt: videoDuration.seconds
             )
             let audioHasExtraSamples = try containsSamples(
                 in: audioAsset, track: audioTrack,
-                startingAt: firstUnexpectedSample, endingAt: audioDuration.seconds
+                startingAt: audioHint + 1, endingAt: audioDuration.seconds
             )
             let videoHasReferenceSamples = try containsSamples(
-                in: videoAsset, track: videoTrack, endingAt: referenceDuration
+                in: videoAsset, track: videoTrack, endingAt: videoHint
             )
             let audioHasReferenceSamples = try containsSamples(
-                in: audioAsset, track: audioTrack, endingAt: referenceDuration
+                in: audioAsset, track: audioTrack, endingAt: audioHint
             )
             log.notice("Fast playback timeline diagnostic: reference=\(referenceDuration, privacy: .public)s source=\(sourceEnd, privacy: .public)s nearReferenceVideo=\(videoHasReferenceSamples, privacy: .public) nearReferenceAudio=\(audioHasReferenceSamples, privacy: .public) afterReferenceVideo=\(videoHasExtraSamples, privacy: .public) afterReferenceAudio=\(audioHasExtraSamples, privacy: .public)")
-            throw Failure.timelineMismatch
+            guard videoHasReferenceSamples, audioHasReferenceSamples,
+                  !videoHasExtraSamples, !audioHasExtraSamples else {
+                throw Failure.timelineMismatch
+            }
+            videoEnd = CMTime(seconds: videoHint, preferredTimescale: 600)
+            audioEnd = CMTime(seconds: audioHint, preferredTimescale: 600)
+            log.notice("Fast playback source timeline corrected using verified URL durations: video=\(videoHint, privacy: .public)s audio=\(audioHint, privacy: .public)s")
         }
-        let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
+        audioEnd = CMTimeCompare(videoEnd, audioEnd) <= 0 ? videoEnd : audioEnd
         try Task.checkCancellation()
         let composition = AVMutableComposition()
         guard let composedVideo = composition.addMutableTrack(
@@ -221,7 +241,7 @@ final class FastPlaybackLocalFileService {
             throw Failure.missingTracks
         }
         try composedVideo.insertTimeRange(
-            CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
+            CMTimeRange(start: .zero, duration: videoEnd), of: videoTrack, at: .zero
         )
         try composedAudio.insertTimeRange(
             CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
@@ -249,6 +269,11 @@ final class FastPlaybackLocalFileService {
         let finalDuration = try await finalAsset.load(.duration)
         guard finalDuration.seconds.isFinite, finalDuration.seconds > 0 else {
             throw Failure.missingPlayableTail
+        }
+        if let referenceDuration, referenceDuration.isFinite, referenceDuration > 10,
+           abs(finalDuration.seconds - referenceDuration) > max(2, referenceDuration * 0.05) {
+            log.notice("Fast playback output timeline still differs: reference=\(referenceDuration, privacy: .public)s output=\(finalDuration.seconds, privacy: .public)s")
+            throw Failure.timelineMismatch
         }
         let finalVideoHasTail = try containsSamples(
             in: finalAsset, track: finalVideoTracks[0], endingAt: finalDuration.seconds
