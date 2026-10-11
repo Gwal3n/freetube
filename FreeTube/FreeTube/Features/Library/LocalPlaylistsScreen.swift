@@ -28,10 +28,18 @@ struct LocalPlaylistsScreen: View {
     }
 
     var body: some View {
+        playlistDialogs
+    }
+
+    private var playlistList: some View {
         List(selection: editMode.isEditing ? $selectedPlaylistIDs : nil) {
             playlistSection("Personal", items: personalPlaylists, savedFromYouTube: false)
             playlistSection("Saved from YouTube", items: savedPlaylists, savedFromYouTube: true)
         }
+    }
+
+    private var searchContent: some View {
+        playlistList
         .environment(\.editMode, $editMode)
         .initialContentLoading(hasLoaded: hasLoaded)
         .navigationTitle("Local Playlists")
@@ -40,25 +48,17 @@ struct LocalPlaylistsScreen: View {
             if !newValue.isEmpty && editMode.isEditing { finishEditing() }
         }
         .overlay {
-            if hasLoaded && playlists.isEmpty {
-                ContentUnavailableView(
-                    "No local playlists",
-                    systemImage: "music.note.list",
-                    description: Text("Create a playlist here or import playlists from Settings.")
-                )
-            } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty
-                        && !searchQuery.isEmpty
-                        && (isSearchingVideos || completedVideoSearchQuery != searchQuery) {
-                ProgressView("Searching saved videos…")
-            } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty {
-                ContentUnavailableView.search(text: searchText)
-            }
+            emptyStateOverlay
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 toolbarButtons
             }
         }
+    }
+
+    private var loadedContent: some View {
+        searchContent
         .alert("New Playlist", isPresented: $showingCreate) {
             TextField("Playlist name", text: $newTitle)
             Button("Create") { Task { await create() } }
@@ -91,6 +91,10 @@ struct LocalPlaylistsScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
         }
+    }
+
+    private var playlistDialogs: some View {
+        loadedContent
         .confirmationDialog(
             "Delete selected playlists?",
             isPresented: $showingDeleteConfirmation,
@@ -128,6 +132,23 @@ struct LocalPlaylistsScreen: View {
                 await service.update(id: playlist.id, title: title, descriptionText: description)
                 await reload()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStateOverlay: some View {
+        if hasLoaded && playlists.isEmpty {
+            ContentUnavailableView(
+                "No local playlists",
+                systemImage: "music.note.list",
+                description: Text("Create a playlist here or import playlists from Settings.")
+            )
+        } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty
+                    && !searchQuery.isEmpty
+                    && (isSearchingVideos || completedVideoSearchQuery != searchQuery) {
+            ProgressView("Searching saved videos…")
+        } else if hasLoaded && personalPlaylists.isEmpty && savedPlaylists.isEmpty {
+            ContentUnavailableView.search(text: searchText)
         }
     }
 

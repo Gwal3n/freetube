@@ -37,6 +37,10 @@ struct LocalPlaylistScreen: View {
     }
 
     var body: some View {
+        playlistDialogs
+    }
+
+    private var playlistList: some View {
         List(selection: editingMode != nil ? $selectedVideoIDs : nil) {
             if let details {
                 Section {
@@ -57,6 +61,10 @@ struct LocalPlaylistScreen: View {
                 }
             }
         }
+    }
+
+    private var styledPlaylist: some View {
+        playlistList
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .ignoresSafeArea(.container, edges: details == nil ? [] : .top)
@@ -74,26 +82,13 @@ struct LocalPlaylistScreen: View {
         .onChange(of: searchText) { _, newValue in
             if !newValue.isEmpty && editingMode != nil { finishEditing() }
         }
+    }
+
+    private var livePlaylist: some View {
+        styledPlaylist
         .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .overlay {
-            if let details, details.videos.isEmpty {
-                ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
-                    .allowsHitTesting(false)
-            } else if let details, editingMode == nil, searchText.isEmpty,
-                      visibleVideos(in: details).isEmpty {
-                ContentUnavailableView(
-                    "Playlist Videos Hidden",
-                    systemImage: "hand.raised",
-                    description: Text("Change blocked content in Settings to see them again.")
-                )
-                .allowsHitTesting(false)
-            } else if let details, !searchText.isEmpty, visibleVideos(in: details).isEmpty {
-                ContentUnavailableView.search(text: searchText)
-                    .allowsHitTesting(false)
-            } else if hasLoaded && details == nil {
-                ContentUnavailableView("Playlist Unavailable", systemImage: "music.note.list")
-                    .allowsHitTesting(false)
-            }
+            emptyStateOverlay
         }
         .task { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
@@ -104,6 +99,10 @@ struct LocalPlaylistScreen: View {
                 toolbarButtons
             }
         }
+    }
+
+    private var playlistPresentations: some View {
+        livePlaylist
         .alert("Couldn’t Restore Playlist", isPresented: Binding(
             get: { restoreError != nil },
             set: { if !$0 { restoreError = nil } }
@@ -131,6 +130,10 @@ struct LocalPlaylistScreen: View {
         ) { result in
             if case .failure(let error) = result { playlistExportError = error.localizedDescription }
         }
+    }
+
+    private var playlistDialogs: some View {
+        playlistPresentations
         .alert("Couldn’t Export Playlist", isPresented: Binding(
             get: { playlistExportError != nil },
             set: { if !$0 { playlistExportError = nil } }
@@ -160,6 +163,28 @@ struct LocalPlaylistScreen: View {
                 Task { await deleteSelectedVideos() }
             }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStateOverlay: some View {
+        if let details, details.videos.isEmpty {
+            ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
+                .allowsHitTesting(false)
+        } else if let details, editingMode == nil, searchText.isEmpty,
+                  visibleVideos(in: details).isEmpty {
+            ContentUnavailableView(
+                "Playlist Videos Hidden",
+                systemImage: "hand.raised",
+                description: Text("Change blocked content in Settings to see them again.")
+            )
+            .allowsHitTesting(false)
+        } else if let details, !searchText.isEmpty, visibleVideos(in: details).isEmpty {
+            ContentUnavailableView.search(text: searchText)
+                .allowsHitTesting(false)
+        } else if hasLoaded && details == nil {
+            ContentUnavailableView("Playlist Unavailable", systemImage: "music.note.list")
+                .allowsHitTesting(false)
         }
     }
 
