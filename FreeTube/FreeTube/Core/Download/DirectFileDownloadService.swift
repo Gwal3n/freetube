@@ -6,20 +6,28 @@ import Foundation
 /// simultaneous downloads. The caller still validates the media before publishing completion.
 @available(iOS 17.0, *)
 nonisolated final class DirectFileDownloadService: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    enum Failure: Error {
+        case sizeLimitExceeded
+    }
+
     private let destination: URL
     private let expectedSizeHint: Int64?
+    private let maximumBytes: Int64?
     private let onProgress: @Sendable (Int64, Int64) -> Void
     private var continuation: CheckedContinuation<HTTPURLResponse, Error>?
     private var moveError: Error?
+    private var exceededSizeLimit = false
     private var lastProgressAt: ContinuousClock.Instant?
 
     private init(
         destination: URL,
         expectedSizeHint: Int64?,
+        maximumBytes: Int64?,
         onProgress: @escaping @Sendable (Int64, Int64) -> Void
     ) {
         self.destination = destination
         self.expectedSizeHint = expectedSizeHint
+        self.maximumBytes = maximumBytes
         self.onProgress = onProgress
         super.init()
     }
@@ -30,12 +38,14 @@ nonisolated final class DirectFileDownloadService: NSObject, URLSessionDownloadD
         request: URLRequest,
         to destination: URL,
         expectedSizeHint: Int64? = nil,
+        maximumBytes: Int64? = nil,
         onProgress: @escaping @Sendable (Int64, Int64) -> Void
     ) async throws -> HTTPURLResponse {
         try Task.checkCancellation()
         let transfer = DirectFileDownloadService(
             destination: destination,
             expectedSizeHint: expectedSizeHint,
+            maximumBytes: maximumBytes,
             onProgress: onProgress
         )
         return try await transfer.run(request: request)
@@ -75,6 +85,12 @@ nonisolated final class DirectFileDownloadService: NSObject, URLSessionDownloadD
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
+        if let maximumBytes,
+           (totalBytesWritten > maximumBytes || totalBytesExpectedToWrite > maximumBytes) {
+            exceededSizeLimit = true
+            downloadTask.cancel()
+            return
+        }
         let now = ContinuousClock.now
         if let lastProgressAt,
            now - lastProgressAt < .milliseconds(200),
@@ -106,7 +122,9 @@ nonisolated final class DirectFileDownloadService: NSObject, URLSessionDownloadD
         defer { session.finishTasksAndInvalidate() }
         guard let continuation else { return }
         self.continuation = nil
-        if let error {
+        if exceededSizeLimit {
+            continuation.resume(throwing: Failure.sizeLimitExceeded)
+        } else if let error {
             continuation.resume(throwing: error)
         } else if let moveError {
             continuation.resume(throwing: moveError)

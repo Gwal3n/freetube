@@ -61,6 +61,8 @@ final class PlayerStateManager {
     /// Actual requested transport rate, capped at 2x until a ready item supports fast-forward.
     private(set) var effectivePlaybackRate: Double
     private(set) var isPreparingFastPlayback = false
+    private(set) var fastPlaybackPreparationPhase: FastPlaybackLocalFileService.Phase?
+    private(set) var fastPlaybackPreparationProgress: Double?
     private(set) var playbackQuality: VideoQuality
     private(set) var sleepTimerOption: SleepTimerOption = .off
     var isAudioOnly: Bool { playbackQuality == .audioOnly }
@@ -209,6 +211,8 @@ final class PlayerStateManager {
     private var fastPlaybackTimeoutTask: Task<Void, Never>?
     private var fastPlaybackGeneration = 0
     private var fastPlaybackFailed = false
+    private var fastPlaybackUserRequested = false
+    private var fastPlaybackLocalFileURL: URL?
     private var isInstallingFastPlayback = false
     private var resumeAfterFastPlaybackSwitch: Bool?
     private var temporaryPlaybackRate: Double?
@@ -245,6 +249,7 @@ final class PlayerStateManager {
         self.manualQueue = Self.restoreManualQueue()
         self.playbackRate = PlaybackSpeedPresets.bounded(preferences.playbackRate)
         self.effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(preferences.playbackRate, canPlayFastForward: false)
+        FastPlaybackLocalFileService.removeOrphansAtLaunch()
         self.playbackQuality = preferences.preferredQuality
         self.videoQualityBeforeAudio = preferences.preferredQuality == .audioOnly
             ? .auto : preferences.preferredQuality
@@ -878,7 +883,10 @@ final class PlayerStateManager {
         log.info("Playback speed selected: \(boundedRate, privacy: .public)x")
         playbackRate = boundedRate
         preferences.playbackRate = boundedRate
-        if boundedRate > 2, !isPreparingFastPlayback { fastPlaybackFailed = false }
+        if boundedRate > 2 {
+            fastPlaybackUserRequested = true
+            if !isPreparingFastPlayback { fastPlaybackFailed = false }
+        }
         reconcilePlaybackRate()
         if let item = player.currentItem, item.status == .readyToPlay {
             log.info("Playback speed applied: selected=\(self.playbackRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x actual=\(self.player.rate, privacy: .public)x canPlayFastForward=\(item.canPlayFastForward, privacy: .public) pitch=\(item.audioTimePitchAlgorithm, privacy: .public)")
@@ -916,6 +924,9 @@ final class PlayerStateManager {
             if !isInstallingFastPlayback { cancelFastPlaybackPreparation() }
             return
         }
+        // A hold must not start a potentially large temporary download. A saved high-speed
+        // preference also waits for an explicit tap on each new online video.
+        guard temporaryPlaybackRate == nil, fastPlaybackUserRequested else { return }
         guard let item = player.currentItem, item.status == .readyToPlay,
               !item.canPlayFastForward, loadState == .readyToPlay,
               !hasEnded, !isSwitchingAudioMode, !isPreparingFastPlayback, !fastPlaybackFailed,
@@ -925,6 +936,8 @@ final class PlayerStateManager {
             return
         }
         isPreparingFastPlayback = true
+        fastPlaybackPreparationPhase = .resolving
+        fastPlaybackPreparationProgress = nil
         fastPlaybackGeneration &+= 1
         let generation = fastPlaybackGeneration
         let session = playbackSessionID
@@ -933,8 +946,13 @@ final class PlayerStateManager {
         fastPlaybackTask = Task { [weak self] in
             await self?.prepareFastPlayback(for: video, quality: quality, originalItem: item, session: session, generation: generation)
         }
+        scheduleFastPlaybackTimeout(after: .seconds(30), generation: generation)
+    }
+
+    private func scheduleFastPlaybackTimeout(after duration: Duration, generation: Int) {
+        fastPlaybackTimeoutTask?.cancel()
         fastPlaybackTimeoutTask = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            do { try await Task.sleep(for: duration) } catch { return }
             guard let self, self.fastPlaybackGeneration == generation,
                   !self.isInstallingFastPlayback else { return }
             self.log.notice("Fast playback extraction/preparation timed out")
@@ -966,6 +984,23 @@ final class PlayerStateManager {
         fastPlaybackTimeoutTask?.cancel()
         fastPlaybackTimeoutTask = nil
         isPreparingFastPlayback = false
+        fastPlaybackPreparationPhase = nil
+        fastPlaybackPreparationProgress = nil
+    }
+
+    func cancelPendingFastPlayback() {
+        guard isPreparingFastPlayback else { return }
+        cancelFastPlaybackPreparation()
+        fastPlaybackFailed = true
+        fastPlaybackUserRequested = false
+        temporaryPlaybackRate = nil
+        wasPlayingBeforeTemporaryRate = nil
+        if playbackRate > 2 {
+            playbackRate = 2
+            preferences.playbackRate = 2
+        }
+        applyEffectivePlaybackRate()
+        log.info("Fast playback preparation cancelled by user")
     }
 
     private func resetFastPlaybackState() {
@@ -973,6 +1008,7 @@ final class PlayerStateManager {
         isInstallingFastPlayback = false
         resumeAfterFastPlaybackSwitch = nil
         fastPlaybackFailed = false
+        fastPlaybackUserRequested = false
         temporaryPlaybackRate = nil
         wasPlayingBeforeTemporaryRate = nil
         effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(playbackRate, canPlayFastForward: false)
@@ -980,6 +1016,9 @@ final class PlayerStateManager {
 
     private func failFastPlayback(message: String) {
         fastPlaybackFailed = true
+        fastPlaybackUserRequested = false
+        fastPlaybackPreparationPhase = nil
+        fastPlaybackPreparationProgress = nil
         if playbackRate > 2 {
             playbackRate = 2
             preferences.playbackRate = 2
@@ -992,12 +1031,36 @@ final class PlayerStateManager {
         for video: Video, quality: VideoQuality, originalItem: AVPlayerItem,
         session: Int, generation: Int
     ) async {
+        var preparedLocalFile: URL?
+        var installedReplacement: AVPlayerItem?
+        var replacementAccepted = false
+        var switchPosition: TimeInterval?
         defer {
+            // A cancellation during the final item handoff must not strand the visible player
+            // on a half-loaded temporary source. Restore the still-valid original item first.
+            if let installedReplacement, !replacementAccepted,
+               player.currentItem === installedReplacement,
+               currentVideo?.id == video.id, playbackSessionID == session {
+                let resume = resumeAfterFastPlaybackSwitch == true
+                player.pause()
+                isInstallingFastPlayback = false
+                loadItem(originalItem)
+                let position = switchPosition ?? elapsed
+                player.seek(to: CMTime(seconds: max(0, position), preferredTimescale: 600))
+                pendingSeekTarget = nil
+                loadState = .readyToPlay
+                if resume { play() }
+            }
+            if let preparedLocalFile, fastPlaybackLocalFileURL != preparedLocalFile {
+                FastPlaybackLocalFileService.remove(preparedLocalFile)
+            }
             if fastPlaybackGeneration == generation {
                 fastPlaybackTask = nil
                 fastPlaybackTimeoutTask?.cancel()
                 fastPlaybackTimeoutTask = nil
                 isPreparingFastPlayback = false
+                fastPlaybackPreparationPhase = nil
+                fastPlaybackPreparationProgress = nil
                 isInstallingFastPlayback = false
                 resumeAfterFastPlaybackSwitch = nil
             }
@@ -1006,14 +1069,28 @@ final class PlayerStateManager {
         do {
             let candidate = try await resolver.resolveForFastPlayback(video: video, quality: quality)
             try Task.checkCancellation()
-            // A remote composition of separate video/audio tracks has repeatedly stalled in
-            // AVFoundation's paused probe. Keep the working HLS stream instead of entering a
-            // long preparation that cannot demonstrate >2x capability on device.
-            guard case .direct = candidate.source else {
-                log.notice("Fast playback requires a direct progressive item; paired remote tracks are unavailable")
-                throw FastPlaybackPreparation.Failure.unsupportedRate
+            let itemToProbe: AVPlayerItem
+            switch candidate.source {
+            case .direct, .localFile:
+                itemToProbe = try await makePlayerItem(for: candidate)
+            case .composite(let videoURL, let audioURL):
+                // Remote AVCompositions stalled on device. Materialize their tracks in a
+                // cancellable temporary file while the existing HLS item keeps playing.
+                scheduleFastPlaybackTimeout(after: .seconds(1_200), generation: generation)
+                log.info("Preparing temporary local file for fast playback of \(video.id, privacy: .public)")
+                let localFile = try await FastPlaybackLocalFileService.prepare(
+                    videoURL: videoURL, audioURL: audioURL
+                ) { [weak self] phase, progress in
+                    guard let self, self.fastPlaybackGeneration == generation,
+                          self.playbackSessionID == session else { return }
+                    self.fastPlaybackPreparationPhase = phase
+                    self.fastPlaybackPreparationProgress = progress
+                }
+                preparedLocalFile = localFile
+                itemToProbe = AVPlayerItem(url: localFile)
             }
-            let preparation = FastPlaybackPreparation(item: try await makePlayerItem(for: candidate))
+            try Task.checkCancellation()
+            let preparation = FastPlaybackPreparation(item: itemToProbe)
             let preparedAsset = try await preparation.prepare(audioOnly: quality == .audioOnly)
             try Task.checkCancellation()
             // Never insert the probe's AVPlayerItem into the visible AVQueuePlayer. The two
@@ -1024,7 +1101,9 @@ final class PlayerStateManager {
         } catch {
             guard !Task.isCancelled, fastPlaybackGeneration == generation,
                   playbackSessionID == session else { return }
-            log.notice("Fast playback candidate rejected before swap: \(Self.describe(itemError: error), privacy: .public) reason=\(String(describing: error as? FastPlaybackPreparation.Failure), privacy: .public)")
+            // Keep signed stream URLs out of diagnostics. Error type + code distinguish
+            // transfer, export and probe failures without logging NSError userInfo.
+            log.notice("Fast playback candidate rejected before swap: \(Self.describe(itemError: error), privacy: .public) type=\(String(reflecting: type(of: error)), privacy: .public)")
             failFastPlayback(message: "Higher speeds are unavailable for this video")
             return
         }
@@ -1037,6 +1116,7 @@ final class PlayerStateManager {
         // seeks performed while the progressive URL was resolving must carry into the new item.
         let time = player.currentTime().seconds
         let position = time.isFinite && time >= 0 ? time : elapsed
+        switchPosition = position
         let previousSize = videoPresentationSize
         resumeAfterFastPlaybackSwitch = isPlaying
         isInstallingFastPlayback = true
@@ -1047,6 +1127,7 @@ final class PlayerStateManager {
         loadState = .buffering
         itemLoadStartedAt = Date()
         loadItem(replacement)
+        installedReplacement = replacement
         let readiness = await waitForReadiness(of: replacement, timeout: .seconds(12))
         guard !Task.isCancelled, fastPlaybackGeneration == generation,
               playbackSessionID == session, player.currentItem === replacement else { return }
@@ -1059,7 +1140,9 @@ final class PlayerStateManager {
             loadState = .readyToPlay
             applyEffectivePlaybackRate()
             if resumeAfterFastPlaybackSwitch == true { play() } else { isPlaying = false }
-            log.info("Fast progressive playback accepted: requested=\(self.requestedTransportRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x canPlayFastForward=\(replacement.canPlayFastForward, privacy: .public) pitch=\(replacement.audioTimePitchAlgorithm, privacy: .public)")
+            fastPlaybackLocalFileURL = preparedLocalFile
+            replacementAccepted = true
+            log.info("Fast progressive playback accepted: source=\(preparedLocalFile == nil ? "direct" : "temporary-local", privacy: .public) requested=\(self.requestedTransportRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x actual=\(self.player.rate, privacy: .public)x canPlayFastForward=\(replacement.canPlayFastForward, privacy: .public) pitch=\(replacement.audioTimePitchAlgorithm, privacy: .public)")
         } else {
             log.notice("Fast playback swap rejected; restoring original stream")
             loadItem(originalItem)
@@ -1586,6 +1669,10 @@ final class PlayerStateManager {
         loadState = .idle
         hasEnded = false
         player.removeAllItems()
+        if let fastPlaybackLocalFileURL {
+            self.fastPlaybackLocalFileURL = nil
+            FastPlaybackLocalFileService.remove(fastPlaybackLocalFileURL)
+        }
         itemLoadedTimeRangesObservation?.invalidate()
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
@@ -1880,6 +1967,11 @@ final class PlayerStateManager {
         let assetKind = item.asset is AVURLAsset ? "URL" : "composition"
         log.info("loadItem: removeAllItems + insert (assetKind=\(assetKind, privacy: .public))")
         player.removeAllItems()
+        if let fastPlaybackLocalFileURL,
+           (item.asset as? AVURLAsset)?.url != fastPlaybackLocalFileURL {
+            self.fastPlaybackLocalFileURL = nil
+            FastPlaybackLocalFileService.remove(fastPlaybackLocalFileURL)
+        }
         player.insert(item, after: nil)
         applyEffectivePlaybackRate()
         disableLegibleMediaSelection(on: item)

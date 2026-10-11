@@ -159,21 +159,24 @@ Because HLS is now the usual source, `PlayerStateManager.applyQualityCap` sets
 setting still bounds ABR variant selection. `.auto` stays uncapped.
 
 **High-speed experiment (`experiment/high-speed-progressive`).** Normal playback still resolves
-HLS first. An unsupported rate above 2x triggers `PlaybackResolver.resolveForFastPlayback`, which
-uses a separate memory-only progressive cache and never falls back to HLS or starts a download.
-The existing item continues at up to 2x while `FastPlaybackPreparation` prepares a direct MP4 in a
-paused, muted, viewless AVPlayer probe. Paired remote MP4/M4A compositions are currently rejected
-for this high-speed experiment: device logs show that their probe stalls or times out, and they have
-not demonstrated >2x playback. Accept only a ready item with fast-forward support and the required
-audio/video tracks. Never transfer the probe's `AVPlayerItem` to the visible player: AVFoundation
-crashes when one item is associated with two players, even after detachment. Create a distinct item
-from the prepared asset, then seek to the position at handoff and restore current play/pause intent.
-Use time-domain audio pitch correction for high rates, as speech quality is the priority. Menu and hold requests share this path;
-releasing a hold cancels unfinished preparation, and replacing/dismissing the video invalidates
-the entire transaction. Failed extraction or validation keeps the working stream at up to 2x.
+HLS first. An explicit menu selection above 2x triggers `PlaybackResolver.resolveForFastPlayback`,
+which uses a separate memory-only progressive cache and never falls back to HLS. The working item
+continues at up to 2x while an alternative is prepared. A direct MP4 is checked in a paused,
+muted, viewless AVPlayer probe. Paired remote MP4/M4A tracks, which stalled when probed directly
+on device, are downloaded into an app-owned temporary directory, muxed to a local MP4 without
+re-encoding, then probed. This has a visible progress and Cancel control, a combined input cap of
+1 GB or less on low-storage devices, and a 200 MB storage reserve. It does not enter Downloads;
+inputs are removed after muxing, the output is removed on video replacement/dismissal, and
+abandoned files are removed on next launch. Normal playback and holds never initiate this transfer,
+nor does a saved high-speed preference on a newly opened video. Accept only a ready item with
+fast-forward support and the required audio/video tracks. Never transfer the probe's `AVPlayerItem`
+to the visible player: AVFoundation crashes when one item is associated with two players, even after
+detachment. Create a distinct item from the prepared asset, then seek to the position at handoff and
+restore current play/pause intent. Use time-domain audio pitch correction for speech. Replacing or
+dismissing the video invalidates the preparation; failure keeps the working stream at up to 2x.
 Successful progressive playback stays on that fixed-resolution source for the rest of the video,
-even after lowering the rate. No new dependencies, persistent signed URLs, or download side effects.
-The selected base rate is saved explicitly; transient AVPlayer defaults and holds never write it.
+even after lowering the rate. No new dependencies or persistent signed URLs. The selected base
+rate is saved explicitly; transient AVPlayer defaults and holds never write it.
 
 **Playback starts optimistically.** `resolveAndPlay` installs the candidate, sets
 `loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`. This
@@ -477,7 +480,9 @@ and a rejected strategy is excluded before requesting the next candidate.
 ### Playback and downloads stay separate
 
 - `PlaybackResolver` checks existing local files and direct streams only. Failed playback reports an error rather than calling `ensureDownloaded`.
-- Playback never creates an offline file. The Downloads tab changes only after an explicit download.
+- Ordinary playback never creates an offline file. Only an explicit >2x speed selection may prepare
+  a cancellable temporary local file; it never appears in Downloads. The Downloads tab changes
+  only after an explicit download.
 - Automatic next-item download prefetch is disabled; recommendation queue filling does not initiate downloads.
 
 ### PythonRunner priority queue

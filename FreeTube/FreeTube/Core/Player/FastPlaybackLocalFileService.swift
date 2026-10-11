@@ -1,0 +1,218 @@
+import AVFoundation
+import Foundation
+import OSLog
+
+/// Materializes separate, short-lived video/audio URLs into one local MP4 for fast playback.
+/// Ordinary playback never calls this service. Work lives in the app's temporary directory and
+/// is cancelled with the requesting task; only a successfully validated file is handed back.
+@available(iOS 17.0, *)
+@MainActor
+final class FastPlaybackLocalFileService {
+    enum Phase: String, Sendable {
+        case resolving = "Finding streams"
+        case video = "Downloading video"
+        case audio = "Downloading audio"
+        case finishing = "Finishing"
+    }
+
+    enum Failure: Error {
+        case insufficientSpace
+        case invalidResponse(Int)
+        case missingTracks
+        case exportUnavailable
+        case exportFailed
+    }
+
+    typealias ProgressHandler = @MainActor @Sendable (Phase, Double?) -> Void
+
+    /// Keep enough space for both input files and their exported copy. This is a per-request
+    /// ceiling, not a persistent cache: iOS may remove temporary files after app termination.
+    private static let maximumMediaBytes: Int64 = 1_000_000_000
+    private static let reservedBytes: Int64 = 200_000_000
+    private static let log = AppLog(subsystem: "com.leshko.freetube", category: "FastPlaybackLocalFileService")
+    private static let rootDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("FreeTubeFastPlayback", isDirectory: true)
+    private static var removedOrphansThisLaunch = false
+
+    static func removeOrphansAtLaunch() {
+        guard !removedOrphansThisLaunch else { return }
+        removedOrphansThisLaunch = true
+        guard let children = try? FileManager.default.contentsOfDirectory(
+            at: rootDirectory, includingPropertiesForKeys: nil
+        ) else { return }
+        for child in children { try? FileManager.default.removeItem(at: child) }
+    }
+
+    static func prepare(
+        videoURL: URL,
+        audioURL: URL,
+        onProgress: @escaping ProgressHandler
+    ) async throws -> URL {
+        try Task.checkCancellation()
+        let startedAt = Date()
+        let workDirectory = rootDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+        let videoFile = workDirectory.appendingPathComponent("video.mp4")
+        let audioFile = workDirectory.appendingPathComponent("audio.m4a")
+        let outputFile = workDirectory.appendingPathComponent("playback.mp4")
+        var completed = false
+        defer {
+            try? FileManager.default.removeItem(at: videoFile)
+            try? FileManager.default.removeItem(at: audioFile)
+            if !completed { try? FileManager.default.removeItem(at: workDirectory) }
+        }
+
+        let available = (try? workDirectory.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        ))?.volumeAvailableCapacityForImportantUsage
+        let capacityLimit = available.map { max(0, ($0 - reservedBytes) / 2) } ?? maximumMediaBytes
+        let mediaLimit = min(maximumMediaBytes, capacityLimit)
+        guard mediaLimit >= 50_000_000 else { throw Failure.insufficientSpace }
+        log.info("Fast playback temporary preparation started, combined input limit=\(mediaLimit, privacy: .public) bytes")
+
+        try await transfer(
+            videoURL, to: videoFile, maximumBytes: mediaLimit,
+            phase: .video, onProgress: onProgress
+        )
+        try Task.checkCancellation()
+        let videoBytes = try fileSize(at: videoFile)
+        guard videoBytes < mediaLimit else { throw Failure.insufficientSpace }
+        try await transfer(
+            audioURL, to: audioFile, maximumBytes: mediaLimit - videoBytes,
+            phase: .audio, onProgress: onProgress
+        )
+        try Task.checkCancellation()
+
+        onProgress(.finishing, nil)
+        let videoAsset = AVURLAsset(url: videoFile)
+        let audioAsset = AVURLAsset(url: audioFile)
+        guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
+              let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first else {
+            throw Failure.missingTracks
+        }
+        let videoDuration = try await videoAsset.load(.duration)
+        let audioDuration = try await audioAsset.load(.duration)
+        guard videoDuration.isValid, audioDuration.isValid,
+              videoDuration.seconds.isFinite, audioDuration.seconds.isFinite,
+              videoDuration.seconds > 0, audioDuration.seconds > 0 else {
+            throw Failure.missingTracks
+        }
+        let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
+        try Task.checkCancellation()
+        let composition = AVMutableComposition()
+        guard let composedVideo = composition.addMutableTrack(
+            withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
+        ), let composedAudio = composition.addMutableTrack(
+            withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else {
+            throw Failure.missingTracks
+        }
+        try composedVideo.insertTimeRange(
+            CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
+        )
+        try composedAudio.insertTimeRange(
+            CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
+        )
+        composedVideo.preferredTransform = try await videoTrack.load(.preferredTransform)
+        try Task.checkCancellation()
+        guard let preparedComposition = composition.copy() as? AVComposition,
+              let exporter = AVAssetExportSession(
+                asset: preparedComposition, presetName: AVAssetExportPresetPassthrough
+              ), exporter.supportedFileTypes.contains(.mp4) else {
+            throw Failure.exportUnavailable
+        }
+        exporter.outputURL = outputFile
+        exporter.outputFileType = .mp4
+        exporter.shouldOptimizeForNetworkUse = false
+        try await export(exporter, onProgress: onProgress)
+        try Task.checkCancellation()
+        guard try fileSize(at: outputFile) > 1_024 else { throw Failure.exportFailed }
+        let finalAsset = AVURLAsset(url: outputFile)
+        let finalVideoTracks = try await finalAsset.loadTracks(withMediaType: .video)
+        let finalAudioTracks = try await finalAsset.loadTracks(withMediaType: .audio)
+        guard !finalVideoTracks.isEmpty, !finalAudioTracks.isEmpty else {
+            throw Failure.missingTracks
+        }
+        let outputBytes = try fileSize(at: outputFile)
+        log.info("Fast playback temporary preparation completed: output=\(outputBytes, privacy: .public) bytes elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s")
+        completed = true
+        return outputFile
+    }
+
+    static func remove(_ fileURL: URL) {
+        let directory = fileURL.deletingLastPathComponent()
+        guard directory.deletingLastPathComponent().standardizedFileURL == rootDirectory.standardizedFileURL else { return }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private static func transfer(
+        _ source: URL,
+        to destination: URL,
+        maximumBytes: Int64,
+        phase: Phase,
+        onProgress: @escaping ProgressHandler
+    ) async throws {
+        var request = URLRequest(url: source)
+        request.httpShouldHandleCookies = false
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 60
+        let declaredLength = URLComponents(url: source, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int64.init)
+        if let declaredLength, declaredLength > maximumBytes {
+            throw DirectFileDownloadService.Failure.sizeLimitExceeded
+        }
+        onProgress(phase, nil)
+        let response = try await DirectFileDownloadService.download(
+            request: request, to: destination,
+            expectedSizeHint: declaredLength, maximumBytes: maximumBytes
+        ) { written, expected in
+            Task { @MainActor in
+                onProgress(phase, expected > 0 ? min(1, Double(written) / Double(expected)) : nil)
+            }
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw Failure.invalidResponse(response.statusCode)
+        }
+        let transferredBytes = try fileSize(at: destination)
+        log.info("Fast playback \(phase.rawValue, privacy: .public) completed: \(transferredBytes, privacy: .public) bytes")
+        try Task.checkCancellation()
+    }
+
+    private static func export(
+        _ exporter: AVAssetExportSession,
+        onProgress: @escaping ProgressHandler
+    ) async throws {
+        let progressTask = Task { @MainActor in
+            while !Task.isCancelled {
+                onProgress(.finishing, Double(exporter.progress))
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+        defer { progressTask.cancel() }
+        try Task.checkCancellation()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                exporter.exportAsynchronously {
+                    Task { @MainActor in
+                        switch exporter.status {
+                        case .completed:
+                            continuation.resume()
+                        case .cancelled:
+                            continuation.resume(throwing: CancellationError())
+                        default:
+                            continuation.resume(throwing: exporter.error ?? Failure.exportFailed)
+                        }
+                    }
+                }
+            }
+        } onCancel: {
+            Task { @MainActor in exporter.cancelExport() }
+        }
+    }
+
+    private static func fileSize(at url: URL) throws -> Int64 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.size] as? NSNumber)?.int64Value ?? 0
+    }
+}

@@ -373,6 +373,22 @@ struct FullScreenPlayer: View {
                         DownloadProgressOverlay(state: player.loadState)
                             .opacity(max(0, 1 - collapseProgress * 2.5))
                     }
+                    if !isFloating,
+                       let phase = player.fastPlaybackPreparationPhase {
+                        FastPlaybackProgressOverlay(
+                            requestedRate: player.playbackRate,
+                            phase: phase,
+                            progress: player.fastPlaybackPreparationProgress,
+                            onCancel: { player.cancelPendingFastPlayback() }
+                        )
+                        .position(
+                            x: controlFrame.midX,
+                            y: controlFrame.minY + min(72, max(52, controlFrame.height * 0.24))
+                        )
+                        .opacity(max(0, 1 - collapseProgress * 3))
+                        .allowsHitTesting(collapseProgress < 0.05)
+                        .zIndex(6)
+                    }
                     if !isFloating, let previewTime = scrubberSeekPreview {
                         Group {
                             if player.isAudioOnly {
