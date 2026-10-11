@@ -19,6 +19,7 @@ final class FastPlaybackLocalFileService {
         case insufficientSpace
         case invalidResponse(Int)
         case missingTracks
+        case timelineMismatch
         case missingPlayableTail
         case exportUnavailable
         case exportFailed
@@ -183,17 +184,14 @@ final class FastPlaybackLocalFileService {
             throw Failure.missingTracks
         }
         log.info("Fast playback source durations: video=\(videoDuration.seconds, privacy: .public)s audio=\(audioDuration.seconds, privacy: .public)s")
+        let videoRange = try await videoTrack.load(.timeRange)
+        let audioRange = try await audioTrack.load(.timeRange)
+        log.info("Fast playback source timing: videoTrack=\(videoRange.start.seconds, privacy: .public)..\(CMTimeRangeGetEnd(videoRange).seconds, privacy: .public)s audioTrack=\(audioRange.start.seconds, privacy: .public)..\(CMTimeRangeGetEnd(audioRange).seconds, privacy: .public)s URLDurations=\(durationHint(of: videoURL) ?? -1, privacy: .public)/\(durationHint(of: audioURL) ?? -1, privacy: .public)s")
         let sourceEnd = min(videoDuration.seconds, audioDuration.seconds)
-        var outputDuration = videoDuration
         if let referenceDuration, referenceDuration.isFinite, referenceDuration > 10,
            abs(sourceEnd - referenceDuration) > max(2, referenceDuration * 0.05) {
-            // Never swap to a timeline whose length disagrees with the working player unless
-            // we can prove the apparent extra duration contains no video or audio samples.
-            guard sourceEnd > referenceDuration * 1.8,
-                  sourceEnd < referenceDuration * 2.2 else {
-                log.notice("Fast playback source timeline differs from working stream: reference=\(referenceDuration, privacy: .public)s source=\(sourceEnd, privacy: .public)s")
-                throw Failure.missingPlayableTail
-            }
+            // Diagnostic only: the doubled duration may be a bad source, a media-header/edit
+            // issue, or an AVFoundation interpretation issue. Do not guess by trimming it.
             let firstUnexpectedSample = referenceDuration + 1
             let videoHasExtraSamples = try containsSamples(
                 in: videoAsset, track: videoTrack,
@@ -203,19 +201,16 @@ final class FastPlaybackLocalFileService {
                 in: audioAsset, track: audioTrack,
                 startingAt: firstUnexpectedSample, endingAt: audioDuration.seconds
             )
-            log.info("Fast playback extra-sample probe: reference=\(referenceDuration, privacy: .public)s video=\(videoHasExtraSamples, privacy: .public) audio=\(audioHasExtraSamples, privacy: .public)")
-            // The container can advertise twice the real duration even when its samples
-            // stop at the HLS endpoint. Requiring both tracks near that endpoint prevents
-            // an abrupt cut of genuine content with a different timeline.
-            guard !videoHasExtraSamples, !audioHasExtraSamples,
-                  try containsSamples(in: videoAsset, track: videoTrack, endingAt: referenceDuration),
-                  try containsSamples(in: audioAsset, track: audioTrack, endingAt: referenceDuration) else {
-                throw Failure.missingPlayableTail
-            }
-            outputDuration = CMTime(seconds: referenceDuration, preferredTimescale: 600)
-            log.notice("Fast playback trimmed empty media tail to \(referenceDuration, privacy: .public)s")
+            let videoHasReferenceSamples = try containsSamples(
+                in: videoAsset, track: videoTrack, endingAt: referenceDuration
+            )
+            let audioHasReferenceSamples = try containsSamples(
+                in: audioAsset, track: audioTrack, endingAt: referenceDuration
+            )
+            log.notice("Fast playback timeline diagnostic: reference=\(referenceDuration, privacy: .public)s source=\(sourceEnd, privacy: .public)s nearReferenceVideo=\(videoHasReferenceSamples, privacy: .public) nearReferenceAudio=\(audioHasReferenceSamples, privacy: .public) afterReferenceVideo=\(videoHasExtraSamples, privacy: .public) afterReferenceAudio=\(audioHasExtraSamples, privacy: .public)")
+            throw Failure.timelineMismatch
         }
-        let audioEnd = CMTimeCompare(outputDuration, audioDuration) <= 0 ? outputDuration : audioDuration
+        let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
         try Task.checkCancellation()
         let composition = AVMutableComposition()
         guard let composedVideo = composition.addMutableTrack(
@@ -226,7 +221,7 @@ final class FastPlaybackLocalFileService {
             throw Failure.missingTracks
         }
         try composedVideo.insertTimeRange(
-            CMTimeRange(start: .zero, duration: outputDuration), of: videoTrack, at: .zero
+            CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
         )
         try composedAudio.insertTimeRange(
             CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
@@ -368,6 +363,14 @@ final class FastPlaybackLocalFileService {
     private static func fileSize(at url: URL) throws -> Int64 {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    /// Reads only the non-secret duration field from a signed media URL; never log the URL.
+    private static func durationHint(of url: URL) -> Double? {
+        guard let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "dur" })?.value,
+              let duration = Double(value), duration.isFinite, duration > 0 else { return nil }
+        return duration
     }
 
     /// Check actual compressed samples, not just container headers or a track's advertised range.

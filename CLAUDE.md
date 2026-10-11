@@ -168,11 +168,12 @@ re-encoding, then probed. Both media transfers reuse the validated ranged downlo
 source advertises its length, with the ordinary file transfer as fallback. This has a single
 combined-byte progress bar, a Cancel control, an input cap of
 1 GB or less on low-storage devices, and a 200 MB storage reserve. It does not enter Downloads;
-before accepting the temporary mux, compressed samples must exist near its advertised end. If
-both downloaded tracks advertise roughly twice the current HLS duration but have no samples
-beyond that endpoint, trim only after confirming samples near it; otherwise reject the mux
-and keep the working source. Container duration and AVPlayer readiness alone are insufficient:
-an empty edit tail can render black while the seek bar keeps running. Inputs are removed after
+before accepting the temporary mux, compressed samples must exist near its advertised end. A
+source duration that materially disagrees with the working HLS item is currently rejected, not
+trimmed: the cause of the observed 2x discrepancy has not been established. The diagnostic logs
+record source track ranges, non-secret URL duration hints, and whether compressed samples exist
+near or beyond the HLS endpoint. Keep the working source while investigating; container duration
+and AVPlayer readiness alone did not prevent a black screen. Inputs are removed after
 muxing, the output is removed on video replacement/dismissal, and
 abandoned files are removed on next launch. Normal playback and holds never initiate this transfer,
 nor does a saved high-speed preference on a newly opened video. Accept only a ready item with

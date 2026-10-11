@@ -1073,7 +1073,7 @@ final class PlayerStateManager {
                 // Remote AVCompositions stalled on device. Materialize their tracks in a
                 // cancellable temporary file while the existing HLS item keeps playing.
                 scheduleFastPlaybackTimeout(after: .seconds(1_200), generation: generation)
-                log.info("Preparing temporary local file for fast playback of \(video.id, privacy: .public)")
+                log.info("Preparing temporary local file for fast playback of \(video.id, privacy: .public): workingDuration=\(originalItem.duration.seconds, privacy: .public)s videoMetadataDuration=\(video.duration ?? -1, privacy: .public)s")
                 let localFile = try await FastPlaybackLocalFileService.prepare(
                     videoURL: videoURL, audioURL: audioURL,
                     referenceDuration: originalItem.duration.seconds
