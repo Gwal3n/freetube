@@ -33,8 +33,8 @@ final class SettingsViewModel {
     var libraryShelfContent: LibraryShelfContent {
         didSet { preferences.libraryShelfContent = libraryShelfContent }
     }
-    var playbackRate: Double {
-        didSet { preferences.playbackRate = playbackRate }
+    var defaultPlaybackRate: Double {
+        didSet { preferences.defaultPlaybackRate = defaultPlaybackRate }
     }
     var holdForSpeedEnabled: Bool {
         didSet { preferences.holdForSpeedEnabled = holdForSpeedEnabled }
@@ -90,7 +90,7 @@ final class SettingsViewModel {
         self.showContinueWatchingMenu = preferences.showContinueWatchingMenu
         self.recentLibraryVideoCount = preferences.recentLibraryVideoCount
         self.libraryShelfContent = preferences.libraryShelfContent
-        self.playbackRate = preferences.playbackRate
+        self.defaultPlaybackRate = preferences.defaultPlaybackRate
         self.holdForSpeedEnabled = preferences.holdForSpeedEnabled
         self.holdSpeedRate = preferences.holdSpeedRate
         self.deArrowTitles = preferences.deArrowTitles

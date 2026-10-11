@@ -86,11 +86,10 @@ struct UserPreferences {
     /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
     /// balance for cellular and consumer Wi-Fi. Values above 8 risk YouTube rate-limiting.
     @AppStorage("concurrentFragments") var concurrentFragments: Int = 4
-    /// Persisted user-selected playback rate (1.0 = normal speed). The player may temporarily
-    /// cap an unsupported source at 2x while preparing an experimental progressive alternative.
-    /// `AVPlayer.defaultRate` uses the validated base rate, not a temporary hold override.
-    /// Menu and Settings choices write here explicitly; hold gestures never do.
-    @AppStorage("playbackRate") var playbackRate: Double = 1.0
+    /// Saved default for each newly opened video. The old `playbackRate` key also held every
+    /// player-menu choice, so its value cannot be safely treated as the user's chosen default.
+    /// Starting a distinct key at 1x avoids carrying a stale 3x–5x selection into new videos.
+    @AppStorage("defaultPlaybackRate") var defaultPlaybackRate: Double = 1.0
     @AppStorage("customPlaybackSpeeds") var customPlaybackSpeedsRaw: String = ""
     @AppStorage("holdForSpeedEnabled") var holdForSpeedEnabled: Bool = true
     @AppStorage("holdSpeedRate") var holdSpeedRate: Double = 2.0

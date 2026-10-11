@@ -246,8 +246,8 @@ final class PlayerStateManager {
         self.playlistService = playlistService
         self.preferences = preferences
         self.manualQueue = Self.restoreManualQueue()
-        self.playbackRate = PlaybackSpeedPresets.bounded(preferences.playbackRate)
-        self.effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(preferences.playbackRate, canPlayFastForward: false)
+        self.playbackRate = PlaybackSpeedPresets.bounded(preferences.defaultPlaybackRate)
+        self.effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(preferences.defaultPlaybackRate, canPlayFastForward: false)
         FastPlaybackLocalFileService.removeOrphansAtLaunch()
         self.playbackQuality = preferences.preferredQuality
         self.videoQualityBeforeAudio = preferences.preferredQuality == .audioOnly
@@ -455,6 +455,7 @@ final class PlayerStateManager {
         }
         playbackSessionID &+= 1
         resetFastPlaybackState()
+        log.info("Playback speed for new video: default=\(self.playbackRate, privacy: .public)x")
         if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
         // Settings can change while the player is alive. Adopt that choice for the next video,
         // without disturbing the stream currently playing when the preference changes.
@@ -881,7 +882,8 @@ final class PlayerStateManager {
         let boundedRate = PlaybackSpeedPresets.bounded(rate)
         log.info("Playback speed selected: \(boundedRate, privacy: .public)x")
         playbackRate = boundedRate
-        preferences.playbackRate = boundedRate
+        // The player menu changes this video only. Settings owns the saved default; writing
+        // menu choices there made subsequent HLS videos start at a capped 2x after a 3x choice.
         if boundedRate > 2 {
             fastPlaybackUserRequested = true
             if !isPreparingFastPlayback { fastPlaybackFailed = false }
@@ -994,7 +996,6 @@ final class PlayerStateManager {
         wasPlayingBeforeTemporaryRate = nil
         if playbackRate > 2 {
             playbackRate = 2
-            preferences.playbackRate = 2
         }
         applyEffectivePlaybackRate()
         log.info("Fast playback preparation cancelled by user")
@@ -1008,6 +1009,7 @@ final class PlayerStateManager {
         fastPlaybackUserRequested = false
         temporaryPlaybackRate = nil
         wasPlayingBeforeTemporaryRate = nil
+        playbackRate = PlaybackSpeedPresets.bounded(preferences.defaultPlaybackRate)
         effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(playbackRate, canPlayFastForward: false)
     }
 
@@ -1017,7 +1019,6 @@ final class PlayerStateManager {
         fastPlaybackPreparation = nil
         if playbackRate > 2 {
             playbackRate = 2
-            preferences.playbackRate = 2
         }
         applyEffectivePlaybackRate()
         showQueueNotice(message: message, haptic: false)
@@ -2651,8 +2652,8 @@ final class PlayerStateManager {
         // under the video title (and the popup-bar play/pause glyph) reflects taps on the native
         // AVPlayerViewController controls. Without this, hitting the native pause button on the
         // video surface left our SwiftUI button showing "Pause" forever.
-        // Custom menu changes persist explicitly in setPlaybackRate. The capability-limited
-        // AVPlayer default and a temporary hold must never overwrite that user preference.
+        // The current video's menu rate is separate from the saved default. The
+        // capability-limited AVPlayer rate and temporary holds must not change either choice.
 
         timeControlStatusObservation = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] _, _ in
             guard let self else { return }

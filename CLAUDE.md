@@ -177,8 +177,11 @@ detachment. Create a distinct item from the prepared asset, then seek to the pos
 restore current play/pause intent. Use time-domain audio pitch correction for speech. Replacing or
 dismissing the video invalidates the preparation; failure keeps the working stream at up to 2x.
 Successful progressive playback stays on that fixed-resolution source for the rest of the video,
-even after lowering the rate. No new dependencies or persistent signed URLs. The selected base
-rate is saved explicitly; transient AVPlayer defaults and holds never write it.
+even after lowering the rate. No new dependencies or persistent signed URLs. Settings owns the
+saved default playback rate (`defaultPlaybackRate`); player-menu choices apply only to the current
+video, and a new video resets to that default. The legacy `playbackRate` setting mixed default and
+current-video choices and cannot be migrated unambiguously, so the distinct default starts at 1x.
+Holds never write it either.
 
 **Playback starts optimistically.** `resolveAndPlay` installs the candidate, sets
 `loadState = .buffering`, and calls `play()` right away instead of waiting for `.readyToPlay`. This

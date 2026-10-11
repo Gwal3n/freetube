@@ -4,14 +4,13 @@ import SwiftUI
 /// It is independent of the ordinary playback spinner: the current HLS video keeps playing.
 @available(iOS 17.0, *)
 struct FastPlaybackProgressOverlay: View {
-    let requestedRate: Double
     let preparation: FastPlaybackLocalFileService.ProgressUpdate
     let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Preparing \(PlaybackSpeedPresets.label(requestedRate)) playback")
+                Text("Preparing faster playback")
                     .font(.caption.weight(.semibold))
 
                 if let fraction = preparation.fraction {

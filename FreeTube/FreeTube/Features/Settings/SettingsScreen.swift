@@ -32,12 +32,12 @@ struct SettingsScreen: View {
                             Text(quality.displayName).tag(quality)
                         }
                     }
-                    Picker("Default playback speed", selection: Bindable(model).playbackRate) {
+                    Picker("Default playback speed", selection: Bindable(model).defaultPlaybackRate) {
                         ForEach(defaultPlaybackRates, id: \.self) { rate in
-                            Text(verbatim: rate == 1 ? "Normal" : PlaybackSpeedPresets.label(rate)).tag(rate)
+                            Text(verbatim: PlaybackSpeedPresets.label(rate)).tag(rate)
                         }
                     }
-                    .onChange(of: model.playbackRate) { _, rate in
+                    .onChange(of: model.defaultPlaybackRate) { _, rate in
                         player.setPlaybackRate(rate)
                     }
                     NavigationLink {
@@ -394,7 +394,7 @@ struct SettingsScreen: View {
 
     private var defaultPlaybackRates: [Double] {
         Array(Set(PlaybackSpeedPresets.settingsRates +
-                  PlaybackSpeedPresets.decode(savedPlaybackSpeedsRaw) + [model.playbackRate])).sorted()
+                  PlaybackSpeedPresets.decode(savedPlaybackSpeedsRaw) + [model.defaultPlaybackRate])).sorted()
     }
 
     private var appVersion: String {
