@@ -56,20 +56,7 @@ struct LocalPlaylistsScreen: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if !editMode.isEditing {
-                    Button { showingCreate = true } label: {
-                        Image(systemName: "plus")
-                    }
-                    Button("Edit") { beginEditing() }
-                } else {
-                    Button(role: .destructive) {
-                        showingDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .disabled(selectedPlaylistIDs.isEmpty)
-                    Button("Done") { finishEditing() }
-                }
+                toolbarButtons
             }
         }
         .alert("New Playlist", isPresented: $showingCreate) {
@@ -141,6 +128,24 @@ struct LocalPlaylistsScreen: View {
                 await service.update(id: playlist.id, title: title, descriptionText: description)
                 await reload()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarButtons: some View {
+        if !editMode.isEditing {
+            Button { showingCreate = true } label: {
+                Image(systemName: "plus")
+            }
+            Button("Edit") { beginEditing() }
+        } else {
+            Button(role: .destructive) {
+                showingDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+            }
+            .disabled(selectedPlaylistIDs.isEmpty)
+            Button("Done") { finishEditing() }
         }
     }
 

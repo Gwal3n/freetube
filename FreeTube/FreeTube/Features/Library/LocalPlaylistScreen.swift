@@ -46,33 +46,7 @@ struct LocalPlaylistScreen: View {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(visibleVideos(in: details)) { video in
-                    VideoRow(
-                        video: video,
-                        accessory: editingMode == nil
-                            ? .actions(offersPlayNext: true)
-                            : .reserved
-                    ) {
-                        if editingMode != nil {
-                            if selectedVideoIDs.contains(video.id) {
-                                selectedVideoIDs.remove(video.id)
-                            } else {
-                                selectedVideoIDs.insert(video.id)
-                            }
-                        } else if editingMode == nil {
-                            player.loadPlaylist(playbackDetails(for: details), startAt: video, origin: .local)
-                        }
-                    }
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            Task {
-                                await service.remove(videoID: video.id, from: playlistID)
-                                await reload()
-                            }
-                        } label: { Label("Remove", systemImage: "trash") }
-                    }
-                    .tag(video.id)
-                    .moveDisabled(editingMode == nil)
-                    .listRowBackground(Color.clear)
+                    playlistVideoRow(video, in: details)
                 }
                 .onMove { source, destination in
                     guard editingMode != nil, searchText.isEmpty else { return }
@@ -127,30 +101,7 @@ struct LocalPlaylistScreen: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if editingMode != nil {
-                    Button(role: .destructive) {
-                        showingVideoDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .disabled(selectedVideoIDs.isEmpty)
-                    Button("Done") { finishEditing() }
-                }
-                if editingMode == nil {
-                    if details?.playlist.isSavedFromYouTube == false {
-                        Button {
-                            showingAddVideo = true
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .accessibilityLabel("Add Video")
-                    }
-                    Button("Edit") { beginEditing() }
-                        .disabled(details == nil)
-                    if let details {
-                        localMoreMenu(details)
-                    }
-                }
+                toolbarButtons
             }
         }
         .alert("Couldn’t Restore Playlist", isPresented: Binding(
@@ -210,6 +161,60 @@ struct LocalPlaylistScreen: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    @ViewBuilder
+    private var toolbarButtons: some View {
+        if editingMode != nil {
+            Button(role: .destructive) {
+                showingVideoDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+            }
+            .disabled(selectedVideoIDs.isEmpty)
+            Button("Done") { finishEditing() }
+        } else {
+            if details?.playlist.isSavedFromYouTube == false {
+                Button {
+                    showingAddVideo = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add Video")
+            }
+            Button("Edit") { beginEditing() }
+                .disabled(details == nil)
+            if let details {
+                localMoreMenu(details)
+            }
+        }
+    }
+
+    private func playlistVideoRow(_ video: Video, in details: LocalPlaylistDetails) -> some View {
+        let accessory: VideoRow.Accessory = editingMode == nil
+            ? .actions(offersPlayNext: true) : .reserved
+        return VideoRow(video: video, accessory: accessory, onTap: {
+            if editingMode != nil {
+                if selectedVideoIDs.contains(video.id) {
+                    selectedVideoIDs.remove(video.id)
+                } else {
+                    selectedVideoIDs.insert(video.id)
+                }
+            } else {
+                player.loadPlaylist(playbackDetails(for: details), startAt: video, origin: .local)
+            }
+        })
+        .swipeActions {
+            Button(role: .destructive) {
+                Task {
+                    await service.remove(videoID: video.id, from: playlistID)
+                    await reload()
+                }
+            } label: { Label("Remove", systemImage: "trash") }
+        }
+        .tag(video.id)
+        .moveDisabled(editingMode == nil)
+        .listRowBackground(Color.clear)
     }
 
     private func visibleVideos(in details: LocalPlaylistDetails) -> [Video] {
