@@ -1,8 +1,8 @@
 import Foundation
 import OSLog
 
-/// Decodes a channel's Videos tab without going through YouTubeKit's parser. Used by channel
-/// browsing and feed refresh when YouTubeKit's decoder can miss newer renderer shapes.
+/// Decodes a channel's Videos tab without going through YouTubeKit's parser. Used as a
+/// fallback when YouTubeKit returns zero items for a tab that actually has videos.
 ///
 /// **Why this exists.** `ChannelInfosResponse.Videos.decodeJSONFromTab` and
 /// `decodeContinuation` only walk the legacy `richItemRenderer.content.videoRenderer` shape.
@@ -11,9 +11,8 @@ import OSLog
 /// but missed the channel Videos and Directs tabs. When a channel uses the new shape we'd
 /// see an empty list while the header still reports the correct video count. Subclassing
 /// isn't an option (the affected types are structs and the decoders are static methods),
-/// so we duplicate just enough of the request + decode pipeline to cover the gap. The feed
-/// tries this decoder first because a mixed page can return a nonempty but incomplete result
-/// through YouTubeKit; it falls back to YouTubeKit if this request fails or returns no videos.
+/// so we duplicate just enough of the request + decode pipeline to cover the gap, and
+/// keep YouTubeKit as the primary path.
 ///
 /// **Continuation handoff.** When the initial fetch uses the fallback path we store the
 /// continuation token on the actor-backed state map. `ChannelService.fetchVideosNextPage`
@@ -61,8 +60,7 @@ final class ChannelVideosFallbackService: Sendable {
         channelID: String,
         params: String,
         cacheKey: String? = nil,
-        sort: ChannelVideoSort = .newest,
-        retainContinuation: Bool = true
+        sort: ChannelVideoSort = .newest
     ) async throws -> ChannelTab<Video> {
         // YouTube no longer accepts a static params variant for Popular and Oldest. Those values
         // now select the Videos surface only; the actual sort is represented by a per-response
@@ -90,7 +88,7 @@ final class ChannelVideosFallbackService: Sendable {
             ) { root in
                 Self.decodeContinuation(root: root, channelID: channelID)
             }
-            if retainContinuation { await state.set(cacheKey ?? channelID, token: result.continuation) }
+            await state.set(cacheKey ?? channelID, token: result.continuation)
             return ChannelTab(items: result.videos, continuationToken: result.continuation)
         }
 
@@ -98,7 +96,7 @@ final class ChannelVideosFallbackService: Sendable {
         let result = try await sendBrowse(body: body, channelID: channelID, kind: "initial") { root in
             Self.decodeVideosTab(root: root, channelID: channelID)
         }
-        if retainContinuation { await state.set(cacheKey ?? channelID, token: result.continuation) }
+        await state.set(cacheKey ?? channelID, token: result.continuation)
         return ChannelTab(items: result.videos, continuationToken: result.continuation)
     }
 
