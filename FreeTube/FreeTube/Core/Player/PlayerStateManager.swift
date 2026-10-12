@@ -618,6 +618,10 @@ final class PlayerStateManager {
                 isLive: current.isLive || info.video.isLive,
                 isShort: current.isShort || info.video.isShort
             ))
+        } else if info.video.isLive && !current.isLive {
+            // Search/feed rows do not always carry a live badge. A watch-page count explicitly
+            // marked live can confirm the stream without replacing its already-correct identity.
+            enrichCurrentVideo(with: current.markedLive())
         }
         if !info.chapters.isEmpty {
             youtubeChapters = info.chapters

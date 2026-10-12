@@ -36,6 +36,21 @@ final class LiveViewerCountExtractorTests: XCTestCase {
         XCTAssertFalse(PlayerDetailsModel().statsText(for: video).contains("views"))
     }
 
+    func testConfirmedLiveVideoKeepsExistingIdentityAndHidesTotalViews() {
+        let listing = Video(
+            id: "abc12345678", title: "Existing title", channelID: "UC123", channelName: "Creator",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: nil, viewCount: 1_234_567,
+            publishedAt: nil, descriptionSnippet: nil, isLive: false, isShort: false
+        )
+
+        let confirmed = listing.markedLive()
+        XCTAssertTrue(confirmed.isLive)
+        XCTAssertEqual(confirmed.title, listing.title)
+        XCTAssertEqual(confirmed.channelID, listing.channelID)
+        XCTAssertEqual(confirmed.viewCount, listing.viewCount)
+        XCTAssertFalse(PlayerDetailsModel().statsText(for: confirmed).contains("views"))
+    }
+
     private func watchResponse(isLive: Bool?, label: [String: Any]) throws -> Data {
         var renderer: [String: Any] = ["viewCount": label]
         if let isLive { renderer["isLive"] = isLive }

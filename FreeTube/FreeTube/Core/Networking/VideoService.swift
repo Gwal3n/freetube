@@ -137,6 +137,7 @@ final class VideoService: VideoServicing {
                 ?? Self.descriptionParts(from: response.videoDescription ?? [])
             let linkedPartCount = descriptionParts.filter { $0.action != nil }.count
             log.info("Description parsed id=\(id, privacy: .public) raw=\(extractedDescription != nil, privacy: .public) linkedParts=\(linkedPartCount, privacy: .public)")
+            log.info("Watch-page live viewers id=\(id, privacy: .public) count=\(rawResponse.liveViewerCountText ?? "unavailable", privacy: .public)")
             let video = Video(
                 id: id,
                 title: response.videoTitle ?? "",

@@ -64,6 +64,7 @@ final class PlayerDetailsModel {
                       videoID == requestedVideoID,
                       player.currentVideo?.id == requestedVideoID else { return }
                 details = info
+                liveViewerCountText = info.liveViewerCountText
                 player.installVideoDetails(info, for: requestedVideoID)
                 let fetchedDescription = info.descriptionText?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
