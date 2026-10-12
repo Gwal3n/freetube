@@ -27,9 +27,6 @@ struct LocalPlaylistScreen: View {
     @State private var playlistExportError: String?
     @State private var searchText = ""
     @State private var videoSort: LocalPlaylistVideoSort = .custom
-    @State private var isRefreshingDurations = false
-    @State private var durationRefreshProgress: (completed: Int, total: Int)?
-    @State private var durationRefreshTask: Task<Void, Never>?
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
@@ -97,7 +94,6 @@ struct LocalPlaylistScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
         }
-        .onDisappear { durationRefreshTask?.cancel() }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 toolbarButtons
@@ -280,30 +276,33 @@ struct LocalPlaylistScreen: View {
                 localActionToolbar(local)
             }
             PlaylistMetadataBlock(details: local.playbackDetails, isExpanded: $isDetailsExpanded)
-            durationRefreshStatus
+            metadataRefreshStatus(for: local.playlist)
         }
         .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
         .padding(.bottom, 16)
     }
 
     @ViewBuilder
-    private var durationRefreshStatus: some View {
-        if let progress = durationRefreshProgress, isRefreshingDurations {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Refreshing video lengths")
-                        .appFont(.caption, weight: .medium)
-                    ProgressView(value: Double(progress.completed), total: Double(max(progress.total, 1)))
-                        .tint(.white)
-                    Text("\(progress.completed) of \(progress.total)")
-                        .appFont(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Button("Cancel") { durationRefreshTask?.cancel() }
-                    .buttonStyle(.borderless)
-                    .tint(.white)
+    private func metadataRefreshStatus(for playlist: LocalPlaylistSnapshot) -> some View {
+        if playlist.isRefreshingMetadata {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Refreshing video details")
+                    .appFont(.caption, weight: .medium)
+                ProgressView(
+                    value: Double(playlist.metadataRefreshProcessed),
+                    total: Double(playlist.metadataRefreshTotal)
+                )
+                .tint(.white)
+                Text("\(playlist.metadataRefreshProcessed) of \(playlist.metadataRefreshTotal) · Continues while the app is open")
+                    .appFont(.caption2)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal)
+        } else if playlist.metadataRefreshFailures > 0 {
+            Text("\(playlist.metadataRefreshFailures) videos could not be refreshed. Saved details were kept.")
+                .appFont(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
         }
     }
 
@@ -360,15 +359,18 @@ struct LocalPlaylistScreen: View {
                 } label: {
                     Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
                 }
+                .disabled(local.playlist.isRefreshingMetadata)
             }
-            if local.videos.contains(where: { !$0.isLive && ($0.duration ?? 0) <= 0 }) {
-                Button {
-                    startDurationRefresh()
-                } label: {
-                    Label("Refresh missing video lengths", systemImage: "clock.arrow.circlepath")
+            Button {
+                Task {
+                    _ = await LocalPlaylistRefreshCoordinator.shared.schedule(playlistID: playlistID)
+                    await reload()
                 }
-                .disabled(isRefreshingDurations || local.playlist.isHydratingMetadata)
+            } label: {
+                Label("Refresh video details", systemImage: "arrow.clockwise")
             }
+            .disabled(local.playlist.isRefreshingMetadata
+                || local.playlist.isHydratingMetadata || local.videos.isEmpty)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body.weight(.semibold))
@@ -397,32 +399,6 @@ struct LocalPlaylistScreen: View {
             showingPlaylistExporter = true
         } catch {
             playlistExportError = error.localizedDescription
-        }
-    }
-
-    private func startDurationRefresh() {
-        guard !isRefreshingDurations else { return }
-        isRefreshingDurations = true
-        durationRefreshProgress = nil
-        durationRefreshTask = Task {
-            let missing = await service.videosMissingDuration(id: playlistID)
-            durationRefreshProgress = (0, missing.count)
-            for (index, video) in missing.enumerated() {
-                guard !Task.isCancelled else { break }
-                let completed = index + 1
-                _ = await service.refreshMissingDuration(
-                    for: video,
-                    in: playlistID,
-                    notifyProgress: completed.isMultiple(of: 5) || completed == missing.count
-                )
-                durationRefreshProgress = (completed, missing.count)
-                if completed.isMultiple(of: 5) { await reload() }
-                try? await Task.sleep(for: .milliseconds(200))
-            }
-            await reload()
-            durationRefreshProgress = nil
-            isRefreshingDurations = false
-            durationRefreshTask = nil
         }
     }
 

@@ -20,7 +20,8 @@ enum PersistenceController {
             FavoritePlaylist.self,
             SubscriptionFeedEntry.self,
             LocalPlaylistRecord.self,
-            LocalPlaylistVideoRecord.self
+            LocalPlaylistVideoRecord.self,
+            LocalPlaylistRefreshJob.self
         ])
         let config = ModelConfiguration(schema: schema)
         do {

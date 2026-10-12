@@ -16,8 +16,13 @@ actor LocalPlaylistWriter {
                 if $0.sortPosition != $1.sortPosition { return $0.sortPosition < $1.sortPosition }
                 return $0.createdAt < $1.createdAt
             }
+        let refreshJobs = (try? modelContext.fetch(FetchDescriptor<LocalPlaylistRefreshJob>())) ?? []
+        let refreshByPlaylist = refreshJobs.reduce(into: [String: LocalPlaylistRefreshJob]()) {
+            $0[$1.playlistID] = $1
+        }
         return records.map { record in
             let itemCount = videoCount(playlistID: record.playlistID)
+            let refresh = refreshByPlaylist[record.playlistID]
             return LocalPlaylistSnapshot(
                 id: record.playlistID,
                 title: record.title,
@@ -28,7 +33,10 @@ actor LocalPlaylistWriter {
                 updatedAt: record.updatedAt,
                 metadataHydrationTotal: record.metadataHydrationTotal,
                 metadataHydrationProcessed: record.metadataHydrationProcessed,
-                metadataHydrationFailures: record.metadataHydrationFailures
+                metadataHydrationFailures: record.metadataHydrationFailures,
+                metadataRefreshTotal: refresh?.total ?? 0,
+                metadataRefreshProcessed: refresh?.nextIndex ?? 0,
+                metadataRefreshFailures: refresh?.failures ?? 0
             )
         }
     }
@@ -68,6 +76,7 @@ actor LocalPlaylistWriter {
         let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })
         guard let record = try? modelContext.fetch(descriptor).first else { return nil }
         let items = videoRecords(playlistID: playlistID)
+        let refresh = refreshJob(playlistID: playlistID)
         return LocalPlaylistDetails(
             playlist: LocalPlaylistSnapshot(
                 id: record.playlistID,
@@ -79,7 +88,10 @@ actor LocalPlaylistWriter {
                 updatedAt: record.updatedAt,
                 metadataHydrationTotal: record.metadataHydrationTotal,
                 metadataHydrationProcessed: record.metadataHydrationProcessed,
-                metadataHydrationFailures: record.metadataHydrationFailures
+                metadataHydrationFailures: record.metadataHydrationFailures,
+                metadataRefreshTotal: refresh?.total ?? 0,
+                metadataRefreshProcessed: refresh?.nextIndex ?? 0,
+                metadataRefreshFailures: refresh?.failures ?? 0
             ),
             videos: items.map(Self.video(from:))
         )
@@ -200,6 +212,7 @@ actor LocalPlaylistWriter {
         let target = playlistID
         let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })
         if let record = try? modelContext.fetch(descriptor).first { modelContext.delete(record) }
+        if let job = refreshJob(playlistID: playlistID) { modelContext.delete(job) }
         for item in videoRecords(playlistID: playlistID) { modelContext.delete(item) }
         try? modelContext.save()
         normalizePlaylistPositions()
@@ -222,6 +235,7 @@ actor LocalPlaylistWriter {
             let target = playlistID
             let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })
             if let record = try? modelContext.fetch(descriptor).first { modelContext.delete(record) }
+            if let job = refreshJob(playlistID: playlistID) { modelContext.delete(job) }
             for item in videoRecords(playlistID: playlistID) { modelContext.delete(item) }
         }
         try? modelContext.save()
@@ -261,6 +275,7 @@ actor LocalPlaylistWriter {
             descriptionText: descriptionText,
             sourcePlaylistID: sourcePlaylistID
         )
+        if let job = refreshJob(playlistID: playlistID) { modelContext.delete(job) }
         for item in videoRecords(playlistID: playlistID) { modelContext.delete(item) }
         for (index, video) in videos.enumerated() {
             modelContext.insert(LocalPlaylistVideoRecord(
@@ -331,29 +346,126 @@ actor LocalPlaylistWriter {
             .map(Self.video(from:))
     }
 
-    /// Existing resolved playlist entries can predate duration parsing. Return only those with
-    /// missing lengths; imported placeholders remain owned by the regular hydration coordinator.
-    func videosMissingDuration(playlistID: String) -> [Video] {
-        videoRecords(playlistID: playlistID)
-            .filter { $0.metadataState == 0 && !$0.isLive && ($0.duration ?? 0) <= 0 }
-            .map(Self.video(from:))
+    /// Queue one explicit refresh over the current membership. A running job is never reset by
+    /// reopening the screen or tapping the action twice; its checkpoint remains authoritative.
+    func scheduleMetadataRefresh(playlistID: String) -> Bool {
+        let target = playlistID
+        let playlistDescriptor = FetchDescriptor<LocalPlaylistRecord>(
+            predicate: #Predicate { $0.playlistID == target }
+        )
+        guard let playlist = try? modelContext.fetch(playlistDescriptor).first,
+              playlist.metadataHydrationProcessed >= playlist.metadataHydrationTotal else { return false }
+        if let active = refreshJob(playlistID: playlistID), active.nextIndex < active.total {
+            return true
+        }
+        let videoIDs = videoRecords(playlistID: playlistID).map(\.videoID)
+        guard !videoIDs.isEmpty,
+              let data = try? JSONEncoder().encode(videoIDs),
+              let encoded = String(data: data, encoding: .utf8) else { return false }
+        if let existing = refreshJob(playlistID: playlistID) {
+            existing.videoIDsJSON = encoded
+            existing.nextIndex = 0
+            existing.total = videoIDs.count
+            existing.failures = 0
+            existing.startedAt = .now
+        } else {
+            modelContext.insert(LocalPlaylistRefreshJob(
+                playlistID: playlistID, videoIDsJSON: encoded, total: videoIDs.count
+            ))
+        }
+        try? modelContext.save()
+        notify()
+        return true
     }
 
-    /// Fill only the absent length. Never replace a locally edited title, artwork, or order with
-    /// newly fetched metadata, and do not change the playlist's own updated/sort date.
-    func fillMissingDuration(_ duration: TimeInterval, videoID: String, playlistID: String, notifyProgress: Bool) -> Bool {
-        guard duration.isFinite, duration > 0 else { return false }
+    func playlistsAwaitingMetadataRefresh() -> [String] {
+        ((try? modelContext.fetch(FetchDescriptor<LocalPlaylistRefreshJob>())) ?? [])
+            .filter { $0.nextIndex < $0.total }
+            .sorted { $0.startedAt < $1.startedAt }
+            .map(\.playlistID)
+    }
+
+    /// Missing/deleted memberships advance without a request. The next index is saved with
+    /// each successful result, so an interrupted lookup is the only item retried on relaunch.
+    func nextMetadataRefreshVideo(playlistID: String) -> Video? {
+        guard let job = refreshJob(playlistID: playlistID), job.nextIndex < job.total else { return nil }
+        let target = playlistID
+        let playlistDescriptor = FetchDescriptor<LocalPlaylistRecord>(
+            predicate: #Predicate { $0.playlistID == target }
+        )
+        guard (try? modelContext.fetch(playlistDescriptor).first) != nil else {
+            modelContext.delete(job)
+            try? modelContext.save()
+            notify()
+            return nil
+        }
+        guard let data = job.videoIDsJSON.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([String].self, from: data),
+              ids.count == job.total else {
+            job.failures += max(0, job.total - job.nextIndex)
+            job.nextIndex = job.total
+            job.videoIDsJSON = ""
+            try? modelContext.save()
+            notify()
+            return nil
+        }
+        var skipped = false
+        while job.nextIndex < ids.count {
+            let membership = "\(playlistID):\(ids[job.nextIndex])"
+            let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(
+                predicate: #Predicate { $0.membershipID == membership }
+            )
+            if let item = try? modelContext.fetch(descriptor).first {
+                if skipped {
+                    try? modelContext.save()
+                    notify()
+                }
+                return Self.video(from: item)
+            }
+            job.nextIndex += 1
+            skipped = true
+        }
+        job.videoIDsJSON = ""
+        try? modelContext.save()
+        notify()
+        return nil
+    }
+
+    /// Merge only data that the anonymous response actually supplied. One SwiftData save commits
+    /// the new metadata and the checkpoint, preserving edits/order and old data on a failed lookup.
+    func completeMetadataRefresh(videoID: String, playlistID: String, refreshed: Video?) {
+        guard let job = refreshJob(playlistID: playlistID), job.nextIndex < job.total,
+              let data = job.videoIDsJSON.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([String].self, from: data),
+              ids.indices.contains(job.nextIndex), ids[job.nextIndex] == videoID else { return }
         let membership = "\(playlistID):\(videoID)"
         let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(
             predicate: #Predicate { $0.membershipID == membership }
         )
-        guard let item = try? modelContext.fetch(descriptor).first,
-              item.metadataState == 0,
-              (item.duration ?? 0) <= 0 else { return false }
-        item.duration = duration
+        if let item = try? modelContext.fetch(descriptor).first, let refreshed {
+            if !refreshed.title.isEmpty { item.title = refreshed.title }
+            if !refreshed.channelID.isEmpty { item.channelID = refreshed.channelID }
+            if !refreshed.channelName.isEmpty { item.channelName = refreshed.channelName }
+            if let image = refreshed.channelThumbnailURL { item.channelThumbnailURL = image }
+            if let image = refreshed.thumbnailURL { item.thumbnailURL = image }
+            if let duration = refreshed.duration, duration.isFinite, duration > 0 { item.duration = duration }
+            if let views = refreshed.viewCount { item.viewCount = views }
+            if let date = refreshed.publishedAt { item.publishedAt = date }
+            if let relative = refreshed.publishedRelative, !relative.isEmpty {
+                item.publishedRelative = relative
+            }
+            if let description = refreshed.descriptionSnippet, !description.isEmpty {
+                item.descriptionSnippet = description
+            }
+            item.isLive = refreshed.isLive
+            item.isShort = refreshed.isShort
+        } else if refreshed == nil {
+            job.failures += 1
+        }
+        job.nextIndex += 1
+        if job.nextIndex == job.total { job.videoIDsJSON = "" }
         try? modelContext.save()
-        if notifyProgress { notify() }
-        return true
+        notify()
     }
 
     func retryFailedMetadata(playlistID: String) {
@@ -420,6 +532,14 @@ actor LocalPlaylistWriter {
     private func record(sourcePlaylistID: String) -> LocalPlaylistRecord? {
         let source = sourcePlaylistID
         let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.sourcePlaylistID == source })
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func refreshJob(playlistID: String) -> LocalPlaylistRefreshJob? {
+        let target = playlistID
+        let descriptor = FetchDescriptor<LocalPlaylistRefreshJob>(
+            predicate: #Predicate { $0.playlistID == target }
+        )
         return try? modelContext.fetch(descriptor).first
     }
 

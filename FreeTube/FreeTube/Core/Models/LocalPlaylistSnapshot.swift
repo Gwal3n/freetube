@@ -11,9 +11,15 @@ struct LocalPlaylistSnapshot: Identifiable, Hashable, Sendable {
     let metadataHydrationTotal: Int
     let metadataHydrationProcessed: Int
     let metadataHydrationFailures: Int
+    let metadataRefreshTotal: Int
+    let metadataRefreshProcessed: Int
+    let metadataRefreshFailures: Int
 
     var isSavedFromYouTube: Bool { sourcePlaylistID != nil }
     var isHydratingMetadata: Bool {
         metadataHydrationTotal > 0 && metadataHydrationProcessed < metadataHydrationTotal
+    }
+    var isRefreshingMetadata: Bool {
+        metadataRefreshTotal > 0 && metadataRefreshProcessed < metadataRefreshTotal
     }
 }

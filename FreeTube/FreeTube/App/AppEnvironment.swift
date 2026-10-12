@@ -18,6 +18,9 @@ final class AppEnvironment {
         AudioSessionConfigurator.configure()
         RemoteCommandCenter.wire(to: playerStateManager)
         BackgroundDownloadCoordinator.shared.registerBackgroundTasks()
+        // Explicit local-playlist metadata jobs are app-owned, not tied to a playlist screen.
+        // The saved per-video checkpoint lets an interrupted session resume on relaunch.
+        Task { await LocalPlaylistRefreshCoordinator.shared.resumePending() }
         if let cutoff = UserPreferences().historyRetentionPolicy.cutoffDate() {
             Task { await PersistenceWriter.shared.clearWatchHistory(olderThan: cutoff) }
         }

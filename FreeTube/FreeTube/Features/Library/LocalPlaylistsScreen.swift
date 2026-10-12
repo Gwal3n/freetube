@@ -313,6 +313,17 @@ struct LocalPlaylistsScreen: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 }
+                if playlist.isRefreshingMetadata {
+                    ProgressView(
+                        value: Double(playlist.metadataRefreshProcessed),
+                        total: Double(playlist.metadataRefreshTotal)
+                    )
+                    .progressViewStyle(.linear)
+                    Text("Refreshing \(playlist.metadataRefreshProcessed) of \(playlist.metadataRefreshTotal)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
             }
             Spacer(minLength: 0)
             if let downloaded, downloadedCount > 0 {

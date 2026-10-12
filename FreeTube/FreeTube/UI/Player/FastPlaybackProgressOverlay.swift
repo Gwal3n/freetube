@@ -9,21 +9,23 @@ struct FastPlaybackProgressOverlay: View {
     let onCancel: () -> Void
 
     var body: some View {
-        HStack(spacing: 9) {
-            Text("Preparing \(PlaybackSpeedPresets.label(rate))")
-                .font(.caption.weight(.medium))
-                .lineLimit(1)
-            Group {
-                if let fraction = preparation.fraction {
-                    ProgressView(value: fraction)
-                } else {
-                    ProgressView()
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Preparing \(PlaybackSpeedPresets.label(rate))")
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                Group {
+                    if let fraction = preparation.fraction {
+                        ProgressView(value: fraction)
+                    } else {
+                        ProgressView()
+                    }
                 }
+                .tint(.white)
+                .progressViewStyle(.linear)
+                .accessibilityLabel("Preparing faster playback")
             }
-            .tint(.white)
-            .progressViewStyle(.linear)
-            .frame(width: 88)
-            .accessibilityLabel("Preparing faster playback")
+            .frame(width: 150, alignment: .leading)
 
             Button(action: onCancel) {
                 Image(systemName: "xmark")
@@ -37,7 +39,7 @@ struct FastPlaybackProgressOverlay: View {
         .foregroundStyle(.white)
         .padding(.leading, 14)
         .padding(.trailing, 3)
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
         .background(.ultraThinMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }

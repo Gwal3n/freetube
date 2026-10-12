@@ -157,35 +157,73 @@ final class LocalPlaylistService: Sendable {
         await writer.playlists().filter(\.isHydratingMetadata)
     }
 
-    func videosMissingDuration(id playlistID: String) async -> [Video] {
-        await writer.videosMissingDuration(playlistID: playlistID)
+    func scheduleMetadataRefresh(id playlistID: String) async -> Bool {
+        await writer.scheduleMetadataRefresh(playlistID: playlistID)
     }
 
-    /// Refreshes a single missing length without touching any other saved video detail.
-    func refreshMissingDuration(for video: Video, in playlistID: String, notifyProgress: Bool) async -> Bool {
-        do {
-            let info = try await videoService.fetchInfo(id: video.id)
-            if let duration = info.video.duration, duration > 0 {
-                guard !Task.isCancelled else { return false }
-                return await writer.fillMissingDuration(
-                    duration, videoID: video.id, playlistID: playlistID, notifyProgress: notifyProgress
-                )
-            }
-        } catch {
-            log.notice("Player duration unavailable for \(video.id, privacy: .public); trying watch metadata")
-        }
-        guard !Task.isCancelled else { return false }
-        do {
-            let info = try await videoService.fetchMoreInfo(id: video.id)
-            guard let duration = info.video.duration, duration > 0 else { return false }
-            guard !Task.isCancelled else { return false }
-            return await writer.fillMissingDuration(
-                duration, videoID: video.id, playlistID: playlistID, notifyProgress: notifyProgress
+    func playlistsAwaitingMetadataRefresh() async -> [String] {
+        await writer.playlistsAwaitingMetadataRefresh()
+    }
+
+    /// Walks only the persisted remainder. Network failures leave each video's saved metadata
+    /// intact and advance the checkpoint so one unavailable item never stalls a large playlist.
+    func refreshPendingMetadata(id playlistID: String) async {
+        while !Task.isCancelled {
+            guard let saved = await writer.nextMetadataRefreshVideo(playlistID: playlistID) else { break }
+            let refreshed = await refreshedMetadata(for: saved)
+            guard !Task.isCancelled else { return }
+            await writer.completeMetadataRefresh(
+                videoID: saved.id, playlistID: playlistID, refreshed: refreshed
             )
-        } catch {
-            log.notice("Playlist duration refresh failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
-            return false
+            try? await Task.sleep(for: .milliseconds(200))
         }
+    }
+
+    private func refreshedMetadata(for saved: Video) async -> Video? {
+        let playerInfo: VideoInfo?
+        do {
+            playerInfo = try await videoService.fetchInfo(id: saved.id)
+        } catch {
+            guard !Task.isCancelled else { return nil }
+            log.notice("Playlist player metadata unavailable for \(saved.id, privacy: .public): \(String(describing: error), privacy: .public)")
+            playerInfo = nil
+        }
+        guard !Task.isCancelled else { return nil }
+        let watchInfo: VideoInfo?
+        do {
+            watchInfo = try await videoService.fetchMoreInfo(id: saved.id)
+        } catch {
+            guard !Task.isCancelled else { return nil }
+            log.notice("Playlist watch metadata unavailable for \(saved.id, privacy: .public): \(String(describing: error), privacy: .public)")
+            watchInfo = nil
+        }
+        guard !Task.isCancelled, playerInfo != nil || watchInfo != nil else { return nil }
+        let title = [watchInfo?.video.title, playerInfo?.video.title]
+            .compactMap { $0 }.first(where: { !$0.isEmpty }) ?? saved.title
+        let channelName = [watchInfo?.video.channelName, playerInfo?.video.channelName]
+            .compactMap { $0 }.first(where: { !$0.isEmpty }) ?? saved.channelName
+        let channelID = [watchInfo?.video.channelID, playerInfo?.video.channelID]
+            .compactMap { $0 }.first(where: { !$0.isEmpty }) ?? saved.channelID
+        return Video(
+            id: saved.id,
+            title: title,
+            channelID: channelID,
+            channelName: channelName,
+            channelThumbnailURL: watchInfo?.video.channelThumbnailURL
+                ?? playerInfo?.video.channelThumbnailURL ?? saved.channelThumbnailURL,
+            thumbnailURL: playerInfo?.video.thumbnailURL
+                ?? watchInfo?.video.thumbnailURL ?? saved.thumbnailURL,
+            duration: playerInfo?.video.duration ?? saved.duration,
+            viewCount: playerInfo?.video.viewCount ?? saved.viewCount,
+            publishedAt: playerInfo?.video.publishedAt ?? saved.publishedAt,
+            publishedRelative: watchInfo?.uploadDateText
+                ?? playerInfo?.video.publishedRelative ?? saved.publishedRelative,
+            descriptionSnippet: watchInfo?.descriptionText
+                ?? playerInfo?.descriptionText ?? saved.descriptionSnippet,
+            isLive: playerInfo?.video.isLive ?? saved.isLive,
+            // Neither detail response classifies Shorts; keep the saved classification.
+            isShort: saved.isShort
+        )
     }
 
     func hydratePendingPlaylist(id playlistID: String) async {

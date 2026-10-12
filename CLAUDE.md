@@ -548,6 +548,12 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 Preferences live in `UserDefaults` via a `@AppStorage`-backed `UserPreferences` type. Don't over-engineer with SwiftData for primitive flags.
 
+An explicit local-playlist detail refresh uses `LocalPlaylistRefreshJob` for its per-video
+checkpoint. `LocalPlaylistRefreshCoordinator` owns the worker at app scope, resumes unfinished
+jobs on launch, and saves each video's available metadata with the next checkpoint through
+`LocalPlaylistWriter`. Screen dismissal must not cancel the job. Playlist order and user-edited
+playlist details are not refreshed.
+
 ---
 
 ## 12. Error handling rules
