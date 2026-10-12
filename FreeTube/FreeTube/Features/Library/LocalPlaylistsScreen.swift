@@ -256,7 +256,7 @@ struct LocalPlaylistsScreen: View {
                         videoCount: playlist.videoCount,
                         descriptionText: playlist.descriptionText,
                         isOwnedByUser: false
-                    ))
+                    ), imageData: playlist.customArtworkData)
                 }
         }
     }
@@ -276,11 +276,7 @@ struct LocalPlaylistsScreen: View {
             $0 + (availableIDs.contains($1.id) ? 1 : 0)
         } ?? 0
         return HStack(spacing: 12) {
-            KFImage(playlist.thumbnailURL)
-                .thumbnail(size: CGSize(width: 72, height: 44)) {
-                    Image(systemName: "music.note.list").foregroundStyle(.secondary)
-                }
-                .resizable()
+            playlistArtwork(playlist)
                 .scaledToFill()
                 .frame(width: 72, height: 44)
                 .background(.quaternary)
@@ -333,6 +329,19 @@ struct LocalPlaylistsScreen: View {
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("\(downloadedCount) of \(downloaded.videos.count) downloaded")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func playlistArtwork(_ playlist: LocalPlaylistSnapshot) -> some View {
+        if let data = playlist.customArtworkData, let image = UIImage(data: data) {
+            Image(uiImage: image).resizable()
+        } else {
+            KFImage(playlist.thumbnailURL)
+                .thumbnail(size: CGSize(width: 72, height: 44)) {
+                    Image(systemName: "music.note.list").foregroundStyle(.secondary)
+                }
+                .resizable()
         }
     }
 

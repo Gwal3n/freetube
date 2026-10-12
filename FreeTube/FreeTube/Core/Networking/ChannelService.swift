@@ -124,6 +124,22 @@ final class ChannelService: ChannelServicing {
     /// Live, Playlists, or retain continuation state for every subscribed channel.
     func fetchLatestVideos(channelID: String) async throws -> [Video] {
         log.info("fetchLatestVideos(\(channelID, privacy: .public))")
+        // The feed needs the entire first page, not only the legacy renderers that b5i's
+        // Videos-tab decoder recognizes. A page can mix old videoRenderer items with newer
+        // lockupViewModel items; falling back only when b5i returns zero silently misses the
+        // latter and makes a successful refresh look stale. The existing fallback decoder
+        // handles both shapes in one request. Keep b5i as the safety net if it cannot parse it.
+        do {
+            let tab = try await videosFallback.fetchVideos(
+                channelID: channelID,
+                params: ChannelVideoSort.newest.requestParameters,
+                retainContinuation: false
+            )
+            if !tab.items.isEmpty { return tab.items }
+            log.notice("Feed decoder returned no videos for \(channelID, privacy: .public); trying YouTubeKit")
+        } catch {
+            log.notice("Feed decoder failed for \(channelID, privacy: .public); trying YouTubeKit: \(String(describing: error), privacy: .public)")
+        }
         let response: ChannelInfosResponse
         do {
             response = try await ChannelInfosResponse.sendThrowingRequest(

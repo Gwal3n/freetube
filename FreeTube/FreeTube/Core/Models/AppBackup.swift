@@ -29,6 +29,8 @@ struct AppBackup: Codable, Sendable {
         let descriptionText: String?
         let sourcePlaylistID: String?
         let videos: [Video]
+        /// Optional so older backups and playlist archives remain importable.
+        var customArtworkData: Data? = nil
     }
 
     struct SearchRecord: Codable, Sendable {

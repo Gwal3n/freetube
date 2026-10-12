@@ -21,7 +21,8 @@ final class PlaylistArchiveService {
                 title: playlist.title,
                 descriptionText: playlist.descriptionText,
                 sourcePlaylistID: playlist.sourcePlaylistID,
-                videos: details.videos
+                videos: details.videos,
+                customArtworkData: playlist.customArtworkData
             ))
         }
         return PlaylistArchive(playlists: records)
@@ -57,12 +58,13 @@ final class PlaylistArchiveService {
         guard !archive.playlists.isEmpty else { throw ArchiveError.noPlaylists }
 
         for record in archive.playlists {
-            _ = await LocalPlaylistWriter.shared.replace(
+            let id = await LocalPlaylistWriter.shared.replace(
                 title: record.title,
                 descriptionText: record.descriptionText,
                 sourcePlaylistID: record.sourcePlaylistID,
                 videos: record.videos
             )
+            await playlists.setArtwork(id: id, data: record.customArtworkData)
         }
         return archive.playlists.count
     }

@@ -29,7 +29,9 @@ struct PlaylistMetadataBlock: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                statRow(label: "Videos", value: videoCountLabel)
+                videoCountText
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
                 statRow(label: "Views", value: viewsLabel)
                 descriptionRow(details.playlist.descriptionText)
             }
@@ -61,9 +63,13 @@ struct PlaylistMetadataBlock: View {
         .padding(.horizontal)
     }
 
-    private var videoCountLabel: String {
-        if let total = details.playlist.videoCount { return "\(total)" }
-        return "\(details.videos.count)\(details.continuationToken == nil ? "" : "+")"
+    private var videoCountText: Text {
+        if let total = details.playlist.videoCount {
+            return total == 1 ? Text("1 video") : Text("\(total) videos")
+        }
+        let loaded = details.videos.count
+        if details.continuationToken != nil { return Text("\(loaded)+ videos") }
+        return loaded == 1 ? Text("1 video") : Text("\(loaded) videos")
     }
 
     private var viewsLabel: String? {

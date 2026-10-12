@@ -7,6 +7,7 @@ struct LocalPlaylistSnapshot: Identifiable, Hashable, Sendable {
     let sourcePlaylistID: String?
     let videoCount: Int
     let thumbnailURL: URL?
+    let customArtworkData: Data?
     let updatedAt: Date
     let metadataHydrationTotal: Int
     let metadataHydrationProcessed: Int

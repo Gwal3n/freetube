@@ -65,7 +65,7 @@ final class PlaylistService: PlaylistServicing {
             channelID: owner?.channelId,
             channelName: ownerName.isEmpty ? nil : ownerName,
             thumbnailURL: Mappers.bestThumbnailURL(response.thumbnails),
-            videoCount: parseInteger(response.videoCount),
+            videoCount: Mappers.parseAbbreviatedCount(response.videoCount),
             viewCount: Mappers.parseAbbreviatedCount(response.viewCount),
             descriptionText: response.playlistDescription,
             // Account-free builds never expose remote ownership or editing, even if an
@@ -95,11 +95,6 @@ final class PlaylistService: PlaylistServicing {
             )
         }
         return PlaylistDetails(playlist: playlist, videos: videos, continuationToken: response.continuationToken)
-    }
-
-    private func parseInteger(_ raw: String?) -> Int? {
-        guard let raw else { return nil }
-        return Int(raw.filter(\.isNumber))
     }
 
 }

@@ -21,7 +21,8 @@ final class AppBackupService {
                 title: playlist.title,
                 descriptionText: playlist.descriptionText,
                 sourcePlaylistID: playlist.sourcePlaylistID,
-                videos: details.videos
+                videos: details.videos,
+                customArtworkData: playlist.customArtworkData
             ))
         }
 
@@ -77,6 +78,7 @@ final class AppBackupService {
                 sourcePlaylistID: playlist.sourcePlaylistID,
                 videos: playlist.videos
             )
+            await playlists.setArtwork(id: id, data: playlist.customArtworkData)
             restoredPlaylistIDs.append(id)
             if let oldID = playlist.localID {
                 remappedLocalPlaylistIDs[oldID] = id

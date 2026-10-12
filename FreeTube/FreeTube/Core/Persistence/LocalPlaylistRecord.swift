@@ -10,6 +10,7 @@ final class LocalPlaylistRecord {
     var createdAt: Date
     var updatedAt: Date
     var sourcePlaylistID: String?
+    @Attribute(.externalStorage) var customArtworkData: Data?
     var metadataHydrationTotal: Int = 0
     var metadataHydrationProcessed: Int = 0
     var metadataHydrationFailures: Int = 0

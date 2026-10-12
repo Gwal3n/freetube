@@ -30,6 +30,7 @@ actor LocalPlaylistWriter {
                 sourcePlaylistID: record.sourcePlaylistID,
                 videoCount: itemCount,
                 thumbnailURL: firstVideoRecord(playlistID: record.playlistID)?.thumbnailURL,
+                customArtworkData: record.customArtworkData,
                 updatedAt: record.updatedAt,
                 metadataHydrationTotal: record.metadataHydrationTotal,
                 metadataHydrationProcessed: record.metadataHydrationProcessed,
@@ -85,6 +86,7 @@ actor LocalPlaylistWriter {
                 sourcePlaylistID: record.sourcePlaylistID,
                 videoCount: items.count,
                 thumbnailURL: items.first?.thumbnailURL,
+                customArtworkData: record.customArtworkData,
                 updatedAt: record.updatedAt,
                 metadataHydrationTotal: record.metadataHydrationTotal,
                 metadataHydrationProcessed: record.metadataHydrationProcessed,
@@ -254,6 +256,16 @@ actor LocalPlaylistWriter {
         notify()
     }
 
+    func setArtwork(playlistID: String, data: Data?) {
+        let target = playlistID
+        let descriptor = FetchDescriptor<LocalPlaylistRecord>(predicate: #Predicate { $0.playlistID == target })
+        guard let record = try? modelContext.fetch(descriptor).first else { return }
+        record.customArtworkData = data
+        record.updatedAt = .now
+        try? modelContext.save()
+        notify()
+    }
+
     func isRemotePlaylistSaved(_ sourcePlaylistID: String) -> Bool {
         record(sourcePlaylistID: sourcePlaylistID) != nil
     }
@@ -326,7 +338,7 @@ actor LocalPlaylistWriter {
             // Keep the deterministic thumbnail built from the CSV video ID.
             old.duration = video.duration
             old.viewCount = video.viewCount
-            old.publishedAt = video.publishedAt
+            old.publishedAt = video.estimatedPublishedAt(relativeTo: .now)
             old.publishedRelative = video.publishedRelative
             old.descriptionSnippet = video.descriptionSnippet
             old.isLive = video.isLive
@@ -450,7 +462,7 @@ actor LocalPlaylistWriter {
             if let image = refreshed.thumbnailURL { item.thumbnailURL = image }
             if let duration = refreshed.duration, duration.isFinite, duration > 0 { item.duration = duration }
             if let views = refreshed.viewCount { item.viewCount = views }
-            if let date = refreshed.publishedAt { item.publishedAt = date }
+            if let date = refreshed.estimatedPublishedAt(relativeTo: .now) { item.publishedAt = date }
             if let relative = refreshed.publishedRelative, !relative.isEmpty {
                 item.publishedRelative = relative
             }
@@ -611,7 +623,9 @@ actor LocalPlaylistWriter {
             id: item.videoID, title: item.title, channelID: item.channelID,
             channelName: item.channelName, channelThumbnailURL: item.channelThumbnailURL,
             thumbnailURL: item.thumbnailURL, duration: item.duration, viewCount: item.viewCount,
-            publishedAt: item.publishedAt, publishedRelative: item.publishedRelative,
+            publishedAt: item.publishedAt ?? Video.estimatedPublishedAt(
+                from: item.publishedRelative, relativeTo: item.addedAt
+            ), publishedRelative: item.publishedRelative,
             descriptionSnippet: item.descriptionSnippet,
             isLive: item.isLive, isShort: item.isShort
         )

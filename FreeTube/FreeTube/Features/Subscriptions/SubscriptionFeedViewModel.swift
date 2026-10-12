@@ -32,6 +32,7 @@ final class SubscriptionFeedViewModel {
     private let writer: PersistenceWriter
     private let subscriptions: LocalSubscriptionStore
     private let groups: LocalSubscriptionGroupStore
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "SubscriptionFeed")
 
     init(
         service: any SubscriptionFeedServicing = SubscriptionFeedService(),
@@ -89,6 +90,7 @@ final class SubscriptionFeedViewModel {
 
     func refresh() async {
         guard !isRefreshing else { return }
+        let priorVisibleIDs = Set(videos.map(\.id))
         let refreshID = UUID()
         activeRefreshID = refreshID
         isRefreshing = true
@@ -128,6 +130,8 @@ final class SubscriptionFeedViewModel {
         visibleLimit = pageSize
         await loadCache()
         isRefreshing = false
+        let newVisibleCount = Set(videos.map(\.id)).subtracting(priorVisibleIDs).count
+        log.info("Feed refresh completed: channels=\(result.succeeded, privacy: .public)/\(snapshot.count, privacy: .public), failed=\(result.failedChannels.count, privacy: .public), visible=\(videos.count, privacy: .public), newly visible IDs=\(newVisibleCount, privacy: .public)")
     }
 
     func cancelRefresh() {

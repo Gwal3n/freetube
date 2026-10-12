@@ -11,6 +11,7 @@ struct PlaylistRow: View {
     let playlist: Playlist
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var actionsModel = PlaylistActionsModel()
+    @State private var resolvedVideoCount: Int?
 
     /// Optional tap handler. **Leave nil when wrapping this row inside a `NavigationLink`** —
     /// an inner `Button` swallows the link's tap and pushing never happens. We only attach a
@@ -39,6 +40,15 @@ struct PlaylistRow: View {
             PlaylistContextPreview(playlist: playlist)
         }
         .task(id: playlist.id) { await actionsModel.refresh(id: playlist.id) }
+        .task(id: playlist.id) {
+            resolvedVideoCount = nil
+            guard playlist.videoCount == nil else { return }
+            do { try await Task.sleep(for: .milliseconds(400)) }
+            catch { return }
+            let count = await PlaylistCountResolver.shared.count(for: playlist.id)
+            guard !Task.isCancelled else { return }
+            resolvedVideoCount = count
+        }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await actionsModel.refresh(id: playlist.id) }
         }
@@ -56,23 +66,21 @@ struct PlaylistRow: View {
                     .scaledToFill()
                     .frame(width: 96, height: 56)
 
-                HStack(spacing: 4) {
-                    Image(systemName: "rectangle.stack.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                    if let count = playlist.videoCount {
-                        Text("\(count.formatted(.number.notation(.compactName))) videos")
-                            .accessibilityLabel("\(count) videos")
-                    } else {
-                        Text("Videos")
+                if let count = playlist.videoCount ?? resolvedVideoCount {
+                    HStack(spacing: 4) {
+                        Image(systemName: "rectangle.stack.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("\(count.formatted(.number.notation(.compactName))) \(count == 1 ? "video" : "videos")")
+                            .accessibilityLabel("\(count) \(count == 1 ? "video" : "videos")")
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.black.opacity(0.76))
                 }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.black.opacity(0.76))
             }
             .frame(width: 96, height: 56)
             .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))

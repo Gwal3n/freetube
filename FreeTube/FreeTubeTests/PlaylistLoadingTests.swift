@@ -4,6 +4,20 @@ import XCTest
 
 @MainActor
 final class PlaylistLoadingTests: XCTestCase {
+    func testPlaylistArtworkArchiveKeepsNewImagesAndReadsOldRecords() throws {
+        let oldRecord = Data(#"{"title":"Old playlist","videos":[]}"#.utf8)
+        let decodedOld = try JSONDecoder().decode(AppBackup.PlaylistRecord.self, from: oldRecord)
+        XCTAssertNil(decodedOld.customArtworkData)
+
+        var updated = decodedOld
+        updated.customArtworkData = Data([0xFF, 0xD8, 0xFF])
+        let restored = try JSONDecoder().decode(
+            AppBackup.PlaylistRecord.self,
+            from: JSONEncoder().encode(updated)
+        )
+        XCTAssertEqual(restored.customArtworkData, updated.customArtworkData)
+    }
+
     func testViewCountLabelIsNotUsedAsPlaylistChannel() {
         XCTAssertEqual(Mappers.channelName(from: "21K views"), "")
         XCTAssertEqual(Mappers.channelName(from: "Zeta Explained"), "Zeta Explained")
@@ -25,6 +39,46 @@ final class PlaylistLoadingTests: XCTestCase {
         ]
         XCTAssertEqual(LocalPlaylistVideoSort.length.ordered(videos).map(\.id), ["short", "long", "unknown"])
         XCTAssertEqual(LocalPlaylistVideoSort.lengthLongest.ordered(videos).map(\.id), ["long", "short", "unknown"])
+    }
+
+    func testPlaylistDateAndViewsSortKeepMissingMetadataLast() {
+        let newer = Video(
+            id: "newer", title: "Newer", channelID: "", channelName: "Channel",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: nil, viewCount: 200,
+            publishedAt: Date(timeIntervalSince1970: 200), descriptionSnippet: nil,
+            isLive: false, isShort: false
+        )
+        let older = Video(
+            id: "older", title: "Older", channelID: "", channelName: "Channel",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: nil, viewCount: 100,
+            publishedAt: Date(timeIntervalSince1970: 100), descriptionSnippet: nil,
+            isLive: false, isShort: false
+        )
+        let missing = video(id: "missing", duration: nil)
+        let videos = [missing, newer, older]
+
+        XCTAssertEqual(LocalPlaylistVideoSort.newest.ordered(videos).map(\.id), ["newer", "older", "missing"])
+        XCTAssertEqual(LocalPlaylistVideoSort.oldest.ordered(videos).map(\.id), ["older", "newer", "missing"])
+        XCTAssertEqual(LocalPlaylistVideoSort.mostViewed.ordered(videos).map(\.id), ["newer", "older", "missing"])
+        XCTAssertEqual(LocalPlaylistVideoSort.leastViewed.ordered(videos).map(\.id), ["older", "newer", "missing"])
+    }
+
+    func testPlaylistDateSortUsesRelativeUploadAgeWhenExactDateIsMissing() {
+        let recent = Video(
+            id: "recent", title: "Recent", channelID: "", channelName: "Channel",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: nil, viewCount: nil,
+            publishedAt: nil, publishedRelative: "2 days ago", descriptionSnippet: nil,
+            isLive: false, isShort: false
+        )
+        let older = Video(
+            id: "older", title: "Older", channelID: "", channelName: "Channel",
+            channelThumbnailURL: nil, thumbnailURL: nil, duration: nil, viewCount: nil,
+            publishedAt: nil, publishedRelative: "1 month ago", descriptionSnippet: nil,
+            isLive: false, isShort: false
+        )
+
+        XCTAssertEqual(LocalPlaylistVideoSort.newest.ordered([older, recent]).map(\.id), ["recent", "older"])
+        XCTAssertEqual(LocalPlaylistVideoSort.oldest.ordered([recent, older]).map(\.id), ["older", "recent"])
     }
 
     func testFailedLoadCanRetryAndClearsItsError() async {

@@ -9,6 +9,7 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
     }
     private let channelService: any ChannelServicing
     private let writer: PersistenceWriter
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "SubscriptionFeed")
 
     init(
         channelService: any ChannelServicing = ChannelService(),
@@ -52,6 +53,7 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
                     }
                     switch result {
                     case .success(let channelID, let videos):
+                        log.info("Feed fetched channel \(channelID, privacy: .public): videos=\(videos.count, privacy: .public), firstID=\(videos.first?.id ?? "none", privacy: .public)")
                         await writer.replaceSubscriptionFeedChannel(channelID: channelID, videos: videos, refreshedAt: .now)
                         succeeded += 1
                     case .failure(let subscription):

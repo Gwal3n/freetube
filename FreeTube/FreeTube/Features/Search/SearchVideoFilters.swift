@@ -84,33 +84,15 @@ struct SearchVideoFilters: Equatable {
         func includes(_ video: Video, now: Date, customRange: DateRange?) -> Bool {
             if self == .custom {
                 guard let customRange else { return false }
-                let estimated = video.publishedAt
-                    ?? Self.estimatedDate(from: video.publishedRelative, relativeTo: now)
+                let estimated = video.estimatedPublishedAt(relativeTo: now)
                 guard let estimated else { return false }
                 return customRange.includes(estimated)
             }
             guard let maximumAge else { return true }
-            let estimated = video.publishedAt
-                ?? Self.estimatedDate(from: video.publishedRelative, relativeTo: now)
+            let estimated = video.estimatedPublishedAt(relativeTo: now)
             guard let publishedAt = estimated else { return false }
             let age = now.timeIntervalSince(publishedAt)
             return age >= 0 && age <= maximumAge
-        }
-
-        private static func estimatedDate(from text: String?, relativeTo now: Date) -> Date? {
-            guard let text = text?.lowercased(),
-                  let numberRange = text.range(of: #"\d+"#, options: .regularExpression),
-                  let count = Double(text[numberRange]) else { return nil }
-            let seconds: TimeInterval
-            if text.contains("second") { seconds = count }
-            else if text.contains("minute") { seconds = count * 60 }
-            else if text.contains("hour") { seconds = count * 3_600 }
-            else if text.contains("day") { seconds = count * 86_400 }
-            else if text.contains("week") { seconds = count * 604_800 }
-            else if text.contains("month") { seconds = count * 2_629_746 }
-            else if text.contains("year") { seconds = count * 31_556_952 }
-            else { return nil }
-            return now.addingTimeInterval(-seconds)
         }
     }
 

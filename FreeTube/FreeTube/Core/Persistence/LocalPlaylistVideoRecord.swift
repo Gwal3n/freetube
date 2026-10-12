@@ -41,7 +41,7 @@ final class LocalPlaylistVideoRecord {
         thumbnailURL = video.thumbnailURL
         duration = video.duration
         viewCount = video.viewCount
-        publishedAt = video.publishedAt
+        publishedAt = video.estimatedPublishedAt(relativeTo: addedAt)
         publishedRelative = video.publishedRelative
         descriptionSnippet = video.descriptionSnippet
         isLive = video.isLive

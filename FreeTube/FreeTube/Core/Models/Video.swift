@@ -100,6 +100,29 @@ extension Video {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
+    /// Approximate upload date for YouTube surfaces that provide only relative age text.
+    /// Kept separate from `publishedAt` so a saved relative string is never mistaken for an exact date.
+    func estimatedPublishedAt(relativeTo now: Date) -> Date? {
+        if let publishedAt { return publishedAt }
+        return Self.estimatedPublishedAt(from: publishedRelative, relativeTo: now)
+    }
+
+    static func estimatedPublishedAt(from relativeText: String?, relativeTo now: Date) -> Date? {
+        guard let text = relativeText?.lowercased(),
+              let numberRange = text.range(of: #"\d+"#, options: .regularExpression),
+              let count = Double(text[numberRange]) else { return nil }
+        let seconds: TimeInterval
+        if text.contains("second") { seconds = count }
+        else if text.contains("minute") { seconds = count * 60 }
+        else if text.contains("hour") { seconds = count * 3_600 }
+        else if text.contains("day") { seconds = count * 86_400 }
+        else if text.contains("week") { seconds = count * 604_800 }
+        else if text.contains("month") { seconds = count * 2_629_746 }
+        else if text.contains("year") { seconds = count * 31_556_952 }
+        else { return nil }
+        return now.addingTimeInterval(-seconds)
+    }
+
     /// Compact human-readable view-count string (e.g. "1.2M views", "856 views"). Empty when the
     /// API didn't return a count, so callers can hide the label entirely.
     var viewCountString: String {

@@ -70,6 +70,9 @@ final class LocalPlaylistService: Sendable {
     func update(id: String, title: String, descriptionText: String?) async {
         await writer.updatePlaylist(playlistID: id, title: title, descriptionText: descriptionText)
     }
+    func setArtwork(id: String, data: Data?) async {
+        await writer.setArtwork(playlistID: id, data: data)
+    }
     func contains(videoID: String, playlistID: String) async -> Bool {
         await writer.contains(videoID: videoID, playlistID: playlistID)
     }
