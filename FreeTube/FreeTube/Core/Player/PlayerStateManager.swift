@@ -207,6 +207,7 @@ final class PlayerStateManager {
     private var itemErrorLogObservation: NSObjectProtocol?
     private var itemAccessLogObservation: NSObjectProtocol?
     private var lastAccessLogAt = Date.distantPast
+    private var lastLiveDVRLogAt = Date.distantPast
     private var playerErrorObservation: NSKeyValueObservation?
     private var fastPlaybackTask: Task<Void, Never>?
     private var fastPlaybackTimeoutTask: Task<Void, Never>?
@@ -2109,6 +2110,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation?.invalidate()
         bufferedRanges = []
         lastAccessLogAt = .distantPast
+        lastLiveDVRLogAt = .distantPast
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
 
@@ -2642,6 +2644,35 @@ final class PlayerStateManager {
         }
     }
 
+    /// Measure the window AVPlayer actually offers, rather than inferring DVR support from the
+    /// manifest URL. Live ranges can appear after readiness and move as the broadcast advances.
+    /// Keep diagnostics sparse and never log the signed playback URL.
+    private func logLiveDVRIfNeeded(for item: AVPlayerItem) {
+        guard currentVideo?.isLive == true,
+              loadState == .readyToPlay,
+              item.status == .readyToPlay else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastLiveDVRLogAt) >= 15 else { return }
+        lastLiveDVRLogAt = now
+
+        let ranges = item.seekableTimeRanges.compactMap { value -> (start: Double, end: Double)? in
+            let range = value.timeRangeValue
+            let start = range.start.seconds
+            let end = range.end.seconds
+            guard start.isFinite, end.isFinite, end > start else { return nil }
+            return (start, end)
+        }
+        guard let firstStart = ranges.map({ $0.start }).min(),
+              let lastEnd = ranges.map({ $0.end }).max() else {
+            log.info("Live DVR range video=\(currentVideo?.id ?? "unknown", privacy: .public) count=0")
+            return
+        }
+        let playableSeconds = ranges.reduce(0) { $0 + $1.end - $1.start }
+        let playhead = item.currentTime().seconds
+        let behindLive = playhead.isFinite ? max(0, lastEnd - playhead) : 0
+        log.info("Live DVR range video=\(currentVideo?.id ?? "unknown", privacy: .public) count=\(ranges.count, privacy: .public) span=\(lastEnd - firstStart, privacy: .public)s playable=\(playableSeconds, privacy: .public)s behindLive=\(behindLive, privacy: .public)s")
+    }
+
     private func installObservers() {
         // Periodic time observation via Combine-friendly bridging.
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
@@ -2656,6 +2687,7 @@ final class PlayerStateManager {
                 if let item = self.player.currentItem {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
+                    self.logLiveDVRIfNeeded(for: item)
                 }
                 self.accumulateHistoryPlaybackTime()
                 self.persistCurrentPlaybackProgress(force: false)
