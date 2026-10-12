@@ -187,7 +187,16 @@ final class ChannelService: ChannelServicing {
     }
 
     func fetchDirectsNextPage(channelID: String) async throws -> ChannelTab<Video> {
-        try await fetchVideoContinuation(channelID: channelID, type: ChannelInfosResponse.Directs.self, requestType: .directs)
+        if await videosFallback.hasPendingContinuation(channelID: channelID, cacheKey: directsFallbackCacheKey(channelID)) {
+            if let tab = try await videosFallback.fetchContinuation(channelID: channelID, cacheKey: directsFallbackCacheKey(channelID)) {
+                return tab
+            }
+        }
+        return try await fetchVideoContinuation(channelID: channelID, type: ChannelInfosResponse.Directs.self, requestType: .directs)
+    }
+
+    private func directsFallbackCacheKey(_ channelID: String) -> String {
+        "\(channelID)|directs"
     }
 
     func fetchPlaylistsNextPage(channelID: String) async throws -> ChannelTab<Playlist> {
@@ -379,13 +388,21 @@ final class ChannelService: ChannelServicing {
         // **Fallback path.** YouTubeKit's Videos/Directs tab decoder only walks the legacy
         // `videoRenderer` shape. When YouTube serves a channel's tab as `lockupViewModel`,
         // YouTubeKit silently produces zero items. Our own decoder (§ChannelVideosFallbackService)
-        // covers both shapes. We only run it for `.videos` because that's the tab that surfaces
-        // the bug the most in practice; Directs has the same gap but live-stream channels are
-        // rare enough that we leave it alone until the fix gets exercised here first.
-        if type == .videos, primary.videoTab.items.isEmpty, let params = Self.fallbackTabParams[type] {
-            log.notice("[channel] YouTubeKit returned 0 videos for \(channelID, privacy: .public); trying ChannelVideosFallbackService")
+        // covers both shapes. Keep the Live continuation under its own key so it cannot replace
+        // the Videos tab's pagination state for the same channel.
+        if (type == .videos || type == .directs),
+           primary.videoTab.items.isEmpty,
+           let params = Self.fallbackTabParams[type] {
+            let cacheKey = type == .directs ? directsFallbackCacheKey(channelID) : channelID
+            let tabPath = type == .directs ? "streams" : "videos"
+            log.notice("[channel] YouTubeKit returned 0 \(tabPath, privacy: .public) for \(channelID, privacy: .public); trying ChannelVideosFallbackService")
             do {
-                let tab = try await videosFallback.fetchVideos(channelID: channelID, params: params)
+                let tab = try await videosFallback.fetchVideos(
+                    channelID: channelID,
+                    params: params,
+                    cacheKey: cacheKey,
+                    tabPath: tabPath
+                )
                 if !tab.items.isEmpty {
                     return SecondaryFetchResult(videoTab: tab, source: primary.source, didFail: false)
                 }

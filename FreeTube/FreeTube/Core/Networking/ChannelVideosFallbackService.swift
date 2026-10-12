@@ -53,14 +53,15 @@ final class ChannelVideosFallbackService: Sendable {
         await state.contains(cacheKey ?? channelID)
     }
 
-    /// Fetches the channel's Videos tab via a raw POST to youtubei/v1/browse and decodes
+    /// Fetches a channel's Videos or Live tab via a raw POST to youtubei/v1/browse and decodes
     /// items as either `videoRenderer` or `lockupViewModel`. Records the continuation token
     /// on the state map so subsequent pagination calls can route through `fetchContinuation`.
     func fetchVideos(
         channelID: String,
         params: String,
         cacheKey: String? = nil,
-        sort: ChannelVideoSort = .newest
+        sort: ChannelVideoSort = .newest,
+        tabPath: String = "videos"
     ) async throws -> ChannelTab<Video> {
         // YouTube no longer accepts a static params variant for Popular and Oldest. Those values
         // now select the Videos surface only; the actual sort is represented by a per-response
@@ -93,8 +94,8 @@ final class ChannelVideosFallbackService: Sendable {
         }
 
         let body = Self.initialBrowseBody(channelID: channelID, params: params)
-        let result = try await sendBrowse(body: body, channelID: channelID, kind: "initial") { root in
-            Self.decodeVideosTab(root: root, channelID: channelID)
+        let result = try await sendBrowse(body: body, channelID: channelID, kind: "initial-\(tabPath)") { root in
+            Self.decodeVideosTab(root: root, channelID: channelID, tabPath: tabPath)
         }
         await state.set(cacheKey ?? channelID, token: result.continuation)
         return ChannelTab(items: result.videos, continuationToken: result.continuation)
@@ -247,26 +248,29 @@ final class ChannelVideosFallbackService: Sendable {
         return (((chips[sort.chipIndex]["tapCommand"] as? [String: Any])?["innertubeCommand"] as? [String: Any])?["continuationCommand"] as? [String: Any])?["token"] as? String
     }
 
-    /// Walks the response JSON to the Videos tab's items array and extracts videos.
+    /// Walks the response JSON to the requested tab's items array and extracts videos.
     /// Accepts both `videoRenderer` (legacy) and `lockupViewModel` (current) shapes.
-    private static func decodeVideosTab(root: Any, channelID: String) -> (videos: [Video], continuation: String?) {
+    static func decodeVideosTab(root: Any, channelID: String, tabPath: String) -> (videos: [Video], continuation: String?) {
         guard
             let dict = root as? [String: Any],
             let tabs = (dict["contents"] as? [String: Any])?["twoColumnBrowseResultsRenderer"]
                 .flatMap({ ($0 as? [String: Any])?["tabs"] }) as? [[String: Any]]
         else { return ([], nil) }
 
-        // Match the Videos tab by URL suffix; fall back to `selected: true` if URL is missing.
-        // YouTube has been known to flip `selected` onto Home for atypical channels, so URL is
-        // the more reliable signal when we sent `params=videos`.
-        let videosTab = tabs.first { tab in
+        // Match the requested tab by URL suffix. Only use the selected tab when YouTube omits
+        // its URL; a selected Home tab must never be mistaken for a channel's Live content.
+        let contentTab = tabs.first { tab in
             guard let renderer = tab["tabRenderer"] as? [String: Any] else { return false }
             let url = (((renderer["endpoint"] as? [String: Any])?["commandMetadata"] as? [String: Any])?["webCommandMetadata"] as? [String: Any])?["url"] as? String
-            return url?.hasSuffix("/videos") ?? false
-        } ?? tabs.first { ($0["tabRenderer"] as? [String: Any])?["selected"] as? Bool == true }
+            return url?.hasSuffix("/\(tabPath)") ?? false
+        } ?? tabs.first { tab in
+            guard let renderer = tab["tabRenderer"] as? [String: Any], renderer["selected"] as? Bool == true else { return false }
+            let url = (((renderer["endpoint"] as? [String: Any])?["commandMetadata"] as? [String: Any])?["webCommandMetadata"] as? [String: Any])?["url"] as? String
+            return url == nil
+        }
 
         guard
-            let renderer = videosTab?["tabRenderer"] as? [String: Any],
+            let renderer = contentTab?["tabRenderer"] as? [String: Any],
             let items = ((renderer["content"] as? [String: Any])?["richGridRenderer"] as? [String: Any])?["contents"] as? [[String: Any]]
         else { return ([], nil) }
 
