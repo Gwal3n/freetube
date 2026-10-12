@@ -9,37 +9,39 @@ struct FastPlaybackProgressOverlay: View {
     let onCancel: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
                 Text("Preparing \(PlaybackSpeedPresets.label(rate))")
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
-                Group {
-                    if let fraction = preparation.fraction {
-                        ProgressView(value: fraction)
-                    } else {
-                        ProgressView()
-                    }
-                }
-                .tint(.white)
-                .progressViewStyle(.linear)
-                .accessibilityLabel("Preparing faster playback")
-            }
-            .frame(width: 150, alignment: .leading)
+                Spacer(minLength: 4)
 
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel fast playback preparation")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Cancel fast playback preparation")
+
+            Group {
+                if let fraction = preparation.fraction {
+                    ProgressView(value: fraction)
+                } else {
+                    ProgressView()
+                }
+            }
+            .tint(.white)
+            .progressViewStyle(.linear)
+            .accessibilityLabel("Preparing faster playback")
         }
+        .frame(width: 188, alignment: .leading)
         .foregroundStyle(.white)
-        .padding(.leading, 14)
-        .padding(.trailing, 3)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 12)
+        .padding(.top, 3)
+        .padding(.bottom, 10)
         .background(.ultraThinMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
