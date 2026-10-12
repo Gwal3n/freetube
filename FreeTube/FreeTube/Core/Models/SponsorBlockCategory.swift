@@ -17,6 +17,19 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
 
     var id: String { rawValue }
 
+    var supportsFullVideoLabel: Bool {
+        self == .sponsor || self == .exclusiveAccess || self == .selfPromotion
+    }
+
+    var fullVideoLabelName: String? {
+        switch self {
+        case .sponsor: return String(localized: "Sponsor")
+        case .exclusiveAccess: return String(localized: "Exclusive access")
+        case .selfPromotion: return String(localized: "Self-promotion")
+        default: return nil
+        }
+    }
+
     var displayName: String {
         switch self {
         case .sponsor: return String(localized: "Sponsors")

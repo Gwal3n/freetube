@@ -988,6 +988,9 @@ struct FullScreenPlayer: View {
                     .reportPlayerPanelScrollOffset()
                 PlayerInformationPanel(
                     video: video,
+                    fullVideoLabel: SponsorBlockSegment.primaryFullVideoLabel(
+                        in: player.sponsorBlockSegments
+                    ),
                     statsText: detailsModel.statsText(for: video),
                     descriptionText: detailsModel.description(for: video),
                     descriptionParts: detailsModel.details?.descriptionParts ?? [],

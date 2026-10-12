@@ -9,6 +9,7 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct PlayerMetadataHeader<Actions: View>: View {
     let video: Video
+    let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
     let isDetailsExpanded: Bool
     let showsDescription: Bool
@@ -20,6 +21,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
 
     init(
         video: Video,
+        fullVideoLabel: SponsorBlockCategory?,
         statsText: String,
         isDetailsExpanded: Bool,
         showsDescription: Bool,
@@ -29,6 +31,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         @ViewBuilder actions: () -> Actions
     ) {
         self.video = video
+        self.fullVideoLabel = fullVideoLabel
         self.statsText = statsText
         self.isDetailsExpanded = isDetailsExpanded
         self.showsDescription = showsDescription
@@ -46,6 +49,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                         Button(action: onToggleDetails) {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 title(branding.title(for: video))
+                                fullVideoBadge
                                 Spacer(minLength: 0)
                                 Image(systemName: "chevron.down")
                                     .font(.caption.weight(.semibold))
@@ -55,12 +59,15 @@ struct PlayerMetadataHeader<Actions: View>: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(ResponsiveButtonStyle())
-                        .accessibilityLabel(branding.title(for: video))
+                        .accessibilityLabel(accessibilityTitle(branding.title(for: video)))
                         .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
                         .accessibilityHint("Shows or hides video details")
                     } else {
-                        title(branding.title(for: video))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            title(branding.title(for: video))
+                            fullVideoBadge
+                            Spacer(minLength: 0)
+                        }
                     }
                     if branding.hasTitleReplacement(for: video) {
                         DeArrowToggleButton(video: video, model: branding)
@@ -106,6 +113,36 @@ struct PlayerMetadataHeader<Actions: View>: View {
             .contentTransition(.opacity)
             .appFont(.title3, weight: .semibold)
             .multilineTextAlignment(.leading)
+    }
+
+    @ViewBuilder
+    private var fullVideoBadge: some View {
+        if let fullVideoLabel, let name = fullVideoLabel.fullVideoLabelName {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(fullVideoLabelColor(fullVideoLabel))
+                    .frame(width: 6, height: 6)
+                Text(name)
+                    .appFont(.caption2, weight: .medium)
+                    .foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityLabel("Full video label: \(name)")
+        }
+    }
+
+    private func fullVideoLabelColor(_ category: SponsorBlockCategory) -> Color {
+        switch category {
+        case .sponsor: return .green
+        case .exclusiveAccess: return Color(red: 0, green: 138.0 / 255, blue: 92.0 / 255)
+        case .selfPromotion: return .yellow
+        default: return .clear
+        }
+    }
+
+    private func accessibilityTitle(_ title: String) -> String {
+        guard let name = fullVideoLabel?.fullVideoLabelName else { return title }
+        return "\(title), \(String(localized: "Full video label")): \(name)"
     }
 
     @ViewBuilder

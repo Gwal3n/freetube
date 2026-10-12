@@ -22,6 +22,9 @@ struct SponsorBlockTimeline: View {
     private var currentChapter: VideoChapter? {
         chapters.last { $0.startTime <= displayedTime }
     }
+    private var fullVideoLabel: SponsorBlockCategory? {
+        SponsorBlockSegment.primaryFullVideoLabel(in: segments)
+    }
 
     var body: some View {
         if isLive, duration <= 0 {
@@ -83,14 +86,14 @@ struct SponsorBlockTimeline: View {
 
                     // Full-video labels are annotations, never a seek target. Keep their slim
                     // stripe below the progress track so the red playback position stays clear.
-                    if segments.contains(where: { $0.category == .exclusiveAccess }) {
+                    if let fullVideoLabel {
                         Capsule()
-                            .fill(color(for: .exclusiveAccess))
+                            .fill(color(for: fullVideoLabel))
                             .frame(width: width, height: 2)
                             .offset(y: 5)
                     }
 
-                    ForEach(segments.filter { $0.category != .chapter && $0.category != .exclusiveAccess }, id: \.id) { segment in
+                    ForEach(segments.filter { $0.category != .chapter && !$0.isFullVideoLabel }, id: \.id) { segment in
                         let segmentWidth = width * fraction(for: segment.endTime - segment.startTime)
                         RoundedRectangle(cornerRadius: 1)
                             .fill(color(for: segment.category))

@@ -332,8 +332,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   observers without blocking stream resolution. Duration categories independently support Disabled,
   Show only (timeline marker), or Automatically skip. `poi_highlight` is a point marker and instead
   supports Disabled, Show only, or Ask; Ask presents a configurable-duration prompt to jump to that timestamp
-  as soon as the lookup returns. `exclusive_access` is a full-video label, not a skip range: it
-  supports Disabled or Show only and marks the full timeline below the progress track. `chapter`
+  as soon as the lookup returns. SponsorBlock's `full` action is a whole-video label, not a skip
+  range. The supported labels are Sponsor, Exclusive access, and Self-promotion; show at most one
+  beside the title in that priority order, plus a slim timeline stripe. `exclusive_access` supports
+  Disabled or Show only. Never turn a `full` action into an automatic seek. `chapter`
   also supports Disabled or Show only; when enabled and submitted for a video, its named chapters
   replace YouTube chapters in the existing chapter browser, with YouTube chapters retained as the
   fallback. `hook` is an ordinary duration category. Manual seeks

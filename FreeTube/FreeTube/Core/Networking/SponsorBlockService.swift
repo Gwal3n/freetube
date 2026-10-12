@@ -102,28 +102,37 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
                 let end = item.segment[1]
                 guard start.isFinite, end.isFinite, start >= 0 else { return nil }
                 let title: String?
-                switch category {
-                case .exclusiveAccess:
-                    guard item.actionType == "full", start == 0, end == 0 else { return nil }
+                let isFullVideoLabel: Bool
+                switch item.actionType {
+                case "full":
+                    guard category.supportsFullVideoLabel, start == 0, end == 0 else { return nil }
                     title = nil
-                case .highlight:
-                    guard item.actionType == "poi", end == start else { return nil }
+                    isFullVideoLabel = true
+                case "poi":
+                    guard category == .highlight, end == start else { return nil }
                     title = nil
-                case .chapter:
-                    guard item.actionType == "chapter", end > start,
+                    isFullVideoLabel = false
+                case "chapter":
+                    guard category == .chapter, end > start,
                           let description = item.description?.trimmingCharacters(in: .whitespacesAndNewlines),
                           !description.isEmpty else { return nil }
                     title = description
-                default:
-                    guard (item.actionType == nil || item.actionType == "skip"), end > start else { return nil }
+                    isFullVideoLabel = false
+                case nil, "skip":
+                    guard category != .exclusiveAccess, category != .highlight, category != .chapter,
+                          end > start else { return nil }
                     title = nil
+                    isFullVideoLabel = false
+                default:
+                    return nil
                 }
                 return SponsorBlockSegment(
                     id: item.uuid,
                     startTime: start,
                     endTime: end,
                     category: category,
-                    title: title
+                    title: title,
+                    isFullVideoLabel: isFullVideoLabel
                 )
             }
             .sorted { $0.startTime < $1.startTime } ?? []

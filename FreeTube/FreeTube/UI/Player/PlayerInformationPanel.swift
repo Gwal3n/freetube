@@ -8,6 +8,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerInformationPanel<Actions: View>: View {
     let video: Video
+    let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
     let descriptionText: String?
     let descriptionParts: [VideoDescriptionPart]
@@ -28,6 +29,7 @@ struct PlayerInformationPanel<Actions: View>: View {
 
     init(
         video: Video,
+        fullVideoLabel: SponsorBlockCategory?,
         statsText: String,
         descriptionText: String?,
         descriptionParts: [VideoDescriptionPart],
@@ -47,6 +49,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         @ViewBuilder actions: () -> Actions
     ) {
         self.video = video
+        self.fullVideoLabel = fullVideoLabel
         self.statsText = statsText
         self.descriptionText = descriptionText
         self.descriptionParts = descriptionParts
@@ -70,6 +73,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         VStack(alignment: .leading, spacing: 16) {
             PlayerMetadataHeader(
                 video: video,
+                fullVideoLabel: fullVideoLabel,
                 statsText: statsText,
                 isDetailsExpanded: isDetailsExpanded,
                 showsDescription: showsDescription,

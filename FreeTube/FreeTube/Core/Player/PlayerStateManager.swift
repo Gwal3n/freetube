@@ -1819,6 +1819,7 @@ final class PlayerStateManager {
     private func shouldObserveSponsorBlockSegment(_ segment: SponsorBlockSegment) -> Bool {
         let behavior = preferences.sponsorBlockBehavior(for: segment.category)
         return behavior == .autoSkip
+            && !segment.isFullVideoLabel
             && segment.category != .exclusiveAccess
             && segment.category != .highlight
             && segment.category != .chapter
