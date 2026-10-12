@@ -331,7 +331,7 @@ and a rejected strategy is excluded before requesting the next candidate.
   and caches segment data in memory only. `PlayerStateManager` installs AVPlayer boundary-time
   observers without blocking stream resolution. Duration categories independently support Disabled,
   Show only (timeline marker), or Automatically skip. `poi_highlight` is a point marker and instead
-  supports Disabled, Show only, or Ask; Ask presents a five-second prompt to jump to that timestamp
+  supports Disabled, Show only, or Ask; Ask presents a configurable-duration prompt to jump to that timestamp
   as soon as the lookup returns. `exclusive_access` is a full-video label, not a skip range: it
   supports Disabled or Show only and marks the full timeline below the progress track. `chapter`
   also supports Disabled or Show only; when enabled and submitted for a video, its named chapters
@@ -341,7 +341,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   returns to the settled manual-seek position when the user landed inside a segment, while normal
   boundary skips return to the segment start; Undo is deliberately exempt from rearming so it can
   replay the segment without instantly skipping again. Automatic
-  skips show the existing five-second Undo banner using the category color.
+  skips show the configurable-duration Undo banner using the category color. A user-selected
+  minimum skip length filters automatic skips only, so shorter segments can still appear on the
+  timeline. The defaults remain any length and five seconds.
   Prompt/Undo banners sit above the custom timeline using the same orientation-aware bottom inset,
   so they never cover its time labels.
   AVKit has no public API for adding ranges to its native scrubber, so do not inspect or mutate its
@@ -454,6 +456,9 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **Comments paginate only on explicit request.** `CommentsSection` uses a `LazyVStack` and a Load more button. Do not restore an eager `VStack` plus an `onAppear` pagination sentinel inside the player's outer `ScrollView`: SwiftUI lays out every row immediately there, which chains continuation requests and causes playback UI lag.
 - **Long comments stay compact by default.** `CommentRow` limits long bodies to three lines and exposes an inline Read more / Show less control. Its inexpensive character/newline heuristic may produce occasional false-positive controls by design. The explicit comment continuation remains a compact neutral Load more button; it must never become an eager scroll sentinel.
 - **Playback progress is local and conservative.** `PlayerStateManager` saves a YouTube video's position through `PersistenceWriter` at most every ten seconds and on pause, dismiss, or video replacement. Resume lookup runs concurrently with stream resolution and seeks only after the winning item is ready. Positions below ten seconds, within thirty seconds of the end, or beyond 95% are not resumed. Legacy Link downloads are excluded.
+  Watch history normally starts only after actual playback reaches the lesser of 5% or ten
+  seconds. The optional “Add to history when opened” preference creates the history row at launch
+  without replacing any existing resume position; progress still waits for real playback.
 - **Popup body backdrop is translucent unless OLED mode is enabled.** The expanded `FullScreenPlayer` normally paints a `.thinMaterial` rectangle behind the entire popup body. The explicit OLED preference replaces only that outer lower-player backdrop with true black; opaque black outside that preference is a regression. Common offenders + neutralizers:
   - **`NavigationStack` inside the popup body:** the nav bar paints an opaque system background even with the title hidden. `.toolbarBackground(.hidden, for: .navigationBar)` is NOT sufficient — use `.toolbar(.hidden, for: .navigationBar)` to remove the bar entirely. Supply your own back/close button.
   - **`List` / `ScrollView` default content background:** apply `.scrollContentBackground(.hidden)` on every list/scroll view in the popup body.

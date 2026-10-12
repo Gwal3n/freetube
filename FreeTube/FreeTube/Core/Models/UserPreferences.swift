@@ -27,6 +27,8 @@ struct UserPreferences {
     /// Stops writing local watch history and playback positions when disabled. Existing entries
     /// remain available until the user clears them explicitly.
     @AppStorage("saveWatchHistory") var saveWatchHistory: Bool = true
+    /// Optional immediate history entry. The default keeps the existing meaningful-playback threshold.
+    @AppStorage("addToHistoryWhenOpened") var addToHistoryWhenOpened: Bool = false
     @AppStorage("historyRetentionPolicy") var historyRetentionPolicyRaw: String = HistoryRetentionPolicy.forever.rawValue
     /// Removes the local-subscription Feed destination from the tab bar when disabled. Cached
     /// entries remain on device so restoring the tab is immediate and does not force a refresh.
@@ -98,6 +100,8 @@ struct UserPreferences {
     @AppStorage("libraryShelfContent") var libraryShelfContentRaw: String = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") var recentLibraryVideoCount: Int = 5
     @AppStorage("sponsorBlockEnabled") var sponsorBlockEnabled: Bool = false
+    @AppStorage("sponsorBlockMinimumSkipSeconds") var sponsorBlockMinimumSkipSeconds: Double = 0
+    @AppStorage("sponsorBlockNoticeSeconds") var sponsorBlockNoticeSeconds: Double = 5
     @AppStorage("sponsorBlockSponsor") var sponsorBlockSponsor: Bool = true
     @AppStorage("sponsorBlockSelfPromotion") var sponsorBlockSelfPromotion: Bool = false
     @AppStorage("sponsorBlockInteraction") var sponsorBlockInteraction: Bool = false

@@ -33,11 +33,17 @@ struct SettingsScreen: View {
                             Text(quality.displayName).tag(quality)
                         }
                     }
-                    Picker("Default playback speed", selection: Bindable(model).defaultPlaybackRate) {
-                        ForEach(defaultPlaybackRates, id: \.self) { rate in
-                            Text(verbatim: PlaybackSpeedPresets.label(rate)).tag(rate)
+                    NavigationLink {
+                        CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
+                    } label: {
+                        LabeledContent {
+                            Text(verbatim: PlaybackSpeedPresets.label(model.defaultPlaybackRate))
+                                .foregroundStyle(.secondary)
+                        } label: {
+                            navigationLabel("Playback speeds", systemImage: "speedometer")
                         }
                     }
+                    .tint(.white)
                     .onChange(of: model.defaultPlaybackRate) { _, rate in
                         player.setPlaybackRate(rate)
                     }
@@ -46,12 +52,6 @@ struct SettingsScreen: View {
                             model.defaultPlaybackRate = 1
                         }
                     }
-                    NavigationLink {
-                        CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
-                    } label: {
-                        navigationLabel("Playback speeds", systemImage: "speedometer")
-                    }
-                    .tint(.white)
                     Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
                     Button {
                         holdSpeedText = model.holdSpeedRate.formatted(.number.precision(.fractionLength(0...2)))
@@ -227,6 +227,8 @@ struct SettingsScreen: View {
                     }
                     .tint(.white)
                     Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
+                    Toggle("Add to history when opened", isOn: Bindable(model).addToHistoryWhenOpened)
+                        .disabled(!model.saveWatchHistory)
                     Toggle("Continue Watching in Library", isOn: Bindable(model).showContinueWatchingMenu)
                     Toggle("Library video shelf", isOn: Bindable(model).showLibraryShelf)
                         .disabled(!model.saveWatchHistory)

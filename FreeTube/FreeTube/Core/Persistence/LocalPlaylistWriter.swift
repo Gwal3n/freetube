@@ -331,6 +331,31 @@ actor LocalPlaylistWriter {
             .map(Self.video(from:))
     }
 
+    /// Existing resolved playlist entries can predate duration parsing. Return only those with
+    /// missing lengths; imported placeholders remain owned by the regular hydration coordinator.
+    func videosMissingDuration(playlistID: String) -> [Video] {
+        videoRecords(playlistID: playlistID)
+            .filter { $0.metadataState == 0 && !$0.isLive && ($0.duration ?? 0) <= 0 }
+            .map(Self.video(from:))
+    }
+
+    /// Fill only the absent length. Never replace a locally edited title, artwork, or order with
+    /// newly fetched metadata, and do not change the playlist's own updated/sort date.
+    func fillMissingDuration(_ duration: TimeInterval, videoID: String, playlistID: String, notifyProgress: Bool) -> Bool {
+        guard duration.isFinite, duration > 0 else { return false }
+        let membership = "\(playlistID):\(videoID)"
+        let descriptor = FetchDescriptor<LocalPlaylistVideoRecord>(
+            predicate: #Predicate { $0.membershipID == membership }
+        )
+        guard let item = try? modelContext.fetch(descriptor).first,
+              item.metadataState == 0,
+              (item.duration ?? 0) <= 0 else { return false }
+        item.duration = duration
+        try? modelContext.save()
+        if notifyProgress { notify() }
+        return true
+    }
+
     func retryFailedMetadata(playlistID: String) {
         let failed = videoRecords(playlistID: playlistID).filter { $0.metadataState == 2 }
         guard !failed.isEmpty else { return }

@@ -157,6 +157,37 @@ final class LocalPlaylistService: Sendable {
         await writer.playlists().filter(\.isHydratingMetadata)
     }
 
+    func videosMissingDuration(id playlistID: String) async -> [Video] {
+        await writer.videosMissingDuration(playlistID: playlistID)
+    }
+
+    /// Refreshes a single missing length without touching any other saved video detail.
+    func refreshMissingDuration(for video: Video, in playlistID: String, notifyProgress: Bool) async -> Bool {
+        do {
+            let info = try await videoService.fetchInfo(id: video.id)
+            if let duration = info.video.duration, duration > 0 {
+                guard !Task.isCancelled else { return false }
+                return await writer.fillMissingDuration(
+                    duration, videoID: video.id, playlistID: playlistID, notifyProgress: notifyProgress
+                )
+            }
+        } catch {
+            log.notice("Player duration unavailable for \(video.id, privacy: .public); trying watch metadata")
+        }
+        guard !Task.isCancelled else { return false }
+        do {
+            let info = try await videoService.fetchMoreInfo(id: video.id)
+            guard let duration = info.video.duration, duration > 0 else { return false }
+            guard !Task.isCancelled else { return false }
+            return await writer.fillMissingDuration(
+                duration, videoID: video.id, playlistID: playlistID, notifyProgress: notifyProgress
+            )
+        } catch {
+            log.notice("Playlist duration refresh failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
+            return false
+        }
+    }
+
     func hydratePendingPlaylist(id playlistID: String) async {
         let candidates = await writer.pendingMetadataVideos(playlistID: playlistID)
         log.info("Metadata hydration started playlist=\(playlistID, privacy: .public) remaining=\(candidates.count, privacy: .public)")

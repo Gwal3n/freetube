@@ -18,13 +18,24 @@ struct CustomPlaybackSpeedsScreen: View {
     var body: some View {
         List {
             Section {
+                Picker("Default playback speed", selection: $defaultPlaybackRate) {
+                    ForEach(savedRates, id: \.self) { rate in
+                        Text(verbatim: PlaybackSpeedPresets.label(rate)).tag(rate)
+                    }
+                }
+            } footer: {
+                Text("Used when a new video opens. Player menu changes affect only the current video.")
+            }
+            Section {
                 ForEach(savedRates, id: \.self) { rate in
                     Text(verbatim: PlaybackSpeedPresets.label(rate))
                         .deleteDisabled(rate == 1)
                 }
                 .onDelete(perform: deleteSpeeds)
+            } header: {
+                Text("Available speeds")
             } footer: {
-                Text("Speeds appear in the player and default speed picker. 1× cannot be removed.")
+                Text("Swipe left to remove a speed. 1× cannot be removed.")
             }
         }
         .navigationTitle("Playback speeds")

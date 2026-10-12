@@ -533,6 +533,7 @@ final class PlayerStateManager {
         } else {
             queue.replace(with: [video])
         }
+        recordHistoryOnOpenIfRequested(video)
         presentPlayer(for: video.id, expanded: expandPlayer)
         loadState = .resolving
         // Wipe transport state from the previous video so a stray time-observer tick during the
@@ -1821,6 +1822,7 @@ final class PlayerStateManager {
             && segment.category != .exclusiveAccess
             && segment.category != .highlight
             && segment.category != .chapter
+            && segment.endTime - segment.startTime >= max(0, preferences.sponsorBlockMinimumSkipSeconds)
     }
 
     private func handleSponsorBlockSegment(at time: TimeInterval) {
@@ -1866,8 +1868,9 @@ final class PlayerStateManager {
     }
 
     private func scheduleSponsorBlockNoticeDismissal() {
+        let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
         sponsorBlockNoticeTask = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
             self?.sponsorBlockNotice = nil
         }
     }
@@ -2739,6 +2742,32 @@ final class PlayerStateManager {
     }
 
     // MARK: - Resume position
+
+    /// Records an opening without overwriting an existing resume point. The ordinary
+    /// meaningful-playback path still owns progress updates once actual playback qualifies.
+    private func recordHistoryOnOpenIfRequested(_ video: Video) {
+        guard preferences.recordsWatchHistory,
+              preferences.addToHistoryWhenOpened,
+              !video.id.hasPrefix("fetch-") else { return }
+        historyRecordedVideoID = video.id
+        let playlist = queue.current?.id == video.id ? activePlaylist : nil
+        let playlistOrigin = playlist == nil ? nil : activePlaylistOrigin
+        Task {
+            await PersistenceWriter.shared.upsertWatchHistory(
+                videoID: video.id,
+                title: video.title,
+                channelName: video.channelName,
+                channelID: video.channelID,
+                thumbnailURL: video.thumbnailURL,
+                position: 0,
+                duration: video.duration ?? 0,
+                saveProgress: false,
+                playlistID: playlist?.id,
+                playlistTitle: playlist?.title,
+                playlistOrigin: playlistOrigin
+            )
+        }
+    }
 
     /// Resumes only meaningful, unfinished progress. A short opening is treated as unwatched, and
     /// the final 30 seconds are treated as completed so finished videos restart normally.

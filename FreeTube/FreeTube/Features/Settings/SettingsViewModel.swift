@@ -18,6 +18,9 @@ final class SettingsViewModel {
     var saveWatchHistory: Bool {
         didSet { preferences.saveWatchHistory = saveWatchHistory }
     }
+    var addToHistoryWhenOpened: Bool {
+        didSet { preferences.addToHistoryWhenOpened = addToHistoryWhenOpened }
+    }
     var saveSearchHistory: Bool {
         didSet { preferences.saveSearchHistory = saveSearchHistory }
     }
@@ -54,6 +57,12 @@ final class SettingsViewModel {
     var sponsorBlockEnabled: Bool {
         didSet { preferences.sponsorBlockEnabled = sponsorBlockEnabled }
     }
+    var sponsorBlockMinimumSkipSeconds: Double {
+        didSet { preferences.sponsorBlockMinimumSkipSeconds = sponsorBlockMinimumSkipSeconds }
+    }
+    var sponsorBlockNoticeSeconds: Double {
+        didSet { preferences.sponsorBlockNoticeSeconds = sponsorBlockNoticeSeconds }
+    }
     var playerControlLayout: PlayerControlLayout {
         didSet { preferences.playerControlLayout = playerControlLayout }
     }
@@ -85,6 +94,7 @@ final class SettingsViewModel {
         self.upNextInitialCount = preferences.upNextInitialCount
         self.showUpNext = preferences.showUpNext
         self.saveWatchHistory = preferences.saveWatchHistory
+        self.addToHistoryWhenOpened = preferences.addToHistoryWhenOpened
         self.saveSearchHistory = preferences.saveSearchHistory
         self.showLibraryShelf = preferences.showLibraryShelf
         self.showContinueWatchingMenu = preferences.showContinueWatchingMenu
@@ -97,6 +107,8 @@ final class SettingsViewModel {
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
         self.sponsorBlockEnabled = preferences.sponsorBlockEnabled
+        self.sponsorBlockMinimumSkipSeconds = preferences.sponsorBlockMinimumSkipSeconds
+        self.sponsorBlockNoticeSeconds = preferences.sponsorBlockNoticeSeconds
         self.playerControlLayout = preferences.playerControlLayout
         self.playerMoreMenuDividers = preferences.playerMoreMenuDividers
         self.appFontPreset = preferences.appFontPreset

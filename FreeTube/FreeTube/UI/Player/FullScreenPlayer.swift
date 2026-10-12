@@ -377,6 +377,7 @@ struct FullScreenPlayer: View {
                        let preparation = player.fastPlaybackPreparation {
                         FastPlaybackProgressOverlay(
                             preparation: preparation,
+                            rate: player.playbackRate,
                             onCancel: { player.cancelPendingFastPlayback() }
                         )
                         .position(

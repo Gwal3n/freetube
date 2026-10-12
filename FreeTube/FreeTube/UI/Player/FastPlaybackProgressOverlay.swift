@@ -5,10 +5,14 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct FastPlaybackProgressOverlay: View {
     let preparation: FastPlaybackLocalFileService.ProgressUpdate
+    let rate: Double
     let onCancel: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 9) {
+            Text("Preparing \(PlaybackSpeedPresets.label(rate))")
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
             Group {
                 if let fraction = preparation.fraction {
                     ProgressView(value: fraction)
@@ -18,7 +22,7 @@ struct FastPlaybackProgressOverlay: View {
             }
             .tint(.white)
             .progressViewStyle(.linear)
-            .frame(width: 130)
+            .frame(width: 88)
             .accessibilityLabel("Preparing faster playback")
 
             Button(action: onCancel) {
@@ -31,10 +35,10 @@ struct FastPlaybackProgressOverlay: View {
             .accessibilityLabel("Cancel fast playback preparation")
         }
         .foregroundStyle(.white)
-        .padding(.leading, 12)
-        .padding(.trailing, 4)
-        .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.leading, 14)
+        .padding(.trailing, 3)
+        .padding(.vertical, 3)
+        .background(.ultraThinMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 }

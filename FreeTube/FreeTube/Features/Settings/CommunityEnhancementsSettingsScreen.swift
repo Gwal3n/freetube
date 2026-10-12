@@ -30,6 +30,27 @@ struct CommunityEnhancementsSettingsScreen: View {
             }
             .disabled(!model.sponsorBlockEnabled)
 
+            Section("Skipping") {
+                Stepper(value: $model.sponsorBlockMinimumSkipSeconds, in: 0...30, step: 1) {
+                    LabeledContent("Minimum segment length") {
+                        if model.sponsorBlockMinimumSkipSeconds == 0 {
+                            Text("Any length")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(Int(model.sponsorBlockMinimumSkipSeconds)) seconds")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Stepper(value: $model.sponsorBlockNoticeSeconds, in: 1...15, step: 1) {
+                    LabeledContent("Skip notice duration") {
+                        Text("\(Int(model.sponsorBlockNoticeSeconds)) seconds")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .disabled(!model.sponsorBlockEnabled)
+
             Section {
                 Toggle("Replace video titles", isOn: $model.deArrowTitles)
                 Toggle("Replace video thumbnails", isOn: $model.deArrowThumbnails)

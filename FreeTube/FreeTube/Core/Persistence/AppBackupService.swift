@@ -148,7 +148,7 @@ final class AppBackupService {
     }
 
     private static let settingKeys: Set<String> = [
-        "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appFontPreset",
+        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appFontPreset",
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
@@ -172,6 +172,7 @@ final class AppBackupService {
         "sponsorBlockMusicOfftopicBehavior", "sponsorBlockFillerBehavior",
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
+        "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
         "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount"
     ]
 

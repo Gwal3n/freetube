@@ -27,6 +27,9 @@ struct LocalPlaylistScreen: View {
     @State private var playlistExportError: String?
     @State private var searchText = ""
     @State private var videoSort: LocalPlaylistVideoSort = .custom
+    @State private var isRefreshingDurations = false
+    @State private var durationRefreshProgress: (completed: Int, total: Int)?
+    @State private var durationRefreshTask: Task<Void, Never>?
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
@@ -94,6 +97,7 @@ struct LocalPlaylistScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await reload() }
         }
+        .onDisappear { durationRefreshTask?.cancel() }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 toolbarButtons
@@ -276,9 +280,31 @@ struct LocalPlaylistScreen: View {
                 localActionToolbar(local)
             }
             PlaylistMetadataBlock(details: local.playbackDetails, isExpanded: $isDetailsExpanded)
+            durationRefreshStatus
         }
         .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
         .padding(.bottom, 16)
+    }
+
+    @ViewBuilder
+    private var durationRefreshStatus: some View {
+        if let progress = durationRefreshProgress, isRefreshingDurations {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Refreshing video lengths")
+                        .appFont(.caption, weight: .medium)
+                    ProgressView(value: Double(progress.completed), total: Double(max(progress.total, 1)))
+                        .tint(.white)
+                    Text("\(progress.completed) of \(progress.total)")
+                        .appFont(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Cancel") { durationRefreshTask?.cancel() }
+                    .buttonStyle(.borderless)
+                    .tint(.white)
+            }
+            .padding(.horizontal)
+        }
     }
 
     private func localActionToolbar(_ local: LocalPlaylistDetails) -> some View {
@@ -335,6 +361,14 @@ struct LocalPlaylistScreen: View {
                     Label("Retry Video Information", systemImage: "arrow.clockwise.circle")
                 }
             }
+            if local.videos.contains(where: { !$0.isLive && ($0.duration ?? 0) <= 0 }) {
+                Button {
+                    startDurationRefresh()
+                } label: {
+                    Label("Refresh missing video lengths", systemImage: "clock.arrow.circlepath")
+                }
+                .disabled(isRefreshingDurations || local.playlist.isHydratingMetadata)
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body.weight(.semibold))
@@ -363,6 +397,32 @@ struct LocalPlaylistScreen: View {
             showingPlaylistExporter = true
         } catch {
             playlistExportError = error.localizedDescription
+        }
+    }
+
+    private func startDurationRefresh() {
+        guard !isRefreshingDurations else { return }
+        isRefreshingDurations = true
+        durationRefreshProgress = nil
+        durationRefreshTask = Task {
+            let missing = await service.videosMissingDuration(id: playlistID)
+            durationRefreshProgress = (0, missing.count)
+            for (index, video) in missing.enumerated() {
+                guard !Task.isCancelled else { break }
+                let completed = index + 1
+                _ = await service.refreshMissingDuration(
+                    for: video,
+                    in: playlistID,
+                    notifyProgress: completed.isMultiple(of: 5) || completed == missing.count
+                )
+                durationRefreshProgress = (completed, missing.count)
+                if completed.isMultiple(of: 5) { await reload() }
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            await reload()
+            durationRefreshProgress = nil
+            isRefreshingDurations = false
+            durationRefreshTask = nil
         }
     }
 

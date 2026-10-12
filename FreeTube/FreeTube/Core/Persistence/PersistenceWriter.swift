@@ -148,7 +148,9 @@ actor PersistenceWriter {
             if !channelID.isEmpty { existing.channelID = channelID }
             existing.thumbnailURL = thumbnailURL
             if saveProgress { existing.lastPosition = position }
-            existing.duration = duration
+            // An immediate-open history entry must not erase a previously saved resume position
+            // or its duration before the new player item has reported a usable timeline.
+            if saveProgress || duration > 0 { existing.duration = duration }
             existing.playlistID = playlistID
             existing.playlistTitle = playlistTitle
             existing.playlistOriginRaw = playlistOrigin?.rawValue
