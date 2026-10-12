@@ -57,6 +57,9 @@ final class PlayerStateManager {
     /// Actual loaded ranges can be discontinuous, especially for HLS. Keep each range separate
     /// so the timeline never suggests that an unbuffered gap is ready to play.
     private(set) var bufferedRanges: [ClosedRange<TimeInterval>] = []
+    /// The newest contiguous DVR window offered by the current live AVPlayerItem. Unlike a
+    /// video's duration, this range moves forward as the broadcast advances.
+    private(set) var liveSeekableRange: ClosedRange<TimeInterval>?
     private(set) var playbackRate: Double
     /// Actual requested transport rate, capped at 2x until a ready item supports fast-forward.
     private(set) var effectivePlaybackRate: Double
@@ -314,6 +317,7 @@ final class PlayerStateManager {
         itemPresentationSizeObservation = nil
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
+        liveSeekableRange = nil
         clearSponsorBlockState()
         clearChapterState()
         storyboard = nil
@@ -412,6 +416,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation?.invalidate()
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
+        liveSeekableRange = nil
         hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
@@ -546,6 +551,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation?.invalidate()
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
+        liveSeekableRange = nil
         hasEnded = false
         pendingSeekTarget = nil
         seekRequestID += 1
@@ -1376,8 +1382,14 @@ final class PlayerStateManager {
         resumeAfterEnded: Bool = true
     ) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
-        guard currentVideo?.isLive != true || duration > 0 else { return }
-        let boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
+        guard seconds.isFinite else { return }
+        let boundedSeconds: TimeInterval
+        if currentVideo?.isLive == true {
+            guard let range = liveSeekableRange else { return }
+            boundedSeconds = min(max(seconds, range.lowerBound), range.upperBound)
+        } else {
+            boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
+        }
         let shouldResume = resumeAfterEnded && hasEnded && boundedSeconds < max(0, duration - 0.25)
         if shouldResume {
             hasEnded = false
@@ -1409,6 +1421,9 @@ final class PlayerStateManager {
                 if settledTime.isFinite {
                     self.elapsed = settledTime
                     self.handleSponsorBlockSegment(at: settledTime)
+                    if self.currentVideo?.isLive == true {
+                        self.log.info("Live DVR seek settled target=\(boundedSeconds, privacy: .public)s actual=\(settledTime, privacy: .public)s")
+                    }
                 }
                 if shouldResume {
                     self.play()
@@ -1419,7 +1434,36 @@ final class PlayerStateManager {
 
     func seekRelative(by delta: TimeInterval) {
         log.info("seekRelative(by: \(delta, privacy: .public)s)")
-        seek(to: max(0, min(elapsed + delta, duration)))
+        if currentVideo?.isLive == true {
+            guard let range = liveSeekableRange else { return }
+            seek(to: min(max(elapsed, range.lowerBound), range.upperBound) + delta)
+        } else {
+            seek(to: max(0, min(elapsed + delta, duration)))
+        }
+    }
+
+    /// Ask AVPlayer to return to its live edge. A rolling HLS window can move between drawing
+    /// the timeline and tapping LIVE, so a finite seek to a cached end time is less reliable.
+    func seekToLive() {
+        guard currentVideo?.isLive == true, let range = liveSeekableRange else { return }
+        log.info("seekToLive()")
+        seekRequestID += 1
+        let requestID = seekRequestID
+        pendingSeekTarget = range.upperBound
+        elapsed = range.upperBound
+        player.seek(to: .positiveInfinity) { [weak self] finished in
+            Task { @MainActor in
+                guard let self, self.seekRequestID == requestID else { return }
+                self.pendingSeekTarget = nil
+                if finished {
+                    let settledTime = self.player.currentTime().seconds
+                    if settledTime.isFinite { self.elapsed = settledTime }
+                    self.log.info("Live DVR returned to live edge at \(settledTime, privacy: .public)s")
+                } else {
+                    self.log.notice("Live DVR return-to-live seek did not complete")
+                }
+            }
+        }
     }
 
     func playNext() {
@@ -1695,6 +1739,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation?.invalidate()
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
+        liveSeekableRange = nil
         playbackHistory.removeAll()
         playbackHistoryIndex = -1
         NowPlayingCenter.clear()
@@ -2109,6 +2154,7 @@ final class PlayerStateManager {
         itemPresentationSizeObservation?.invalidate()
         itemLoadedTimeRangesObservation?.invalidate()
         bufferedRanges = []
+        liveSeekableRange = nil
         lastAccessLogAt = .distantPast
         lastLiveDVRLogAt = .distantPast
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
@@ -2644,9 +2690,25 @@ final class PlayerStateManager {
         }
     }
 
-    /// Measure the window AVPlayer actually offers, rather than inferring DVR support from the
+    /// Read the window AVPlayer actually offers, rather than inferring DVR support from the
     /// manifest URL. Live ranges can appear after readiness and move as the broadcast advances.
-    /// Keep diagnostics sparse and never log the signed playback URL.
+    private func updateLiveSeekableRange(for item: AVPlayerItem) {
+        guard currentVideo?.isLive == true,
+              loadState == .readyToPlay,
+              item.status == .readyToPlay else { return }
+        // A seek bar cannot safely cross a gap. Use the most recent contiguous range if the
+        // manifest ever reports several, and let AVPlayer keep advancing its moving bounds.
+        let newest = item.seekableTimeRanges.compactMap { value -> ClosedRange<TimeInterval>? in
+            let range = value.timeRangeValue
+            let start = range.start.seconds
+            let end = range.end.seconds
+            guard start.isFinite, end.isFinite, start >= 0, end > start else { return nil }
+            return start...end
+        }.max { $0.upperBound < $1.upperBound }
+        if liveSeekableRange != newest { liveSeekableRange = newest }
+    }
+
+    /// Keep DVR diagnostics sparse and never log the signed playback URL.
     private func logLiveDVRIfNeeded(for item: AVPlayerItem) {
         guard currentVideo?.isLive == true,
               loadState == .readyToPlay,
@@ -2687,6 +2749,7 @@ final class PlayerStateManager {
                 if let item = self.player.currentItem {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
+                    self.updateLiveSeekableRange(for: item)
                     self.logLiveDVRIfNeeded(for: item)
                 }
                 self.accumulateHistoryPlaybackTime()

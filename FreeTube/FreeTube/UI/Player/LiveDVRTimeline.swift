@@ -1,0 +1,116 @@
+import SwiftUI
+
+/// A rolling HLS timeline. Its bounds come from AVPlayer's seekable range, not the indefinite
+/// duration of a live item. The range is frozen while dragging so the handle follows the finger
+/// even if the live edge advances before the gesture ends.
+@available(iOS 17.0, *)
+struct LiveDVRTimeline: View {
+    let elapsed: TimeInterval
+    let seekableRange: ClosedRange<TimeInterval>?
+    let onSeek: (TimeInterval) -> Void
+    let onGoLive: () -> Void
+
+    @State private var dragTarget: TimeInterval?
+    @State private var dragRange: ClosedRange<TimeInterval>?
+
+    var body: some View {
+        if let range = dragRange ?? seekableRange, range.upperBound - range.lowerBound >= 30 {
+            let position = dragTarget ?? elapsed
+            let behindLive = max(0, range.upperBound - position)
+            let atLiveEdge = behindLive < 10
+
+            VStack(spacing: 4) {
+                HStack {
+                    Text(verbatim: formatOffset(behindLive))
+                        .monospacedDigit()
+                    Spacer()
+                    Button(action: onGoLive) {
+                        HStack(spacing: 5) {
+                            Circle().frame(width: 5, height: 5)
+                            Text("LIVE")
+                        }
+                        .foregroundStyle(atLiveEdge ? Color.red : Color.white)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(.interaction, Rectangle().inset(by: -10))
+                    .disabled(atLiveEdge)
+                    .accessibilityLabel(atLiveEdge ? "At live edge" : "Return to live")
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white)
+
+                GeometryReader { proxy in
+                    let width = max(proxy.size.width, 1)
+                    let progress = fraction(of: position, in: range)
+
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.white.opacity(0.28)).frame(height: 4)
+                        Capsule().fill(.red).frame(width: width * progress, height: 4)
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 14, height: 14)
+                            .offset(x: min(max(width * progress - 7, 0), width - 14))
+                    }
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                if dragRange == nil { dragRange = range }
+                                dragTarget = time(at: value.location.x, width: width, in: dragRange ?? range)
+                            }
+                            .onEnded { value in
+                                let target = time(at: value.location.x, width: width, in: dragRange ?? range)
+                                dragTarget = nil
+                                dragRange = nil
+                                if (seekableRange?.upperBound ?? range.upperBound) - target < 10 {
+                                    onGoLive()
+                                } else {
+                                    onSeek(target)
+                                }
+                            }
+                    )
+                }
+                .frame(height: 24)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Live playback position")
+            .accessibilityValue("\(formatOffset(behindLive)) behind live")
+            .accessibilityAdjustableAction { direction in
+                let delta: TimeInterval = direction == .increment ? 10 : -10
+                onSeek(min(max(elapsed + delta, range.lowerBound), range.upperBound))
+            }
+        } else {
+            HStack {
+                Text("LIVE")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                Spacer()
+            }
+            .padding(.vertical, 6)
+            .frame(height: 43, alignment: .top)
+            .accessibilityLabel("Live broadcast")
+        }
+    }
+
+    private func fraction(of time: TimeInterval, in range: ClosedRange<TimeInterval>) -> CGFloat {
+        CGFloat(min(max((time - range.lowerBound) / (range.upperBound - range.lowerBound), 0), 1))
+    }
+
+    private func time(at x: CGFloat, width: CGFloat, in range: ClosedRange<TimeInterval>) -> TimeInterval {
+        range.lowerBound + Double(min(max(x / width, 0), 1)) * (range.upperBound - range.lowerBound)
+    }
+
+    private func formatOffset(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let remainder = total % 60
+        if hours > 0 { return String(format: "-%d:%02d:%02d", hours, minutes, remainder) }
+        return String(format: "-%d:%02d", minutes, remainder)
+    }
+}

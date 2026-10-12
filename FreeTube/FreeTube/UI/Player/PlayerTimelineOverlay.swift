@@ -11,17 +11,26 @@ struct PlayerTimelineOverlay: View {
     let onShowChapters: () -> Void
 
     var body: some View {
-        SponsorBlockTimeline(
-            elapsed: player.elapsed,
-            previewElapsed: previewElapsed,
-            duration: player.duration,
-            bufferedRanges: player.bufferedRanges,
-            isLive: player.currentVideo?.isLive == true,
-            segments: player.sponsorBlockSegments,
-            chapters: player.chapters,
-            onSeek: onSeek,
-            onPreviewChanged: onPreviewChanged,
-            onShowChapters: onShowChapters
-        )
+        if player.currentVideo?.isLive == true {
+            LiveDVRTimeline(
+                elapsed: player.elapsed,
+                seekableRange: player.liveSeekableRange,
+                onSeek: onSeek,
+                onGoLive: { player.seekToLive() }
+            )
+        } else {
+            SponsorBlockTimeline(
+                elapsed: player.elapsed,
+                previewElapsed: previewElapsed,
+                duration: player.duration,
+                bufferedRanges: player.bufferedRanges,
+                isLive: false,
+                segments: player.sponsorBlockSegments,
+                chapters: player.chapters,
+                onSeek: onSeek,
+                onPreviewChanged: onPreviewChanged,
+                onShowChapters: onShowChapters
+            )
+        }
     }
 }
