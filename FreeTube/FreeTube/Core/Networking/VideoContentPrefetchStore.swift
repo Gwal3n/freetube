@@ -10,6 +10,7 @@ final class VideoContentPrefetchStore {
 
     private struct Entry {
         var details: VideoInfo? = nil
+        var detailsFetchedAt: Date? = nil
         var comments: CommentThread? = nil
     }
 
@@ -44,10 +45,18 @@ final class VideoContentPrefetchStore {
         }
     }
 
-    func fetchDetails(videoID: String) async throws -> VideoInfo {
-        if let cached = entries[videoID]?.details {
-            markRecentlyUsed(videoID)
-            return cached
+    func fetchDetails(videoID: String, maxAge: TimeInterval? = nil) async throws -> VideoInfo {
+        if let entry = entries[videoID], let cached = entry.details {
+            if let maxAge {
+                if let fetchedAt = entry.detailsFetchedAt,
+                   Date().timeIntervalSince(fetchedAt) < maxAge {
+                    markRecentlyUsed(videoID)
+                    return cached
+                }
+            } else {
+                markRecentlyUsed(videoID)
+                return cached
+            }
         }
         if let task = detailTasks[videoID] { return try await task.value }
 
@@ -58,6 +67,7 @@ final class VideoContentPrefetchStore {
             let details = try await task.value
             var entry = entries[videoID] ?? Entry()
             entry.details = details
+            entry.detailsFetchedAt = .now
             entries[videoID] = entry
             detailTasks[videoID] = nil
             markRecentlyUsed(videoID)

@@ -10,15 +10,17 @@ nonisolated struct MoreVideoInfosWithRawDescriptionResponse: YouTubeResponse {
 
     let info: MoreVideoInfosResponse
     let description: (text: String, parts: [VideoDescriptionPart])?
+    let liveViewerCountText: String?
 
     static func decodeData(data: Data) throws -> Self {
         Self(
             info: try MoreVideoInfosResponse.decodeData(data: data),
-            description: VideoDescriptionExtractor.extract(from: data)
+            description: VideoDescriptionExtractor.extract(from: data),
+            liveViewerCountText: LiveViewerCountExtractor.extract(from: data)
         )
     }
 
     static func decodeJSON(json: JSON) throws -> Self {
-        Self(info: MoreVideoInfosResponse.decodeJSON(json: json), description: nil)
+        Self(info: MoreVideoInfosResponse.decodeJSON(json: json), description: nil, liveViewerCountText: nil)
     }
 }

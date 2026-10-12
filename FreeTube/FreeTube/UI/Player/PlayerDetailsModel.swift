@@ -11,6 +11,7 @@ import Observation
 @Observable
 final class PlayerDetailsModel {
     private(set) var details: VideoInfo?
+    private(set) var liveViewerCountText: String?
     private(set) var isLoading = false
     private(set) var loadFailed = false
     var isExpanded = false
@@ -33,6 +34,7 @@ final class PlayerDetailsModel {
         loadTask = nil
         self.videoID = videoID
         details = nil
+        liveViewerCountText = nil
         isLoading = false
         loadFailed = false
         isExpanded = false
@@ -97,8 +99,12 @@ final class PlayerDetailsModel {
 
     func statsText(for video: Video) -> String {
         var parts: [String] = []
-        if let viewsText = details?.viewCountText?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !viewsText.isEmpty {
+        if video.isLive {
+            if let liveViewerCountText, !liveViewerCountText.isEmpty {
+                parts.append(liveViewerCountText)
+            }
+        } else if let viewsText = details?.viewCountText?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !viewsText.isEmpty {
             parts.append(viewsText)
         } else if let views = video.viewCount, views > 0 {
             parts.append("\(Self.formatCount(views)) views")
@@ -115,6 +121,31 @@ final class PlayerDetailsModel {
             parts.append("Uploaded \(relative)")
         }
         return parts.joined(separator: " • ")
+    }
+
+    /// The shared details cache is useful for ordinary videos, but live viewership goes stale.
+    /// Refresh only while the expanded live player is visible; its SwiftUI task owns cancellation.
+    func refreshLiveViewerCount(for videoID: String, player: PlayerStateManager) async {
+        guard !Task.isCancelled, player.currentVideo?.id == videoID else { return }
+        reset(for: videoID)
+        while !Task.isCancelled {
+            do {
+                let fresh = try await store.fetchDetails(videoID: videoID, maxAge: 60)
+                guard !Task.isCancelled, self.videoID == videoID,
+                      player.currentVideo?.id == videoID else { return }
+                liveViewerCountText = fresh.liveViewerCountText
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled, self.videoID == videoID else { return }
+                liveViewerCountText = nil
+            }
+            do {
+                try await Task.sleep(for: .seconds(60))
+            } catch {
+                return
+            }
+        }
     }
 
     func commentsCountText(fallback: String?) -> String? {

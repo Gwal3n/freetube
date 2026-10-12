@@ -10,6 +10,8 @@ struct VideoInfo: Sendable {
     let recommended: [Video]
     let recommendedContinuationToken: String?
     let viewCountText: String?
+    /// Watch-page text only when its count renderer explicitly marks it as live viewership.
+    let liveViewerCountText: String?
     let uploadDateText: String?
     let chapters: [VideoChapter]
     let captionTracks: [VideoCaptionTrack]
@@ -142,7 +144,7 @@ final class VideoService: VideoServicing {
                 viewCount: nil,
                 publishedAt: nil,
                 descriptionSnippet: descriptionText,
-                isLive: false,
+                isLive: rawResponse.liveViewerCountText != nil,
                 isShort: false
             )
             return VideoInfo(
@@ -155,6 +157,7 @@ final class VideoService: VideoServicing {
                 recommended: recommended,
                 recommendedContinuationToken: response.recommendedVideosContinuationToken,
                 viewCountText: response.viewsCount.fullViewsCount ?? response.viewsCount.shortViewsCount,
+                liveViewerCountText: rawResponse.liveViewerCountText,
                 uploadDateText: response.timePosted.postedDate ?? response.timePosted.relativePostedDate,
                 chapters: Self.chapters(from: response.chapters ?? []),
                 captionTracks: [],
@@ -273,6 +276,7 @@ final class VideoService: VideoServicing {
             recommended: recommended,
             recommendedContinuationToken: nil,
             viewCountText: nil,
+            liveViewerCountText: nil,
             uploadDateText: nil,
             chapters: [],
             captionTracks: Self.captionTracks(from: response.captions),

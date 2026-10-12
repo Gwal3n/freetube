@@ -23,6 +23,7 @@ struct FullScreenPlayer: View {
     }
 
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var detailsModel = PlayerDetailsModel()
@@ -67,6 +68,14 @@ struct FullScreenPlayer: View {
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
     @AppStorage("playerControlLayout") private var playerControlLayoutRaw = ""
+
+    private var liveRefreshVideoID: String? {
+        guard scenePhase == .active,
+              player.fullScreenPresented,
+              let video = player.currentVideo,
+              video.isLive else { return nil }
+        return video.id
+    }
 
     var body: some View {
         // Single dark-blur material under EVERYTHING — status bar inset, video chrome, transport,
@@ -646,6 +655,10 @@ struct FullScreenPlayer: View {
                   let videoID = player.currentVideo?.id else { return }
             captionsModel.reset(for: videoID)
             await captionsModel.loadTracks(for: videoID, preferredTracks: player.captionTracks)
+        }
+        .task(id: liveRefreshVideoID) {
+            guard let videoID = liveRefreshVideoID else { return }
+            await detailsModel.refreshLiveViewerCount(for: videoID, player: player)
         }
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task {

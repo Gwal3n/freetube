@@ -396,6 +396,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   It shows views plus an explicitly labelled upload date/relative upload value, never the video
   duration (duration already belongs in the player timeline). Prefer the exact display strings from
   the prefetched response and fall back to the `Video` summary fields while that request is pending.
+  Live streams are different: the player/list `viewCount` is not concurrent viewership. Display
+  only the watch-page count whose renderer explicitly sets `isLive`, and refresh that text every
+  60 seconds only while the live player is expanded in the foreground. If YouTube omits that
+  marker, omit the viewer count rather than relabel a total view count.
 - **Up Next and Comments are always present as independent collapsed sections.** There is no
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's
