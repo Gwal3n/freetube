@@ -1755,7 +1755,8 @@ final class PlayerStateManager {
                 try Task.checkCancellation()
                 guard currentVideo?.id == videoID else { return }
                 installSponsorBlockObservers(for: segments)
-                log.info("SponsorBlock loaded \(segments.count, privacy: .public) segments for \(videoID, privacy: .public)")
+                let fullLabels = segments.filter(\.isFullVideoLabel).count
+                log.info("SponsorBlock loaded \(segments.count, privacy: .public) segments (full labels=\(fullLabels, privacy: .public)) for \(videoID, privacy: .public)")
             } catch is CancellationError {
                 log.debug("SponsorBlock lookup cancelled for \(videoID, privacy: .public)")
             } catch {

@@ -558,7 +558,9 @@ An explicit local-playlist detail refresh uses `LocalPlaylistRefreshJob` for its
 checkpoint. `LocalPlaylistRefreshCoordinator` owns the worker at app scope, resumes unfinished
 jobs on launch, and saves each video's available metadata with the next checkpoint through
 `LocalPlaylistWriter`. Screen dismissal must not cancel the job. Playlist order and user-edited
-playlist details are not refreshed.
+playlist details are not refreshed. The pinned `VideoInfosResponse` does not expose the player's
+`videoDetails.lengthSeconds`; `VideoInfosWithRawDurationResponse` reads it from the same response
+bytes so a refresh can restore missing playlist duration badges without a second request.
 
 ---
 

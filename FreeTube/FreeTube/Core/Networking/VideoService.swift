@@ -71,11 +71,13 @@ final class VideoService: VideoServicing {
         // if the user taps a video immediately on launch; ensureVisitorData no-ops when one's already set.
         await client.ensureVisitorData()
         do {
-            let response = try await VideoInfosResponse.sendThrowingRequest(
+            let rawResponse = try await VideoInfosWithRawDurationResponse.sendThrowingRequest(
                 youtubeModel: client.model,
                 data: [.query: id]
             )
-            let info = Self.videoInfo(from: response, id: id, recommended: [])
+            let info = Self.videoInfo(
+                from: rawResponse.info, id: id, recommended: [], duration: rawResponse.duration
+            )
             log.info("fetchInfo[IOS] ok id=\(id, privacy: .public) hls=\(info.streamingURL != nil, privacy: .public) formats=\(info.formats.count, privacy: .public) captions=\(info.captionTracks.count, privacy: .public)")
             return info
         } catch {
@@ -88,11 +90,13 @@ final class VideoService: VideoServicing {
         log.info("fetchInfo[TVHTML5] start id=\(id, privacy: .public)")
         await client.ensureVisitorData()
         do {
-            let response = try await VideoInfosResponse.sendThrowingRequest(
+            let rawResponse = try await VideoInfosWithRawDurationResponse.sendThrowingRequest(
                 youtubeModel: client.tvHtmlModel,
                 data: [.query: id]
             )
-            let info = Self.videoInfo(from: response, id: id, recommended: [])
+            let info = Self.videoInfo(
+                from: rawResponse.info, id: id, recommended: [], duration: rawResponse.duration
+            )
             log.info("fetchInfo[TVHTML5] ok id=\(id, privacy: .public) hls=\(info.streamingURL != nil, privacy: .public) formats=\(info.formats.count, privacy: .public)")
             return info
         } catch {
@@ -252,7 +256,12 @@ final class VideoService: VideoServicing {
 
     // MARK: - Mapping helpers
 
-    private static func videoInfo(from response: VideoInfosResponse, id: String, recommended: [Video]) -> VideoInfo {
+    private static func videoInfo(
+        from response: VideoInfosResponse,
+        id: String,
+        recommended: [Video],
+        duration: TimeInterval? = nil
+    ) -> VideoInfo {
         let video = Video(
             id: response.videoId ?? id,
             title: response.title ?? "",
@@ -260,7 +269,7 @@ final class VideoService: VideoServicing {
             channelName: response.channel?.name ?? "",
             channelThumbnailURL: Mappers.bestThumbnailURL(response.channel?.thumbnails ?? []),
             thumbnailURL: Mappers.bestThumbnailURL(response.thumbnails),
-            duration: nil,
+            duration: duration,
             viewCount: response.viewCount.flatMap { Int($0) },
             publishedAt: nil,
             descriptionSnippet: response.videoDescription,

@@ -198,6 +198,8 @@ final class LocalPlaylistService: Sendable {
             watchInfo = nil
         }
         guard !Task.isCancelled, playerInfo != nil || watchInfo != nil else { return nil }
+        let resolvedDuration = playerInfo?.video.duration ?? saved.duration
+        log.info("Playlist refreshed video=\(saved.id, privacy: .public) duration=\(resolvedDuration ?? 0, privacy: .public)s")
         let title = [watchInfo?.video.title, playerInfo?.video.title]
             .compactMap { $0 }.first(where: { !$0.isEmpty }) ?? saved.title
         let channelName = [watchInfo?.video.channelName, playerInfo?.video.channelName]
@@ -213,7 +215,7 @@ final class LocalPlaylistService: Sendable {
                 ?? playerInfo?.video.channelThumbnailURL ?? saved.channelThumbnailURL,
             thumbnailURL: playerInfo?.video.thumbnailURL
                 ?? watchInfo?.video.thumbnailURL ?? saved.thumbnailURL,
-            duration: playerInfo?.video.duration ?? saved.duration,
+            duration: resolvedDuration,
             viewCount: playerInfo?.video.viewCount ?? saved.viewCount,
             publishedAt: playerInfo?.video.publishedAt ?? saved.publishedAt,
             publishedRelative: watchInfo?.uploadDateText

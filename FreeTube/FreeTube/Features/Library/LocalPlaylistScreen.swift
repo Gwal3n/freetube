@@ -285,18 +285,13 @@ struct LocalPlaylistScreen: View {
     @ViewBuilder
     private func metadataRefreshStatus(for playlist: LocalPlaylistSnapshot) -> some View {
         if playlist.isRefreshingMetadata {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Refreshing video details")
-                    .appFont(.caption, weight: .medium)
-                ProgressView(
-                    value: Double(playlist.metadataRefreshProcessed),
-                    total: Double(playlist.metadataRefreshTotal)
-                )
-                .tint(.white)
-                Text("\(playlist.metadataRefreshProcessed) of \(playlist.metadataRefreshTotal) · Continues while the app is open")
-                    .appFont(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+            ProgressView(
+                value: Double(playlist.metadataRefreshProcessed),
+                total: Double(playlist.metadataRefreshTotal)
+            )
+            .tint(.white)
+            .accessibilityLabel("Refreshing video details")
+            .accessibilityValue("\(playlist.metadataRefreshProcessed) of \(playlist.metadataRefreshTotal)")
             .padding(.horizontal)
         } else if playlist.metadataRefreshFailures > 0 {
             Text("\(playlist.metadataRefreshFailures) videos could not be refreshed. Saved details were kept.")
