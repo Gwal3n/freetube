@@ -337,6 +337,15 @@ struct LocalPlaylistScreen: View {
             } label: {
                 Label("Export Playlist", systemImage: "square.and.arrow.up")
             }
+            if let share = TemporaryYouTubePlaylistShare.make(videoIDs: local.videos.map(\.id)) {
+                ShareLink(item: share.url) {
+                    if share.availableCount > share.includedCount {
+                        Label("Share first 50 videos on YouTube", systemImage: "link")
+                    } else {
+                        Label("Share as YouTube playlist", systemImage: "link")
+                    }
+                }
+            }
             if local.playlist.isSavedFromYouTube {
                 Button {
                     showingRestoreConfirmation = true
