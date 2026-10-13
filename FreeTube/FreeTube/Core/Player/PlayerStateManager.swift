@@ -257,7 +257,7 @@ final class PlayerStateManager {
         self.videoService = videoService
         self.playlistService = playlistService
         self.preferences = preferences
-        self.manualQueue = Self.restoreManualQueue()
+        self.manualQueue = PlayerManualQueueStore.restore()
         self.playbackRate = PlaybackSpeedPresets.bounded(preferences.defaultPlaybackRate)
         self.effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(preferences.defaultPlaybackRate, canPlayFastForward: false)
         FastPlaybackLocalFileService.removeOrphansAtLaunch()
@@ -491,7 +491,7 @@ final class PlayerStateManager {
             if preferredQuality != .audioOnly { videoQualityBeforeAudio = preferredQuality }
         }
         if manualQueue.contains(where: { $0.id == video.id }) {
-            manualQueue.removeAll { $0.id == video.id }
+            manualQueue = PlayerManualQueueStore.removing(video.id, from: manualQueue)
             persistManualQueue()
         }
         persistCurrentPlaybackProgress(force: true)
@@ -811,8 +811,7 @@ final class PlayerStateManager {
     func enqueueNext(_ video: Video) {
         guard let currentVideo, video.id != currentVideo.id,
               !VideoBlocklist.shared.blocks(video) else { return }
-        manualQueue.removeAll { $0.id == video.id }
-        manualQueue.insert(video, at: 0)
+        manualQueue = PlayerManualQueueStore.insertingNext(video, into: manualQueue)
         persistManualQueue()
         showQueueNotice(message: "Playing next")
         log.info("Queued \(video.id, privacy: .public) to play next")
@@ -822,7 +821,7 @@ final class PlayerStateManager {
         guard video.id != currentVideo?.id,
               !VideoBlocklist.shared.blocks(video),
               !manualQueue.contains(where: { $0.id == video.id }) else { return }
-        manualQueue.append(video)
+        manualQueue = PlayerManualQueueStore.appending(video, to: manualQueue)
         persistManualQueue()
         showQueueNotice(message: "Added to queue")
         log.info("Added \(video.id, privacy: .public) to manual queue")
@@ -832,7 +831,7 @@ final class PlayerStateManager {
     /// recommendation session. Both the Next button and a tapped queue row use this path.
     func playManualQueueItem(_ video: Video, expandPlayer: Bool = true) {
         guard manualQueue.contains(where: { $0.id == video.id }) else { return }
-        manualQueue.removeAll { $0.id == video.id }
+        manualQueue = PlayerManualQueueStore.removing(video.id, from: manualQueue)
         persistManualQueue()
         let interruptsPlaylist = activePlaylist != nil
         if interruptsPlaylist {
@@ -847,7 +846,7 @@ final class PlayerStateManager {
     }
 
     func removeFromManualQueue(videoID: String) {
-        manualQueue.removeAll { $0.id == videoID }
+        manualQueue = PlayerManualQueueStore.removing(videoID, from: manualQueue)
         persistManualQueue()
     }
 
@@ -857,7 +856,7 @@ final class PlayerStateManager {
         persistManualQueue()
         showQueueNotice(message: "Removed") { [weak self] in
             guard let self, !self.manualQueue.contains(where: { $0.id == removedVideo.id }) else { return }
-            self.manualQueue.insert(removedVideo, at: min(index, self.manualQueue.endIndex))
+            self.manualQueue = PlayerManualQueueStore.restoring(removedVideo, at: index, to: self.manualQueue)
             self.persistManualQueue()
         }
     }
@@ -875,33 +874,19 @@ final class PlayerStateManager {
         persistManualQueue()
         showQueueNotice(message: "Queue cleared") { [weak self] in
             guard let self else { return }
-            let existingIDs = Set(self.manualQueue.map(\.id))
-            self.manualQueue.insert(
-                contentsOf: removedVideos.filter { !existingIDs.contains($0.id) },
-                at: 0
-            )
+            self.manualQueue = PlayerManualQueueStore.restoring(removedVideos, to: self.manualQueue)
             self.persistManualQueue()
         }
     }
 
     func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
-        guard !offsets.isEmpty else { return }
-        var visible = manualQueue.filter { !VideoBlocklist.shared.blocks($0) }
-        guard offsets.allSatisfy({ visible.indices.contains($0) }) else { return }
-        let videos = offsets.sorted().map { visible[$0] }
-        for index in offsets.sorted(by: >) {
-            visible.remove(at: index)
-        }
-        let removedBeforeDestination = offsets.filter { $0 < destination }.count
-        let insertionIndex = min(
-            max(0, destination - removedBeforeDestination),
-            visible.endIndex
-        )
-        visible.insert(contentsOf: videos, at: insertionIndex)
-        var reordered = visible.makeIterator()
-        manualQueue = manualQueue.map { item in
-            VideoBlocklist.shared.blocks(item) ? item : (reordered.next() ?? item)
-        }
+        guard let reordered = PlayerManualQueueStore.reordered(
+            manualQueue,
+            fromOffsets: offsets,
+            toOffset: destination,
+            isBlocked: { VideoBlocklist.shared.blocks($0) }
+        ) else { return }
+        manualQueue = reordered
         persistManualQueue()
     }
 
@@ -2961,19 +2946,8 @@ final class PlayerStateManager {
         updateNowPlaying()
     }
 
-    private static let manualQueueDefaultsKey = "manualQueue"
-
-    private static func restoreManualQueue() -> [Video] {
-        guard let encoded = UserDefaults.standard.string(forKey: manualQueueDefaultsKey),
-              let data = encoded.data(using: .utf8),
-              let videos = try? JSONDecoder().decode([Video].self, from: data) else { return [] }
-        return videos
-    }
-
     private func persistManualQueue() {
-        guard let data = try? JSONEncoder().encode(manualQueue),
-              let encoded = String(data: data, encoding: .utf8) else { return }
-        UserDefaults.standard.set(encoded, forKey: Self.manualQueueDefaultsKey)
+        PlayerManualQueueStore.persist(manualQueue)
     }
 
     /// Resolves an artwork image for the given video and stores it in `currentArtwork`. Tries three
