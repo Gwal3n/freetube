@@ -242,8 +242,8 @@ enum PlaybackSource {
 }
 ```
 
-`PlayerStateManager` builds a direct `AVPlayerItem` for single URLs and composes the separate
-tracks for `.composite`. A returned source is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
+`PlaybackItemFactory` builds a direct `AVPlayerItem` for single URLs and composes the separate
+tracks for `.composite`; `PlayerStateManager` alone installs and validates it. A returned source is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
 and a rejected strategy is excluded before requesting the next candidate.
 
 ---

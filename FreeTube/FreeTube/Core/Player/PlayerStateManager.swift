@@ -150,6 +150,7 @@ final class PlayerStateManager {
 
     let queue: QueueManager
     private let resolver: any PlaybackResolving
+    private let itemFactory = PlaybackItemFactory()
     private let sponsorBlockService: any SponsorBlockServicing
     private let videoService: any VideoServicing
     private let playlistService: any PlaylistServicing
@@ -165,25 +166,17 @@ final class PlayerStateManager {
     ///      these refills never retain previously played videos.
     private var queueAcceptsRecommendations = true
 
-    /// Browser-style playback navigation, deliberately separate from the visible recommendation
-    /// queue. Going back does not delete the forward entries, so Next returns to the video the
-    /// user came from before resuming normal recommendations.
-    private struct PlaybackHistoryItem {
-        let video: Video
-        let skipRecommendations: Bool
-        let preservesPlaylistPosition: Bool
-    }
-    private var playbackHistory: [PlaybackHistoryItem] = []
-    private var playbackHistoryIndex = -1
+    /// Separate from recommendations so Previous/Next can revisit explicit selections.
+    private var playbackHistory = PlayerPlaybackHistory()
     /// Actual time spent playing the selected video in this session. This is intentionally not
     /// derived from the playhead: resume and manual seeks must not instantly qualify history.
     private var historyPlaybackSeconds: TimeInterval = 0
     private var lastHistoryPlaybackTick: Date?
     private var historyRecordedVideoID: String?
 
-    var canPlayPrevious: Bool { playbackHistoryIndex > 0 }
+    var canPlayPrevious: Bool { playbackHistory.canMoveBackward }
     var canPlayNext: Bool {
-        playbackHistoryIndex + 1 < playbackHistory.count
+        playbackHistory.hasForwardEntry
             || !manualQueue.isEmpty
             || queue.availableUpcomingCount(limit: 1) > 0
     }
@@ -527,11 +520,11 @@ final class PlayerStateManager {
         videoPresentationSize = .zero
         let isPlaylistInterlude = preservePlaylistPosition && skipRecommendations && activePlaylist != nil
         if recordInPlaybackHistory {
-            recordPlaybackNavigation(
+            playbackHistory.record(.init(
                 video: video,
                 skipRecommendations: skipRecommendations,
                 preservesPlaylistPosition: isPlaylistInterlude
-            )
+            ))
         }
         queueAcceptsRecommendations = !skipRecommendations
         if skipRecommendations, activePlaylist != nil {
@@ -607,15 +600,7 @@ final class PlayerStateManager {
         guard currentVideo?.id == video.id else { return }
         currentVideo = video
         queue.updateVideo(video)
-        if playbackHistory.indices.contains(playbackHistoryIndex),
-           playbackHistory[playbackHistoryIndex].video.id == video.id {
-            let previous = playbackHistory[playbackHistoryIndex]
-            playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
-                video: video,
-                skipRecommendations: previous.skipRecommendations,
-                preservesPlaylistPosition: previous.preservesPlaylistPosition
-            )
-        }
+        playbackHistory.updateCurrentVideo(video)
         refreshArtwork(for: video)
         if preferences.recordsWatchHistory, historyRecordedVideoID == video.id {
             Task {
@@ -1149,7 +1134,7 @@ final class PlayerStateManager {
             let itemToProbe: AVPlayerItem
             switch candidate.source {
             case .direct, .localFile:
-                itemToProbe = try await makePlayerItem(for: candidate)
+                itemToProbe = try await itemFactory.makeItem(for: candidate)
             case .composite(let videoURL, let audioURL):
                 // Remote AVCompositions stalled on device. Materialize their tracks in a
                 // cancellable temporary file while the existing HLS item keeps playing.
@@ -1359,7 +1344,7 @@ final class PlayerStateManager {
         let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
         let replacement: AVPlayerItem
         do {
-            replacement = try await makePlayerItem(for: candidate)
+            replacement = try await itemFactory.makeItem(for: candidate)
         } catch {
             log.notice("Audio mode switch candidate could not be prepared: \(Self.describe(itemError: error), privacy: .public)")
             return
@@ -1542,12 +1527,7 @@ final class PlayerStateManager {
 
     func playNext() {
         log.info("playNext() — queue size=\(self.queue.items.count, privacy: .public) currentIndex=\(self.queue.currentIndex, privacy: .public)")
-        if playbackHistoryIndex + 1 < playbackHistory.count,
-           let nextIndex = ((playbackHistoryIndex + 1)..<playbackHistory.count).first(where: {
-               !VideoBlocklist.shared.blocks(playbackHistory[$0].video)
-           }) {
-            playbackHistoryIndex = nextIndex
-            let item = playbackHistory[nextIndex]
+        if let item = playbackHistory.moveForward(where: { !VideoBlocklist.shared.blocks($0) }) {
             load(
                 item.video,
                 skipRecommendations: item.skipRecommendations,
@@ -1601,16 +1581,13 @@ final class PlayerStateManager {
     }
 
     func playPrevious() {
-        log.info("playPrevious() — history size=\(self.playbackHistory.count, privacy: .public) index=\(self.playbackHistoryIndex, privacy: .public)")
-        guard playbackHistoryIndex > 0 else {
+        log.info("playPrevious() — history size=\(self.playbackHistory.count, privacy: .public) index=\(self.playbackHistory.currentIndex, privacy: .public)")
+        guard playbackHistory.canMoveBackward else {
             log.notice("playPrevious: at start of playback history")
             return
         }
-        guard let previousIndex = stride(from: playbackHistoryIndex - 1, through: 0, by: -1).first(where: {
-            !VideoBlocklist.shared.blocks(playbackHistory[$0].video)
-        }) else { return }
-        playbackHistoryIndex = previousIndex
-        let item = playbackHistory[previousIndex]
+        guard let item = playbackHistory.moveBackward(where: { !VideoBlocklist.shared.blocks($0) })
+        else { return }
         load(
             item.video,
             skipRecommendations: item.skipRecommendations,
@@ -1667,13 +1644,11 @@ final class PlayerStateManager {
         activePlaylist = details.playlist
         activePlaylistOrigin = origin
         playlistContinuationToken = details.continuationToken
-        if playbackHistory.indices.contains(playbackHistoryIndex) {
-            playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
-                video: currentVideo ?? visibleVideos[index],
-                skipRecommendations: true,
-                preservesPlaylistPosition: false
-            )
-        }
+        playbackHistory.replaceCurrent(.init(
+            video: currentVideo ?? visibleVideos[index],
+            skipRecommendations: true,
+            preservesPlaylistPosition: false
+        ))
         if preferences.recordsWatchHistory {
             Task {
                 await PersistenceWriter.shared.updateWatchHistoryPlaylistContext(
@@ -1710,13 +1685,11 @@ final class PlayerStateManager {
         queue.replace(with: [currentVideo] + suggestions)
         queue.isShuffleOn = false
 
-        if playbackHistory.indices.contains(playbackHistoryIndex) {
-            playbackHistory[playbackHistoryIndex] = PlaybackHistoryItem(
-                video: currentVideo,
-                skipRecommendations: false,
-                preservesPlaylistPosition: false
-            )
-        }
+        playbackHistory.replaceCurrent(.init(
+            video: currentVideo,
+            skipRecommendations: false,
+            preservesPlaylistPosition: false
+        ))
         if preferences.recordsWatchHistory {
             Task {
                 await PersistenceWriter.shared.updateWatchHistoryPlaylistContext(
@@ -1818,8 +1791,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
         liveSeekableRange = nil
-        playbackHistory.removeAll()
-        playbackHistoryIndex = -1
+        playbackHistory.reset()
         NowPlayingCenter.clear()
     }
 
@@ -1842,29 +1814,6 @@ final class PlayerStateManager {
     func dismissSponsorBlockNotice() {
         sponsorBlockNoticeTask?.cancel()
         sponsorBlockNotice = nil
-    }
-
-    private func recordPlaybackNavigation(
-        video: Video,
-        skipRecommendations: Bool,
-        preservesPlaylistPosition: Bool
-    ) {
-        if playbackHistory.indices.contains(playbackHistoryIndex),
-           playbackHistory[playbackHistoryIndex].video.id == video.id {
-            return
-        }
-        if playbackHistoryIndex + 1 < playbackHistory.count {
-            playbackHistory.removeSubrange((playbackHistoryIndex + 1)..<playbackHistory.count)
-        }
-        playbackHistory.append(PlaybackHistoryItem(
-            video: video,
-            skipRecommendations: skipRecommendations,
-            preservesPlaylistPosition: preservesPlaylistPosition
-        ))
-        if playbackHistory.count > 50 {
-            playbackHistory.removeFirst(playbackHistory.count - 50)
-        }
-        playbackHistoryIndex = playbackHistory.count - 1
     }
 
     // MARK: - Internals
@@ -2033,99 +1982,6 @@ final class PlayerStateManager {
             player.removeTimeObserver(observer)
         }
         sponsorBlockBoundaryObservers.removeAll()
-    }
-
-    /// Extensionless remote audio URLs need the resolved container type. A selected HLS audio
-    /// rendition is a playlist, not an MP4; carry its MIME type with the candidate so switching
-    /// modes never makes AVPlayer parse the new source as the old format.
-    private func makePlayerItem(for candidate: PlaybackCandidate) async throws -> AVPlayerItem {
-        if case .composite(let videoURL, let audioURL) = candidate.source {
-            // AVMutableComposition references both remote tracks. It does not download, mux,
-            // or persist a file. Extensionless signed URLs need their actual media types.
-            let videoAsset = AVURLAsset(url: videoURL, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])
-            let audioAsset = AVURLAsset(url: audioURL, options: [AVURLAssetOverrideMIMETypeKey: "audio/mp4"])
-            var stage = "video-track"
-            do {
-                guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first else {
-                    throw YouTubeServiceError.streamExtractionFailed
-                }
-                stage = "audio-track"
-                guard let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first else {
-                    throw YouTubeServiceError.streamExtractionFailed
-                }
-                stage = "video-duration"
-                let videoDuration = try await videoAsset.load(.duration)
-                stage = "audio-duration"
-                let audioDuration = try await audioAsset.load(.duration)
-                stage = "duration-validation"
-                guard videoDuration.isValid, audioDuration.isValid,
-                      videoDuration.seconds.isFinite, audioDuration.seconds.isFinite,
-                      videoDuration.seconds > 0, audioDuration.seconds > 0 else {
-                    throw YouTubeServiceError.streamExtractionFailed
-                }
-                let audioEnd = CMTimeCompare(videoDuration, audioDuration) <= 0 ? videoDuration : audioDuration
-                let composition = AVMutableComposition()
-                stage = "composition-tracks"
-                guard let compositionVideo = composition.addMutableTrack(
-                    withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
-                ), let compositionAudio = composition.addMutableTrack(
-                    withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
-                ) else {
-                    throw YouTubeServiceError.streamExtractionFailed
-                }
-                stage = "video-insertion"
-                try compositionVideo.insertTimeRange(
-                    CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero
-                )
-                stage = "audio-insertion"
-                try compositionAudio.insertTimeRange(
-                    CMTimeRange(start: .zero, duration: audioEnd), of: audioTrack, at: .zero
-                )
-                stage = "preferred-transform"
-                compositionVideo.preferredTransform = try await videoTrack.load(.preferredTransform)
-                stage = "composition-copy"
-                guard let playbackComposition = composition.copy() as? AVComposition else {
-                    throw YouTubeServiceError.streamExtractionFailed
-                }
-                log.info("Prepared paired video/audio composition duration=\(videoDuration.seconds, privacy: .public)s")
-                return AVPlayerItem(asset: playbackComposition)
-            } catch {
-                let nsError = error as NSError
-                log.notice("Paired source preparation failed stage=\(stage, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
-                if stage == "video-track" {
-                    // Probe just the response and first byte after AVFoundation rejects the URL.
-                    // The signed URL never appears in the log and this does not delay playback.
-                    Task { [weak self, videoURL] in
-                        await self?.diagnoseRemoteVideoTrack(videoURL)
-                    }
-                }
-                throw error
-            }
-        }
-        guard case .direct(let url) = candidate.source,
-              let mimeType = candidate.mimeTypeOverride else {
-            return AVPlayerItem(url: candidate.source.url)
-        }
-        let asset = AVURLAsset(url: url, options: [AVURLAssetOverrideMIMETypeKey: mimeType])
-        log.info("Remote candidate MIME override=\(mimeType, privacy: .public)")
-        return AVPlayerItem(asset: asset)
-    }
-
-    private func diagnoseRemoteVideoTrack(_ url: URL) async {
-        var request = URLRequest(url: url)
-        request.setValue("bytes=0-1023", forHTTPHeaderField: "Range")
-        request.httpShouldHandleCookies = false
-        request.timeoutInterval = 5
-        do {
-            let (bytes, response) = try await URLSession.shared.bytes(for: request)
-            var iterator = bytes.makeAsyncIterator()
-            let firstByte = try await iterator.next()
-            let http = response as? HTTPURLResponse
-            log.notice("Paired video HTTP probe status=\(http?.statusCode ?? 0, privacy: .public) mime=\(response.mimeType ?? "unknown", privacy: .public) range=\(http?.value(forHTTPHeaderField: "Content-Range") != nil, privacy: .public) length=\(response.expectedContentLength, privacy: .public) body=\(firstByte != nil, privacy: .public)")
-        } catch {
-            let nsError = error as NSError
-            log.notice("Paired video HTTP probe failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
-        }
     }
 
     /// Swap the player to a new item using the `AVQueuePlayer`-correct pattern. `replaceCurrentItem`
@@ -2521,7 +2377,7 @@ final class PlayerStateManager {
             log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
             let item: AVPlayerItem
             do {
-                item = try await makePlayerItem(for: candidate)
+                item = try await itemFactory.makeItem(for: candidate)
             } catch is CancellationError {
                 return
             } catch {
