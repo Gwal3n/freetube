@@ -339,8 +339,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   feedback is a 124×26 capsule at the top and shows only the signed offset.
 - **SponsorBlock is opt-in and playback-independent.** `SponsorBlockService` performs a read-only
   k-anonymous hash-prefix lookup for only the selected video; it never submits skip/view telemetry
-  and caches segment data in memory only. `PlayerStateManager` installs AVPlayer boundary-time
-  observers without blocking stream resolution. Duration categories independently support Disabled,
+  and caches segment data in memory only. `PlayerSponsorBlockCoordinator` owns AVPlayer boundary-time
+  observers and skip deduplication; `PlayerStateManager` owns fetching, notices, and seeking without
+  blocking stream resolution. Duration categories independently support Disabled,
   Show only (timeline marker), or Automatically skip. `poi_highlight` is a point marker and instead
   supports Disabled, Show only, or Ask; Ask presents a configurable-duration prompt to jump to that timestamp
   as soon as the lookup returns. SponsorBlock's `full` action is a whole-video label, not a skip

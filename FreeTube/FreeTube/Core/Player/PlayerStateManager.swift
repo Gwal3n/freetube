@@ -152,6 +152,7 @@ final class PlayerStateManager {
     private let resolver: any PlaybackResolving
     private let itemFactory = PlaybackItemFactory()
     private let sponsorBlockService: any SponsorBlockServicing
+    private let sponsorBlockCoordinator = PlayerSponsorBlockCoordinator()
     private let videoService: any VideoServicing
     private let playlistService: any PlaylistServicing
     private let preferences: UserPreferences
@@ -232,8 +233,6 @@ final class PlayerStateManager {
     private var temporaryPlaybackRate: Double?
     private var wasPlayingBeforeTemporaryRate: Bool?
     private var sponsorBlockTask: Task<Void, Never>?
-    private var sponsorBlockBoundaryObservers: [Any] = []
-    private var handledSponsorBlockSegmentIDs = Set<String>()
     private var sponsorBlockNoticeTask: Task<Void, Never>?
     private var pendingSeekTarget: TimeInterval?
     private var seekRequestID = 0
@@ -1425,9 +1424,7 @@ final class PlayerStateManager {
         // Any segment whose end is still ahead of the new position becomes eligible again. This
         // makes rewinding before a previously skipped segment behave like a fresh encounter.
         if rearmSponsorBlock {
-            for segment in sponsorBlockSegments where boundedSeconds < segment.endTime {
-                handledSponsorBlockSegmentIDs.remove(segment.id)
-            }
+            sponsorBlockCoordinator.rearm(afterSeekingTo: boundedSeconds, segments: sponsorBlockSegments)
         }
         // Update optimistically so rapid continuation taps accumulate from the last requested
         // target instead of the periodic observer's up-to-0.5-second-old playback position.
@@ -1814,9 +1811,7 @@ final class PlayerStateManager {
     }
 
     private func installSponsorBlockObservers(for segments: [SponsorBlockSegment]) {
-        removeSponsorBlockBoundaryObservers()
         sponsorBlockSegments = segments
-        handledSponsorBlockSegmentIDs.removeAll()
         var chapterStarts = Set<TimeInterval>()
         communityChapters = segments.compactMap { segment in
             guard segment.category == .chapter,
@@ -1829,13 +1824,12 @@ final class PlayerStateManager {
         }
         updateDisplayedChapters()
 
-        for segment in segments where shouldObserveSponsorBlockSegment(segment) {
-            let boundary = NSValue(time: CMTime(seconds: segment.startTime, preferredTimescale: 600))
-            let observer = player.addBoundaryTimeObserver(forTimes: [boundary], queue: .main) { [weak self] in
-                Task { @MainActor in self?.handleSponsorBlockSegment(segment) }
-            }
-            sponsorBlockBoundaryObservers.append(observer)
-        }
+        sponsorBlockCoordinator.installBoundaryObservers(
+            on: player,
+            for: segments,
+            shouldObserve: { [weak self] in self?.shouldObserveSponsorBlockSegment($0) ?? false },
+            onEntry: { [weak self] in self?.handleSponsorBlockSegment($0) }
+        )
 
         // A highlight is a point to jump *to*, not a duration to skip once playback reaches it.
         // Offer it as soon as the lookup finishes while leaving Show only as a marker-only mode.
@@ -1844,7 +1838,7 @@ final class PlayerStateManager {
                 && preferences.sponsorBlockBehavior(for: $0.category) == .ask
                 && elapsed < $0.startTime - 0.5
         }) {
-            handledSponsorBlockSegmentIDs.insert(highlight.id)
+            sponsorBlockCoordinator.markHandled(highlight.id)
             sponsorBlockNotice = SponsorBlockNotice(
                 category: .highlight,
                 originalStartTime: elapsed,
@@ -1864,13 +1858,11 @@ final class PlayerStateManager {
     }
 
     private func shouldObserveSponsorBlockSegment(_ segment: SponsorBlockSegment) -> Bool {
-        let behavior = preferences.sponsorBlockBehavior(for: segment.category)
-        return behavior == .autoSkip
-            && !segment.isFullVideoLabel
-            && segment.category != .exclusiveAccess
-            && segment.category != .highlight
-            && segment.category != .chapter
-            && segment.endTime - segment.startTime >= max(0, preferences.sponsorBlockMinimumSkipSeconds)
+        sponsorBlockCoordinator.shouldObserve(
+            segment,
+            behavior: preferences.sponsorBlockBehavior(for: segment.category),
+            minimumSkipSeconds: preferences.sponsorBlockMinimumSkipSeconds
+        )
     }
 
     private func handleSponsorBlockSegment(at time: TimeInterval) {
@@ -1886,24 +1878,19 @@ final class PlayerStateManager {
         _ segment: SponsorBlockSegment,
         enteredAt explicitEntryTime: TimeInterval? = nil
     ) {
-        guard preferences.sponsorBlockEnabled,
-              shouldObserveSponsorBlockSegment(segment),
-              !handledSponsorBlockSegmentIDs.contains(segment.id),
-              currentVideo != nil else { return }
         let currentTime = explicitEntryTime ?? player.currentTime().seconds
-        guard currentTime.isFinite,
-              currentTime >= segment.startTime - 0.5,
-              currentTime < segment.endTime - 0.1 else { return }
-
-        handledSponsorBlockSegmentIDs.insert(segment.id)
-        sponsorBlockNoticeTask?.cancel()
-
         // Preserve where the viewer actually entered the segment. A boundary observer can fire a
         // fraction late during ordinary playback, so positions near the beginning normalize to
         // the true segment start. A manual scrub into the middle retains its settled seek target.
-        let undoPosition = currentTime <= segment.startTime + 0.75
-            ? segment.startTime
-            : min(currentTime, segment.endTime)
+        guard let undoPosition = sponsorBlockCoordinator.claimSkip(
+            for: segment,
+            enteredAt: currentTime,
+            isEnabled: preferences.sponsorBlockEnabled,
+            hasVideo: currentVideo != nil,
+            behavior: preferences.sponsorBlockBehavior(for: segment.category),
+            minimumSkipSeconds: preferences.sponsorBlockMinimumSkipSeconds
+        ) else { return }
+        sponsorBlockNoticeTask?.cancel()
 
         log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
         seek(to: segment.endTime)
@@ -1930,8 +1917,7 @@ final class PlayerStateManager {
         sponsorBlockNoticeTask = nil
         sponsorBlockNotice = nil
         sponsorBlockSegments = []
-        handledSponsorBlockSegmentIDs.removeAll()
-        removeSponsorBlockBoundaryObservers()
+        sponsorBlockCoordinator.clear(on: player)
     }
 
     private func clearChapterState() {
@@ -1944,13 +1930,6 @@ final class PlayerStateManager {
         // Community chapters are a separate optional source. If none were submitted, retain
         // YouTube chapters; neither source is mixed with the other or used for automatic seeks.
         chapters = communityChapters.isEmpty ? youtubeChapters : communityChapters
-    }
-
-    private func removeSponsorBlockBoundaryObservers() {
-        for observer in sponsorBlockBoundaryObservers {
-            player.removeTimeObserver(observer)
-        }
-        sponsorBlockBoundaryObservers.removeAll()
     }
 
     /// Swap the player to a new item using the `AVQueuePlayer`-correct pattern. `replaceCurrentItem`
