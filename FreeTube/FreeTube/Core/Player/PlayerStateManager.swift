@@ -195,6 +195,23 @@ final class PlayerStateManager {
     private var itemStatusObservation: NSKeyValueObservation?
     private var itemPresentationSizeObservation: NSKeyValueObservation?
     private var itemLoadedTimeRangesObservation: NSKeyValueObservation?
+    private var itemFailedToEndObservation: NSObjectProtocol?
+    private weak var acceptedStreamItem: AVPlayerItem?
+    private var acceptedStreamStrategy: PlaybackStrategy?
+    /// One post-start resolver pass per video. A second terminal failure is shown to the user
+    /// instead of repeatedly rebuilding the player on an unusable network/source.
+    private var didAttemptPlaybackRecovery = false
+    /// Explicit transport intent survives AVPlayer autonomously pausing a failed item. `isPlaying`
+    /// is an observation/prediction for chrome and may already be false when failure KVO arrives.
+    private var wantsPlayback = false
+
+    private struct PlaybackRecovery {
+        let sessionID: Int
+        let failedStrategy: PlaybackStrategy
+        /// VOD position or distance behind the live edge. A nil live offset means live edge.
+        let position: TimeInterval
+        let isLive: Bool
+    }
     private var itemLoadStartedAt: Date?
     /// KVO-driven readiness handshake for the candidate currently under test.
     ///
@@ -307,10 +324,16 @@ final class PlayerStateManager {
         itemPresentationSizeObservation?.invalidate()
         itemLoadedTimeRangesObservation?.invalidate()
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        if let itemFailedToEndObservation { NotificationCenter.default.removeObserver(itemFailedToEndObservation) }
         if let itemErrorLogObservation { NotificationCenter.default.removeObserver(itemErrorLogObservation) }
         if let itemAccessLogObservation { NotificationCenter.default.removeObserver(itemAccessLogObservation) }
         timeObserver = nil
         endObserver = nil
+        itemFailedToEndObservation = nil
+        acceptedStreamItem = nil
+        acceptedStreamStrategy = nil
+        didAttemptPlaybackRecovery = false
+        wantsPlayback = false
         itemErrorLogObservation = nil
         itemAccessLogObservation = nil
         itemStatusObservation = nil
@@ -355,6 +378,9 @@ final class PlayerStateManager {
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
         log.info("loadLocalFile path=\(fileURL.path, privacy: .public) title=\"\(title, privacy: .public)\"")
         playbackSessionID &+= 1
+        acceptedStreamItem = nil
+        acceptedStreamStrategy = nil
+        didAttemptPlaybackRecovery = false
         resetFastPlaybackState()
         if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
         // Link downloads are independent of the YouTube quality preference. An audio file keeps
@@ -462,6 +488,9 @@ final class PlayerStateManager {
             }
         }
         playbackSessionID &+= 1
+        acceptedStreamItem = nil
+        acceptedStreamStrategy = nil
+        didAttemptPlaybackRecovery = false
         resetFastPlaybackState()
         log.info("Playback speed for new video: default=\(self.playbackRate, privacy: .public)x")
         if sleepTimerOption == .endOfVideo { setSleepTimer(.off) }
@@ -519,6 +548,7 @@ final class PlayerStateManager {
             log.info("load: pausing current playback before resolving new video")
             pause()
         }
+        wantsPlayback = autoplay
         if !player.items().isEmpty {
             log.debug("load: clearing AVQueuePlayer items (\(self.player.items().count, privacy: .public) entries)")
             player.removeAllItems()
@@ -719,6 +749,7 @@ final class PlayerStateManager {
             return
         }
         log.info("play()")
+        wantsPlayback = true
         AudioSessionConfigurator.configure(
             allowMixing: preferences.allowAudioMixing,
             activate: true
@@ -741,6 +772,7 @@ final class PlayerStateManager {
 
     func pause() {
         log.info("pause()")
+        wantsPlayback = false
         player.pause()
         isPlaying = false
         if isSwitchingAudioMode, resumeAfterAudioSwitch != nil {
@@ -763,6 +795,7 @@ final class PlayerStateManager {
     func replay() {
         guard player.currentItem != nil else { return }
         log.info("replay()")
+        wantsPlayback = true
         hasEnded = false
         seek(to: 0, resumeAfterEnded: false)
         player.play()
@@ -1326,7 +1359,15 @@ final class PlayerStateManager {
             await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: replacement)
             guard !Task.isCancelled, currentVideo?.id == video.id,
                   player.currentItem === replacement else { return }
+            guard replacement.status == .readyToPlay else {
+                await restoreSourceAfterFailedSwitch(
+                    previousItem, videoID: video.id, position: position, size: previousSize
+                )
+                return
+            }
             pendingSeekTarget = nil
+            acceptedStreamItem = replacement
+            acceptedStreamStrategy = candidate.strategy
             loadState = .readyToPlay
             if resumeAfterAudioSwitch == true { play() }
             updateNowPlaying()
@@ -1687,6 +1728,10 @@ final class PlayerStateManager {
 
     func dismiss() {
         log.info("dismiss()")
+        acceptedStreamItem = nil
+        acceptedStreamStrategy = nil
+        didAttemptPlaybackRecovery = false
+        wantsPlayback = false
         resetFastPlaybackState()
         setSleepTimer(.off)
         persistCurrentPlaybackProgress(force: true)
@@ -2159,6 +2204,8 @@ final class PlayerStateManager {
         lastLiveDVRLogAt = .distantPast
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
+        if let token = itemFailedToEndObservation { NotificationCenter.default.removeObserver(token) }
+        itemFailedToEndObservation = nil
 
         itemStatusObservation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
             guard let self else { return }
@@ -2181,8 +2228,9 @@ final class PlayerStateManager {
                     }
                 case .failed:
                     let err = item.error as NSError?
-                    self.log.error("AVPlayerItem status: FAILED domain=\(err?.domain ?? "?", privacy: .public) code=\(err?.code ?? 0, privacy: .public) info=\(String(describing: err?.userInfo), privacy: .public)")
+                    self.log.error("AVPlayerItem status: FAILED domain=\(err?.domain ?? "?", privacy: .public) code=\(err?.code ?? 0, privacy: .public)")
                     self.finishReadiness(.failed(Self.describe(itemError: item.error)), for: item)
+                    self.recoverAcceptedStreamIfNeeded(item, reason: "item-failed")
                 @unknown default:
                     break
                 }
@@ -2224,6 +2272,17 @@ final class PlayerStateManager {
             // Never include `entry.uri`: YouTube playback URLs are signed, sensitive, and
             // short-lived. Resolver identity is enough to correlate this with candidate logs.
             self?.log.error("AVPlayerItem error-log: domain=\(entry.errorDomain, privacy: .public) code=\(entry.errorStatusCode, privacy: .public) comment=\(entry.errorComment ?? "", privacy: .public)")
+        }
+
+        itemFailedToEndObservation = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.failedToPlayToEndTimeNotification,
+            object: item,
+            queue: .main
+        ) { [weak self, weak item] _ in
+            Task { @MainActor in
+                guard let self, let item else { return }
+                self.recoverAcceptedStreamIfNeeded(item, reason: "failed-to-play-to-end")
+            }
         }
 
         itemAccessLogObservation = NotificationCenter.default.addObserver(
@@ -2295,24 +2354,96 @@ final class PlayerStateManager {
         return String(bytes: bytes, encoding: .ascii) ?? String(value)
     }
 
+    /// Only a terminal failure of the accepted, visible stream starts recovery. A stall alone
+    /// remains AVPlayer's job; pre-acceptance failures stay in the startup candidate loop.
+    private func recoverAcceptedStreamIfNeeded(_ item: AVPlayerItem, reason: String) {
+        guard player.currentItem === item, acceptedStreamItem === item,
+              let strategy = acceptedStreamStrategy, let video = currentVideo,
+              loadState == .readyToPlay, !hasEnded, !isSwitchingAudioMode,
+              !isInstallingFastPlayback else { return }
+        acceptedStreamItem = nil
+        acceptedStreamStrategy = nil
+        player.pause()
+        isPlaying = false
+        if didAttemptPlaybackRecovery {
+            log.error("Playback recovery exhausted video=\(video.id, privacy: .public) reason=\(reason, privacy: .public)")
+            loadState = .failed("The video stream stopped. Please try again.")
+            updateNowPlaying()
+            return
+        }
+
+        didAttemptPlaybackRecovery = true
+        cancelFastPlaybackPreparation()
+        let currentTime = player.currentTime().seconds
+        let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
+        let behindLiveEdge = liveSeekableRange.map { max(0, $0.upperBound - position) } ?? 0
+        let recovery = PlaybackRecovery(
+            sessionID: playbackSessionID,
+            failedStrategy: strategy,
+            position: video.isLive ? behindLiveEdge : max(0, position),
+            isLive: video.isLive
+        )
+        log.notice("Playback stream failed after start video=\(video.id, privacy: .public) strategy=\(strategy.rawValue, privacy: .public) reason=\(reason, privacy: .public); trying another source")
+        resolutionTask?.cancel()
+        player.removeAllItems()
+        loadState = .resolving
+        updateNowPlaying()
+        resolutionTask = Task { [weak self] in
+            await self?.resolveAndPlay(video: video, autoplay: false, recovery: recovery)
+        }
+    }
+
+    private func restoreRecoveredPosition(_ recovery: PlaybackRecovery, in item: AVPlayerItem) async {
+        if !recovery.isLive {
+            await seekForSourceSwitch(to: recovery.position, item: item)
+            return
+        }
+        let range = item.seekableTimeRanges.compactMap { value -> ClosedRange<TimeInterval>? in
+            let timeRange = value.timeRangeValue
+            let start = timeRange.start.seconds
+            let end = timeRange.end.seconds
+            guard start.isFinite, end.isFinite, end > start else { return nil }
+            return start...end
+        }.max { $0.upperBound < $1.upperBound }
+        let target: CMTime
+        if let range, recovery.position > 5 {
+            target = CMTime(
+                seconds: min(range.upperBound, max(range.lowerBound, range.upperBound - recovery.position)),
+                preferredTimescale: 600
+            )
+        } else {
+            target = .positiveInfinity
+        }
+        await withCheckedContinuation { continuation in
+            player.seek(to: target) { _ in continuation.resume() }
+        }
+        guard player.currentItem === item else { return }
+        let settled = player.currentTime().seconds
+        if settled.isFinite { elapsed = settled }
+    }
+
     private func resolveAndPlay(
         video: Video,
         autoplay: Bool,
         skipRecommendations: Bool = false,
-        localFileURL: URL? = nil
+        localFileURL: URL? = nil,
+        recovery: PlaybackRecovery? = nil
     ) async {
-        log.info("resolveAndPlay: start for \(video.id, privacy: .public)")
+        let sessionID = recovery?.sessionID ?? playbackSessionID
+        log.info("resolveAndPlay: start for \(video.id, privacy: .public) recovery=\(recovery != nil, privacy: .public)")
         let resolutionStartedAt = Date()
         // The model-actor read runs alongside network resolution and is consumed only after the
         // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
-        let resumeLookup = Task<(position: TimeInterval, duration: TimeInterval)?, Never> {
-            guard preferences.recordsWatchProgress else { return nil }
-            return await PersistenceWriter.shared.watchProgress(videoID: video.id)
-        }
+        let resumeLookup: Task<(position: TimeInterval, duration: TimeInterval)?, Never>? = recovery == nil
+            ? Task {
+                guard preferences.recordsWatchProgress else { return nil }
+                return await PersistenceWriter.shared.watchProgress(videoID: video.id)
+            } : nil
         loadState = .resolving
         var excludedStrategies = Set<PlaybackStrategy>()
+        if let recovery { excludedStrategies.insert(recovery.failedStrategy) }
 
-        while !Task.isCancelled, currentVideo?.id == video.id {
+        while !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id {
             let candidate: PlaybackCandidate
             do {
                 if let localFileURL {
@@ -2332,13 +2463,13 @@ final class PlayerStateManager {
                 log.debug("resolveAndPlay: cancelled for \(video.id, privacy: .public)")
                 return
             } catch {
-                guard currentVideo?.id == video.id else { return }
+                guard playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
                 log.error("resolveAndPlay: all resolvers failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
                 loadState = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
                 return
             }
 
-            guard !Task.isCancelled, currentVideo?.id == video.id else {
+            guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else {
                 log.debug("resolveAndPlay: discarded stale result for \(video.id, privacy: .public)")
                 return
             }
@@ -2350,12 +2481,12 @@ final class PlayerStateManager {
             } catch is CancellationError {
                 return
             } catch {
-                guard !Task.isCancelled, currentVideo?.id == video.id else { return }
+                guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
                 log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(Self.describe(itemError: error), privacy: .public)")
                 excludedStrategies.insert(candidate.strategy)
                 continue
             }
-            guard !Task.isCancelled, currentVideo?.id == video.id else { return }
+            guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
             applyQualityCap(to: item)
             itemLoadStartedAt = Date()
             loadItem(item, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
@@ -2366,10 +2497,11 @@ final class PlayerStateManager {
             // play request when readiness lands, so it starts without waiting for us to notice.
             // This only works because `automaticallyWaitsToMinimizeStalling` is `true` — see the
             // note in `init`, where turning it off silently discards this call.
-            // `.buffering` keeps the UI on the video's thumbnail instead of a spinner.
-            loadState = .buffering
+            // Recovery waits to seek before playing, so it stays `.resolving` until ready;
+            // only a normal optimistic start uses `.buffering` here.
+            loadState = recovery == nil ? .buffering : .resolving
             updateNowPlaying()
-            if autoplay {
+            if recovery == nil, autoplay, wantsPlayback {
                 log.info("resolveAndPlay: optimistic play issued for candidate=\(candidate.strategy.rawValue, privacy: .public) at \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 play()
             }
@@ -2378,17 +2510,38 @@ final class PlayerStateManager {
                 of: item,
                 timeout: readinessTimeout(for: candidate.strategy)
             )
-            guard !Task.isCancelled, currentVideo?.id == video.id else {
+            guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else {
                 log.debug("resolveAndPlay: discarded candidate result for stale video \(video.id, privacy: .public)")
                 return
             }
 
             switch readiness {
             case .ready:
+                // A ready KVO event and a terminal failure can arrive before this task resumes.
+                // Never bless an item that has already failed or been replaced.
+                guard player.currentItem === item, item.status == .readyToPlay else {
+                    log.notice("resolveAndPlay: candidate changed before acceptance strategy=\(candidate.strategy.rawValue, privacy: .public)")
+                    break
+                }
+                if let recovery {
+                    await restoreRecoveredPosition(recovery, in: item)
+                    guard !Task.isCancelled, playbackSessionID == sessionID,
+                          currentVideo?.id == video.id, player.currentItem === item else { return }
+                    guard item.status == .readyToPlay else { break }
+                    acceptedStreamItem = item
+                    acceptedStreamStrategy = candidate.strategy
+                    loadState = .readyToPlay
+                    if wantsPlayback { play() } else { updateNowPlaying() }
+                    reconcilePlaybackRate()
+                    log.info("resolveAndPlay: recovered with candidate=\(candidate.strategy.rawValue, privacy: .public)")
+                    return
+                }
                 // `total` still measures resolve → `.readyToPlay`, unchanged, so the number stays
                 // comparable with builds that played only after this point.
                 log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
                 captionTracks = candidate.captionTracks
+                acceptedStreamItem = item
+                acceptedStreamStrategy = candidate.strategy
                 loadState = .readyToPlay
                 if let title = candidate.originalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !title.isEmpty, let current = currentVideo, current.title != title {
@@ -2399,7 +2552,11 @@ final class PlayerStateManager {
                 if let nativeStoryboard = candidate.storyboard {
                     storyboard = nativeStoryboard
                 }
-                applyStoredResumePosition(await resumeLookup.value, for: video)
+                let savedProgress = await resumeLookup?.value
+                guard !Task.isCancelled, playbackSessionID == sessionID,
+                      currentVideo?.id == video.id, player.currentItem === item else { return }
+                guard item.status == .readyToPlay else { return }
+                applyStoredResumePosition(savedProgress, for: video)
                 updateNowPlaying()
                 contentPrefetchTask?.cancel()
                 contentPrefetchTask = Task {
@@ -2421,7 +2578,7 @@ final class PlayerStateManager {
                 // for immediate UI feedback, so after an optimistic start it reads `true` whether
                 // or not AVPlayer honoured the request. Gating this on it means the one situation
                 // that needs a retry is the one situation where the retry is skipped.
-                if autoplay, player.timeControlStatus == .paused { play() }
+                if wantsPlayback, player.timeControlStatus == .paused { play() }
                 finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
                 reconcilePlaybackRate()
                 return
@@ -2436,7 +2593,8 @@ final class PlayerStateManager {
             // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`
             // and the Now Playing rate don't advertise playback for a rejected candidate while the
             // next one resolves.
-            if isPlaying { pause() }
+            player.pause()
+            isPlaying = false
             player.removeAllItems()
             itemLoadStartedAt = nil
             loadState = .resolving
@@ -2771,6 +2929,7 @@ final class PlayerStateManager {
                       endedItem === self.player.currentItem else { return }
                 self.log.info("Playback reached item end: sourceDuration=\(endedItem.duration.seconds, privacy: .public)s metadataDuration=\(self.currentVideo?.duration ?? -1, privacy: .public)s")
                 self.isPlaying = false
+                self.wantsPlayback = false
                 self.hasEnded = true
                 self.elapsed = self.duration
                 self.persistCurrentPlaybackProgress(force: true)
