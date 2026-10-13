@@ -1,16 +1,7 @@
 import SwiftUI
 
-/// Overlay rendered on top of the player surface while a video isn't playing yet. Reads
-/// `PlayerStateManager.loadState` and disappears once `.readyToPlay` flips on.
-///
-/// Two visual registers, because the two waits are nothing alike:
-///
-/// - **Startup (`.resolving` / `.buffering`)** — normally under three seconds and covered by
-///   `PlayerArtworkBackdrop`'s thumbnail. All we add is a small spinner, with no scrim and no label:
-///   dimming the artwork and captioning it "Preparing…" is exactly the "this app is loading" tell
-///   the perception pass exists to remove.
-/// - **`.downloading` / `.failed`** — long-running transfer feedback and hard errors. These keep
-///   the dimmed scrim, the label, and the determinate bar over the thumbnail rather than black.
+/// Long-running transfer feedback and terminal playback errors over the artwork. Brief startup
+/// waits use the transport overlay's small indicator instead, so this view never duplicates it.
 @available(iOS 17.0, *)
 struct DownloadProgressOverlay: View {
     let state: PlayerStateManager.LoadState
@@ -19,52 +10,37 @@ struct DownloadProgressOverlay: View {
 
     var body: some View {
         switch state {
-        case .resolving, .buffering:
-            startupIndicator
         case .downloading(let progress, let phase):
             overlay(label: label(for: progress, phase: phase), progress: progress)
         case .failed(let message):
             overlay(label: message, progress: nil, error: true)
-        case .idle, .readyToPlay:
+        case .idle, .resolving, .buffering, .readyToPlay:
             EmptyView()
         }
-    }
-
-    /// Unobtrusive "still working" hint over the artwork. `allowsHitTesting(false)` matters: this
-    /// sits above `PlayerSurface`, and a hit-testable layer here would swallow taps meant for
-    /// `AVPlayerViewController`'s controls.
-    @ViewBuilder
-    private var startupIndicator: some View {
-        PlaybackActivityIndicator(size: 30, lineWidth: 3.5)
-            .padding(12)
-            .background(.black.opacity(0.58), in: Circle())
-            .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .allowsHitTesting(false)
-            .transition(.opacity)
     }
 
     @ViewBuilder
     private func overlay(label: String, progress: Double?, error: Bool = false) -> some View {
         ZStack {
-            Color.black.opacity(0.55).ignoresSafeArea()
-            VStack(spacing: 12) {
-                if error && allowsRetry {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(.yellow)
-                } else {
+            Color.black.opacity(0.55)
+            VStack(spacing: 10) {
+                if error {
+                    Image(systemName: "play.slash")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(.white)
+                        .accessibilityHidden(true)
+                } else if progress == nil {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .tint(.white)
-                        .scaleEffect(1.3)
+                        .accessibilityHidden(true)
                 }
                 Text(label)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                if error {
+                    .frame(maxWidth: 280)
+                if error && allowsRetry {
                     Button("Retry", action: onRetry)
                         .buttonStyle(.borderedProminent)
                         .tint(.white)
@@ -75,9 +51,10 @@ struct DownloadProgressOverlay: View {
                     ProgressView(value: progress)
                         .tint(.white)
                         .frame(maxWidth: 220)
-                        .padding(.horizontal, 24)
+                        .accessibilityLabel("Download progress")
                 }
             }
+            .padding(.horizontal, 24)
         }
         .transition(.opacity)
     }

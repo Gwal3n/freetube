@@ -379,14 +379,17 @@ struct FullScreenPlayer: View {
                     // Long-running fallback downloads and failures retain their explanatory
                     // overlay. Brief startup waits replace the centre transport glyph instead,
                     // keeping the surrounding player chrome stable and avoiding a dark badge.
-                    if !isFloating && !isPreparingPlayback {
-                        DownloadProgressOverlay(
-                            state: player.loadState,
-                            allowsRetry: player.currentVideo?.id.hasPrefix("fetch-") == false,
-                            onRetry: { player.retryFailedPlayback() }
-                        )
+                    Group {
+                        if !isFloating && showsStatusOverlay {
+                            DownloadProgressOverlay(
+                                state: player.loadState,
+                                allowsRetry: player.currentVideo?.id.hasPrefix("fetch-") == false,
+                                onRetry: { player.retryFailedPlayback() }
+                            )
                             .opacity(max(0, 1 - collapseProgress * 2.5))
+                        }
                     }
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsStatusOverlay)
                     if !isFloating,
                        let preparation = player.fastPlaybackPreparation {
                         FastPlaybackProgressOverlay(
@@ -808,6 +811,15 @@ struct FullScreenPlayer: View {
         case .resolving, .buffering:
             return true
         case .idle, .downloading, .readyToPlay, .failed:
+            return false
+        }
+    }
+
+    private var showsStatusOverlay: Bool {
+        switch player.loadState {
+        case .downloading, .failed:
+            return true
+        case .idle, .resolving, .buffering, .readyToPlay:
             return false
         }
     }
