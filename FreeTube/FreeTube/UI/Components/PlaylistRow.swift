@@ -10,6 +10,7 @@ import Kingfisher
 struct PlaylistRow: View {
     let playlist: Playlist
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(AppErrorPresenter.self) private var errorPresenter
     @State private var actionsModel = PlaylistActionsModel()
     @State private var resolvedVideoCount: Int?
 
@@ -52,7 +53,10 @@ struct PlaylistRow: View {
         .onReceive(NotificationCenter.default.publisher(for: .localPlaylistsDidChange)) { _ in
             Task { await actionsModel.refresh(id: playlist.id) }
         }
-        .errorToast(Bindable(actionsModel).errorState)
+        .onChange(of: actionsModel.errorState?.id) { _, _ in
+            guard let error = actionsModel.errorState else { return }
+            errorPresenter.present(error)
+        }
     }
 
     private var content: some View {

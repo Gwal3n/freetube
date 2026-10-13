@@ -19,6 +19,7 @@ struct VideoMoreActionsMenu: View {
     var onOpenChannel: (() -> Void)? = nil
 
     @Environment(PlayerStateManager.self) private var player
+    @Environment(AppErrorPresenter.self) private var errorPresenter
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
     @State private var savedMomentsVideo: Video?
@@ -75,10 +76,10 @@ struct VideoMoreActionsMenu: View {
                 player.load(selectedVideo, skipRecommendations: preservesPlaylist)
             }
         }
-        .errorToast(Binding(
-            get: { downloadModel?.downloadError },
-            set: { downloadModel?.downloadError = $0 }
-        ))
+        .onChange(of: downloadModel?.downloadError?.id) { _, _ in
+            guard let error = downloadModel?.downloadError else { return }
+            errorPresenter.present(error)
+        }
     }
 
     private func startDownload(_ quality: VideoQuality) {
@@ -264,6 +265,7 @@ private struct VideoContextMenuModifier: ViewModifier {
     let onRemoveFromHistory: (() -> Void)?
 
     @Environment(PlayerStateManager.self) private var player
+    @Environment(AppErrorPresenter.self) private var errorPresenter
     @State private var shareFileURL: URL?
     @State private var addToPlaylistVideo: Video?
     @State private var savedMomentsVideo: Video?
@@ -318,10 +320,10 @@ private struct VideoContextMenuModifier: ViewModifier {
                     player.load(selectedVideo, skipRecommendations: preservesPlaylist)
                 }
             }
-            .errorToast(Binding(
-                get: { downloadModel?.downloadError },
-                set: { downloadModel?.downloadError = $0 }
-            ))
+            .onChange(of: downloadModel?.downloadError?.id) { _, _ in
+                guard let error = downloadModel?.downloadError else { return }
+                errorPresenter.present(error)
+            }
     }
 
     private func startDownload(_ quality: VideoQuality) {

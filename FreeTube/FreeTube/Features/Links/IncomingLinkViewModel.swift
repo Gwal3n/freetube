@@ -7,8 +7,6 @@ import Observation
 @Observable
 @MainActor
 final class IncomingLinkViewModel {
-    var errorState: ErrorState?
-
     private let searchService: any SearchServicing
     private let videoService: any VideoServicing
 

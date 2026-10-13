@@ -23,6 +23,7 @@ struct RootView: View {
     @AppStorage("appFontPreset") private var appFontPresetRaw = AppFontPreset.system.rawValue
     @State private var navigationRouter = AppNavigationRouter()
     @State private var incomingLinkModel = IncomingLinkViewModel()
+    @State private var errorPresenter = AppErrorPresenter()
     private enum RootSheet: String, Identifiable {
         case settings
         case subscriptionGroups
@@ -75,7 +76,7 @@ struct RootView: View {
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
         .errorToast(
-            Bindable(incomingLinkModel).errorState,
+            Bindable(errorPresenter).errorState,
             bottomClearance: errorToastBottomClearance
         )
         .onOpenURL { url in
@@ -167,6 +168,7 @@ struct RootView: View {
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
         .environment(\.appFontPreset, AppFontPreset(rawValue: appFontPresetRaw) ?? .system)
+        .environment(errorPresenter)
     }
 
     private var tabShell: some View {
@@ -205,7 +207,7 @@ struct RootView: View {
     /// navigation stack receives channel/playlist destinations; video resolution starts first.
     private func openIncomingLink(_ url: URL) async {
         guard let link = YouTubeIncomingLink.parse(url) else {
-            incomingLinkModel.errorState = ErrorState(message: "This isn't a supported YouTube link.")
+            errorPresenter.present(ErrorState(message: "This isn't a supported YouTube link."))
             return
         }
         switch link {
@@ -219,7 +221,9 @@ struct RootView: View {
             routeFromPlayer(.channel(id))
         case .channelHandle(let handle):
             guard let id = await incomingLinkModel.channelID(for: handle) else {
-                incomingLinkModel.errorState = ErrorState(message: "This channel couldn't be opened. Try searching for it instead.")
+                errorPresenter.present(ErrorState(
+                    message: "This channel couldn't be opened. Try searching for it instead."
+                ))
                 return
             }
             routeFromPlayer(.channel(id))
