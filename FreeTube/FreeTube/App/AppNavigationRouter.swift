@@ -12,4 +12,5 @@ final class AppNavigationRouter {
     var search: AppNavigationRequest?
     var library: AppNavigationRequest?
     var downloads: AppNavigationRequest?
+    var settings: AppNavigationRequest?
 }

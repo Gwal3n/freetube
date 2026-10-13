@@ -78,9 +78,8 @@ struct FullScreenPlayer: View {
     }
 
     var body: some View {
-        // Single dark-blur material under EVERYTHING — status bar inset, video chrome, transport,
-        // comments, queue. Removing per-section backgrounds and using one full-screen material lets
-        // the popup read as one continuous translucent surface instead of three stacked tones.
+        // One continuous appearance-aware canvas sits behind the video and lower details.
+        // The media surface itself remains black, keeping letterboxing and white controls legible.
         //
         // The outer GeometryReader provides a stable viewport for both the display-correct
         // expanded ratio and the compact baseline (16:9 for ordinary/tall media, native ratio for
@@ -584,9 +583,9 @@ struct FullScreenPlayer: View {
             .zIndex(6)
             }
             }
-        // Keep a continuous OLED-black canvas behind the expanded player and status area.
+        // Follow app appearance outside the black video surface, including the status area.
         .background {
-            Color.black.ignoresSafeArea()
+            Color(uiColor: .systemBackground).ignoresSafeArea()
             // In floating mode the moving host should contain only the video. The expanded
             // details canvas fades away instead of travelling down as a miniature sheet.
             .opacity(player.fullScreenPresented && chromePresentationReady
@@ -594,8 +593,6 @@ struct FullScreenPlayer: View {
             .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: player.fullScreenPresented)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromePresentationReady)
         }
-        // Video chrome stays dark without forcing the entire app window into dark appearance.
-        .environment(\.colorScheme, .dark)
         .statusBarHidden(portraitFullscreenActive)
         .sensoryFeedback(.success, trigger: savedMomentFeedbackCount)
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL

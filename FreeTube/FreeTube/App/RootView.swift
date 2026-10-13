@@ -1,14 +1,13 @@
 import SwiftUI
-import UIKit
 
 /// Top-level tabbed shell. The in-app floating player persists across tabs.
 ///
-/// Tab layout: Feed, Library, Downloads, and Search (a separate system button on iOS 26).
+/// Tab layout is customizable; Search keeps its native system role on iOS 26.
 /// - Feed (latest cached videos from local subscriptions)
 /// - Library (device-local history, subscriptions, and playlists)
 /// - Downloads (saved videos and transfer queue)
 /// - Search (search field, suggestions, results, and local recent searches)
-/// Settings opens from Library's toolbar.
+/// Settings opens from Library's toolbar or an optional dedicated tab.
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
@@ -17,6 +16,11 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var selectedTab: Tab
     @AppStorage("showSubscriptionFeedTab") private var showSubscriptionFeedTab = true
+    @AppStorage("showLibraryTab") private var showLibraryTab = true
+    @AppStorage("showDownloadsTab") private var showDownloadsTab = true
+    @AppStorage("showSearchTab") private var showSearchTab = true
+    @AppStorage("showSettingsTab") private var showSettingsTab = false
+    @AppStorage("tabBarOrder") private var tabBarOrderRaw = TabBarOrder.defaultValue
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideFeed") private var incognitoHideFeed = false
     @AppStorage("incognitoHideLibrary") private var incognitoHideLibrary = false
@@ -35,7 +39,7 @@ struct RootView: View {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     enum Tab: String, Hashable {
-        case feed, search, library, downloads
+        case feed, search, library, downloads, settings
 
         var title: LocalizedStringKey {
             switch self {
@@ -43,6 +47,7 @@ struct RootView: View {
             case .search: "Search"
             case .library: "Library"
             case .downloads: "Downloads"
+            case .settings: "Settings"
             }
         }
 
@@ -52,6 +57,7 @@ struct RootView: View {
             case .search: "magnifyingglass"
             case .library: "play.square.stack"
             case .downloads: "arrow.down.circle"
+            case .settings: "gearshape"
             }
         }
     }
@@ -61,7 +67,18 @@ struct RootView: View {
     }
 
     private var showsLibrary: Bool {
-        !(incognitoEnabled && incognitoHideLibrary)
+        showLibraryTab && !(incognitoEnabled && incognitoHideLibrary)
+    }
+
+    private var visibleTabs: [Tab] {
+        TabBarOrder.visibleTabs(
+            from: tabBarOrderRaw,
+            feed: showsFeed,
+            library: showsLibrary,
+            downloads: showDownloadsTab,
+            search: showSearchTab,
+            settings: showSettingsTab
+        )
     }
 
     private var queueNoticeBottomPadding: CGFloat {
@@ -106,20 +123,18 @@ struct RootView: View {
         }) { sheet in
             switch sheet {
             case .settings:
-                SettingsScreen {
+                SettingsScreen(onClose: {
                     rootSheet = nil
-                }
+                })
+                    .environment(navigationRouter)
                     .presentationDragIndicator(.hidden)
             case .subscriptionGroups:
                 SubscriptionGroupsScreen()
                     .presentationDragIndicator(.visible)
             }
         }
-        // Force light status-bar glyphs while the dark expanded player is visible, then restore
-        // the app's normal appearance when it returns to the mini-player.
         .onChange(of: player.fullScreenPresented) { _, presented in
             log.info("Player expanded presentation changed: \(presented)")
-            updateStatusBarOverride(forFullScreenOpen: presented)
             if presented {
                 player.requestInlinePlaybackRestoration()
             }
@@ -142,11 +157,7 @@ struct RootView: View {
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
         .onReceive(NotificationCenter.default.publisher(for: .freetubeSelectTab)) { note in
             if let tab = note.object as? Tab {
-                if (tab == .feed && !showsFeed) || (tab == .library && !showsLibrary) {
-                    selectedTab = .search
-                } else {
-                    selectedTab = tab
-                }
+                selectedTab = visibleTabs.contains(tab) ? tab : visibleTabs[0]
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSettings)) { _ in
@@ -182,10 +193,14 @@ struct RootView: View {
         .onChange(of: showsLibrary) { _, _ in
             selectVisibleTabIfNeeded()
         }
+        .onChange(of: showDownloadsTab) { _, _ in selectVisibleTabIfNeeded() }
+        .onChange(of: showSearchTab) { _, _ in selectVisibleTabIfNeeded() }
+        .onChange(of: showSettingsTab) { _, _ in selectVisibleTabIfNeeded() }
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
         .environment(\.appFontPreset, AppFontPreset(rawValue: appFontPresetRaw) ?? .system)
+        .environment(navigationRouter)
         .environment(errorPresenter)
     }
 
@@ -193,14 +208,16 @@ struct RootView: View {
         RootTabShell(
             selection: $selectedTab,
             showsFeed: showsFeed,
-            showsLibrary: showsLibrary
+            showsLibrary: showsLibrary,
+            showsDownloads: showDownloadsTab,
+            showsSearch: showSearchTab,
+            showsSettings: showSettingsTab
         )
-        .environment(navigationRouter)
     }
 
     private func selectVisibleTabIfNeeded() {
-        if (selectedTab == .feed && !showsFeed) || (selectedTab == .library && !showsLibrary) {
-            selectedTab = .search
+        if !visibleTabs.contains(selectedTab) {
+            selectedTab = visibleTabs[0]
         }
     }
 
@@ -218,6 +235,8 @@ struct RootView: View {
             navigationRouter.library = request
         case .downloads:
             navigationRouter.downloads = request
+        case .settings:
+            navigationRouter.settings = request
         }
     }
 
@@ -249,14 +268,4 @@ struct RootView: View {
             routeFromPlayer(.playlist(id))
         }
     }
-
-    private func updateStatusBarOverride(forFullScreenOpen open: Bool) {
-        let scene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first(where: { $0.activationState == .foregroundActive })
-            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first
-        window?.overrideUserInterfaceStyle = open ? .dark : .unspecified
-    }
-
 }

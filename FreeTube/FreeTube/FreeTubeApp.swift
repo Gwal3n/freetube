@@ -26,7 +26,7 @@ struct FreeTubeApp: App {
                 .environment(appEnvironment.playerStateManager)
                 .environment(appEnvironment.appVisitState)
                 .modelContainer(PersistenceController.sharedContainer)
-                // The app follows the chosen appearance; video chrome keeps its own dark surface.
+                // The app and player interface follow the chosen appearance.
                 .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)
         }
         // Menu-bar items + keyboard shortcuts. Only meaningful on Mac (via "Designed for

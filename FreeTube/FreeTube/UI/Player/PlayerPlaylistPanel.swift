@@ -191,12 +191,12 @@ struct PlayerPlaylistPanel: View {
             }
             .background {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .fill(Color.black)
+                    .fill(Color(uiColor: .systemBackground))
                     .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                     .allowsHitTesting(false)
             }
             .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
@@ -272,7 +272,7 @@ struct PlayerPlaylistPanel: View {
                                         }
                                     } label: {
                                         Image(systemName: "square.and.arrow.up")
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(.primary)
                                             .frame(width: 44, height: 44)
                                             .contentShape(Rectangle())
                                     }
@@ -326,11 +326,11 @@ struct PlayerPlaylistPanel: View {
                     }
                 }
             }
-            .background(Color.black)
+            .background(Color(uiColor: .systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
             .overlay(alignment: isLandscape ? .leading : .top) {
                 Rectangle()
-                    .fill(.white.opacity(0.12))
+                    .fill(Color.primary.opacity(0.12))
                     .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
             }
             .shadow(color: .black.opacity(0.28), radius: 14)
@@ -415,7 +415,7 @@ struct PlayerPlaylistPanel: View {
                 .background {
                     if isCurrent {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(.white.opacity(0.09))
+                            .fill(Color.primary.opacity(0.09))
                             .padding(.horizontal, 6)
                     }
                 }

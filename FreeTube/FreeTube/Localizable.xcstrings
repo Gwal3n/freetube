@@ -85,19 +85,26 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les icônes restent accessibles par leur nom lorsque les libellés sont masqués." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Даже без подписей значки остаются доступны по названию." } }
     } },
-    "Drag the handles to reorder tabs. Search keeps its native system position." : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "Ziehe die Griffe, um die Tabs neu anzuordnen. Suche bleibt an der systemseitig vorgegebenen Position." } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag the handles to reorder tabs. Search keeps its native system position." } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Arrastra los controles para reordenar las pestañas. Buscar conserva la posición del sistema." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Faites glisser les poignées pour réorganiser les onglets. Recherche conserve sa place native." } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перетаскивайте маркеры, чтобы изменить порядок вкладок. Поиск остаётся на системном месте." } }
+    "Drag the handles to reorder tabs. Search keeps its native system position. Settings remains available when Library is hidden." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Ziehe die Griffe, um die Tabs neu anzuordnen. Suche bleibt an der Systemposition. Einstellungen bleibt verfügbar, wenn die Mediathek ausgeblendet ist." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag the handles to reorder tabs. Search keeps its native system position. Settings remains available when Library is hidden." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Arrastra los controles para reordenar las pestañas. Buscar conserva la posición del sistema. Ajustes permanece disponible si se oculta Biblioteca." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Faites glisser les poignées pour réorganiser les onglets. Recherche conserve sa place native. Réglages reste disponible si Bibliothèque est masquée." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перетаскивайте маркеры, чтобы изменить порядок вкладок. Поиск остаётся на системном месте. Настройки доступны, даже если медиатека скрыта." } }
     } },
-    "The video player keeps a dark canvas in every appearance." : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "Der Videoplayer behält in jeder Darstellung einen dunklen Hintergrund." } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "The video player keeps a dark canvas in every appearance." } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "El reproductor de vídeo mantiene un fondo oscuro en todos los modos." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Le lecteur vidéo conserve un fond sombre dans tous les modes." } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Видеоплеер сохраняет тёмный фон при любом оформлении." } }
+    "The player interface follows your appearance; the video canvas stays black." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Player-Oberfläche folgt der Darstellung; die Videofläche bleibt schwarz." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "The player interface follows your appearance; the video canvas stays black." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "La interfaz del reproductor sigue la apariencia elegida; el área de vídeo permanece negra." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’interface du lecteur suit l’apparence choisie ; la surface vidéo reste noire." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Интерфейс плеера следует выбранной теме; область видео остаётся чёрной." } }
+    } },
+    "Automatic refresh runs only while Feed is selected and the app is active. Tab visibility is set in Appearance." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Die automatische Aktualisierung läuft nur, wenn Feed ausgewählt und die App aktiv ist. Sichtbare Tabs legst du unter Darstellung fest." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic refresh runs only while Feed is selected and the app is active. Tab visibility is set in Appearance." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "La actualización automática solo funciona con Feed seleccionado y la app activa. La visibilidad de las pestañas se configura en Apariencia." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’actualisation automatique ne fonctionne que lorsque Feed est sélectionné et que l’app est active. La visibilité des onglets se règle dans Apparence." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Автообновление работает, только когда выбрана лента и приложение активно. Видимость вкладок настраивается в разделе оформления." } }
     } },
     "Hooks and greetings" : {
       "localizations" : {

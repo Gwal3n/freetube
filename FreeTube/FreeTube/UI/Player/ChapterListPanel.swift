@@ -76,11 +76,11 @@ struct ChapterListPanel: View {
                 }
             }
         }
-        .background(Color.black)
+        .background(Color(uiColor: .systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 16 * (1 - expansionProgress), style: .continuous))
         .overlay(alignment: isLandscape ? .leading : .top) {
             Rectangle()
-                .fill(.white.opacity(0.12))
+                .fill(Color.primary.opacity(0.12))
                 .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
         }
         .shadow(color: .black.opacity(0.28), radius: 14)
@@ -249,7 +249,7 @@ struct ChapterListPanel: View {
             KFImage(chapter.thumbnailURL)
                 .thumbnail(size: CGSize(width: 128, height: 72)) {
                     ZStack {
-                        Color.white.opacity(0.08)
+                        Color.primary.opacity(0.08)
                         Image(systemName: "play.rectangle")
                             .foregroundStyle(.secondary)
                     }

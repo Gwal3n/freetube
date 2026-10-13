@@ -16,7 +16,6 @@ struct BrowsingSettingsScreen: View {
             }
 
             Section {
-                Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
                 Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
                 Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
@@ -35,7 +34,7 @@ struct BrowsingSettingsScreen: View {
             } header: {
                 Text("Feed")
             } footer: {
-                Text("Hiding Feed does not remove your subscriptions. Automatic refresh runs only while the Feed tab is selected and the app is active.")
+                Text("Automatic refresh runs only while Feed is selected and the app is active. Tab visibility is set in Appearance.")
             }
 
             Section("Channels") {

@@ -6,6 +6,9 @@ struct RootTabShell: View {
     @Binding var selection: RootView.Tab
     let showsFeed: Bool
     let showsLibrary: Bool
+    let showsDownloads: Bool
+    let showsSearch: Bool
+    let showsSettings: Bool
     @AppStorage("tabBarOrder") private var tabBarOrderRaw = TabBarOrder.defaultValue
     @AppStorage("showTabBarLabels") private var showTabBarLabels = true
 
@@ -21,9 +24,14 @@ struct RootTabShell: View {
     }
 
     private var visibleOrdinaryTabs: [RootView.Tab] {
-        TabBarOrder.tabs(from: tabBarOrderRaw).filter { tab in
-            (tab != .feed || showsFeed) && (tab != .library || showsLibrary)
-        }
+        TabBarOrder.visibleTabs(
+            from: tabBarOrderRaw,
+            feed: showsFeed,
+            library: showsLibrary,
+            downloads: showsDownloads,
+            search: showsSearch,
+            settings: showsSettings
+        ).filter { $0 != .search }
     }
 
     @ViewBuilder
@@ -43,14 +51,16 @@ struct RootTabShell: View {
                     }
                     .badge(tab == .downloads && activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                 }
-                SwiftUI.Tab(value: RootView.Tab.search, role: .search) {
-                    HomeScreen()
-                } label: {
-                    if showTabBarLabels {
-                        Label("Search", systemImage: "magnifyingglass")
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .accessibilityLabel("Search")
+                if showsSearch {
+                    SwiftUI.Tab(value: RootView.Tab.search, role: .search) {
+                        HomeScreen()
+                    } label: {
+                        if showTabBarLabels {
+                            Label("Search", systemImage: "magnifyingglass")
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                                .accessibilityLabel("Search")
+                        }
                     }
                 }
             }
@@ -76,16 +86,18 @@ struct RootTabShell: View {
                     .badge(tab == .downloads && activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                     .tag(tab)
             }
-            HomeScreen()
-                .tabItem {
-                    if showTabBarLabels {
-                        Label("Search", systemImage: "magnifyingglass")
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .accessibilityLabel("Search")
+            if showsSearch {
+                HomeScreen()
+                    .tabItem {
+                        if showTabBarLabels {
+                            Label("Search", systemImage: "magnifyingglass")
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                                .accessibilityLabel("Search")
+                        }
                     }
-                }
-                .tag(RootView.Tab.search)
+                    .tag(RootView.Tab.search)
+            }
         }
     }
 
@@ -100,6 +112,8 @@ struct RootTabShell: View {
             DownloadsScreen()
         case .search:
             HomeScreen()
+        case .settings:
+            SettingsScreen(onClose: nil)
         }
     }
 

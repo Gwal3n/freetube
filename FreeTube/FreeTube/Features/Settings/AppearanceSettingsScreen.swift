@@ -21,7 +21,7 @@ struct AppearanceSettingsScreen: View {
                     }
                 }
             } footer: {
-                Text("The video player keeps a dark canvas in every appearance.")
+                Text("The player interface follows your appearance; the video canvas stays black.")
             }
 
             Section("Navigation") {
