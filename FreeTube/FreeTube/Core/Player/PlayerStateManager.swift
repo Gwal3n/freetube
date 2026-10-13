@@ -207,10 +207,13 @@ final class PlayerStateManager {
 
     private struct PlaybackRecovery {
         let sessionID: Int
-        let failedStrategy: PlaybackStrategy
-        /// VOD position or distance behind the live edge. A nil live offset means live edge.
+        /// Automatic recovery excludes the terminally failed strategy. An explicit user retry
+        /// starts fresh after invalidating cached URLs, so it may try every strategy again.
+        let failedStrategy: PlaybackStrategy?
+        /// VOD position or distance behind the live edge (zero means live edge).
         let position: TimeInterval
         let isLive: Bool
+        let resumeFromHistoryIfUnstarted: Bool
     }
     private var itemLoadStartedAt: Date?
     /// KVO-driven readiness handshake for the candidate currently under test.
@@ -768,6 +771,36 @@ final class PlayerStateManager {
         if isInstallingFastPlayback { resumeAfterFastPlaybackSwitch = true }
         publishNowPlayingWhenAlone()
         reconcilePlaybackRate()
+    }
+
+    /// A user-requested retry keeps the selected video, queue, active playlist, and presentation.
+    /// It starts a new resolver session, unlike `load(_:)`, which deliberately resets those states.
+    func retryFailedPlayback() {
+        guard case .failed = loadState,
+              let video = currentVideo, !video.id.hasPrefix("fetch-") else { return }
+
+        playbackSessionID &+= 1
+        let recovery = playbackRecovery(for: video, excluding: nil, resumeFromHistoryIfUnstarted: true)
+        log.info("Retrying failed playback for \(video.id, privacy: .public)")
+        resolutionTask?.cancel()
+        cancelFastPlaybackPreparation()
+        acceptedStreamItem = nil
+        acceptedStreamStrategy = nil
+        didAttemptPlaybackRecovery = false
+        wantsPlayback = true
+        player.pause()
+        isPlaying = false
+        player.removeAllItems()
+        loadState = .resolving
+        updateNowPlaying()
+
+        resolutionTask = Task { [weak self] in
+            await StreamURLCache.shared.removeAll(videoID: video.id)
+            guard !Task.isCancelled, let self,
+                  self.playbackSessionID == recovery.sessionID,
+                  self.currentVideo?.id == video.id else { return }
+            await self.resolveAndPlay(video: video, autoplay: false, recovery: recovery)
+        }
     }
 
     func pause() {
@@ -2374,15 +2407,7 @@ final class PlayerStateManager {
 
         didAttemptPlaybackRecovery = true
         cancelFastPlaybackPreparation()
-        let currentTime = player.currentTime().seconds
-        let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
-        let behindLiveEdge = liveSeekableRange.map { max(0, $0.upperBound - position) } ?? 0
-        let recovery = PlaybackRecovery(
-            sessionID: playbackSessionID,
-            failedStrategy: strategy,
-            position: video.isLive ? behindLiveEdge : max(0, position),
-            isLive: video.isLive
-        )
+        let recovery = playbackRecovery(for: video, excluding: strategy)
         log.notice("Playback stream failed after start video=\(video.id, privacy: .public) strategy=\(strategy.rawValue, privacy: .public) reason=\(reason, privacy: .public); trying another source")
         resolutionTask?.cancel()
         player.removeAllItems()
@@ -2391,6 +2416,24 @@ final class PlayerStateManager {
         resolutionTask = Task { [weak self] in
             await self?.resolveAndPlay(video: video, autoplay: false, recovery: recovery)
         }
+    }
+
+    private func playbackRecovery(
+        for video: Video,
+        excluding failedStrategy: PlaybackStrategy?,
+        resumeFromHistoryIfUnstarted: Bool = false
+    ) -> PlaybackRecovery {
+        let currentTime = player.currentTime().seconds
+        let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
+        let behindLiveEdge = liveSeekableRange.map { max(0, $0.upperBound - position) } ?? 0
+        return PlaybackRecovery(
+            sessionID: playbackSessionID,
+            failedStrategy: failedStrategy,
+            position: video.isLive ? behindLiveEdge : max(0, position),
+            isLive: video.isLive,
+            resumeFromHistoryIfUnstarted: resumeFromHistoryIfUnstarted
+                && !video.isLive && position < 1
+        )
     }
 
     private func restoreRecoveredPosition(_ recovery: PlaybackRecovery, in item: AVPlayerItem) async {
@@ -2434,14 +2477,15 @@ final class PlayerStateManager {
         let resolutionStartedAt = Date()
         // The model-actor read runs alongside network resolution and is consumed only after the
         // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
-        let resumeLookup: Task<(position: TimeInterval, duration: TimeInterval)?, Never>? = recovery == nil
-            ? Task {
+        let shouldLoadSavedProgress = recovery == nil || recovery?.resumeFromHistoryIfUnstarted == true
+        let resumeLookup: Task<(position: TimeInterval, duration: TimeInterval)?, Never>? =
+            shouldLoadSavedProgress ? Task {
                 guard preferences.recordsWatchProgress else { return nil }
                 return await PersistenceWriter.shared.watchProgress(videoID: video.id)
             } : nil
         loadState = .resolving
         var excludedStrategies = Set<PlaybackStrategy>()
-        if let recovery { excludedStrategies.insert(recovery.failedStrategy) }
+        if let failedStrategy = recovery?.failedStrategy { excludedStrategies.insert(failedStrategy) }
 
         while !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id {
             let candidate: PlaybackCandidate
@@ -2524,10 +2568,26 @@ final class PlayerStateManager {
                     break
                 }
                 if let recovery {
-                    await restoreRecoveredPosition(recovery, in: item)
+                    if recovery.resumeFromHistoryIfUnstarted {
+                        let savedProgress = await resumeLookup?.value
+                        guard !Task.isCancelled, playbackSessionID == sessionID,
+                              currentVideo?.id == video.id, player.currentItem === item else { return }
+                        if let position = storedResumePosition(savedProgress, for: video) {
+                            log.info("Resuming \(video.id, privacy: .public) at \(position, privacy: .public)s")
+                            await seekForSourceSwitch(to: position, item: item)
+                        }
+                    } else {
+                        await restoreRecoveredPosition(recovery, in: item)
+                    }
                     guard !Task.isCancelled, playbackSessionID == sessionID,
                           currentVideo?.id == video.id, player.currentItem === item else { return }
                     guard item.status == .readyToPlay else { break }
+                    if !candidate.captionTracks.isEmpty { captionTracks = candidate.captionTracks }
+                    if let replacementStoryboard = candidate.storyboard { storyboard = replacementStoryboard }
+                    if let title = candidate.originalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !title.isEmpty, let current = currentVideo, current.title != title {
+                        enrichCurrentVideo(with: current.replacingTitle(with: title))
+                    }
                     acceptedStreamItem = item
                     acceptedStreamStrategy = candidate.strategy
                     loadState = .readyToPlay
@@ -3035,17 +3095,25 @@ final class PlayerStateManager {
         _ progress: (position: TimeInterval, duration: TimeInterval)?,
         for video: Video
     ) {
+        guard let position = storedResumePosition(progress, for: video) else { return }
+        log.info("Resuming \(video.id, privacy: .public) at \(position, privacy: .public)s")
+        seek(to: position)
+    }
+
+    private func storedResumePosition(
+        _ progress: (position: TimeInterval, duration: TimeInterval)?,
+        for video: Video
+    ) -> TimeInterval? {
         guard preferences.recordsWatchProgress,
               currentVideo?.id == video.id,
               let progress,
               progress.position.isFinite,
-              progress.position >= 10 else { return }
+              progress.position >= 10 else { return nil }
         let knownDuration = duration > 0 ? duration : progress.duration
         guard knownDuration > 0,
               knownDuration - progress.position >= 30,
-              progress.position < knownDuration * 0.95 else { return }
-        log.info("Resuming \(video.id, privacy: .public) at \(progress.position, privacy: .public)s")
-        seek(to: progress.position)
+              progress.position < knownDuration * 0.95 else { return nil }
+        return progress.position
     }
 
     /// Writes at most every ten seconds during playback, plus forced lifecycle saves. Duplicate

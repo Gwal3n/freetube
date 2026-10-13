@@ -223,6 +223,9 @@ transport intent, and playback position (or distance behind the live edge). Do n
 transient stall alone, refetch recommendations or details, or start a download. A second terminal
 failure or exhausted alternatives surfaces a playback error. Log only error domain/code, never an
 item error's `userInfo`, which can contain the signed stream URL.
+The failed-player overlay offers a deliberate Retry action. It invalidates only that video's
+in-memory stream URLs and starts a new resolver session without calling `load(_:)`, which would
+reset the queue and playlist. A retry preserves the current position and player presentation.
 
 Automatic next-item download prefetch is disabled. Recommendation queue filling remains independent
 and still runs after playback begins. Signed URLs are used immediately or stored only in

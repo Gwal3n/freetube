@@ -380,7 +380,11 @@ struct FullScreenPlayer: View {
                     // overlay. Brief startup waits replace the centre transport glyph instead,
                     // keeping the surrounding player chrome stable and avoiding a dark badge.
                     if !isFloating && !isPreparingPlayback {
-                        DownloadProgressOverlay(state: player.loadState)
+                        DownloadProgressOverlay(
+                            state: player.loadState,
+                            allowsRetry: player.currentVideo?.id.hasPrefix("fetch-") == false,
+                            onRetry: { player.retryFailedPlayback() }
+                        )
                             .opacity(max(0, 1 - collapseProgress * 2.5))
                     }
                     if !isFloating,

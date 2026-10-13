@@ -80,6 +80,13 @@ actor StreamURLCache {
         log.debug("Invalidated stream URL for \(videoID, privacy: .public)/\(formatID, privacy: .public)")
     }
 
+    /// Explicit playback retry must not reuse a signed URL that just failed. Leave other videos'
+    /// warm resolutions alone so one failed item cannot slow unrelated playback.
+    func removeAll(videoID: String) {
+        entries = entries.filter { $0.key.videoID != videoID }
+        log.debug("Invalidated cached stream URLs for \(videoID, privacy: .public)")
+    }
+
     func purge() {
         entries.removeAll()
     }

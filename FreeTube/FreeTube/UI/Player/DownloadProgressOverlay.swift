@@ -14,6 +14,8 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct DownloadProgressOverlay: View {
     let state: PlayerStateManager.LoadState
+    let allowsRetry: Bool
+    let onRetry: () -> Void
 
     var body: some View {
         switch state {
@@ -47,7 +49,7 @@ struct DownloadProgressOverlay: View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 12) {
-                if error {
+                if error && allowsRetry {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.largeTitle)
                         .foregroundStyle(.yellow)
@@ -62,6 +64,13 @@ struct DownloadProgressOverlay: View {
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
+                if error {
+                    Button("Retry", action: onRetry)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.white)
+                        .foregroundStyle(.black)
+                        .controlSize(.regular)
+                }
                 if let progress {
                     ProgressView(value: progress)
                         .tint(.white)
