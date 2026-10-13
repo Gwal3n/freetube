@@ -80,9 +80,11 @@ struct HomeScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
                 navigationLog.info("Search keyboard hidden; presented=\(isSearchPresented, privacy: .public)")
                 // `.searchable(isPresented:)` does not always clear its presentation binding when
-                // UIKit dismisses the keyboard interactively. Leaving it true pins the expanded
-                // search drawer at the top even though search is no longer active.
-                isSearchPresented = false
+                // UIKit dismisses the keyboard interactively. Keep a submitted query visible in
+                // the native field; only collapse an unfinished search drawer.
+                if searchModel.submittedQuery == nil || searchModel.isEditingNewQuery {
+                    isSearchPresented = false
+                }
             }
             .onChange(of: isSearchPresented) { _, isPresented in
                 navigationLog.info("Search presentation changed: \(isPresented, privacy: .public)")
