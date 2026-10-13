@@ -168,11 +168,7 @@ final class PlayerStateManager {
 
     /// Separate from recommendations so Previous/Next can revisit explicit selections.
     private var playbackHistory = PlayerPlaybackHistory()
-    /// Actual time spent playing the selected video in this session. This is intentionally not
-    /// derived from the playhead: resume and manual seeks must not instantly qualify history.
-    private var historyPlaybackSeconds: TimeInterval = 0
-    private var lastHistoryPlaybackTick: Date?
-    private var historyRecordedVideoID: String?
+    private let watchHistory = PlayerWatchHistoryTracker()
 
     var canPlayPrevious: Bool { playbackHistory.canMoveBackward }
     var canPlayNext: Bool {
@@ -244,9 +240,6 @@ final class PlayerStateManager {
     private var audioModeSwitchGeneration = 0
     private var resumeAfterAudioSwitch: Bool?
     private var sleepTimerTask: Task<Void, Never>?
-    private var lastProgressSaveAt = Date.distantPast
-    private var lastSavedProgressVideoID: String?
-    private var lastSavedProgressPosition: TimeInterval = -.infinity
     private var recommendationBacklog: [Video] = []
     private var recommendationContinuationToken: String?
     private var playlistContinuationToken: String?
@@ -550,12 +543,7 @@ final class PlayerStateManager {
             player.removeAllItems()
         }
         currentVideo = video
-        lastProgressSaveAt = .distantPast
-        lastSavedProgressVideoID = nil
-        lastSavedProgressPosition = -.infinity
-        historyPlaybackSeconds = 0
-        lastHistoryPlaybackTick = nil
-        historyRecordedVideoID = nil
+        watchHistory.reset()
         // Ordinary playback gets a fresh, bounded recommendation set for each video and retains no
         // history. Explicit playlist batches keep their curated order and skip recommendations.
         if skipRecommendations {
@@ -565,7 +553,13 @@ final class PlayerStateManager {
         } else {
             queue.replace(with: [video])
         }
-        recordHistoryOnOpenIfRequested(video)
+        watchHistory.recordOnOpen(
+            video,
+            recordsHistory: preferences.recordsWatchHistory,
+            addWhenOpened: preferences.addToHistoryWhenOpened,
+            playlist: queue.current?.id == video.id ? activePlaylist : nil,
+            playlistOrigin: activePlaylistOrigin
+        )
         presentPlayer(for: video.id, expanded: expandPlayer)
         loadState = .resolving
         // Wipe transport state from the previous video so a stray time-observer tick during the
@@ -602,17 +596,7 @@ final class PlayerStateManager {
         queue.updateVideo(video)
         playbackHistory.updateCurrentVideo(video)
         refreshArtwork(for: video)
-        if preferences.recordsWatchHistory, historyRecordedVideoID == video.id {
-            Task {
-                await PersistenceWriter.shared.updateWatchHistoryMetadata(
-                    videoID: video.id,
-                    title: video.title,
-                    channelName: video.channelName,
-                    channelID: video.channelID,
-                    thumbnailURL: video.thumbnailURL
-                )
-            }
-        }
+        watchHistory.updateMetadataIfRecorded(video, recordsHistory: preferences.recordsWatchHistory)
         updateNowPlaying()
     }
 
@@ -2919,32 +2903,6 @@ final class PlayerStateManager {
 
     // MARK: - Resume position
 
-    /// Records an opening without overwriting an existing resume point. The ordinary
-    /// meaningful-playback path still owns progress updates once actual playback qualifies.
-    private func recordHistoryOnOpenIfRequested(_ video: Video) {
-        guard preferences.recordsWatchHistory,
-              preferences.addToHistoryWhenOpened,
-              !video.id.hasPrefix("fetch-") else { return }
-        historyRecordedVideoID = video.id
-        let playlist = queue.current?.id == video.id ? activePlaylist : nil
-        let playlistOrigin = playlist == nil ? nil : activePlaylistOrigin
-        Task {
-            await PersistenceWriter.shared.upsertWatchHistory(
-                videoID: video.id,
-                title: video.title,
-                channelName: video.channelName,
-                channelID: video.channelID,
-                thumbnailURL: video.thumbnailURL,
-                position: 0,
-                duration: video.duration ?? 0,
-                saveProgress: false,
-                playlistID: playlist?.id,
-                playlistTitle: playlist?.title,
-                playlistOrigin: playlistOrigin
-            )
-        }
-    }
-
     /// Resumes only meaningful, unfinished progress. A short opening is treated as unwatched, and
     /// the final 30 seconds are treated as completed so finished videos restart normally.
     private func applyStoredResumePosition(
@@ -2960,103 +2918,36 @@ final class PlayerStateManager {
         _ progress: (position: TimeInterval, duration: TimeInterval)?,
         for video: Video
     ) -> TimeInterval? {
-        guard preferences.recordsWatchProgress,
-              currentVideo?.id == video.id,
-              let progress,
-              progress.position.isFinite,
-              progress.position >= 10 else { return nil }
-        let knownDuration = duration > 0 ? duration : progress.duration
-        guard knownDuration > 0,
-              knownDuration - progress.position >= 30,
-              progress.position < knownDuration * 0.95 else { return nil }
-        return progress.position
+        watchHistory.resumePosition(
+            progress,
+            for: video.id,
+            currentVideoID: currentVideo?.id,
+            duration: duration,
+            recordsProgress: preferences.recordsWatchProgress
+        )
     }
 
     /// Writes at most every ten seconds during playback, plus forced lifecycle saves. Duplicate
     /// pause/dismiss/video-switch calls are suppressed when the position has not advanced.
     private func persistCurrentPlaybackProgress(force: Bool) {
-        guard preferences.recordsWatchHistory else {
-            historyRecordedVideoID = nil
-            historyPlaybackSeconds = 0
-            lastHistoryPlaybackTick = nil
-            return
-        }
-        guard let video = currentVideo,
-              !video.id.hasPrefix("fetch-"),
-              elapsed.isFinite,
-              duration.isFinite,
-              elapsed >= 0,
-              duration > 0 else { return }
-        let qualificationSeconds = min(duration * 0.05, 10)
-        guard historyPlaybackSeconds >= qualificationSeconds else { return }
-
-        if historyRecordedVideoID != video.id {
-            historyRecordedVideoID = video.id
-            lastProgressSaveAt = Date()
-            lastSavedProgressVideoID = video.id
-            lastSavedProgressPosition = elapsed
-            let position = elapsed
-            let totalDuration = duration
-            let saveProgress = preferences.recordsWatchProgress
-            let historyPlaylist = queue.current?.id == video.id ? activePlaylist : nil
-            let historyPlaylistOrigin = historyPlaylist == nil ? nil : activePlaylistOrigin
-            Task {
-                await PersistenceWriter.shared.upsertWatchHistory(
-                    videoID: video.id,
-                    title: video.title,
-                    channelName: video.channelName,
-                    channelID: video.channelID,
-                    thumbnailURL: video.thumbnailURL,
-                    position: position,
-                    duration: totalDuration,
-                    saveProgress: saveProgress,
-                    playlistID: historyPlaylist?.id,
-                    playlistTitle: historyPlaylist?.title,
-                    playlistOrigin: historyPlaylistOrigin
-                )
-            }
-            return
-        }
-        guard preferences.recordsWatchProgress else { return }
-        let now = Date()
-        if !force, now.timeIntervalSince(lastProgressSaveAt) < 10 { return }
-        if lastSavedProgressVideoID == video.id,
-           abs(lastSavedProgressPosition - elapsed) < 0.5 { return }
-
-        lastProgressSaveAt = now
-        lastSavedProgressVideoID = video.id
-        lastSavedProgressPosition = elapsed
-        let videoID = video.id
-        let position = elapsed
-        let totalDuration = duration
-        Task {
-            await PersistenceWriter.shared.updateWatchProgress(
-                videoID: videoID,
-                position: position,
-                duration: totalDuration,
-                notifyObservers: force
-            )
-        }
+        let video = currentVideo
+        watchHistory.persist(
+            video: video,
+            elapsed: elapsed,
+            duration: duration,
+            force: force,
+            recordsHistory: preferences.recordsWatchHistory,
+            recordsProgress: preferences.recordsWatchProgress,
+            playlist: queue.current?.id == video?.id ? activePlaylist : nil,
+            playlistOrigin: activePlaylistOrigin
+        )
     }
 
     private func accumulateHistoryPlaybackTime() {
-        guard preferences.recordsWatchHistory else {
-            historyRecordedVideoID = nil
-            historyPlaybackSeconds = 0
-            lastHistoryPlaybackTick = nil
-            return
-        }
-        let now = Date()
-        guard player.timeControlStatus == .playing else {
-            lastHistoryPlaybackTick = nil
-            return
-        }
-        if let previous = lastHistoryPlaybackTick {
-            // Cap a delayed observer callback so backgrounding or a blocked main thread cannot
-            // count wall-clock time during which playback was not actually observed.
-            historyPlaybackSeconds += min(max(now.timeIntervalSince(previous), 0), 1)
-        }
-        lastHistoryPlaybackTick = now
+        watchHistory.accumulatePlaybackTime(
+            isPlaying: player.timeControlStatus == .playing,
+            recordsHistory: preferences.recordsWatchHistory
+        )
     }
 
     /// A mixable session should not compete for Now Playing while another app is active. When the
