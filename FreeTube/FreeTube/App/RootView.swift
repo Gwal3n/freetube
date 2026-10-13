@@ -94,7 +94,7 @@ struct RootView: View {
         queueNoticeBottomPadding + (player.queueNotice == nil ? 0 : MediaStyle.actionSize + 8)
     }
 
-    var body: some View {
+    private var playerPresentation: some View {
         SwiftUIPlayerContainer {
             tabShell
         }
@@ -133,6 +133,10 @@ struct RootView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    private var playerLifecycle: some View {
+        playerPresentation
         .onChange(of: player.fullScreenPresented) { _, presented in
             log.info("Player expanded presentation changed: \(presented)")
             if presented {
@@ -152,6 +156,10 @@ struct RootView: View {
                 player.requestInlinePlaybackRestoration()
             }
         }
+    }
+
+    private var navigationEvents: some View {
+        playerLifecycle
         // Menu-bar / keyboard-shortcut driven tab switching from `MacCommands`. The
         // notification is meaningful only on Mac (where the menu bar exists) and on iPad
         // with a hardware keyboard; everywhere else nobody posts it and this is a no-op.
@@ -183,19 +191,15 @@ struct RootView: View {
             guard let playlistID = note.object as? String, !playlistID.isEmpty else { return }
             routeFromPlayer(.localPlaylist(playlistID))
         }
+    }
+
+    var body: some View {
+        navigationEvents
         .onAppear {
             log.info("Root appeared with tab=\(selectedTab.rawValue, privacy: .public)")
             selectVisibleTabIfNeeded()
         }
-        .onChange(of: showsFeed) { _, _ in
-            selectVisibleTabIfNeeded()
-        }
-        .onChange(of: showsLibrary) { _, _ in
-            selectVisibleTabIfNeeded()
-        }
-        .onChange(of: showDownloadsTab) { _, _ in selectVisibleTabIfNeeded() }
-        .onChange(of: showSearchTab) { _, _ in selectVisibleTabIfNeeded() }
-        .onChange(of: showSettingsTab) { _, _ in selectVisibleTabIfNeeded() }
+        .onChange(of: visibleTabs) { _, _ in selectVisibleTabIfNeeded() }
         .onChange(of: selectedTab) { previous, tab in
             log.info("Tab changed: \(previous.rawValue, privacy: .public) → \(tab.rawValue, privacy: .public)")
         }
