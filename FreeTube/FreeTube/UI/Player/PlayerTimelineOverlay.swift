@@ -14,6 +14,7 @@ struct PlayerTimelineOverlay: View {
         if player.currentVideo?.isLive == true {
             LiveDVRTimeline(
                 elapsed: player.elapsed,
+                previewElapsed: previewElapsed,
                 seekableRange: player.liveSeekableRange,
                 onSeek: onSeek,
                 onGoLive: { player.seekToLive() }

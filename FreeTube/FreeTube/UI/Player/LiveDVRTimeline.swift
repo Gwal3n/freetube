@@ -6,6 +6,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LiveDVRTimeline: View {
     let elapsed: TimeInterval
+    let previewElapsed: TimeInterval?
     let seekableRange: ClosedRange<TimeInterval>?
     let onSeek: (TimeInterval) -> Void
     let onGoLive: () -> Void
@@ -15,13 +16,20 @@ struct LiveDVRTimeline: View {
 
     var body: some View {
         if let range = dragRange ?? seekableRange, range.upperBound - range.lowerBound >= 30 {
-            let position = dragTarget ?? elapsed
+            let position = dragTarget ?? previewElapsed ?? elapsed
             let behindLive = max(0, range.upperBound - position)
             let atLiveEdge = behindLive < 10
+            // HLS playback naturally sits a few seconds behind the latest seekable sample.
+            // Use the same live-edge threshold for the label and LIVE button so a return to
+            // live does not visibly count down from -0:04 and restart on every playlist tick.
+            let displayedOffset = atLiveEdge && dragTarget == nil && previewElapsed == nil
+                ? 0 : behindLive
+            let displayedPosition = displayedOffset == 0 && dragTarget == nil && previewElapsed == nil
+                ? range.upperBound : position
 
             VStack(spacing: 4) {
                 HStack {
-                    Text(verbatim: formatOffset(behindLive))
+                    Text(verbatim: formatOffset(displayedOffset))
                         .monospacedDigit()
                     Spacer()
                     Button(action: onGoLive) {
@@ -42,7 +50,7 @@ struct LiveDVRTimeline: View {
 
                 GeometryReader { proxy in
                     let width = max(proxy.size.width, 1)
-                    let progress = fraction(of: position, in: range)
+                    let progress = fraction(of: displayedPosition, in: range)
 
                     ZStack(alignment: .leading) {
                         Capsule().fill(.white.opacity(0.28)).frame(height: 4)
@@ -76,7 +84,7 @@ struct LiveDVRTimeline: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Live playback position")
-            .accessibilityValue("\(formatOffset(behindLive)) behind live")
+            .accessibilityValue("\(formatOffset(displayedOffset)) behind live")
             .accessibilityAdjustableAction { direction in
                 let delta: TimeInterval = direction == .increment ? 10 : -10
                 onSeek(min(max(elapsed + delta, range.lowerBound), range.upperBound))

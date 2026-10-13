@@ -185,6 +185,7 @@ struct FullScreenPlayer: View {
                         onSeekPreview: { seconds in
                             gestureSeekPreview = seconds
                         },
+                        liveSeekableRange: { player.liveSeekableRange },
                         onTogglePlayback: {
                             player.togglePlayPause()
                         },

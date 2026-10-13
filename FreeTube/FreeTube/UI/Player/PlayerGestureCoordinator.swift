@@ -14,6 +14,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var onSeekRelative: (TimeInterval) -> Void
     private var onSeekAbsolute: (TimeInterval) -> Void
     private var onSeekPreview: (TimeInterval?) -> Void
+    private var liveSeekableRange: () -> ClosedRange<TimeInterval>?
     private var onTogglePlayback: () -> Void
     private var onHoldSpeedChange: (Double?) -> Double
     private var effectivePlaybackRate: Double
@@ -38,7 +39,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var seekSessionTotal: TimeInterval = 0
     private var horizontalSeekStart: TimeInterval?
     private var horizontalSeekTarget: TimeInterval?
-    private var horizontalSeekDuration: TimeInterval?
+    private var horizontalSeekRange: ClosedRange<TimeInterval>?
+    private var horizontalSeekIsLive = false
     private var horizontalSeekPeakVelocity: CGFloat = 0
     private var isHoldingForSpeed = false
     private var holdForSpeedEnabled: Bool
@@ -56,6 +58,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
+        liveSeekableRange: @escaping () -> ClosedRange<TimeInterval>?,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void,
         onRestoreFromPictureInPicture: @escaping () -> Void
@@ -69,6 +72,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
+        self.liveSeekableRange = liveSeekableRange
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
         self.onRestoreFromPictureInPicture = onRestoreFromPictureInPicture
@@ -98,6 +102,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekRelative: @escaping (TimeInterval) -> Void,
         onSeekAbsolute: @escaping (TimeInterval) -> Void,
         onSeekPreview: @escaping (TimeInterval?) -> Void,
+        liveSeekableRange: @escaping () -> ClosedRange<TimeInterval>?,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void,
         onRestoreFromPictureInPicture: @escaping () -> Void
@@ -119,6 +124,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
+        self.liveSeekableRange = liveSeekableRange
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
         self.onRestoreFromPictureInPicture = onRestoreFromPictureInPicture
@@ -253,10 +259,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func performDoubleTapSeek(at location: CGPoint) {
-        guard let view = gestureView,
-              let itemDuration = player?.currentItem?.duration.seconds,
-              itemDuration.isFinite,
-              itemDuration > 0 else { return }
+        guard let view = gestureView, let item = player?.currentItem else { return }
+        let itemDuration = item.duration.seconds
+        guard (itemDuration.isFinite && itemDuration > 0) || liveSeekableRange() != nil else { return }
         let isForward = location.x >= view.bounds.midX
         let interval: TimeInterval = isForward ? 10 : -10
         log.info("Double tap recognized; seeking \(interval, privacy: .public)s")
@@ -337,13 +342,24 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             guard let player else { return }
             let current = player.currentTime().seconds
             let duration = player.currentItem?.duration.seconds ?? .nan
-            guard current.isFinite, duration.isFinite, duration > 0 else {
+            let liveRange = liveSeekableRange()
+            let range: ClosedRange<TimeInterval>
+            if let liveRange {
+                range = liveRange
+            } else if duration.isFinite, duration > 0 {
+                range = 0...duration
+            } else {
                 resetHorizontalSeek()
                 return
             }
-            horizontalSeekStart = min(max(current, 0), duration)
+            guard current.isFinite, range.upperBound > range.lowerBound else {
+                resetHorizontalSeek()
+                return
+            }
+            horizontalSeekStart = min(max(current, range.lowerBound), range.upperBound)
             horizontalSeekTarget = horizontalSeekStart
-            horizontalSeekDuration = duration
+            horizontalSeekRange = range
+            horizontalSeekIsLive = liveRange != nil
             horizontalSeekPeakVelocity = 0
             onSeekPreview(horizontalSeekStart)
         case .changed:
@@ -353,8 +369,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                 return
             }
             guard let start = horizontalSeekStart,
-                  let duration = horizontalSeekDuration,
+                  let range = horizontalSeekRange,
                   view.bounds.width > 0 else { return }
+            let duration = range.upperBound - range.lowerBound
             let translation = gesture.translation(in: view).x
             let precisionRange: TimeInterval
             if duration >= 3_600 {
@@ -383,13 +400,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
                 + (durationRelativeRange - precisionRange) * velocityProgress
             let dragFraction = TimeInterval(translation / view.bounds.width)
             let target = min(
-                max(start + dragFraction * activeRange, 0),
-                duration
+                max(start + dragFraction * activeRange, range.lowerBound),
+                range.upperBound
             )
             horizontalSeekTarget = target
             onSeekPreview(target)
             showFeedback(
-                horizontalSeekText(target: target, duration: duration),
+                horizontalSeekIsLive
+                    ? liveHorizontalSeekText(target: target, start: start)
+                    : horizontalSeekText(target: target, duration: duration),
                 horizontalFraction: 0.5,
                 verticalFraction: 0.10,
                 compact: true,
@@ -492,10 +511,16 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 
+    private func liveHorizontalSeekText(target: TimeInterval, start: TimeInterval) -> String {
+        let offset = Int((target - start).rounded())
+        return offset >= 0 ? "+\(offset)s" : "−\(abs(offset))s"
+    }
+
     private func resetHorizontalSeek() {
         horizontalSeekStart = nil
         horizontalSeekTarget = nil
-        horizontalSeekDuration = nil
+        horizontalSeekRange = nil
+        horizontalSeekIsLive = false
         horizontalSeekPeakVelocity = 0
     }
 
