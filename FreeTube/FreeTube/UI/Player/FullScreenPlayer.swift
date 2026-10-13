@@ -594,8 +594,8 @@ struct FullScreenPlayer: View {
             .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: player.fullScreenPresented)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromePresentationReady)
         }
-        // Ensure the system status bar stays visible with light glyphs against the dark material.
-        .preferredColorScheme(.dark)
+        // Video chrome stays dark without forcing the entire app window into dark appearance.
+        .environment(\.colorScheme, .dark)
         .statusBarHidden(portraitFullscreenActive)
         .sensoryFeedback(.success, trigger: savedMomentFeedbackCount)
         // Presents UIActivityViewController for the "Open in…" menu action. Wrapping shareFileURL

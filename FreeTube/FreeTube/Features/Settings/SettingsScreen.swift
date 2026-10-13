@@ -1,341 +1,49 @@
 import SwiftUI
 
+/// A short, native Settings index. Each destination owns one coherent group of controls.
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     let onClose: () -> Void
-    @Environment(PlayerStateManager.self) private var player
-    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
-    @AppStorage("playbackSpeedChoices") private var savedPlaybackSpeedsRaw = ""
-    @AppStorage("customPlaybackSpeeds") private var legacyCustomPlaybackSpeedsRaw = ""
     @State private var model = SettingsViewModel()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
-
-    /// Observed so the "Save logs to file" section re-renders when the writer opens / closes
-    /// the current log file.
-    @State private var logWriter = LogFileWriter.shared
-
-    /// Wraps a single URL for the Share sheet. Optional because the sheet only presents when
-    /// the user taps "Share latest log" AND there's a file to share. `nil` → sheet not shown.
-    @State private var shareLogURL: URL?
-
-    /// "Are you sure?" confirmation for the destructive Clear-all-logs button.
-    @State private var showingClearLogsConfirmation = false
-    @State private var showingClearHistoryConfirmation = false
-    @State private var showingHoldSpeedEditor = false
-    @State private var holdSpeedText = ""
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Preferred quality", selection: Bindable(model).preferredQuality) {
-                        ForEach(VideoQuality.allCases) { quality in
-                            Text(quality.displayName).tag(quality)
-                        }
+                    settingsLink("Playback", systemImage: "play.circle") {
+                        PlaybackSettingsScreen(model: model)
                     }
-                    NavigationLink {
-                        CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
-                    } label: {
-                        LabeledContent {
-                            Text(verbatim: PlaybackSpeedPresets.label(model.defaultPlaybackRate))
-                                .foregroundStyle(.secondary)
-                        } label: {
-                            navigationLabel("Playback speeds", systemImage: "speedometer")
-                        }
+                    settingsLink("Browsing", systemImage: "rectangle.stack") {
+                        BrowsingSettingsScreen(model: model)
                     }
-                    .tint(.white)
-                    .onChange(of: model.defaultPlaybackRate) { _, rate in
-                        player.setPlaybackRate(rate)
+                    settingsLink("Appearance", systemImage: "paintbrush") {
+                        AppearanceSettingsScreen(model: model)
                     }
-                    .onChange(of: savedPlaybackSpeedsRaw) { _, _ in
-                        if !defaultPlaybackRates.contains(model.defaultPlaybackRate) {
-                            model.defaultPlaybackRate = 1
-                        }
+                    settingsLink("Library & Data", systemImage: "books.vertical") {
+                        LibraryDataSettingsScreen(model: model)
                     }
-                    Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
-                    Button {
-                        holdSpeedText = model.holdSpeedRate.formatted(.number.precision(.fractionLength(0...2)))
-                        showingHoldSpeedEditor = true
-                    } label: {
-                        LabeledContent("Hold speed") {
-                            Text(verbatim: PlaybackSpeedPresets.label(model.holdSpeedRate))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .tint(.primary)
-                    .disabled(!model.holdForSpeedEnabled)
-                    Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
-                    Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
-                        Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
-                        Text("Brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
-                        Text("Off").tag(PlayerVerticalSwipeAction.off)
-                    }
-                    Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
-                    Toggle("Show description", isOn: Bindable(model).showDescription)
-                    Toggle("Show comments", isOn: Bindable(model).showComments)
-                    if model.showComments {
-                        Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
-                    }
-                    Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
-                    if model.showUpNext {
-                        Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
-                            LabeledContent("Initial Up Next videos") {
-                                Text("\(model.upNextInitialCount)")
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
-                    Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
-                } header: {
-                    Text("Playback")
-                } footer: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if model.playerVerticalSwipeAction == .adjustPlayback {
-                            Text("In fullscreen, swipe on the left for screen brightness or the right for FreeTube's playback volume. The device volume buttons still control system volume.")
-                        }
-                        Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. Prefetching loads details and the first comments page after playback starts. Allowing other audio may leave another app in control of Lock Screen playback.")
-                    }
-                }
-
-                Section("Captions") {
-                    Toggle("Dark caption background", isOn: Bindable(model).captionBackgroundEnabled)
-                    Toggle("Use source formatting", isOn: Bindable(model).formattedCaptions)
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Caption text size")
-                            Spacer()
-                            Text(verbatim: "\(Int((model.captionTextScale * 100).rounded()))%")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(value: Bindable(model).captionTextScale, in: 0.8...1.5, step: 0.1)
-                            .accessibilityLabel("Caption text size")
+                    settingsLink("Downloads", systemImage: "arrow.down.circle") {
+                        DownloadsSettingsScreen(model: model)
                     }
                 }
 
                 Section {
-                    Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
-                    Toggle("Save recent searches", isOn: Bindable(model).saveSearchHistory)
-                } header: {
-                    Text("Search")
-                } footer: {
-                    Text("Turning off recent searches stops saving new queries. Existing searches remain until cleared from Search.")
-                }
-
-                Section("Privacy") {
-                    NavigationLink {
-                        IncognitoSettingsScreen()
-                    } label: {
-                        HStack {
-                            navigationLabel("Incognito", systemImage: "eye.slash")
-                            Spacer()
-                            if incognitoEnabled {
-                                Text("On")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                    settingsLink("Privacy", systemImage: "hand.raised") {
+                        PrivacySettingsScreen()
                     }
-                    .tint(.white)
-                    NavigationLink {
-                        VideoBlockingSettingsScreen()
-                    } label: {
-                        navigationLabel("Blocked content", systemImage: "hand.raised")
-                    }
-                    .tint(.white)
-                }
-
-                Section {
-                    Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
-                    Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
-                    Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
-                    Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
-                    if model.automaticFeedRefreshEnabled {
-                        Picker("Refresh interval", selection: Bindable(model).automaticFeedRefreshInterval) {
-                            ForEach(FeedRefreshInterval.allCases) { interval in
-                                switch interval {
-                                case .hourly: Text("Every hour").tag(interval)
-                                case .everySixHours: Text("Every 6 hours").tag(interval)
-                                case .everyTwelveHours: Text("Every 12 hours").tag(interval)
-                                case .daily: Text("Every day").tag(interval)
-                                }
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Feed")
-                } footer: {
-                    Text("Hiding Feed does not remove your subscriptions. Automatic refresh runs only while the Feed tab is selected and the app is active.")
-                }
-
-                Section("Channels") {
-                    NavigationLink {
-                        SubscriptionGroupsScreen(isEmbedded: true)
-                    } label: {
-                        navigationLabel("Manage subscription groups", systemImage: "square.stack.3d.up")
-                    }
-                    .tint(.white)
-                    NavigationLink {
-                        ChannelTabsSettingsScreen()
-                    } label: {
-                        navigationLabel("Channel tabs", systemImage: "rectangle.stack")
-                    }
-                    .tint(.white)
-                }
-
-                Section {
-                    Picker("Text font", selection: Bindable(model).appFontPreset) {
-                        ForEach(AppFontPreset.allCases) { preset in
-                            preset.label
-                                .font(preset.font(.body))
-                                .tag(preset)
-                        }
-                    }
-                } header: {
-                    Text("Appearance")
-                }
-
-                Section {
-                    NavigationLink {
+                    settingsLink("SponsorBlock & DeArrow", systemImage: "sparkles") {
                         CommunityEnhancementsSettingsScreen(model: model)
-                            .onAppear { log.info("Settings community enhancements destination appeared") }
-                    } label: {
-                        navigationLabel("SponsorBlock and DeArrow", systemImage: "sparkles")
                     }
-                    .tint(.white)
-                } header: {
-                    Text("Community enhancements")
-                }
-
-                Section("Player controls") {
-                    NavigationLink {
-                        PlayerControlsSettingsScreen(model: model)
-                            .onAppear { log.info("Settings controls destination appeared") }
-                    } label: {
-                        navigationLabel("Customize controls", systemImage: "slider.horizontal.3")
-                    }
-                    .tint(.white)
                 }
 
                 Section {
-                    NavigationLink {
-                        ImportDataScreen()
-                            .onAppear { log.info("Settings import destination appeared") }
-                    } label: {
-                        navigationLabel("Import & Export", systemImage: "square.and.arrow.down")
+                    settingsLink("Diagnostics", systemImage: "stethoscope") {
+                        DiagnosticsSettingsScreen(model: model)
                     }
-                    .tint(.white)
-                    Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
-                    Toggle("Add to history when opened", isOn: Bindable(model).addToHistoryWhenOpened)
-                        .disabled(!model.saveWatchHistory)
-                    Toggle("Continue Watching in Library", isOn: Bindable(model).showContinueWatchingMenu)
-                    Toggle("Library video shelf", isOn: Bindable(model).showLibraryShelf)
-                        .disabled(!model.saveWatchHistory)
-                    if model.showLibraryShelf && model.saveWatchHistory {
-                        Picker("Shelf content", selection: Bindable(model).libraryShelfContent) {
-                            ForEach(LibraryShelfContent.allCases) { content in
-                                Text(content.settingsTitle).tag(content)
-                            }
-                        }
-                        Stepper(value: Bindable(model).recentLibraryVideoCount, in: 3...12) {
-                            LabeledContent("Shelf videos") {
-                                Text("\(model.recentLibraryVideoCount)")
-                                    .monospacedDigit()
-                            }
-                        }
+                    settingsLink("About", systemImage: "info.circle") {
+                        AboutSettingsScreen()
                     }
-                    Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
-                        ForEach(HistoryRetentionPolicy.allCases) { policy in
-                            Text(policy.title).tag(policy)
-                        }
-                    }
-                    .disabled(!model.saveWatchHistory)
-                    Button(role: .destructive) {
-                        showingClearHistoryConfirmation = true
-                    } label: {
-                        Label("Clear Watch History", systemImage: "trash")
-                    }
-                } header: {
-                    Text("Data")
-                } footer: {
-                    Text("Turning this off stops recording history and playback positions. Existing history stays on this device until you clear it.")
-                }
-
-                Section {
-                    Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
-                    Picker("Parallel fragments", selection: Bindable(model).concurrentFragments) {
-                        ForEach([1, 2, 4, 8, 16], id: \.self) { value in
-                            Text(value == 1 ? "1 (sequential)" : "\(value)").tag(value)
-                        }
-                    }
-                } header: {
-                    Text("Downloads")
-                } footer: {
-                    DownloadsSettingsFooter()
-                }
-
-                Section {
-                    Toggle("Save logs to file", isOn: Bindable(model).logToFile)
-                    if model.logToFile, let url = logWriter.currentLogFileURL {
-                        LabeledContent("Current log") {
-                            Text(url.lastPathComponent)
-                                .font(.caption.monospaced())
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                    }
-                    Button {
-                        // Prefer the active file; fall back to the latest historical one
-                        // so the Share button still works right after the toggle is flipped
-                        // off (writer closes the file, currentLogFileURL goes nil, but the
-                        // file is still on disk and shareable).
-                        log.info("Settings Share latest log requested")
-                        shareLogURL = logWriter.currentLogFileURL ?? LogFileWriter.allLogFiles().first
-                    } label: {
-                        Label("Share latest log…", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(LogFileWriter.allLogFiles().isEmpty)
-                    if MacIntegration.isRunningOnMac {
-                        Button {
-                            MacIntegration.revealInFinder(LogFileWriter.logsDirectory())
-                        } label: {
-                            Label("Show log folder", systemImage: "folder")
-                        }
-                    }
-                    Button(role: .destructive) {
-                        showingClearLogsConfirmation = true
-                    } label: {
-                        Label("Clear all logs", systemImage: "trash")
-                    }
-                    .disabled(LogFileWriter.allLogFiles().isEmpty)
-                } header: {
-                    Text("Diagnostics")
-                } footer: {
-                    Text("Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries.")
-                }
-
-                Section {
-                    LabeledContent("Version") {
-                        Text(appVersion)
-                            .monospacedDigit()
-                    }
-                    LabeledContent("Build") {
-                        Text(appBuild)
-                            .monospacedDigit()
-                    }
-                    LabeledContent("Revision") {
-                        Text(appRevision)
-                            .font(.body.monospaced())
-                            .textSelection(.enabled)
-                    }
-                    Text("An account-free YouTube client for personal use. Playback and downloads may break when YouTube changes its internal APIs.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("About")
-                } footer: {
-                    Text("[freetube.io](https://freetube.io)")
                 }
             }
             .navigationTitle("Settings")
@@ -348,81 +56,20 @@ struct SettingsScreen: View {
                     }
                 }
             }
-            // System Share sheet for the log file. `ShareLink` would be cleaner, but
-            // file:// URLs inside SwiftUI's `ShareLink` sometimes serialize as plain text
-            // — UIActivityViewController via the existing `ActivityShareSheet` is the
-            // reliable path for picking "Save to Files", AirDrop, Mail, etc.
-            .sheet(isPresented: Binding(
-                get: { shareLogURL != nil },
-                set: { if !$0 { shareLogURL = nil } }
-            )) {
-                if let url = shareLogURL {
-                    ActivityShareSheet(activityItems: [url])
-                }
-            }
-            .confirmationDialog(
-                "Delete all log files?",
-                isPresented: $showingClearLogsConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    model.clearLogFiles()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes every saved diagnostic log. If \"Save logs to file\" is on, a fresh log file will be opened for new entries.")
-            }
-            .confirmationDialog(
-                "Clear local watch history?",
-                isPresented: $showingClearHistoryConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Clear History", role: .destructive) {
-                    model.clearLocalHistory()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes watch history stored by FreeTube on this device.")
-            }
-        }
-        .alert("Hold speed", isPresented: $showingHoldSpeedEditor) {
-            TextField("Speed", text: $holdSpeedText)
-                .keyboardType(.decimalPad)
-            Button("Set Speed") {
-                if let rate = PlaybackSpeedPresets.parse(holdSpeedText) {
-                    model.holdSpeedRate = rate
-                }
-            }
-            .disabled(PlaybackSpeedPresets.parse(holdSpeedText) == nil)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Enter 0.25× to 5×, with up to two decimal places.")
         }
     }
 
-    private var defaultPlaybackRates: [Double] {
-        PlaybackSpeedPresets.availableRates(
-            savedRaw: savedPlaybackSpeedsRaw,
-            legacyCustomRaw: legacyCustomPlaybackSpeedsRaw
-        )
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-    }
-
-    private var appBuild: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-    }
-
-    private var appRevision: String {
-        guard let revision = Bundle.main.infoDictionary?["FreeTubeCommit"] as? String,
-              !revision.isEmpty else { return "local" }
-        return revision
-    }
-
-    private func navigationLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-        .foregroundStyle(.primary)
+    private func settingsLink<Destination: View>(
+        _ title: LocalizedStringKey,
+        systemImage: String,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            Label(title, systemImage: systemImage)
+                .foregroundStyle(.primary)
+        }
+        .tint(.primary)
     }
 }

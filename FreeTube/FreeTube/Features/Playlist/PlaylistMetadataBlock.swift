@@ -48,11 +48,11 @@ struct PlaylistMetadataBlock: View {
                             .font(.caption2.weight(.bold))
                     }
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+                    .overlay(Capsule().stroke(Color.primary.opacity(0.18), lineWidth: 0.5))
                     .frame(minHeight: MediaStyle.actionSize)
                     .contentShape(Rectangle())
                 }

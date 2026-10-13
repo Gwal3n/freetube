@@ -97,7 +97,7 @@ struct LocalSubscriptionsScreen: View {
                     NotificationCenter.default.post(name: .freetubeOpenSubscriptionGroups, object: nil)
                 } label: {
                     Image(systemName: "square.stack.3d.up")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
                 .accessibilityLabel("Subscription groups")
             }

@@ -1,6 +1,104 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Appearance" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Darstellung" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Apariencia" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Apparence" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Оформление" } }
+    } },
+    "Browsing" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Entdecken" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Browsing" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Explorar" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Explorer" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Просмотр" } }
+    } },
+    "Library & Data" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Mediathek & Daten" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Library & Data" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Biblioteca y datos" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Bibliothèque et données" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Медиатека и данные" } }
+    } },
+    "Privacy" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Datenschutz" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Privacy" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Privacidad" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Confidentialité" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Конфиденциальность" } }
+    } },
+    "SponsorBlock & DeArrow" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock & DeArrow" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock & DeArrow" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock y DeArrow" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock et DeArrow" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "SponsorBlock и DeArrow" } }
+    } },
+    "Tab Bar" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Tableiste" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Tab Bar" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Barra de pestañas" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Barre d’onglets" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Панель вкладок" } }
+    } },
+    "Show tab names" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Tabnamen anzeigen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Show tab names" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar nombres de pestañas" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher le nom des onglets" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показывать названия вкладок" } }
+    } },
+    "Tab order" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Tabreihenfolge" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Tab order" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Orden de pestañas" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ordre des onglets" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Порядок вкладок" } }
+    } },
+    "Navigation" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Navigation" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Navigation" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Navegación" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Navigation" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Навигация" } }
+    } },
+    "Light" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Hell" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Claro" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Clair" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Светлая" } }
+    } },
+    "Dark" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Dunkel" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Oscuro" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Sombre" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Тёмная" } }
+    } },
+    "Icons remain accessible by name when labels are hidden." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Auch ohne sichtbare Beschriftung bleiben die Symbole über ihren Namen zugänglich." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Icons remain accessible by name when labels are hidden." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Los iconos siguen siendo accesibles por su nombre cuando se ocultan las etiquetas." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les icônes restent accessibles par leur nom lorsque les libellés sont masqués." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Даже без подписей значки остаются доступны по названию." } }
+    } },
+    "Drag the handles to reorder tabs. Search keeps its native system position." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Ziehe die Griffe, um die Tabs neu anzuordnen. Suche bleibt an der systemseitig vorgegebenen Position." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag the handles to reorder tabs. Search keeps its native system position." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Arrastra los controles para reordenar las pestañas. Buscar conserva la posición del sistema." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Faites glisser les poignées pour réorganiser les onglets. Recherche conserve sa place native." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перетаскивайте маркеры, чтобы изменить порядок вкладок. Поиск остаётся на системном месте." } }
+    } },
+    "The video player keeps a dark canvas in every appearance." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Der Videoplayer behält in jeder Darstellung einen dunklen Hintergrund." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "The video player keeps a dark canvas in every appearance." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "El reproductor de vídeo mantiene un fondo oscuro en todos los modos." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Le lecteur vidéo conserve un fond sombre dans tous les modes." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Видеоплеер сохраняет тёмный фон при любом оформлении." } }
+    } },
     "Hooks and greetings" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Aufhänger und Begrüßungen" } },

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Shared visual roles for media browsing. Screen containers own outer margins.
 enum MediaStyle {
@@ -6,6 +7,7 @@ enum MediaStyle {
     static let thumbnailRadius: CGFloat = 8
     static let actionSize: CGFloat = 44
     static let placeholderFill = Color.secondary.opacity(0.12)
+    static let pageBackground = Color(uiColor: .systemBackground)
     static let cardHorizontalPadding: CGFloat = 16
     static let listRowInsets = EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 8)
 }

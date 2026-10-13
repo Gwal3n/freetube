@@ -36,6 +36,24 @@ struct RootView: View {
 
     enum Tab: String, Hashable {
         case feed, search, library, downloads
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .feed: "Feed"
+            case .search: "Search"
+            case .library: "Library"
+            case .downloads: "Downloads"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .feed: "rectangle.stack"
+            case .search: "magnifyingglass"
+            case .library: "play.square.stack"
+            case .downloads: "arrow.down.circle"
+            }
+        }
     }
 
     private var showsFeed: Bool {

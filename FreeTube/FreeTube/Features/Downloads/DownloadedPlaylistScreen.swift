@@ -77,7 +77,7 @@ struct DownloadedPlaylistScreen: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color.black)
+        .background(MediaStyle.pageBackground)
         .navigationTitle(manifest?.title ?? "Playlist")
         .toolbar {
             if let manifest,

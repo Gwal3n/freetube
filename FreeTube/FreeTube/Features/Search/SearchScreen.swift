@@ -546,7 +546,7 @@ struct SearchContent: View {
                         showingClearSearchHistoryConfirmation = true
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .textCase(nil)
                     .frame(minWidth: 44, minHeight: 44)
                     .accessibilityLabel("Clear recent searches")

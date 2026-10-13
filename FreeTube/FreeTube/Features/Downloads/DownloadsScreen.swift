@@ -242,7 +242,7 @@ struct DownloadsScreen: View {
                 isSelecting = false
             }
             .scrollContentBackground(.hidden)
-            .background(Color.black)
+            .background(MediaStyle.pageBackground)
             .navigationTitle(isSelecting
                              ? String(localized: "\(selectedIDs.count) selected")
                              : String(localized: "Downloads"))
@@ -384,7 +384,7 @@ struct DownloadsScreen: View {
                     } label: {
                         Label(sortLabel, systemImage: "arrow.up.arrow.down")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .frame(minHeight: 44)
                     }
                     .accessibilityLabel("Sort saved videos")

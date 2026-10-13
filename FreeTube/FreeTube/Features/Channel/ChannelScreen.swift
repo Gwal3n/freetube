@@ -45,6 +45,7 @@ struct ChannelScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
 
     private let prefetchLookahead = 5
 
@@ -68,7 +69,7 @@ struct ChannelScreen: View {
     /// double movement you get from putting a collapsing header inside the thing that scrolls it.
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
+            MediaStyle.pageBackground.ignoresSafeArea()
 
             if let details = model.details {
                 pager(details)
@@ -91,18 +92,15 @@ struct ChannelScreen: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .navigationTitle(showsNavigationTitle ? (model.details?.channel.name ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             channelActionsToolbar
         }
-        // Transparent over the banner, which is what makes the top of the screen feel immersive,
-        // then solid black on the same trigger as the title. Black rather than a material because
-        // by the time the title appears the header behind the bar is also black, and a blur would
-        // draw a seam across a surface that should read as one continuous piece with the tab row.
+        // Transparent over the banner, then the same system background as the profile row
+        // once the title appears. This avoids a seam in either light or dark appearance.
         .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
-        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarBackground(MediaStyle.pageBackground, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
         .onChange(of: currentTabs) { _, tabs in
@@ -368,7 +366,7 @@ struct ChannelScreen: View {
                 }
         }
         // Opaque, because the pages scroll underneath it rather than below it.
-        .background(Color.black)
+        .background(MediaStyle.pageBackground)
         .offset(y: -headerOffset)
         .onPreferenceChange(ChannelHeaderHeightKey.self) { headerContentHeight = $0 }
         .onPreferenceChange(ChannelTabBarHeightKey.self) { tabBarHeight = $0 }
@@ -383,7 +381,7 @@ struct ChannelScreen: View {
                 } label: {
                     Image(systemName: "square.stack.3d.up")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(showsNavigationTitle ? Color.primary : Color.white)
                 }
                 .accessibilityLabel("Add channel to group")
             }
@@ -417,7 +415,7 @@ struct ChannelScreen: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(showsNavigationTitle ? Color.primary : Color.white)
                 }
                 .accessibilityLabel("Channel actions")
             }
@@ -454,27 +452,27 @@ struct ChannelScreen: View {
 
             HStack(alignment: .center, spacing: Metrics.headerRowSpacing) {
                 Circle()
-                    .fill(Color(white: 0.2))
+                    .fill(MediaStyle.placeholderFill)
                     .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
 
                 VStack(alignment: .leading, spacing: 7) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(white: 0.2))
+                        .fill(MediaStyle.placeholderFill)
                         .frame(maxWidth: 160)
                         .frame(height: 18)
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(white: 0.16))
+                        .fill(MediaStyle.placeholderFill)
                         .frame(maxWidth: 110)
                         .frame(height: 12)
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(white: 0.16))
+                        .fill(MediaStyle.placeholderFill)
                         .frame(maxWidth: 135)
                         .frame(height: 11)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Capsule()
-                    .fill(Color(white: 0.16))
+                    .fill(MediaStyle.placeholderFill)
                     .frame(width: 92, height: 34)
             }
             .padding(.horizontal, Metrics.headerRowInset)
@@ -484,7 +482,7 @@ struct ChannelScreen: View {
             HStack(spacing: 26) {
                 ForEach([CGFloat(54), 48, 62, 47], id: \.self) { width in
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(white: 0.18))
+                        .fill(MediaStyle.placeholderFill)
                         .frame(width: width, height: 12)
                 }
                 Spacer(minLength: 0)
@@ -496,7 +494,7 @@ struct ChannelScreen: View {
             HStack {
                 Spacer()
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(white: 0.16))
+                    .fill(MediaStyle.placeholderFill)
                     .frame(width: 82, height: 13)
             }
             .padding(.horizontal, 32)
@@ -506,22 +504,22 @@ struct ChannelScreen: View {
                 ForEach(0..<4, id: \.self) { _ in
                     HStack(spacing: MediaStyle.spacing) {
                         RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
-                            .fill(Color(white: 0.16))
+                            .fill(MediaStyle.placeholderFill)
                             .frame(
                                 width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
                                 height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
                             )
                         VStack(alignment: .leading, spacing: 8) {
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color(white: 0.2))
+                                .fill(MediaStyle.placeholderFill)
                                 .frame(maxWidth: 170)
                                 .frame(height: 12)
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color(white: 0.16))
+                                .fill(MediaStyle.placeholderFill)
                                 .frame(maxWidth: 115)
                                 .frame(height: 11)
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color(white: 0.16))
+                                .fill(MediaStyle.placeholderFill)
                                 .frame(width: 72, height: 10)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -557,21 +555,21 @@ struct ChannelScreen: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(channel.name)
                         .appFont(.title3, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
 
                     if let handle = channel.handle, !handle.isEmpty {
                         Text(handle)
                             .appFont(.subheadline)
-                            .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Color.primary.opacity(0.7))
                             .lineLimit(1)
                     }
 
                     if !channelStats(channel).isEmpty {
                         Text(channelStats(channel))
                             .appFont(.footnote)
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color.primary.opacity(0.5))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -591,10 +589,10 @@ struct ChannelScreen: View {
 
     private func avatar(_ channel: Channel) -> some View {
         ZStack {
-            Circle().fill(Color(white: 0.16))
+            Circle().fill(MediaStyle.placeholderFill)
             Text(channel.name.prefix(1).uppercased())
                 .font(.title.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Color.primary.opacity(0.7))
             KFImage(channel.thumbnailURL)
                 .thumbnail(size: CGSize(width: Metrics.avatarSize, height: Metrics.avatarSize)) {
                     Color.clear
@@ -611,7 +609,7 @@ struct ChannelScreen: View {
         // A hairline rather than the thick black ring the straddling version used. That ring was
         // cutting the avatar out of the banner behind it; here there is nothing behind it but the
         // page, so the edge only needs defining against a dark image.
-        .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
     }
 
     /// Full-bleed banner whose layout stays at its original height while only its artwork extends
@@ -649,13 +647,13 @@ struct ChannelScreen: View {
                 }
                 .overlay {
                     // Keep navigation actions legible over bright banners and dissolve the lower
-                    // edge into the profile row's black background.
+                    // edge into the profile row's current system background.
                     LinearGradient(
                         stops: [
                             .init(color: .black.opacity(0.55), location: 0),
                             .init(color: .clear, location: 0.35),
                             .init(color: .clear, location: 0.55),
-                            .init(color: .black.opacity(0.85), location: 1)
+                            .init(color: MediaStyle.pageBackground.opacity(0.95), location: 1)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -679,7 +677,8 @@ struct ChannelScreen: View {
 
     /// Subscribed state is the quiet one. An unsubscribed channel gets a solid white capsule
     /// because subscribing is the screen's primary action; once subscribed the control becomes a
-    /// low-contrast confirmation so it stops competing with the content below it.
+    /// low-contrast confirmation so it stops competing with the content below it. The
+    /// prominent capsule inverts with the current appearance for readable contrast.
     @ViewBuilder
     private func subscribeButton(_ channel: Channel) -> some View {
         Button {
@@ -693,7 +692,9 @@ struct ChannelScreen: View {
                 }
             }
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(channel.isSubscribed ? Color.white : Color.black)
+            .foregroundStyle(channel.isSubscribed
+                ? Color.primary
+                : (colorScheme == .dark ? Color.black : Color.white))
             // `fixedSize` so the capsule hugs its label. Without it the button inherits the
             // header's width and spans the screen.
             .fixedSize(horizontal: true, vertical: false)
@@ -703,7 +704,9 @@ struct ChannelScreen: View {
             .padding(.horizontal, channel.isSubscribed ? 12 : 18)
             .frame(height: 34)
             .background(
-                channel.isSubscribed ? AnyShapeStyle(Color.white.opacity(0.14)) : AnyShapeStyle(Color.white),
+                channel.isSubscribed
+                    ? AnyShapeStyle(Color.primary.opacity(0.12))
+                    : AnyShapeStyle(colorScheme == .dark ? Color.white : Color.black),
                 in: Capsule()
             )
             .contentShape(Capsule())
@@ -740,7 +743,7 @@ struct ChannelScreen: View {
                             VStack(spacing: 7) {
                                 Text(tab.title)
                                     .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                    .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.5))
+                                    .foregroundStyle(isSelected ? Color.primary : Color.primary.opacity(0.5))
                                     .fixedSize()
                                 // Reserves the underline's row so the labels don't shift when it
                                 // moves; the underline itself is drawn once, in the overlay below.
@@ -765,7 +768,7 @@ struct ChannelScreen: View {
                 .overlay(alignment: .bottomLeading) {
                     if let indicator = indicatorFrame(tabs: tabs) {
                         Capsule()
-                            .fill(Color.white)
+                            .fill(Color.primary)
                             .frame(width: indicator.width, height: 2.5)
                             .offset(x: indicator.minX)
                             // Already an exact function of where the pager is, including while a
@@ -791,7 +794,7 @@ struct ChannelScreen: View {
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(.white.opacity(0.08))
+                .fill(Color.primary.opacity(0.08))
                 .frame(height: 1)
         }
     }
@@ -873,7 +876,7 @@ struct ChannelScreen: View {
                 } label: {
                     Label(videoSort.title, systemImage: "arrow.up.arrow.down")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
             }
             .padding(.horizontal, 16)

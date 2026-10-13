@@ -78,11 +78,8 @@ struct UserPreferences {
     /// capturing diagnostic traces from TestFlight / sideload installs where Console.app
     /// access isn't practical. Defaults off — only a handful of users will ever flip this.
     @AppStorage("logToFile") var logToFile: Bool = false
-    /// When true (default), `PlayerStateManager` kicks off a background download of the
-    /// next queue item right after the current video starts playing — so Next-tap is
-    /// instant. Users who want to save bandwidth (or who tend not to advance through the
-    /// queue) can flip this off in Settings.
-    @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.system.rawValue
+    /// Preserve the historical dark appearance unless the user chooses System or Light.
+    @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.dark.rawValue
     @AppStorage("appFontPreset") var appFontPresetRaw: String = AppFontPreset.system.rawValue
     /// `--concurrent-fragments` value passed to yt-dlp. Higher values fetch more DASH/HLS chunks
     /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
@@ -227,7 +224,7 @@ struct UserPreferences {
     }
 
     var appearanceMode: AppearanceMode {
-        get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
+        get { AppearanceMode(rawValue: appearanceModeRaw) ?? .dark }
         nonmutating set { appearanceModeRaw = newValue.rawValue }
     }
 

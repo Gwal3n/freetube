@@ -6,6 +6,8 @@ struct RootTabShell: View {
     @Binding var selection: RootView.Tab
     let showsFeed: Bool
     let showsLibrary: Bool
+    @AppStorage("tabBarOrder") private var tabBarOrderRaw = TabBarOrder.defaultValue
+    @AppStorage("showTabBarLabels") private var showTabBarLabels = true
 
     private let downloads = DownloadManager.shared
 
@@ -18,31 +20,38 @@ struct RootTabShell: View {
         }.count
     }
 
+    private var visibleOrdinaryTabs: [RootView.Tab] {
+        TabBarOrder.tabs(from: tabBarOrderRaw).filter { tab in
+            (tab != .feed || showsFeed) && (tab != .library || showsLibrary)
+        }
+    }
+
     @ViewBuilder
     var body: some View {
         if #available(iOS 26.0, *) {
             TabView(selection: $selection) {
-                if showsFeed {
-                    SwiftUI.Tab("Feed", systemImage: "rectangle.stack", value: RootView.Tab.feed) {
-                        SubscriptionFeedScreen(selectedTab: $selection)
-                    }
-                }
-
-                if showsLibrary {
-                    SwiftUI.Tab("Library", systemImage: "play.square.stack", value: RootView.Tab.library) {
-                        NavigationStack {
-                            LibraryScreen()
+                ForEach(visibleOrdinaryTabs, id: \.self) { tab in
+                    SwiftUI.Tab(value: tab) {
+                        screen(for: tab)
+                    } label: {
+                        if showTabBarLabels {
+                            Label(tab.title, systemImage: tab.symbol)
+                        } else {
+                            Image(systemName: tab.symbol)
+                                .accessibilityLabel(Text(tab.title))
                         }
                     }
+                    .badge(tab == .downloads && activeDownloadsCount > 0 ? activeDownloadsCount : 0)
                 }
-
-                SwiftUI.Tab("Downloads", systemImage: "arrow.down.circle", value: RootView.Tab.downloads) {
-                    DownloadsScreen()
-                }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-
-                SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: RootView.Tab.search, role: .search) {
+                SwiftUI.Tab(value: RootView.Tab.search, role: .search) {
                     HomeScreen()
+                } label: {
+                    if showTabBarLabels {
+                        Label("Search", systemImage: "magnifyingglass")
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .accessibilityLabel("Search")
+                    }
                 }
             }
         } else {
@@ -54,28 +63,43 @@ struct RootTabShell: View {
     /// native Liquid Glass tab bar and a separate Search button.
     private var legacyTabShell: some View {
         TabView(selection: $selection) {
-            if showsFeed {
-                SubscriptionFeedScreen(selectedTab: $selection)
-                    .tabItem { Label("Feed", systemImage: "rectangle.stack") }
-                    .tag(RootView.Tab.feed)
+            ForEach(visibleOrdinaryTabs, id: \.self) { tab in
+                screen(for: tab)
+                    .tabItem {
+                        if showTabBarLabels {
+                            Label(tab.title, systemImage: tab.symbol)
+                        } else {
+                            Image(systemName: tab.symbol)
+                                .accessibilityLabel(Text(tab.title))
+                        }
+                    }
+                    .badge(tab == .downloads && activeDownloadsCount > 0 ? activeDownloadsCount : 0)
+                    .tag(tab)
             }
-
             HomeScreen()
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(RootView.Tab.search)
-
-            if showsLibrary {
-                NavigationStack {
-                    LibraryScreen()
+                .tabItem {
+                    if showTabBarLabels {
+                        Label("Search", systemImage: "magnifyingglass")
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .accessibilityLabel("Search")
+                    }
                 }
-                    .tabItem { Label("Library", systemImage: "play.square.stack") }
-                    .tag(RootView.Tab.library)
-            }
+                .tag(RootView.Tab.search)
+        }
+    }
 
+    @ViewBuilder
+    private func screen(for tab: RootView.Tab) -> some View {
+        switch tab {
+        case .feed:
+            SubscriptionFeedScreen(selectedTab: $selection)
+        case .library:
+            NavigationStack { LibraryScreen() }
+        case .downloads:
             DownloadsScreen()
-                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-                .badge(activeDownloadsCount > 0 ? activeDownloadsCount : 0)
-                .tag(RootView.Tab.downloads)
+        case .search:
+            HomeScreen()
         }
     }
 

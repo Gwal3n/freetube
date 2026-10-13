@@ -15,6 +15,7 @@ import SwiftData
 @available(iOS 17.0, *)
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
+    @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
     // A new app session starts on Feed. Keep selection in memory so presentations and player
     // transitions cannot change the current tab within that session.
     @State private var selectedTab = RootView.Tab.feed
@@ -25,9 +26,8 @@ struct FreeTubeApp: App {
                 .environment(appEnvironment.playerStateManager)
                 .environment(appEnvironment.appVisitState)
                 .modelContainer(PersistenceController.sharedContainer)
-                // Dark-only appearance app-wide. No user-facing toggle — the player chrome,
-                // mini-player bar, and full-screen content are all designed for dark.
-                .preferredColorScheme(.dark)
+                // The app follows the chosen appearance; video chrome keeps its own dark surface.
+                .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)
         }
         // Menu-bar items + keyboard shortcuts. Only meaningful on Mac (via "Designed for
         // iPad on Mac" — Catalyst would also pick them up if we ever enable it), but

@@ -81,7 +81,7 @@ struct PlaylistScreen: View {
             }
         }
         .ignoresSafeArea(.container, edges: model.details == nil || isSearching ? [] : .top)
-        .background(Color.black)
+        .background(MediaStyle.pageBackground)
         .coordinateSpace(name: "playlistScroll")
         .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
             guard titleBottom.isFinite else { return }
@@ -259,7 +259,7 @@ struct PlaylistScreen: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(isSearching || showsNavigationTitle ? Color.primary : Color.white)
         }
         .accessibilityLabel("More playlist actions")
     }

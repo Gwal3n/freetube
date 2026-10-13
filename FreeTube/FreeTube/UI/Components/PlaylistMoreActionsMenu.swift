@@ -12,7 +12,7 @@ struct PlaylistMoreActionsMenu: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                 .contentShape(Rectangle())
         }

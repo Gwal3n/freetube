@@ -49,7 +49,7 @@ struct ChannelGroupPickerSheet: View {
                         if isMember {
                             Image(systemName: "checkmark")
                                 .fontWeight(.semibold)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
                     }
                     .contentShape(Rectangle())

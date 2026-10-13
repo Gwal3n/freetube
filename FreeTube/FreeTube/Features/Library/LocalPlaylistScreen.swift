@@ -81,7 +81,7 @@ struct LocalPlaylistScreen: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .ignoresSafeArea(.container, edges: details == nil ? [] : .top)
-        .background(Color.black)
+        .background(MediaStyle.pageBackground)
         .coordinateSpace(name: "playlistScroll")
         .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
             guard titleBottom.isFinite else { return }
@@ -465,7 +465,7 @@ struct LocalPlaylistScreen: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(showsNavigationTitle || !searchText.isEmpty ? Color.primary : Color.white)
         }
         .accessibilityLabel("More playlist actions")
     }
@@ -528,11 +528,12 @@ struct LocalPlaylistScreen: View {
             .disabled(!videoFilters.isActive && videoSort == .custom)
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
-                .foregroundStyle(.white)
+                .foregroundStyle(showsNavigationTitle || !searchText.isEmpty ? Color.primary : Color.white)
                 .frame(width: 44, height: 44)
                 .overlay(alignment: .topTrailing) {
                     if videoFilters.isActive || videoSort != .custom {
-                        Circle().fill(.white).frame(width: 5, height: 5).padding(8)
+                        Circle().fill(showsNavigationTitle || !searchText.isEmpty ? Color.primary : Color.white)
+                            .frame(width: 5, height: 5).padding(8)
                     }
                 }
                 .contentShape(Rectangle())

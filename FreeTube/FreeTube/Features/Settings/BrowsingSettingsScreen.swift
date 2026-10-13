@@ -1,0 +1,59 @@
+import SwiftUI
+
+@available(iOS 17.0, *)
+struct BrowsingSettingsScreen: View {
+    let model: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
+                Toggle("Save recent searches", isOn: Bindable(model).saveSearchHistory)
+            } header: {
+                Text("Search")
+            } footer: {
+                Text("Turning off recent searches stops saving new queries. Existing searches remain until cleared from Search.")
+            }
+
+            Section {
+                Toggle("Show subscription feed tab", isOn: Bindable(model).showSubscriptionFeedTab)
+                Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
+                Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
+                Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
+                if model.automaticFeedRefreshEnabled {
+                    Picker("Refresh interval", selection: Bindable(model).automaticFeedRefreshInterval) {
+                        ForEach(FeedRefreshInterval.allCases) { interval in
+                            switch interval {
+                            case .hourly: Text("Every hour").tag(interval)
+                            case .everySixHours: Text("Every 6 hours").tag(interval)
+                            case .everyTwelveHours: Text("Every 12 hours").tag(interval)
+                            case .daily: Text("Every day").tag(interval)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Feed")
+            } footer: {
+                Text("Hiding Feed does not remove your subscriptions. Automatic refresh runs only while the Feed tab is selected and the app is active.")
+            }
+
+            Section("Channels") {
+                NavigationLink {
+                    SubscriptionGroupsScreen(isEmbedded: true)
+                } label: {
+                    Label("Manage subscription groups", systemImage: "square.stack.3d.up")
+                }
+                .tint(.primary)
+                NavigationLink {
+                    ChannelTabsSettingsScreen()
+                } label: {
+                    Label("Channel tabs", systemImage: "rectangle.stack")
+                }
+                .tint(.primary)
+            }
+        }
+        .navigationTitle("Browsing")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
