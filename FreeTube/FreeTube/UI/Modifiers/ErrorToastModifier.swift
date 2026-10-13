@@ -3,18 +3,23 @@ import SwiftUI
 /// CLAUDE.md §12: "Show errors via a single `ErrorToast` view modifier reading `errorState`."
 struct ErrorToastModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Binding var errorState: ErrorState?
+    let bottomClearance: CGFloat
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottom) {
                 if let errorState {
-                    HStack(alignment: .top, spacing: 8) {
+                    HStack(alignment: .center, spacing: 12) {
                         Image(systemName: errorState.isFatal ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                         Text(errorState.message)
                             .font(.subheadline)
                             .multilineTextAlignment(.leading)
-                        Spacer()
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         Button {
                             self.errorState = nil
                         } label: {
@@ -26,11 +31,21 @@ struct ErrorToastModifier: ViewModifier {
                         .accessibilityLabel("Dismiss error")
                     }
                     .padding(12)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .padding()
+                    .frame(maxWidth: 420)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, bottomClearance + 16)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: errorState.id) {
-                        try? await Task.sleep(for: .seconds(4))
+                        // A VoiceOver user must have time to find and read the banner. Fatal
+                        // errors also remain until the explicit dismiss button is used.
+                        guard !errorState.isFatal, !voiceOverEnabled else { return }
+                        do { try await Task.sleep(for: .seconds(6)) }
+                        catch { return }
                         if self.errorState?.id == errorState.id { self.errorState = nil }
                     }
                 }
@@ -40,7 +55,7 @@ struct ErrorToastModifier: ViewModifier {
 }
 
 extension View {
-    func errorToast(_ state: Binding<ErrorState?>) -> some View {
-        modifier(ErrorToastModifier(errorState: state))
+    func errorToast(_ state: Binding<ErrorState?>, bottomClearance: CGFloat = 0) -> some View {
+        modifier(ErrorToastModifier(errorState: state, bottomClearance: bottomClearance))
     }
 }

@@ -54,6 +54,10 @@ struct RootView: View {
         return PlayerLayoutMetrics.bottomTabBarClearance + miniPlayerClearance
     }
 
+    private var errorToastBottomClearance: CGFloat {
+        queueNoticeBottomPadding + (player.queueNotice == nil ? 0 : MediaStyle.actionSize + 8)
+    }
+
     var body: some View {
         SwiftUIPlayerContainer {
             tabShell
@@ -70,7 +74,10 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.notice, value: player.queueNotice?.id)
-        .errorToast(Bindable(incomingLinkModel).errorState)
+        .errorToast(
+            Bindable(incomingLinkModel).errorState,
+            bottomClearance: errorToastBottomClearance
+        )
         .onOpenURL { url in
             Task { await openIncomingLink(url) }
         }
