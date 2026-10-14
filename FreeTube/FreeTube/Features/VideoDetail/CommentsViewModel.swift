@@ -5,6 +5,11 @@ import Observation
 @Observable
 @MainActor
 final class CommentsViewModel {
+    struct TimedComment {
+        let time: TimeInterval
+        let comment: Comment
+    }
+
     let videoID: String
     private(set) var comments: [Comment] = []
     private(set) var continuationToken: String?
@@ -12,6 +17,8 @@ final class CommentsViewModel {
     private(set) var commentsDisabled = false
     private(set) var sortingModes: [CommentSortingMode] = []
     private(set) var teaserText: String?
+    private(set) var timedComments: [TimedComment] = []
+    private var focusedCommentID: String?
     private(set) var repliesByCommentID: [String: [Comment]] = [:]
     private(set) var replyContinuationTokens: [String: String] = [:]
     private(set) var loadingReplyCommentIDs: Set<String> = []
@@ -31,6 +38,7 @@ final class CommentsViewModel {
         do {
             let thread = try await VideoContentPrefetchStore.shared.fetchComments(videoID: videoID)
             comments = thread.comments
+            refreshTimedComments()
             continuationToken = thread.continuationToken
             commentsDisabled = thread.availability == .disabled
             sortingModes = thread.sortingModes
@@ -39,28 +47,28 @@ final class CommentsViewModel {
         }
     }
 
-    /// Loads only the shared watch-page metadata. Unlike `load()`, this does not fetch the comments
-    /// continuation when YouTubeKit decoded its native teaser. YouTube currently emits more than
-    /// one teaser JSON shape, while b5i only decodes the older `simpleText` form; when that field is
-    /// absent, fall back to the first top-level comment and retain the page for instant expansion.
+    /// Keep the native excerpt as a fallback, then use the shared first comments page for
+    /// playback-time matches. The preview setting is opt-in, and expansion reuses this page.
     func loadTeaser() async {
-        guard teaserText == nil else { return }
+        guard teaserText == nil && comments.isEmpty else { return }
         do {
             let details = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
             let nativeTeaser = details.teaserCommentText?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if let nativeTeaser, !nativeTeaser.isEmpty {
                 teaserText = nativeTeaser
-                return
             }
 
             let thread = try await VideoContentPrefetchStore.shared.fetchComments(videoID: videoID)
             comments = thread.comments
+            refreshTimedComments()
             continuationToken = thread.continuationToken
             commentsDisabled = thread.availability == .disabled
             sortingModes = thread.sortingModes
-            teaserText = thread.comments.first?.bodyText
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if teaserText == nil {
+                teaserText = thread.comments.first?.bodyText
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
         } catch {
             // The teaser is optional polish. Full comments retain their ordinary error handling.
         }
@@ -69,6 +77,13 @@ final class CommentsViewModel {
     /// YouTube's teaser has no comment ID. If its excerpt occurs in a loaded full comment, place
     /// that comment first so expanding the preview reveals the complete text immediately.
     var commentsForDisplay: [Comment] {
+        if let focusedCommentID,
+           let matchIndex = comments.firstIndex(where: { $0.id == focusedCommentID }),
+           matchIndex != comments.startIndex {
+            var ordered = comments
+            ordered.insert(ordered.remove(at: matchIndex), at: 0)
+            return ordered
+        }
         // The featured excerpt belongs to YouTube's default (normally Top) ordering. Never move it
         // ahead of the server's results after the user explicitly chooses another sort mode.
         let selectedSortID = sortingModes.first(where: \.isSelected)?.id
@@ -83,6 +98,33 @@ final class CommentsViewModel {
         let match = ordered.remove(at: matchIndex)
         ordered.insert(match, at: 0)
         return ordered
+    }
+
+    func focusComment(_ id: String?) {
+        focusedCommentID = id
+    }
+
+    /// Only one-timestamp comments are suitable for a brief preview. Chapter lists and dense
+    /// timestamp indexes would otherwise appear to match throughout the video.
+    private func refreshTimedComments() {
+        timedComments = comments.compactMap { comment in
+            let matches = CommentTimestampLinks.matches(in: comment.bodyText)
+            guard matches.count == 1, let match = matches.first else { return nil }
+            return TimedComment(time: match.seconds, comment: comment)
+        }
+    }
+
+    func featuredComment(near playbackTime: TimeInterval) -> TimedComment? {
+        guard playbackTime.isFinite else { return nil }
+        return timedComments
+            .filter { $0.time <= playbackTime && playbackTime - $0.time <= 30 }
+            .min { left, right in
+                let leftDistance = playbackTime - left.time
+                let rightDistance = playbackTime - right.time
+                return leftDistance == rightDistance
+                    ? left.comment.likeCount > right.comment.likeCount
+                    : leftDistance < rightDistance
+            }
     }
 
     private static func matchesTeaser(_ teaser: String, commentBody: String) -> Bool {
@@ -102,6 +144,7 @@ final class CommentsViewModel {
         do {
             let thread = try await service.fetchComments(videoID: videoID, continuation: token)
             comments.append(contentsOf: thread.comments)
+            refreshTimedComments()
             continuationToken = thread.continuationToken
         } catch {
             errorState = ErrorState(from: error)
@@ -117,6 +160,8 @@ final class CommentsViewModel {
         let previousReplyTokens = replyContinuationTokens
         isLoading = true
         comments = []
+        timedComments = []
+        focusedCommentID = nil
         continuationToken = nil
         repliesByCommentID = [:]
         replyContinuationTokens = [:]
@@ -128,6 +173,7 @@ final class CommentsViewModel {
         do {
             let thread = try await service.fetchComments(videoID: videoID, continuation: mode.token)
             comments = thread.comments
+            refreshTimedComments()
             continuationToken = thread.continuationToken
             commentsDisabled = thread.availability == .disabled
             if !thread.sortingModes.isEmpty {
@@ -135,6 +181,7 @@ final class CommentsViewModel {
             }
         } catch {
             comments = previousComments
+            refreshTimedComments()
             continuationToken = previousContinuationToken
             sortingModes = previousSortingModes
             repliesByCommentID = previousReplies

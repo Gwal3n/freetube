@@ -39,6 +39,7 @@ struct FullScreenPlayer: View {
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var isFrameStepping = false
+    @State private var isHoldingForSpeed = false
     @State private var panelScrollOffset: CGFloat = 0
     @State private var isPlaylistPanelPresented = false
     @State private var playlistPanelExpansion: CGFloat = 0
@@ -174,6 +175,7 @@ struct FullScreenPlayer: View {
                             } else {
                                 player.endTemporaryPlaybackRate()
                             }
+                            isHoldingForSpeed = rate != nil
                             return player.effectivePlaybackRate
                         },
                         onSeekRelative: { seconds in
@@ -249,6 +251,20 @@ struct FullScreenPlayer: View {
                         anchor: .bottom
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
+                    if !isFloating && isHoldingForSpeed {
+                        Text(PlaybackSpeedPresets.label(player.effectivePlaybackRate))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 52, minHeight: 26)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .environment(\.colorScheme, .dark)
+                            .position(
+                                x: controlFrame.midX,
+                                y: controlFrame.minY + max(26, controlFrame.height * 0.10)
+                            )
+                            .allowsHitTesting(false)
+                            .zIndex(5)
+                    }
                     Color.black
                         .opacity(!isFloating && showsPlayerControls ? 0.28 : 0)
                         // Dim the stable player surface rather than AVPlayer's presentation rect.
@@ -510,6 +526,7 @@ struct FullScreenPlayer: View {
                 .onDisappear { controlsVisibility.cancelAutoHide() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     isFrameStepping = false
+                    isHoldingForSpeed = false
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
                     swipeAdjustment.cancel()
@@ -707,6 +724,10 @@ struct FullScreenPlayer: View {
         ))
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
+                if isHoldingForSpeed {
+                    player.endTemporaryPlaybackRate()
+                    isHoldingForSpeed = false
+                }
                 isFrameStepping = false
                 isTranscriptPresented = false
                 swipeAdjustment.cancel()

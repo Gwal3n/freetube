@@ -21,26 +21,11 @@ struct CommentsSection: View {
         LazyVStack(alignment: .leading, spacing: 8) {
             header
 
-            if showsFeaturedCommentPreview,
-               !isExpanded,
-               let teaserText = model.teaserText,
-               !teaserText.isEmpty {
-                Button {
+            if showsFeaturedCommentPreview && !isExpanded {
+                FeaturedCommentPreview(model: model) { commentID in
+                    model.focusComment(commentID)
                     expandComments()
-                } label: {
-                    Text(teaserText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(ResponsiveButtonStyle())
-                .accessibilityHint("Opens comments")
-                .transition(.opacity)
             }
 
             if isExpanded {
@@ -321,6 +306,7 @@ struct CommentsSection: View {
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             isExpanded.toggle()
         }
+        if !isExpanded { model.focusComment(nil) }
         if isExpanded && model.comments.isEmpty && !model.isLoading {
             Task { await model.load() }
         }

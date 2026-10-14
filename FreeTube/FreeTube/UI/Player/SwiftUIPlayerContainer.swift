@@ -35,6 +35,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var floatingPinchAnchor: UnitPoint = .center
     @State private var floatingPinchGeneration = 0
     @State private var floatingActionsSuppressed = false
+    @State private var floatingChromeHiddenForExpansion = false
     @State private var floatingIsDismissing = false
     @State private var floatingShouldFade = false
 
@@ -208,7 +209,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             isEnabled: true
                         ))
                         .position(floatingChromePosition)
-                        .opacity(player.fullScreenPresented || isLaunchingFromThumbnail
+                        .opacity(floatingChromeHiddenForExpansion || player.fullScreenPresented || isLaunchingFromThumbnail
                             || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
                         .zIndex(3)
                         .simultaneousGesture(floatingGesture(in: proxy.size, window: floatingSize, base: floatingBase))
@@ -219,7 +220,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             bottomInset: miniBottomPadding,
                             base: floatingBase
                         ))
-                        .allowsHitTesting(!player.fullScreenPresented && !isLaunchingFromThumbnail
+                        .allowsHitTesting(!floatingChromeHiddenForExpansion
+                            && !player.fullScreenPresented && !isLaunchingFromThumbnail
                             && !floatingIsDismissing && !floatingIsStashed)
 
                     // This cover stays mounted and shares the video's animated position.
@@ -292,6 +294,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 player.finishLaunchPresentation()
                 captionPresentationReady = true
                 chromePresentationReady = true
+                floatingChromeHiddenForExpansion = false
             }
         }
         .onChange(of: player.miniPlayerVisible) { _, visible in
@@ -314,6 +317,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 floatingPinchStartWidth = nil
                 floatingPinchScale = 1
                 floatingActionsSuppressed = false
+                floatingChromeHiddenForExpansion = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(100))
                     guard !player.miniPlayerVisible else { return }
@@ -690,6 +694,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         // the mini-to-full player host has completed its upward handoff.
         captionPresentationReady = false
         chromePresentationReady = false
+        // Hide the corner buttons before their floating origin is reset. Otherwise SwiftUI can
+        // paint one frame of those buttons at the default bottom-right corner during expansion.
+        withTransaction(Transaction(animation: nil)) {
+            floatingChromeHiddenForExpansion = true
+        }
         withAnimation(
             reduceMotion ? nil : .interactiveSpring(response: 0.4, dampingFraction: 0.88),
             completionCriteria: .logicallyComplete

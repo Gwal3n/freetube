@@ -117,10 +117,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             longPressGesture?.isEnabled = holdForSpeedEnabled
         }
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
-        let speedChanged = abs(self.effectivePlaybackRate - effectivePlaybackRate) > 0.001
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
-        if isHoldingForSpeed, speedChanged { showHoldSpeedFeedback() }
         self.onSeekRelative = onSeekRelative
         self.onSeekAbsolute = onSeekAbsolute
         self.onSeekPreview = onSeekPreview
@@ -319,7 +317,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             effectivePlaybackRate = onHoldSpeedChange(Double(holdSpeedRate))
             log.info("Hold recognized; requested=\(self.holdSpeedRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            showHoldSpeedFeedback()
         case .ended, .cancelled, .failed:
             restorePlaybackRateIfNeeded()
             log.info("Hold ended; restored playback rate")
@@ -437,16 +434,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         guard isHoldingForSpeed else { return }
         isHoldingForSpeed = false
         effectivePlaybackRate = onHoldSpeedChange(nil)
-    }
-
-    private func showHoldSpeedFeedback() {
-        showFeedback(
-            PlaybackSpeedPresets.label(effectivePlaybackRate),
-            horizontalFraction: 0.5,
-            verticalFraction: 0.10,
-            compact: true,
-            automaticallyHide: false
-        )
     }
 
     private static func validatedHoldRate(_ rate: Double) -> Float {
