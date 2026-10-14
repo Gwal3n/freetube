@@ -151,6 +151,7 @@ final class PlayerStateManager {
     let queue: QueueManager
     private let resolver: any PlaybackResolving
     private let itemFactory = PlaybackItemFactory()
+    private let readinessGate = PlayerItemReadinessGate()
     private let sponsorBlockService: any SponsorBlockServicing
     private let sponsorBlockCoordinator = PlayerSponsorBlockCoordinator()
     private let videoService: any VideoServicing
@@ -206,17 +207,6 @@ final class PlayerStateManager {
         let resumeFromHistoryIfUnstarted: Bool
     }
     private var itemLoadStartedAt: Date?
-    /// KVO-driven readiness handshake for the candidate currently under test.
-    ///
-    /// `waitForReadiness(of:timeout:)` parks a continuation here and the single `\.status`
-    /// observation installed by `observe(item:)` resumes it. Deliberately one observer per item
-    /// and one waiter at a time: a second competing observer would double-resume. `readinessToken`
-    /// is bumped for every wait so a late timeout or cancellation waker can only ever settle the
-    /// wait it was created for, never a newer candidate's. All three are `@MainActor`-isolated,
-    /// which is what makes "resumed exactly once" checkable by reading this file.
-    private var readinessContinuation: CheckedContinuation<ItemReadiness, Never>?
-    private var readinessItem: AVPlayerItem?
-    private var readinessToken = 0
     private var itemErrorLogObservation: NSObjectProtocol?
     private var itemAccessLogObservation: NSObjectProtocol?
     private var lastAccessLogAt = Date.distantPast
@@ -1133,7 +1123,7 @@ final class PlayerStateManager {
                   playbackSessionID == session else { return }
             // Keep signed stream URLs out of diagnostics. Error type + code distinguish
             // transfer, export and probe failures without logging NSError userInfo.
-            log.notice("Fast playback candidate rejected before swap: \(Self.describe(itemError: error), privacy: .public) type=\(String(reflecting: type(of: error)), privacy: .public)")
+            log.notice("Fast playback candidate rejected before swap: \(PlayerItemReadinessGate.describe(itemError: error), privacy: .public) type=\(String(reflecting: type(of: error)), privacy: .public)")
             failFastPlayback(message: "Higher speeds are unavailable for this video")
             return
         }
@@ -1162,7 +1152,7 @@ final class PlayerStateManager {
         itemLoadStartedAt = Date()
         loadItem(replacement)
         installedReplacement = replacement
-        let readiness = await waitForReadiness(of: replacement, timeout: .seconds(12))
+        let readiness = await readinessGate.wait(for: replacement, timeout: .seconds(12))
         guard !Task.isCancelled, fastPlaybackGeneration == generation,
               playbackSessionID == session, player.currentItem === replacement else { return }
 
@@ -1314,7 +1304,7 @@ final class PlayerStateManager {
         do {
             replacement = try await itemFactory.makeItem(for: candidate)
         } catch {
-            log.notice("Audio mode switch candidate could not be prepared: \(Self.describe(itemError: error), privacy: .public)")
+            log.notice("Audio mode switch candidate could not be prepared: \(PlayerItemReadinessGate.describe(itemError: error), privacy: .public)")
             return
         }
         guard !Task.isCancelled, audioModeSwitchGeneration == generation,
@@ -1327,8 +1317,8 @@ final class PlayerStateManager {
         loadState = .buffering
         itemLoadStartedAt = Date()
         loadItem(replacement, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
-        let readiness = await waitForReadiness(
-            of: replacement,
+        let readiness = await readinessGate.wait(
+            for: replacement,
             timeout: readinessTimeout(for: candidate.strategy)
         )
         guard !Task.isCancelled,
@@ -2056,7 +2046,7 @@ final class PlayerStateManager {
                     self.log.info("AVPlayerItem fast playback: canPlayFastForward=\(item.canPlayFastForward, privacy: .public) defaultRate=\(self.player.defaultRate, privacy: .public) audioPitchAlgorithm=\(item.audioTimePitchAlgorithm, privacy: .public)")
                     self.logAudioDiagnostics(for: item)
                     self.itemLoadStartedAt = nil
-                    self.finishReadiness(.ready, for: item)
+                    self.readinessGate.finish(.ready, for: item)
                     // Local-file playback has no resolveAndPlay readiness branch. Normal stream
                     // and audio-mode switches reconcile after their own acceptance/seek instead.
                     if self.player.currentItem === item, self.loadState == .readyToPlay,
@@ -2066,7 +2056,7 @@ final class PlayerStateManager {
                 case .failed:
                     let err = item.error as NSError?
                     self.log.error("AVPlayerItem status: FAILED domain=\(err?.domain ?? "?", privacy: .public) code=\(err?.code ?? 0, privacy: .public)")
-                    self.finishReadiness(.failed(Self.describe(itemError: item.error)), for: item)
+                    self.readinessGate.finish(.failed(PlayerItemReadinessGate.describe(itemError: item.error)), for: item)
                     self.recoverAcceptedStreamIfNeeded(item, reason: "item-failed")
                 @unknown default:
                     break
@@ -2330,7 +2320,7 @@ final class PlayerStateManager {
                 return
             } catch {
                 guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
-                log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(Self.describe(itemError: error), privacy: .public)")
+                log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(PlayerItemReadinessGate.describe(itemError: error), privacy: .public)")
                 excludedStrategies.insert(candidate.strategy)
                 continue
             }
@@ -2354,8 +2344,8 @@ final class PlayerStateManager {
                 play()
             }
 
-            let readiness = await waitForReadiness(
-                of: item,
+            let readiness = await readinessGate.wait(
+                for: item,
                 timeout: readinessTimeout(for: candidate.strategy)
             )
             guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else {
@@ -2489,112 +2479,6 @@ final class PlayerStateManager {
         // AVPlayer treats this as an upper bound on a variant's frame size, not an exact match,
         // so deriving the width from 16:9 is safe for taller and wider aspect ratios alike.
         item.preferredMaximumResolution = CGSize(width: heightCap * 16 / 9, height: heightCap)
-    }
-
-    private enum ItemReadiness {
-        case ready
-        case failed(String)
-        case timedOut
-    }
-
-    /// Waits for `item` to reach `.readyToPlay` (accept) or `.failed` (reject), giving up after
-    /// `timeout`.
-    ///
-    /// KVO rather than the 100ms poll this replaced: at ~2s of buffering the poll cost up to half a
-    /// frame of latency on the accept path for no benefit, and it woke the main actor twenty times
-    /// per candidate. The `\.status` observation installed by `observe(item:)` is the *only* status
-    /// observer — it calls `finishReadiness(_:for:)`, which resumes the continuation parked here.
-    ///
-    /// Exactly-once resume: every resume path goes through `finishReadiness(_:token:)` on the main
-    /// actor, which nils the continuation before resuming. The three racers are KVO, the timeout
-    /// task, and task cancellation (`load()` cancelling `resolutionTask` on a rapid video switch);
-    /// whichever arrives first wins and the rest no-op.
-    private func waitForReadiness(of item: AVPlayerItem, timeout: Duration) async -> ItemReadiness {
-        // Defensive: settle any wait that outlived its caller before adopting a new item, so the
-        // "one parked continuation" invariant can't be broken by an unexpected call order.
-        finishReadiness(.failed("superseded"), token: readinessToken)
-
-        // `observe(item:)` runs before we get here, so a status that already settled produced a
-        // KVO callback we can no longer catch. Read it directly instead of waiting for an edge
-        // that will never come — this is also the fast path for local files.
-        switch item.status {
-        case .readyToPlay:
-            return .ready
-        case .failed:
-            return .failed(Self.describe(itemError: item.error))
-        case .unknown:
-            break
-        @unknown default:
-            break
-        }
-
-        if Task.isCancelled { return .failed("cancelled") }
-
-        readinessToken += 1
-        let token = readinessToken
-        readinessItem = item
-
-        // Inherits main-actor isolation from this method, so `finishReadiness` is a direct call.
-        let timeoutTask = Task { [weak self] in
-            do {
-                try await Task.sleep(for: timeout)
-            } catch {
-                return // Cancelled because the wait already settled.
-            }
-            self?.finishReadiness(.timedOut, token: token)
-        }
-        defer { timeoutTask.cancel() }
-
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                self.readinessContinuation = continuation
-                // The KVO handler hops through a `Task` before it reaches `finishReadiness`, so a
-                // status change can land in the gap between installing the item and parking this
-                // continuation — where it would find nothing to resume and we'd sit out the whole
-                // timeout on an item that is already playable. Re-reading the status here closes
-                // that window; resuming from inside the body is legal.
-                switch item.status {
-                case .readyToPlay:
-                    self.finishReadiness(.ready, for: item)
-                case .failed:
-                    self.finishReadiness(.failed(Self.describe(itemError: item.error)), for: item)
-                case .unknown:
-                    break
-                @unknown default:
-                    break
-                }
-            }
-        } onCancel: {
-            // `onCancel` is nonisolated, hence the explicit hop. Only the token travels — an
-            // `AVPlayerItem` isn't `Sendable`.
-            Task { @MainActor [weak self] in
-                self?.finishReadiness(.failed("cancelled"), token: token)
-            }
-        }
-    }
-
-    /// Resumes the parked readiness continuation if it belongs to `item`. Called from the `\.status`
-    /// KVO handler, which fires for whichever item is currently observed — that may be a newer item
-    /// than the one being waited on, hence the identity check.
-    private func finishReadiness(_ outcome: ItemReadiness, for item: AVPlayerItem) {
-        guard readinessItem === item else { return }
-        finishReadiness(outcome, token: readinessToken)
-    }
-
-    /// Single resume funnel. Nils the continuation before resuming so a re-entrant caller can't
-    /// resume it twice.
-    private func finishReadiness(_ outcome: ItemReadiness, token: Int) {
-        guard token == readinessToken, let continuation = readinessContinuation else { return }
-        readinessContinuation = nil
-        readinessItem = nil
-        continuation.resume(returning: outcome)
-    }
-
-    /// Compact, log-safe rendering of an `AVPlayerItem.error`. Domain + code only: the userInfo of
-    /// a playback failure can carry the signed asset URL.
-    private static func describe(itemError: Error?) -> String {
-        let error = itemError as NSError?
-        return "domain=\(error?.domain ?? "?") code=\(error?.code ?? 0)"
     }
 
     private func readinessTimeout(for strategy: PlaybackStrategy) -> Duration {

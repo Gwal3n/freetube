@@ -214,8 +214,8 @@ candidate. Readiness
 is observed through KVO on `AVPlayerItem.status` — the single observation installed by
 `observe(item:)`, never a second competing one — feeding a continuation, which replaced a 100ms
 polling loop. That continuation is resumed exactly once, by whichever of KVO, the timeout task, or
-task cancellation arrives first; every path funnels through `finishReadiness(_:token:)` on the main
-actor, and the token exists so a late waker can't settle a newer candidate's wait.
+task cancellation arrives first; every path funnels through the token-checked finish method in
+`PlayerItemReadinessGate` on the main actor, so a late waker can't settle a newer candidate's wait.
 
 After acceptance, a terminal item failure or `failedToPlayToEndTimeNotification` gets one bounded
 resolver pass that excludes the failed strategy. Preserve the selected video, queue, presentation,
@@ -243,7 +243,9 @@ enum PlaybackSource {
 ```
 
 `PlaybackItemFactory` builds a direct `AVPlayerItem` for single URLs and composes the separate
-tracks for `.composite`; `PlayerStateManager` alone installs and validates it. A returned source is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
+tracks for `.composite`; `PlayerStateManager` alone installs and validates it. Its sole item-status
+observer forwards readiness to `PlayerItemReadinessGate`, which owns the one pending continuation
+and settles KVO, timeout, and cancellation through a single token-checked path. A returned source is a candidate, not proof of playback: resolver strategy names are logged (never signed URLs),
 and a rejected strategy is excluded before requesting the next candidate.
 
 ---
