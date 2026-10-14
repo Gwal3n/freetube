@@ -59,7 +59,7 @@ struct SponsorBlockTimeline: View {
                                 .frame(width: 34, height: 28)
                         }
                         .disabled(!canStepBackward)
-                        .accessibilityLabel("Previous frame")
+                        .accessibilityLabel("Fine step backward")
 
                         Button {
                             onStepFrame(1)
@@ -68,7 +68,7 @@ struct SponsorBlockTimeline: View {
                                 .frame(width: 34, height: 28)
                         }
                         .disabled(!canStepForward)
-                        .accessibilityLabel("Next frame")
+                        .accessibilityLabel("Fine step forward")
                     }
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.plain)
@@ -98,7 +98,7 @@ struct SponsorBlockTimeline: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(isFrameStepMode ? "Close frame stepping" : "Frame stepping")
+                    .accessibilityLabel(isFrameStepMode ? "Close fine seeking" : "Fine seeking")
                 }
                 Text(verbatim: format(duration))
             }

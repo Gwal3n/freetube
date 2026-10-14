@@ -60,22 +60,26 @@ final class PlayerStateManager {
     /// The newest contiguous DVR window offered by the current live AVPlayerItem. Unlike a
     /// video's duration, this range moves forward as the broadcast advances.
     private(set) var liveSeekableRange: ClosedRange<TimeInterval>?
-    /// AVFoundation exposes true decoded-frame stepping only for capable, ready video items.
-    /// Live streams and audio-only playback never offer this transport mode.
+    /// Native frame stepping is not available for every item, notably some HLS streams. Ready
+    /// on-demand video still offers a fine-seek fallback rather than hiding the control.
     var canStepFrameBackward: Bool {
         guard case .readyToPlay = loadState,
               currentVideo?.isLive != true,
               !isAudioOnly,
-              pendingSeekTarget == nil else { return false }
-        return player.currentItem?.canStepBackward == true
+              player.currentItem != nil,
+              duration.isFinite,
+              duration > 0 else { return false }
+        return (pendingSeekTarget ?? elapsed) > 0
     }
 
     var canStepFrameForward: Bool {
         guard case .readyToPlay = loadState,
               currentVideo?.isLive != true,
               !isAudioOnly,
-              pendingSeekTarget == nil else { return false }
-        return player.currentItem?.canStepForward == true
+              player.currentItem != nil,
+              duration.isFinite,
+              duration > 0 else { return false }
+        return (pendingSeekTarget ?? elapsed) < duration
     }
     private(set) var playbackRate: Double
     /// Actual requested transport rate, capped at 2x until a ready item supports fast-forward.
@@ -233,6 +237,9 @@ final class PlayerStateManager {
     private var sponsorBlockTask: Task<Void, Never>?
     private var sponsorBlockNoticeTask: Task<Void, Never>?
     private var pendingSeekTarget: TimeInterval?
+    /// The active video track's observed cadence, retained across pause. HLS does not always
+    /// expose a track, so fine seeking falls back to a conservative 30 fps estimate.
+    @ObservationIgnored private var observedFrameRate: (item: AVPlayerItem, fps: Double)?
     private var seekRequestID = 0
     private var audioModeSwitchGeneration = 0
     private var resumeAfterAudioSwitch: Bool?
@@ -1404,7 +1411,8 @@ final class PlayerStateManager {
     func seek(
         to seconds: TimeInterval,
         rearmSponsorBlock: Bool = true,
-        resumeAfterEnded: Bool = true
+        resumeAfterEnded: Bool = true,
+        evaluateSponsorBlockAfterSeek: Bool = true
     ) {
         log.info("seek(to: \(seconds, privacy: .public)s)")
         guard seconds.isFinite else { return }
@@ -1443,7 +1451,9 @@ final class PlayerStateManager {
                 let settledTime = self.player.currentTime().seconds
                 if settledTime.isFinite {
                     self.elapsed = settledTime
-                    self.handleSponsorBlockSegment(at: settledTime)
+                    if evaluateSponsorBlockAfterSeek {
+                        self.handleSponsorBlockSegment(at: settledTime)
+                    }
                     if self.currentVideo?.isLive == true {
                         self.log.info("Live DVR seek settled target=\(boundedSeconds, privacy: .public)s actual=\(settledTime, privacy: .public)s")
                     }
@@ -1465,19 +1475,37 @@ final class PlayerStateManager {
         }
     }
 
-    /// Step one decoded frame while paused, using the current AVPlayerItem rather than assuming
-    /// a fixed frame rate. Unsupported HLS/items simply leave the normal scrubber unchanged.
+    /// Use AVFoundation's decoded-frame step when supported. HLS commonly lacks that capability;
+    /// for those items, seek by the observed frame interval (or approximately 1/30 second).
     func stepFrame(by count: Int) {
         guard count == -1 || count == 1,
               !isPlaying,
               player.timeControlStatus == .paused,
               (count < 0 ? canStepFrameBackward : canStepFrameForward),
               let item = player.currentItem else { return }
-        item.step(byCount: count)
-        let steppedTime = item.currentTime().seconds
-        if steppedTime.isFinite {
-            elapsed = steppedTime
-            updateNowPlaying()
+        if hasEnded && count < 0 { hasEnded = false }
+        if pendingSeekTarget == nil,
+           (count < 0 ? item.canStepBackward : item.canStepForward) {
+            item.step(byCount: count)
+            let steppedTime = item.currentTime().seconds
+            if steppedTime.isFinite {
+                elapsed = steppedTime
+                updateNowPlaying()
+            }
+        } else {
+            let frameRate: Double
+            if let observedFrameRate, observedFrameRate.item === item {
+                frameRate = observedFrameRate.fps
+            } else {
+                frameRate = 30
+            }
+            let position = pendingSeekTarget ?? elapsed
+            seek(
+                to: position + Double(count) / frameRate,
+                rearmSponsorBlock: false,
+                resumeAfterEnded: false,
+                evaluateSponsorBlockAfterSeek: false
+            )
         }
     }
 
@@ -2051,6 +2079,7 @@ final class PlayerStateManager {
         itemLoadedTimeRangesObservation?.invalidate()
         bufferedRanges = []
         liveSeekableRange = nil
+        observedFrameRate = nil
         lastAccessLogAt = .distantPast
         lastLiveDVRLogAt = .distantPast
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
@@ -2068,6 +2097,7 @@ final class PlayerStateManager {
                     let preparationTime = self.itemLoadStartedAt.map { Date().timeIntervalSince($0) } ?? 0
                     self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
                     self.log.info("AVPlayerItem fast playback: canPlayFastForward=\(item.canPlayFastForward, privacy: .public) defaultRate=\(self.player.defaultRate, privacy: .public) audioPitchAlgorithm=\(item.audioTimePitchAlgorithm, privacy: .public)")
+                    self.log.info("AVPlayerItem frame stepping: backward=\(item.canStepBackward, privacy: .public) forward=\(item.canStepForward, privacy: .public) tracks=\(item.tracks.count, privacy: .public)")
                     self.logAudioDiagnostics(for: item)
                     self.itemLoadStartedAt = nil
                     self.readinessGate.finish(.ready, for: item)
@@ -2705,6 +2735,12 @@ final class PlayerStateManager {
                     self.elapsed = time.seconds.isFinite ? time.seconds : 0
                 }
                 if let item = self.player.currentItem {
+                    if self.isPlaying,
+                       let fps = item.tracks.map(\.currentVideoFrameRate).first(where: {
+                           $0.isFinite && $0 >= 10 && $0 <= 240
+                       }) {
+                        self.observedFrameRate = (item, Double(fps))
+                    }
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
                     self.updateLiveSeekableRange(for: item)
