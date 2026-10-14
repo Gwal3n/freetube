@@ -190,8 +190,11 @@ struct FullScreenPlayer: View {
                         },
                         onToggleControls: { togglePlayerControls() },
                         onRestoreFromPictureInPicture: {
+                            let hadInlinePlayer = player.miniPlayerVisible
                             player.miniPlayerVisible = true
-                            player.fullScreenPresented = true
+                            // System PiP may end merely because the app came back to foreground.
+                            // Keep an existing in-app mini-player mini instead of expanding it.
+                            if !hadInlinePlayer { player.fullScreenPresented = true }
                             player.requestInlinePlaybackRestoration()
                         },
                         isInteractionEnabled: player.fullScreenPresented,
@@ -246,7 +249,7 @@ struct FullScreenPlayer: View {
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
                     Color.black
-                        .opacity(!isFloating && controlsVisibility.isVisible ? 0.28 : 0)
+                        .opacity(!isFloating && showsPlayerControls ? 0.28 : 0)
                         // Dim the stable player surface rather than AVPlayer's presentation rect.
                         // The latter changes from unknown/full-size to the decoded aspect ratio
                         // as a new item becomes ready, which made non-16:9 videos flash unevenly.
@@ -273,7 +276,7 @@ struct FullScreenPlayer: View {
                     }
                     if !isFloating {
                     PlayerTransportOverlay(
-                        isVisible: controlsVisibility.isVisible,
+                        isVisible: showsPlayerControls,
                         isPreparing: isPreparingPlayback,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
                         previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
@@ -372,7 +375,7 @@ struct FullScreenPlayer: View {
                     .frame(width: controlFrame.width, height: controlFrame.height)
                     .position(x: controlFrame.midX, y: controlFrame.midY)
                     .opacity(chromePresentationReady ? max(0, 1 - collapseProgress * 3) : 0)
-                    .allowsHitTesting(chromePresentationReady && collapseProgress < 0.05)
+                    .allowsHitTesting(chromePresentationReady && collapseProgress < 0.05 && !isPlaybackFailure)
                     .zIndex(3)
                     }
                     // Long-running fallback downloads and failures retain their explanatory
@@ -513,6 +516,10 @@ struct FullScreenPlayer: View {
                     showPlayerControls()
                 }
                 .onChange(of: player.loadState, initial: true) { _, state in
+                    if case .failed = state {
+                        controlsVisibility.hide(reduceMotion: reduceMotion)
+                        return
+                    }
                     if state == .readyToPlay, player.isPlaying {
                         // The initial onAppear/current-video callbacks run while resolution is
                         // still pending, when showPlayerControls cannot schedule its hide timer.
@@ -821,6 +828,15 @@ struct FullScreenPlayer: View {
         }
     }
 
+    private var isPlaybackFailure: Bool {
+        if case .failed = player.loadState { return true }
+        return false
+    }
+
+    private var showsPlayerControls: Bool {
+        controlsVisibility.isVisible && !isPlaybackFailure
+    }
+
     private func fullscreenExitScale(viewportHeight: CGFloat) -> CGFloat {
         guard fullscreenSwipeTranslation > 0 else { return 1 }
         let progress = min(1, fullscreenSwipeTranslation / max(1, viewportHeight * 0.35))
@@ -1116,6 +1132,7 @@ struct FullScreenPlayer: View {
     // MARK: - Transport
 
     private func togglePlayerControls() {
+        guard !isPlaybackFailure else { return }
         controlsVisibility.toggle(
             isPlaying: player.isPlaying,
             reduceMotion: reduceMotion
@@ -1123,6 +1140,7 @@ struct FullScreenPlayer: View {
     }
 
     private func showPlayerControls() {
+        guard !isPlaybackFailure else { return }
         controlsVisibility.show(
             isPlaying: player.isPlaying,
             reduceMotion: reduceMotion

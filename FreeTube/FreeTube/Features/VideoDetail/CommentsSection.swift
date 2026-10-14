@@ -9,6 +9,7 @@ struct CommentsSection: View {
     @State private var isExpanded = false
     @State private var expandedReplyCommentIDs: Set<String> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(PlayerStateManager.self) private var player
     @AppStorage("showFeaturedCommentPreview") private var showsFeaturedCommentPreview = false
 
     init(videoID: String, countText: String? = nil) {
@@ -192,7 +193,8 @@ struct CommentsSection: View {
             repliesExpanded: expandedReplyCommentIDs.contains(comment.id),
             onToggleReplies: comment.replyCount > 0 && comment.replyContinuationToken != nil
                 ? { toggleReplies(for: comment) }
-                : nil
+                : nil,
+            onSeek: { player.seek(to: $0) }
         )
 
         if comment.replyCount > 0, comment.replyContinuationToken != nil {
@@ -213,7 +215,7 @@ struct CommentsSection: View {
                                             .frame(width: 2)
                                     }
                                 }
-                                CommentRow(comment: item.comment)
+                                CommentRow(comment: item.comment, onSeek: { player.seek(to: $0) })
                             }
                             .padding(.leading, 20)
                         }

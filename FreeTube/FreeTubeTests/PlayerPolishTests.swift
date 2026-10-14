@@ -167,7 +167,9 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(PlayerZoomGeometry.settled(1.38, fillScale: 1.4), 1.4)
         XCTAssertEqual(PlayerZoomGeometry.settled(1.2, fillScale: 1.4), 1.2)
         XCTAssertEqual(PlayerZoomGeometry.clamped(0.6, fillScale: 1.4), 1)
-        XCTAssertEqual(PlayerZoomGeometry.clamped(8, fillScale: 1.4), 3)
+        XCTAssertEqual(PlayerZoomGeometry.clamped(8, fillScale: 1.4), 8)
+        XCTAssertEqual(PlayerZoomGeometry.clamped(9, fillScale: 1.4), 8)
+        XCTAssertEqual(PlayerZoomGeometry.clamped(10, fillScale: 9), 9)
     }
 
     func testScreenFillHasAnAccessibleSnapRangeAndCanBeExceeded() {

@@ -42,7 +42,9 @@ struct ChannelTabScreen: View {
                         }
                     } label: {
                         Label(videoSort.title, systemImage: "arrow.up.arrow.down")
+                            .foregroundStyle(Color.primary)
                     }
+                    .tint(Color.primary)
                 }
             }
         }

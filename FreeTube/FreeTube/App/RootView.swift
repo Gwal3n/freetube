@@ -152,7 +152,8 @@ struct RootView: View {
             // Reopening the app from an automatic PiP session may leave the popup binding true,
             // so there is no false→true popup transition to observe. Foreground activation is
             // the second explicit signal that the same video should return inline.
-            if phase == .active, player.fullScreenPresented {
+            if phase == .active, player.currentVideo != nil,
+               player.fullScreenPresented || player.miniPlayerVisible {
                 player.requestInlinePlaybackRestoration()
             }
         }

@@ -15,7 +15,9 @@ nonisolated enum PlayerZoomGeometry {
 
     static func clamped(_ scale: CGFloat, fillScale: CGFloat) -> CGFloat {
         guard scale.isFinite else { return 1 }
-        return min(max(1, scale), max(3, fillScale * 2))
+        // Preserve the screen-fill detent even for an unusually tall source, while allowing
+        // ordinary videos to zoom as far as 8× without changing pinch or pan physics.
+        return min(max(1, scale), max(8, fillScale))
     }
 
     static func settled(_ scale: CGFloat, fillScale: CGFloat) -> CGFloat {

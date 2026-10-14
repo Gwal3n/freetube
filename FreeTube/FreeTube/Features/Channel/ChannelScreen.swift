@@ -876,8 +876,9 @@ struct ChannelScreen: View {
                 } label: {
                     Label(videoSort.title, systemImage: "arrow.up.arrow.down")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                 }
+                .tint(Color.primary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

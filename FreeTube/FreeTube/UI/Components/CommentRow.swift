@@ -7,6 +7,7 @@ struct CommentRow: View {
     var repliesTitle: String? = nil
     var repliesExpanded = false
     var onToggleReplies: (() -> Void)? = nil
+    var onSeek: ((TimeInterval) -> Void)? = nil
     @State private var isBodyExpanded = false
 
     private var isLongComment: Bool {
@@ -21,7 +22,8 @@ struct CommentRow: View {
             }
             SelectableCommentText(
                 text: comment.bodyText,
-                maximumNumberOfLines: isLongComment && !isBodyExpanded ? 3 : 0
+                maximumNumberOfLines: isLongComment && !isBodyExpanded ? 3 : 0,
+                onSeek: onSeek
             )
 
             if isLongComment {
@@ -63,8 +65,12 @@ struct CommentRow: View {
 /// handles for choosing an exact sentence. Scrolling remains owned by the surrounding player feed.
 private struct SelectableCommentText: UIViewRepresentable {
     @Environment(\.appFontPreset) private var preset
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let text: String
     let maximumNumberOfLines: Int
+    let onSeek: ((TimeInterval) -> Void)?
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
@@ -75,15 +81,39 @@ private struct SelectableCommentText: UIViewRepresentable {
         view.textContainerInset = .zero
         view.textContainer.lineFragmentPadding = 0
         view.adjustsFontForContentSizeCategory = true
+        view.dataDetectorTypes = []
+        view.linkTextAttributes = [.foregroundColor: UIColor.systemBlue]
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         view.setContentHuggingPriority(.required, for: .vertical)
+        view.delegate = context.coordinator
         return view
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
-        if view.text != text { view.text = text }
-        view.font = preset.uiFont(style: .subheadline, size: 15)
-        view.textColor = .label
+        context.coordinator.onSeek = onSeek
+        let font = preset.uiFont(style: .subheadline, size: 15)
+        if context.coordinator.lastText != text || context.coordinator.lastPreset != preset
+            || context.coordinator.lastDynamicTypeSize != dynamicTypeSize
+            || context.coordinator.lastHasSeek != (onSeek != nil) {
+            let rendered = NSMutableAttributedString(string: text, attributes: [
+                .font: font,
+                .foregroundColor: UIColor.label
+            ])
+            if onSeek != nil {
+                for match in CommentTimestampLinks.matches(in: text) {
+                    guard let url = URL(string: "freetube-seek://\(Int(match.seconds))") else { continue }
+                    rendered.addAttributes([
+                        .link: url,
+                        .foregroundColor: UIColor.systemBlue
+                    ], range: match.range)
+                }
+            }
+            view.attributedText = rendered
+            context.coordinator.lastText = text
+            context.coordinator.lastPreset = preset
+            context.coordinator.lastDynamicTypeSize = dynamicTypeSize
+            context.coordinator.lastHasSeek = onSeek != nil
+        }
         view.textContainer.maximumNumberOfLines = maximumNumberOfLines
         view.textContainer.lineBreakMode = maximumNumberOfLines == 0
             ? .byWordWrapping
@@ -101,5 +131,25 @@ private struct SelectableCommentText: UIViewRepresentable {
             CGSize(width: width, height: .greatestFiniteMagnitude)
         )
         return CGSize(width: width, height: ceil(measured.height))
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var onSeek: ((TimeInterval) -> Void)?
+        var lastText: String?
+        var lastPreset: AppFontPreset?
+        var lastDynamicTypeSize: DynamicTypeSize?
+        var lastHasSeek = false
+
+        func textView(
+            _ textView: UITextView,
+            shouldInteractWith url: URL,
+            in characterRange: NSRange,
+            interaction: UITextItemInteraction
+        ) -> Bool {
+            guard url.scheme == "freetube-seek",
+                  let seconds = TimeInterval(url.host ?? "") else { return true }
+            onSeek?(seconds)
+            return false
+        }
     }
 }
