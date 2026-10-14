@@ -196,16 +196,6 @@ final class PlayerStateManager {
     /// is an observation/prediction for chrome and may already be false when failure KVO arrives.
     private var wantsPlayback = false
 
-    private struct PlaybackRecovery {
-        let sessionID: Int
-        /// Automatic recovery excludes the terminally failed strategy. An explicit user retry
-        /// starts fresh after invalidating cached URLs, so it may try every strategy again.
-        let failedStrategy: PlaybackStrategy?
-        /// VOD position or distance behind the live edge (zero means live edge).
-        let position: TimeInterval
-        let isLive: Bool
-        let resumeFromHistoryIfUnstarted: Bool
-    }
     private var itemLoadStartedAt: Date?
     private var itemErrorLogObservation: NSObjectProtocol?
     private var itemAccessLogObservation: NSObjectProtocol?
@@ -2216,41 +2206,33 @@ final class PlayerStateManager {
         for video: Video,
         excluding failedStrategy: PlaybackStrategy?,
         resumeFromHistoryIfUnstarted: Bool = false
-    ) -> PlaybackRecovery {
-        let currentTime = player.currentTime().seconds
-        let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
-        let behindLiveEdge = liveSeekableRange.map { max(0, $0.upperBound - position) } ?? 0
-        return PlaybackRecovery(
+    ) -> PlayerPlaybackRecovery {
+        PlayerPlaybackRecovery(
             sessionID: playbackSessionID,
             failedStrategy: failedStrategy,
-            position: video.isLive ? behindLiveEdge : max(0, position),
+            currentTime: player.currentTime().seconds,
+            elapsed: elapsed,
+            liveSeekableRange: liveSeekableRange,
             isLive: video.isLive,
             resumeFromHistoryIfUnstarted: resumeFromHistoryIfUnstarted
-                && !video.isLive && position < 1
         )
     }
 
-    private func restoreRecoveredPosition(_ recovery: PlaybackRecovery, in item: AVPlayerItem) async {
+    private func restoreRecoveredPosition(_ recovery: PlayerPlaybackRecovery, in item: AVPlayerItem) async {
         if !recovery.isLive {
             await seekForSourceSwitch(to: recovery.position, item: item)
             return
         }
-        let range = item.seekableTimeRanges.compactMap { value -> ClosedRange<TimeInterval>? in
+        let ranges = item.seekableTimeRanges.compactMap { value -> ClosedRange<TimeInterval>? in
             let timeRange = value.timeRangeValue
             let start = timeRange.start.seconds
             let end = timeRange.end.seconds
             guard start.isFinite, end.isFinite, end > start else { return nil }
             return start...end
-        }.max { $0.upperBound < $1.upperBound }
-        let target: CMTime
-        if let range, recovery.position > 5 {
-            target = CMTime(
-                seconds: min(range.upperBound, max(range.lowerBound, range.upperBound - recovery.position)),
-                preferredTimescale: 600
-            )
-        } else {
-            target = .positiveInfinity
         }
+        let target = recovery.liveSeekTarget(in: ranges).map {
+            CMTime(seconds: $0, preferredTimescale: 600)
+        } ?? .positiveInfinity
         await withCheckedContinuation { continuation in
             player.seek(to: target) { _ in continuation.resume() }
         }
@@ -2264,7 +2246,7 @@ final class PlayerStateManager {
         autoplay: Bool,
         skipRecommendations: Bool = false,
         localFileURL: URL? = nil,
-        recovery: PlaybackRecovery? = nil
+        recovery: PlayerPlaybackRecovery? = nil
     ) async {
         let sessionID = recovery?.sessionID ?? playbackSessionID
         log.info("resolveAndPlay: start for \(video.id, privacy: .public) recovery=\(recovery != nil, privacy: .public)")

@@ -219,8 +219,10 @@ task cancellation arrives first; every path funnels through the token-checked fi
 
 After acceptance, a terminal item failure or `failedToPlayToEndTimeNotification` gets one bounded
 resolver pass that excludes the failed strategy. Preserve the selected video, queue, presentation,
-transport intent, and playback position (or distance behind the live edge). Do not retry on a
-transient stall alone, refetch recommendations or details, or start a download. A second terminal
+transport intent, and playback position (or distance behind the live edge). `PlayerPlaybackRecovery`
+holds that immutable retry context and computes the live seek target; `PlayerStateManager` still
+owns the retry decision, item swap, and seek. Do not retry on a transient stall alone, refetch
+recommendations or details, or start a download. A second terminal
 failure or exhausted alternatives surfaces a playback error. Log only error domain/code, never an
 item error's `userInfo`, which can contain the signed stream URL.
 The failed-player overlay offers a deliberate Retry action. It invalidates only that video's
