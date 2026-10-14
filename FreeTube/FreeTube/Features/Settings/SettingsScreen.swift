@@ -7,49 +7,86 @@ struct SettingsScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var model = SettingsViewModel()
     @State private var externalDestination: AppNavigationRequest.Destination?
+    @State private var searchText = ""
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    settingsLink("Playback", systemImage: "play.circle") {
-                        PlaybackSettingsScreen(model: model)
+                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Section {
+                        settingsLink("Playback", systemImage: "play.circle") {
+                            PlaybackSettingsScreen(model: model)
+                        }
+                        settingsLink("Browsing", systemImage: "rectangle.stack") {
+                            BrowsingSettingsScreen(model: model)
+                        }
+                        settingsLink("Appearance", systemImage: "paintbrush") {
+                            AppearanceSettingsScreen(model: model)
+                        }
+                        settingsLink("Library & Data", systemImage: "books.vertical") {
+                            LibraryDataSettingsScreen(model: model)
+                        }
+                        settingsLink("Downloads", systemImage: "arrow.down.circle") {
+                            DownloadsSettingsScreen(model: model)
+                        }
                     }
-                    settingsLink("Browsing", systemImage: "rectangle.stack") {
-                        BrowsingSettingsScreen(model: model)
-                    }
-                    settingsLink("Appearance", systemImage: "paintbrush") {
-                        AppearanceSettingsScreen(model: model)
-                    }
-                    settingsLink("Library & Data", systemImage: "books.vertical") {
-                        LibraryDataSettingsScreen(model: model)
-                    }
-                    settingsLink("Downloads", systemImage: "arrow.down.circle") {
-                        DownloadsSettingsScreen(model: model)
-                    }
-                }
 
-                Section {
-                    settingsLink("Privacy", systemImage: "hand.raised") {
-                        PrivacySettingsScreen()
+                    Section {
+                        settingsLink("Privacy", systemImage: "hand.raised") {
+                            PrivacySettingsScreen()
+                        }
+                        settingsLink("SponsorBlock & DeArrow", systemImage: "sparkles") {
+                            CommunityEnhancementsSettingsScreen(model: model)
+                        }
                     }
-                    settingsLink("SponsorBlock & DeArrow", systemImage: "sparkles") {
-                        CommunityEnhancementsSettingsScreen(model: model)
-                    }
-                }
 
-                Section {
-                    settingsLink("Diagnostics", systemImage: "stethoscope") {
-                        DiagnosticsSettingsScreen(model: model)
+                    Section {
+                        settingsLink("Diagnostics", systemImage: "stethoscope") {
+                            DiagnosticsSettingsScreen(model: model)
+                        }
+                        settingsLink("About", systemImage: "info.circle") {
+                            AboutSettingsScreen()
+                        }
                     }
-                    settingsLink("About", systemImage: "info.circle") {
-                        AboutSettingsScreen()
+                } else {
+                    let results = SettingsSearchIndex.results(matching: searchText)
+                    if results.isEmpty {
+                        ContentUnavailableView(
+                            "No Settings Found",
+                            systemImage: "magnifyingglass",
+                            description: Text("Try a different search term.")
+                        )
+                        .listRowBackground(Color.clear)
+                    } else {
+                        Section {
+                            ForEach(results) { result in
+                                NavigationLink {
+                                    searchDestination(result.destination)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(result.displayTitle)
+                                            .foregroundStyle(.primary)
+                                        if result.destination.section != result.displayTitle {
+                                            Text(result.destination.section)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .tint(.primary)
+                            }
+                        }
                     }
                 }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(onClose == nil ? .large : .inline)
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search Settings"
+            )
             .navigationDestination(item: $externalDestination) { destination in
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)
@@ -72,6 +109,30 @@ struct SettingsScreen: View {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func searchDestination(_ destination: SettingsSearchIndex.Destination) -> some View {
+        switch destination {
+        case .playback: PlaybackSettingsScreen(model: model)
+        case .browsing: BrowsingSettingsScreen(model: model)
+        case .appearance: AppearanceSettingsScreen(model: model)
+        case .libraryData: LibraryDataSettingsScreen(model: model)
+        case .downloads: DownloadsSettingsScreen(model: model)
+        case .privacy: PrivacySettingsScreen()
+        case .community: CommunityEnhancementsSettingsScreen(model: model)
+        case .diagnostics: DiagnosticsSettingsScreen(model: model)
+        case .about: AboutSettingsScreen()
+        case .playbackSpeeds:
+            CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
+        case .playerControls: PlayerControlsSettingsScreen(model: model)
+        case .subscriptionGroups: SubscriptionGroupsScreen(isEmbedded: true)
+        case .channelTabs: ChannelTabsSettingsScreen()
+        case .tabBar: TabBarSettingsScreen()
+        case .importExport: ImportDataScreen()
+        case .incognito: IncognitoSettingsScreen()
+        case .blockedContent: VideoBlockingSettingsScreen()
         }
     }
 
