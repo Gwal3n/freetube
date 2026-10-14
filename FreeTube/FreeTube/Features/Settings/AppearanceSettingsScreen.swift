@@ -4,6 +4,7 @@ import SwiftUI
 struct AppearanceSettingsScreen: View {
     let model: SettingsViewModel
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
+    @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
 
     var body: some View {
         Form {
@@ -12,6 +13,17 @@ struct AppearanceSettingsScreen: View {
                     Text("System").tag(AppearanceMode.system.rawValue)
                     Text("Light").tag(AppearanceMode.light.rawValue)
                     Text("Dark").tag(AppearanceMode.dark.rawValue)
+                }
+                Picker("Accent color", selection: $appAccentPresetRaw) {
+                    ForEach(AppAccentPreset.allCases) { preset in
+                        Label {
+                            Text(preset.label)
+                        } icon: {
+                            Image(systemName: "circle.fill")
+                                .foregroundStyle(preset.color)
+                        }
+                        .tag(preset.rawValue)
+                    }
                 }
                 Picker("Text font", selection: Bindable(model).appFontPreset) {
                     ForEach(AppFontPreset.allCases) { preset in

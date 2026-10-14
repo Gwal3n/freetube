@@ -59,7 +59,7 @@ enum SettingsSearchIndex {
         Group(destination: .playback, titles: [
             "Playback", "Default playback quality", "Cellular streaming limit", "Hold for speed", "Hold speed",
             "Autoplay next video", "Allow audio from other apps",
-            "Resume after interruptions", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen",
+            "Resume after interruptions", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side", "Player volume",
             "Remember floating player placement", "Show watch progress bars", "Show description",
             "Show comments", "Show featured comment preview", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments",
@@ -79,7 +79,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .subscriptionGroups, titles: ["Manage subscription groups"]),
         Group(destination: .channelTabs, titles: ["Channel tabs"]),
-        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Text font"]),
+        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Accent color", "Text font"]),
         Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Tab order"]),
         Group(destination: .libraryData, titles: [
             "Library & Data", "Save watch history", "Add to history when opened",

@@ -90,6 +90,15 @@ final class SettingsViewModel {
     var seekPreviewStyle: SeekPreviewStyle {
         didSet { preferences.seekPreviewStyle = seekPreviewStyle }
     }
+    var playerVerticalSwipeAction: PlayerVerticalSwipeAction {
+        didSet { preferences.playerVerticalSwipeAction = playerVerticalSwipeAction }
+    }
+    var leftFullscreenSwipeAction: PlayerSwipeAdjustmentAction {
+        didSet { preferences.leftFullscreenSwipeAction = leftFullscreenSwipeAction }
+    }
+    var rightFullscreenSwipeAction: PlayerSwipeAdjustmentAction {
+        didSet { preferences.rightFullscreenSwipeAction = rightFullscreenSwipeAction }
+    }
     var doubleTapSeekSeconds: Int {
         didSet { preferences.doubleTapSeekSeconds = doubleTapSeekSeconds }
     }
@@ -136,6 +145,9 @@ final class SettingsViewModel {
         self.defaultDownloadQuality = preferences.defaultDownloadQuality
         self.cellularPlaybackQuality = preferences.cellularPlaybackQuality
         self.seekPreviewStyle = preferences.seekPreviewStyle
+        self.playerVerticalSwipeAction = preferences.playerVerticalSwipeAction
+        self.leftFullscreenSwipeAction = preferences.leftFullscreenSwipeAction
+        self.rightFullscreenSwipeAction = preferences.rightFullscreenSwipeAction
         self.doubleTapSeekSeconds = preferences.doubleTapSeekSeconds
         self.resumeAfterAudioInterruption = preferences.resumeAfterAudioInterruption
         self.rememberFloatingPlayerPlacement = preferences.rememberFloatingPlayerPlacement
@@ -166,11 +178,6 @@ final class SettingsViewModel {
     var autoplayNext: Bool {
         get { preferences.autoplayNext }
         set { preferences.autoplayNext = newValue }
-    }
-
-    var playerVerticalSwipeAction: PlayerVerticalSwipeAction {
-        get { preferences.playerVerticalSwipeAction }
-        set { preferences.playerVerticalSwipeAction = newValue }
     }
 
     var showHistoryProgressBars: Bool {

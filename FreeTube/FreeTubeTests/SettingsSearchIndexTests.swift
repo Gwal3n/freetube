@@ -18,6 +18,10 @@ final class SettingsSearchIndexTests: XCTestCase {
             .contains { $0.destination == .playback })
         XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Remember floating player placement"))
             .contains { $0.destination == .playback })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Accent color"))
+            .contains { $0.destination == .appearance })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Left side"))
+            .contains { $0.destination == .playback })
     }
 
     func testEmptySearchShowsSettingsIndex() {

@@ -31,6 +31,8 @@ struct UserPreferences {
     /// the user's prior on/off choice when adding the fullscreen-only adjustment mode.
     @AppStorage("verticalSwipeFullscreen") var verticalSwipeFullscreen: Bool = true
     @AppStorage("verticalSwipeAdjustments") var verticalSwipeAdjustments: Bool = false
+    @AppStorage("leftFullscreenSwipeAction") var leftFullscreenSwipeActionRaw: String = PlayerSwipeAdjustmentAction.brightness.rawValue
+    @AppStorage("rightFullscreenSwipeAction") var rightFullscreenSwipeActionRaw: String = PlayerSwipeAdjustmentAction.volume.rawValue
     /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
     /// Stops writing local watch history and playback positions when disabled. Existing entries
@@ -89,6 +91,7 @@ struct UserPreferences {
     @AppStorage("logToFile") var logToFile: Bool = false
     /// Preserve the historical dark appearance unless the user chooses System or Light.
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.dark.rawValue
+    @AppStorage("appAccentPreset") var appAccentPresetRaw: String = AppAccentPreset.classic.rawValue
     @AppStorage("appFontPreset") var appFontPresetRaw: String = AppFontPreset.system.rawValue
     /// `--concurrent-fragments` value passed to yt-dlp. Higher values fetch more DASH/HLS chunks
     /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
@@ -175,6 +178,16 @@ struct UserPreferences {
         }
     }
 
+    var leftFullscreenSwipeAction: PlayerSwipeAdjustmentAction {
+        get { PlayerSwipeAdjustmentAction(rawValue: leftFullscreenSwipeActionRaw) ?? .brightness }
+        nonmutating set { leftFullscreenSwipeActionRaw = newValue.rawValue }
+    }
+
+    var rightFullscreenSwipeAction: PlayerSwipeAdjustmentAction {
+        get { PlayerSwipeAdjustmentAction(rawValue: rightFullscreenSwipeActionRaw) ?? .volume }
+        nonmutating set { rightFullscreenSwipeActionRaw = newValue.rawValue }
+    }
+
     var recordsSearchHistory: Bool {
         saveSearchHistory && !(incognitoEnabled && incognitoSkipSearchHistory)
     }
@@ -204,6 +217,11 @@ struct UserPreferences {
     var appFontPreset: AppFontPreset {
         get { AppFontPreset(rawValue: appFontPresetRaw) ?? .system }
         nonmutating set { appFontPresetRaw = newValue.rawValue }
+    }
+
+    var appAccentPreset: AppAccentPreset {
+        get { AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic }
+        nonmutating set { appAccentPresetRaw = newValue.rawValue }
     }
 
     var playerControlLayout: PlayerControlLayout {

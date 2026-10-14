@@ -25,6 +25,8 @@ final class PlayerSwipeAdjustmentModel {
         startLocation: CGPoint,
         surfaceFrame: CGRect,
         controlsVisible: Bool,
+        leftAction: PlayerSwipeAdjustmentAction,
+        rightAction: PlayerSwipeAdjustmentAction,
         player: PlayerStateManager
     ) {
         if isVertical == nil {
@@ -41,8 +43,14 @@ final class PlayerSwipeAdjustmentModel {
                 return
             }
 
+            let action = startLocation.x < surfaceFrame.midX ? leftAction : rightAction
+            guard action != .off else {
+                cancel()
+                isVertical = false
+                return
+            }
             hideTask?.cancel()
-            let selectedKind: Kind = startLocation.x < surfaceFrame.midX ? .brightness : .volume
+            let selectedKind: Kind = action == .brightness ? .brightness : .volume
             kind = selectedKind
             startingLevel = selectedKind == .brightness
                 ? UIScreen.main.brightness

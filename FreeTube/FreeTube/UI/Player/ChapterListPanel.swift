@@ -8,6 +8,11 @@ struct ChapterListPanel: View {
     private static let dismissalThreshold: CGFloat = 42
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
+
+    private var accentColor: Color {
+        (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color
+    }
 
     let chapters: [VideoChapter]
     let elapsed: TimeInterval
@@ -271,19 +276,19 @@ struct ChapterListPanel: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(chapter.title)
                     .font(.subheadline.weight(isCurrent ? .semibold : .regular))
-                    .foregroundStyle(isCurrent ? Color.accentColor : .primary)
+                    .foregroundStyle(isCurrent ? accentColor : .primary)
                     .lineLimit(2)
                 if isCurrent {
                     Label("Playing", systemImage: "speaker.wave.2.fill")
                         .font(.caption2.weight(.medium))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(accentColor)
                 }
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
-        .background(isCurrent ? Color.accentColor.opacity(0.10) : Color.clear)
+        .background(isCurrent ? accentColor.opacity(0.10) : Color.clear)
         .contentShape(Rectangle())
     }
 

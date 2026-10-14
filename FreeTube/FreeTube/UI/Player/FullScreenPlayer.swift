@@ -57,6 +57,8 @@ struct FullScreenPlayer: View {
     @AppStorage("autoplayNext") private var autoplayNext = true
     @AppStorage("verticalSwipeFullscreen") private var verticalSwipeFullscreen = true
     @AppStorage("verticalSwipeAdjustments") private var verticalSwipeAdjustments = false
+    @AppStorage("leftFullscreenSwipeAction") private var leftFullscreenSwipeActionRaw = PlayerSwipeAdjustmentAction.brightness.rawValue
+    @AppStorage("rightFullscreenSwipeAction") private var rightFullscreenSwipeActionRaw = PlayerSwipeAdjustmentAction.volume.rawValue
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("showComments") private var showComments = true
     @AppStorage("showDescription") private var showDescription = true
@@ -771,6 +773,12 @@ struct FullScreenPlayer: View {
             fullscreenSwipeStartedInExpectedDirection = false
             fullscreenSwipeHidControls = false
         }
+        .onChange(of: leftFullscreenSwipeActionRaw) { _, _ in
+            swipeAdjustment.cancel()
+        }
+        .onChange(of: rightFullscreenSwipeActionRaw) { _, _ in
+            swipeAdjustment.cancel()
+        }
         .onChange(of: isPlaylistPanelPresented) { _, isPresented in
             player.playlistPanelPresented = isPresented
             player.playerPresentationGestureEnabled = !portraitFullscreenActive
@@ -933,6 +941,8 @@ struct FullScreenPlayer: View {
                         startLocation: value.startLocation,
                         surfaceFrame: surfaceFrame,
                         controlsVisible: controlsVisibility.isVisible,
+                        leftAction: leftFullscreenSwipeAction,
+                        rightAction: rightFullscreenSwipeAction,
                         player: player
                     )
                     return
@@ -1010,6 +1020,14 @@ struct FullScreenPlayer: View {
     private var playerVerticalSwipeAction: PlayerVerticalSwipeAction {
         if verticalSwipeAdjustments { return .adjustPlayback }
         return verticalSwipeFullscreen ? .fullscreen : .off
+    }
+
+    private var leftFullscreenSwipeAction: PlayerSwipeAdjustmentAction {
+        PlayerSwipeAdjustmentAction(rawValue: leftFullscreenSwipeActionRaw) ?? .brightness
+    }
+
+    private var rightFullscreenSwipeAction: PlayerSwipeAdjustmentAction {
+        PlayerSwipeAdjustmentAction(rawValue: rightFullscreenSwipeActionRaw) ?? .volume
     }
 
     private func enterFullscreen() {

@@ -66,7 +66,7 @@ struct PlaybackSettingsScreen: View {
                 Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. The cellular limit applies to HLS on expensive networks; fixed-quality and downloaded files keep their encoded resolution. Allowing other audio may leave another app in control of Lock Screen playback.")
             }
 
-            Section("Player") {
+            Section {
                 Picker("Double-tap seek", selection: Bindable(model).doubleTapSeekSeconds) {
                     ForEach([5, 10, 15, 30], id: \.self) { seconds in
                         Text("\(seconds) seconds").tag(seconds)
@@ -79,8 +79,20 @@ struct PlaybackSettingsScreen: View {
                 }
                 Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
                     Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
-                    Text("Brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
+                    Text("Adjust brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
                     Text("Off").tag(PlayerVerticalSwipeAction.off)
+                }
+                if model.playerVerticalSwipeAction == .adjustPlayback {
+                    Picker("Left side", selection: Bindable(model).leftFullscreenSwipeAction) {
+                        ForEach(PlayerSwipeAdjustmentAction.allCases) { action in
+                            Text(action.label).tag(action)
+                        }
+                    }
+                    Picker("Right side", selection: Bindable(model).rightFullscreenSwipeAction) {
+                        ForEach(PlayerSwipeAdjustmentAction.allCases) { action in
+                            Text(action.label).tag(action)
+                        }
+                    }
                 }
                 Toggle("Remember floating player placement", isOn: Bindable(model).rememberFloatingPlayerPlacement)
                 Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
@@ -106,6 +118,12 @@ struct PlaybackSettingsScreen: View {
                     Label("Customize controls", systemImage: "slider.horizontal.3")
                 }
                 .tint(.primary)
+            } header: {
+                Text("Player")
+            } footer: {
+                if model.playerVerticalSwipeAction == .adjustPlayback {
+                    Text("Volume swipes adjust FreeTube playback, not the iPhone's system volume.")
+                }
             }
 
             Section("Captions") {

@@ -16,6 +16,7 @@ import SwiftData
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
+    @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
     // A new app session starts on Feed. Keep selection in memory so presentations and player
     // transitions cannot change the current tab within that session.
     @State private var selectedTab = RootView.Tab.feed
@@ -26,6 +27,7 @@ struct FreeTubeApp: App {
                 .environment(appEnvironment.playerStateManager)
                 .environment(appEnvironment.appVisitState)
                 .modelContainer(PersistenceController.sharedContainer)
+                .tint((AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color)
                 // The app and player interface follow the chosen appearance.
                 .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)
         }

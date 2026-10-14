@@ -150,7 +150,7 @@ final class AppBackupService {
     }
 
     private static let settingKeys: Set<String> = [
-        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appFontPreset",
+        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appAccentPreset", "appFontPreset",
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "cellularPlaybackQuality",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
@@ -164,7 +164,7 @@ final class AppBackupService {
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
         "logToFile", "manualQueue",
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder",
-        "libraryShelfContent", "recentLibraryVideoCount",
+        "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
         "saveSearchHistory", "saveWatchHistory", "seekPreviewStyle", "showChannelAboutTab", "showChannelLiveTab",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview",
