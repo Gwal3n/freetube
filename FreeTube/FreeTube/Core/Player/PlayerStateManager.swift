@@ -123,7 +123,8 @@ final class PlayerStateManager {
     private(set) var playerExpansionRequest = 0
     /// Allows the fixed collapse control to use the container's video-only shrinking transition.
     private(set) var playerCollapseRequest = 0
-    /// Session-wide width of the in-app floating video; the view constrains it to the viewport.
+    /// Width of the in-app floating video; optionally restored between launches. The view
+    /// constrains it to the current viewport.
     private(set) var floatingMiniPlayerWidth: CGFloat = 216
     /// The visible thumbnail that initiated the next explicit expansion, in screen coordinates.
     /// This is presentation-only state; it never changes playback or persists with a video.
@@ -246,6 +247,8 @@ final class PlayerStateManager {
     private var recommendationBacklog: [Video] = []
     private var recommendationContinuationToken: String?
     private var playlistContinuationToken: String?
+    private var audioInterruptionObserver: NSObjectProtocol?
+    private var interruptedPlaybackSessionID: Int?
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
@@ -267,6 +270,11 @@ final class PlayerStateManager {
         self.playbackQuality = preferences.preferredQuality
         self.videoQualityBeforeAudio = preferences.preferredQuality == .audioOnly
             ? .auto : preferences.preferredQuality
+        if preferences.rememberFloatingPlayerPlacement {
+            let savedWidth = preferences.savedFloatingPlayerWidth
+            self.floatingMiniPlayerWidth = savedWidth.isFinite
+                ? min(420, max(120, CGFloat(savedWidth))) : 216
+        }
         // AVQueuePlayer defaults to `.advance`, which removes the finished item before our
         // end-of-playback UI can replay or seek it. We manage queue transitions ourselves in the
         // end observer, so pause on the final frame and retain the item until that decision is
@@ -316,6 +324,9 @@ final class PlayerStateManager {
         itemPresentationSizeObservation?.invalidate()
         itemLoadedTimeRangesObservation?.invalidate()
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        if let audioInterruptionObserver { NotificationCenter.default.removeObserver(audioInterruptionObserver) }
+        audioInterruptionObserver = nil
+        interruptedPlaybackSessionID = nil
         if let itemFailedToEndObservation { NotificationCenter.default.removeObserver(itemFailedToEndObservation) }
         if let itemErrorLogObservation { NotificationCenter.default.removeObserver(itemErrorLogObservation) }
         if let itemAccessLogObservation { NotificationCenter.default.removeObserver(itemAccessLogObservation) }
@@ -678,6 +689,9 @@ final class PlayerStateManager {
     func resizeFloatingMiniPlayer(to width: CGFloat) {
         guard width.isFinite else { return }
         floatingMiniPlayerWidth = width
+        if preferences.rememberFloatingPlayerPlacement {
+            preferences.savedFloatingPlayerWidth = Double(width)
+        }
     }
 
     /// Stages one frame at the tapped thumbnail before expansion. `AVPlayerViewController` does
@@ -778,6 +792,7 @@ final class PlayerStateManager {
     func pause() {
         log.info("pause()")
         wantsPlayback = false
+        interruptedPlaybackSessionID = nil
         player.pause()
         isPlaying = false
         if isSwitchingAudioMode, resumeAfterAudioSwitch != nil {
@@ -1749,6 +1764,7 @@ final class PlayerStateManager {
 
     func dismiss() {
         log.info("dismiss()")
+        interruptedPlaybackSessionID = nil
         acceptedStreamItem = nil
         acceptedStreamStrategy = nil
         didAttemptPlaybackRecovery = false
@@ -2600,6 +2616,38 @@ final class PlayerStateManager {
     }
 
     private func installObservers() {
+        // AVPlayer pauses for calls/Siri on its own. Preserve the user's play intent separately
+        // from `isPlaying`, which KVO may already have changed by the time this arrives.
+        audioInterruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            guard let rawType,
+                  let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                switch type {
+                case .began:
+                    self.interruptedPlaybackSessionID = self.wantsPlayback && self.player.currentItem != nil
+                        ? self.playbackSessionID : nil
+                case .ended:
+                    let interruptedSessionID = self.interruptedPlaybackSessionID
+                    self.interruptedPlaybackSessionID = nil
+                    guard self.preferences.resumeAfterAudioInterruption,
+                          AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume),
+                          interruptedSessionID == self.playbackSessionID,
+                          self.wantsPlayback,
+                          self.player.currentItem != nil,
+                          self.player.timeControlStatus == .paused else { return }
+                    self.play()
+                @unknown default:
+                    break
+                }
+            }
+        }
         // Periodic time observation via Combine-friendly bridging.
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in

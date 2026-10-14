@@ -59,7 +59,8 @@ enum SettingsSearchIndex {
         Group(destination: .playback, titles: [
             "Playback", "Default playback quality", "Cellular streaming limit", "Hold for speed", "Hold speed",
             "Autoplay next video", "Allow audio from other apps",
-            "Seek preview", "Vertical swipe in fullscreen", "Show watch progress bars", "Show description",
+            "Resume after interruptions", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen",
+            "Remember floating player placement", "Show watch progress bars", "Show description",
             "Show comments", "Show featured comment preview", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments",
             "Captions", "Dark caption background", "Use source formatting", "Caption text size"

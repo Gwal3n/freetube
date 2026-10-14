@@ -1,6 +1,7 @@
 import AVFoundation
 import AVKit
 import OSLog
+import QuartzCore
 import UIKit
 
 /// Installs YouTube-style gestures on `AVPlayerViewController.view` while using its
@@ -33,6 +34,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var feedbackLabel: UILabel?
     private var feedbackBlurView: UIVisualEffectView?
     private var outlinedFeedbackLabel: UILabel?
+    private var seekChevronView: UIView?
     private var feedbackWorkItem: DispatchWorkItem?
     private var pendingSingleTapWorkItem: DispatchWorkItem?
     private var seekSessionWorkItem: DispatchWorkItem?
@@ -45,6 +47,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var isHoldingForSpeed = false
     private var holdForSpeedEnabled: Bool
     private var holdSpeedRate: Float
+    private var doubleTapSeekSeconds: Int
     private var lastPiPDismissalRequest: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
@@ -53,6 +56,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         pipDismissalRequest: Int,
         holdForSpeedEnabled: Bool,
         holdSpeedRate: Double,
+        doubleTapSeekSeconds: Int,
         effectivePlaybackRate: Double,
         onHoldSpeedChange: @escaping (Double?) -> Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
@@ -67,6 +71,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.lastPiPDismissalRequest = pipDismissalRequest
         self.holdForSpeedEnabled = holdForSpeedEnabled
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
+        self.doubleTapSeekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
         self.onSeekRelative = onSeekRelative
@@ -97,6 +102,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         holdForSpeedEnabled: Bool,
         holdSpeedRate: Double,
+        doubleTapSeekSeconds: Int,
         effectivePlaybackRate: Double,
         onHoldSpeedChange: @escaping (Double?) -> Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
@@ -117,6 +123,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             longPressGesture?.isEnabled = holdForSpeedEnabled
         }
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
+        self.doubleTapSeekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
         self.onSeekRelative = onSeekRelative
@@ -235,6 +242,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         feedbackBlurView = nil
         outlinedFeedbackLabel?.removeFromSuperview()
         outlinedFeedbackLabel = nil
+        seekChevronView?.removeFromSuperview()
+        seekChevronView = nil
         feedbackView = nil
         gestureView = nil
     }
@@ -261,7 +270,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         let itemDuration = item.duration.seconds
         guard (itemDuration.isFinite && itemDuration > 0) || liveSeekableRange() != nil else { return }
         let isForward = location.x >= view.bounds.midX
-        let interval: TimeInterval = isForward ? 10 : -10
+        let interval = seekInterval(isForward: isForward)
         log.info("Double tap recognized; seeking \(interval, privacy: .public)s")
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -293,15 +302,16 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     @objc private func didContinueSeeking(_ gesture: UITapGestureRecognizer) {
         guard let view = gestureView else { return }
         let isForward = gesture.location(in: view).x >= view.bounds.midX
-        let interval: TimeInterval = isForward ? 10 : -10
+        let interval = seekInterval(isForward: isForward)
         seekSessionTotal += interval
         log.info("Seek session tap; seeking \(interval, privacy: .public)s total=\(self.seekSessionTotal, privacy: .public)s")
         onSeekRelative(interval)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showFeedback(
-            doubleTapFeedbackText(isForward: isForward),
+            seekFeedbackText,
             horizontalFraction: isForward ? 0.82 : 0.18,
             outlined: true,
+            seekForward: isForward,
             automaticallyHide: false
         )
         scheduleSeekSessionEnd()
@@ -441,6 +451,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return Float(min(max(rate, PlaybackSpeedPresets.minimumRate), PlaybackSpeedPresets.maximumRate))
     }
 
+    private static func validatedSeekInterval(_ seconds: Int) -> Int {
+        [5, 10, 15, 30].contains(seconds) ? seconds : 10
+    }
+
+    private func seekInterval(isForward: Bool) -> TimeInterval {
+        let seconds = TimeInterval(doubleTapSeekSeconds)
+        return isForward ? seconds : -seconds
+    }
+
     private func beginSeekSession(with interval: TimeInterval, isForward: Bool) {
         seekSessionTotal = interval
         // Once the initial double tap succeeds, count every following tap individually. Keeping
@@ -448,9 +467,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         singleTapGesture?.isEnabled = false
         continuationTapGesture?.isEnabled = true
         showFeedback(
-            doubleTapFeedbackText(isForward: isForward),
+            seekFeedbackText,
             horizontalFraction: isForward ? 0.82 : 0.18,
             outlined: true,
+            seekForward: isForward,
             automaticallyHide: false
         )
         scheduleSeekSessionEnd()
@@ -481,10 +501,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         if seekSessionTotal > 0 { return "+\(seconds)s" }
         if seekSessionTotal < 0 { return "−\(seconds)s" }
         return "0s"
-    }
-
-    private func doubleTapFeedbackText(isForward: Bool) -> String {
-        isForward ? "\(seekFeedbackText)  ≫" : "≪  \(seekFeedbackText)"
     }
 
     private func horizontalSeekText(target: TimeInterval, duration: TimeInterval) -> String {
@@ -518,6 +534,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         compact: Bool = false,
         wide: Bool = false,
         outlined: Bool = false,
+        seekForward: Bool = true,
         automaticallyHide: Bool = true
     ) {
         guard let view = feedbackView else { return }
@@ -528,6 +545,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         feedbackLabel?.layer.removeAllAnimations()
         feedbackBlurView?.layer.removeAllAnimations()
         outlinedFeedbackLabel?.layer.removeAllAnimations()
+        seekChevronView?.layer.removeAllAnimations()
 
         let label: UILabel
         if outlined {
@@ -537,6 +555,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         } else {
             label = feedbackLabel ?? makeFeedbackLabel(in: view)
             outlinedFeedbackLabel?.alpha = 0
+            seekChevronView?.alpha = 0
         }
         let font: UIFont = outlined
             ? .systemFont(ofSize: 20, weight: .bold)
@@ -550,7 +569,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             124
         )
         label.bounds.size = outlined
-            ? CGSize(width: 104, height: 38)
+            ? CGSize(width: 80, height: 38)
             : wide
             ? compact
                 ? CGSize(width: compactTextWidth, height: 26)
@@ -563,8 +582,15 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             y: view.bounds.height * verticalFraction
         )
         if outlined {
-            label.center = center
+            // The text and two individually drawn chevrons form one unbacked, edge-biased
+            // notice. Keep the whole group inside the video on narrow portrait screens.
+            let groupX = min(max(center.x, 62), max(62, view.bounds.width - 62))
+            label.center = CGPoint(x: groupX + (seekForward ? -21 : 21), y: center.y)
             label.alpha = 1
+            let chevrons = seekChevronView ?? makeSeekChevronView(in: view)
+            chevrons.center = CGPoint(x: groupX + (seekForward ? 42 : -42), y: center.y)
+            chevrons.alpha = 1
+            updateSeekChevrons(in: chevrons, forward: seekForward)
         } else if let feedbackBlurView {
             feedbackBlurView.bounds.size = label.bounds.size
             feedbackBlurView.center = center
@@ -623,6 +649,56 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         return label
     }
 
+    private func makeSeekChevronView(in view: UIView) -> UIView {
+        let chevrons = UIView(frame: CGRect(x: 0, y: 0, width: 34, height: 32))
+        chevrons.isUserInteractionEnabled = false
+        chevrons.accessibilityElementsHidden = true
+        for _ in 0..<2 {
+            let stroke = CAShapeLayer()
+            stroke.fillColor = nil
+            stroke.strokeColor = UIColor.white.cgColor
+            stroke.lineWidth = 3
+            stroke.lineCap = .round
+            stroke.lineJoin = .round
+            stroke.shadowColor = UIColor.black.cgColor
+            stroke.shadowOpacity = 0.9
+            stroke.shadowRadius = 1.5
+            chevrons.layer.addSublayer(stroke)
+        }
+        view.addSubview(chevrons)
+        seekChevronView = chevrons
+        return chevrons
+    }
+
+    private func updateSeekChevrons(in view: UIView, forward: Bool) {
+        for (index, layer) in (view.layer.sublayers ?? []).enumerated() {
+            guard let stroke = layer as? CAShapeLayer else { continue }
+            stroke.removeAllAnimations()
+            let x = CGFloat(index) * 15 + 2
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: x + (forward ? 0 : 9), y: 6))
+            path.addLine(to: CGPoint(x: x + (forward ? 9 : 0), y: 16))
+            path.addLine(to: CGPoint(x: x + (forward ? 0 : 9), y: 26))
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            stroke.path = path.cgPath
+            CATransaction.commit()
+            guard !UIAccessibility.isReduceMotionEnabled else { continue }
+            let movement = CABasicAnimation(keyPath: "transform.translation.x")
+            movement.fromValue = forward ? -3 : 3
+            movement.toValue = 0
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0.45
+            fade.toValue = 1
+            let pulse = CAAnimationGroup()
+            pulse.animations = [movement, fade]
+            pulse.duration = 0.22
+            pulse.beginTime = CACurrentMediaTime() + Double(index) * 0.055
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            stroke.add(pulse, forKey: "seekPulse")
+        }
+    }
+
     private func hideFeedback() {
         feedbackWorkItem?.cancel()
         feedbackWorkItem = nil
@@ -630,6 +706,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             self?.feedbackLabel?.alpha = 0
             self?.feedbackBlurView?.alpha = 0
             self?.outlinedFeedbackLabel?.alpha = 0
+            self?.seekChevronView?.alpha = 0
         }
         guard !UIAccessibility.isReduceMotionEnabled else {
             updates()

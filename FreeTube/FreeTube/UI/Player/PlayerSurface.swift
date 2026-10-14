@@ -10,6 +10,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     let pipDismissalRequest: Int
     let holdForSpeedEnabled: Bool
     let holdSpeedRate: Double
+    let doubleTapSeekSeconds: Int
     let effectivePlaybackRate: Double
     var onHoldSpeedChange: (Double?) -> Double
     var onSeekRelative: (TimeInterval) -> Void
@@ -32,6 +33,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             pipDismissalRequest: pipDismissalRequest,
             holdForSpeedEnabled: holdForSpeedEnabled,
             holdSpeedRate: holdSpeedRate,
+            doubleTapSeekSeconds: doubleTapSeekSeconds,
             effectivePlaybackRate: effectivePlaybackRate,
             onHoldSpeedChange: onHoldSpeedChange,
             onSeekRelative: onSeekRelative,
@@ -84,6 +86,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             player: player,
             holdForSpeedEnabled: holdForSpeedEnabled,
             holdSpeedRate: holdSpeedRate,
+            doubleTapSeekSeconds: doubleTapSeekSeconds,
             effectivePlaybackRate: effectivePlaybackRate,
             onHoldSpeedChange: onHoldSpeedChange,
             onSeekRelative: onSeekRelative,

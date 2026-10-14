@@ -13,6 +13,10 @@ struct UserPreferences {
     /// An additional HLS cap only on networks iOS classifies as expensive (usually cellular).
     @AppStorage("cellularPlaybackQuality") var cellularPlaybackQualityRaw: String = VideoQuality.auto.rawValue
     @AppStorage("seekPreviewStyle") var seekPreviewStyleRaw: String = SeekPreviewStyle.compact.rawValue
+    @AppStorage("doubleTapSeekSeconds") var doubleTapSeekSeconds: Int = 10
+    @AppStorage("resumeAfterAudioInterruption") var resumeAfterAudioInterruption: Bool = true
+    @AppStorage("rememberFloatingPlayerPlacement") var rememberFloatingPlayerPlacement: Bool = false
+    @AppStorage("floatingPlayerWidth") private var savedFloatingPlayerWidthRaw: Double = 216
     @AppStorage("alwaysDownloadBeforePlayback") var alwaysDownloadBeforePlayback: Bool = false
     /// When `true`, downloads (and playback-time fetches, since those use the same path) are
     /// allowed to run over cellular. Default is `true` — permissive — so a fresh install
@@ -153,6 +157,11 @@ struct UserPreferences {
     var seekPreviewStyle: SeekPreviewStyle {
         get { SeekPreviewStyle(rawValue: seekPreviewStyleRaw) ?? .compact }
         nonmutating set { seekPreviewStyleRaw = newValue.rawValue }
+    }
+
+    var savedFloatingPlayerWidth: Double {
+        get { savedFloatingPlayerWidthRaw }
+        nonmutating set { savedFloatingPlayerWidthRaw = newValue }
     }
 
     var playerVerticalSwipeAction: PlayerVerticalSwipeAction {

@@ -68,6 +68,7 @@ struct FullScreenPlayer: View {
     @AppStorage("seekPreviewStyle") private var seekPreviewStyleRaw = SeekPreviewStyle.compact.rawValue
     @AppStorage("holdForSpeedEnabled") private var holdForSpeedEnabled = true
     @AppStorage("holdSpeedRate") private var holdSpeedRate = 2.0
+    @AppStorage("doubleTapSeekSeconds") private var doubleTapSeekSeconds = 10
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
     @AppStorage("playerControlLayout") private var playerControlLayoutRaw = ""
@@ -173,6 +174,7 @@ struct FullScreenPlayer: View {
                         pipDismissalRequest: player.pipDismissalRequest,
                         holdForSpeedEnabled: holdForSpeedEnabled,
                         holdSpeedRate: holdSpeedRate,
+                        doubleTapSeekSeconds: doubleTapSeekSeconds,
                         effectivePlaybackRate: player.effectivePlaybackRate,
                         onHoldSpeedChange: { rate in
                             if let rate {

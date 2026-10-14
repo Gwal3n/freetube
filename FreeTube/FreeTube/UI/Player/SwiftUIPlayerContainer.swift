@@ -9,6 +9,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("rememberFloatingPlayerPlacement") private var rememberFloatingPlacement = false
+    @AppStorage("floatingPlayerWidth") private var savedFloatingWidth = 216.0
+    @AppStorage("floatingPlayerCorner") private var savedFloatingCornerRaw = FloatingCorner.bottomTrailing.rawValue
+    /// -1 means the window was snapped to a corner; otherwise this is its proportion of the
+    /// available vertical travel, independent of the current viewport or tab-bar height.
+    @AppStorage("floatingPlayerVerticalFraction") private var savedFloatingYFraction = -1.0
 
     let content: Content
 
@@ -79,7 +85,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             let floatingBase = CGPoint(
                 x: cornerBase.x,
                 y: min(floatingYRange.upperBound, max(floatingYRange.lowerBound,
-                    floatingRestingY ?? cornerBase.y))
+                    floatingRestingY ?? restoredFloatingY(in: floatingYRange, cornerY: cornerBase.y)))
             )
             let stashedX = floatingCorner.isLeading
                 ? -floatingSize.width / 2 + 22
@@ -263,6 +269,23 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 // The collapse control follows the same geometry path as a released drag.
                 animateCollapse(in: proxy.size)
             }
+            .onAppear {
+                if rememberFloatingPlacement {
+                    floatingCorner = FloatingCorner(rawValue: savedFloatingCornerRaw) ?? .bottomTrailing
+                }
+            }
+            .onChange(of: rememberFloatingPlacement) { _, isEnabled in
+                guard isEnabled else { return }
+                savedFloatingWidth = Double(player.floatingMiniPlayerWidth)
+                saveFloatingPlacement(
+                    corner: floatingCorner,
+                    y: floatingRestingY,
+                    in: floatingYRange
+                )
+            }
+            .onChange(of: proxy.size) { _, _ in
+                if rememberFloatingPlacement { floatingRestingY = nil }
+            }
         }
         // Keep the tab shell's geometry identical in expanded, mini, and dismissed states. Only
         // FullScreenPlayer itself is inset below the portrait status area.
@@ -277,9 +300,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if isPresented {
                 floatingPinchGeneration &+= 1
-                // A later collapse should always land in the bottom-trailing resting place,
-                // even if the previous floating window was dragged to another corner.
-                floatingCorner = .bottomTrailing
+                // Preserve the last side only when the user opted in. Otherwise a new
+                // collapse retains the established bottom-trailing destination.
+                if !rememberFloatingPlacement { floatingCorner = .bottomTrailing }
                 floatingIsStashed = false
                 floatingStashGeneration &+= 1
                 floatingStashOverlayVisible = false
@@ -358,6 +381,28 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         let top = topInset + 14 + window.height / 2
         let bottom = max(top, size.height - bottomInset - 14 - window.height / 2)
         return top...bottom
+    }
+
+    private func restoredFloatingY(in bounds: ClosedRange<CGFloat>, cornerY: CGFloat) -> CGFloat {
+        guard rememberFloatingPlacement,
+              savedFloatingYFraction.isFinite,
+              (0...1).contains(savedFloatingYFraction) else { return cornerY }
+        return bounds.lowerBound + CGFloat(savedFloatingYFraction) * (bounds.upperBound - bounds.lowerBound)
+    }
+
+    private func saveFloatingPlacement(
+        corner: FloatingCorner,
+        y: CGFloat?,
+        in bounds: ClosedRange<CGFloat>
+    ) {
+        guard rememberFloatingPlacement else { return }
+        savedFloatingCornerRaw = corner.rawValue
+        if let y, bounds.upperBound > bounds.lowerBound {
+            savedFloatingYFraction = Double(min(1, max(0,
+                (y - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))))
+        } else {
+            savedFloatingYFraction = -1
+        }
     }
 
     private func floatingStashHitTarget(
@@ -557,6 +602,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             floatingStashOverlayVisible = true
                         }
                     }
+                    saveFloatingPlacement(corner: floatingCorner, y: floatingRestingY, in: floatingYBounds(
+                        in: size, window: window,
+                        topInset: PlayerLayoutMetrics.safeAreaInsets.top,
+                        bottomInset: PlayerLayoutMetrics.bottomTabBarClearance
+                    ))
                     floatingActionsSuppressed = false
                     return
                 }
@@ -585,6 +635,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     floatingRestingY = snapsToCorner ? nil : destinationY
                     floatingDragTranslation = .zero
                 }
+                saveFloatingPlacement(corner: nextCorner, y: snapsToCorner ? nil : destinationY, in: yBounds)
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(180))
                     if !floatingGestureActive && !floatingPinchActive
@@ -660,6 +711,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         height: visualCenter.y - newBase.y
                     )
                 }
+                saveFloatingPlacement(corner: floatingCorner, y: floatingRestingY, in: yBounds)
                 floatingPinchStartWidth = nil
                 floatingPinchActive = false
                 let generation = floatingPinchGeneration
@@ -802,6 +854,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 max(yBounds.lowerBound, base.y + translation.height))
             floatingStashDragY = 0
         }
+        saveFloatingPlacement(corner: floatingCorner, y: floatingRestingY, in: yBounds)
 
         let inward = floatingCorner.isLeading ? translation.width : -translation.width
         let projectedInward = floatingCorner.isLeading
@@ -861,7 +914,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 /// Four predictable resting places leave the window draggable without letting it obscure
 /// the status bar or native tab bar. A drag remains free under the finger until release.
 @available(iOS 17.0, *)
-private enum FloatingCorner {
+private enum FloatingCorner: String {
     case topLeading, topTrailing, bottomLeading, bottomTrailing
 
     var isTop: Bool {

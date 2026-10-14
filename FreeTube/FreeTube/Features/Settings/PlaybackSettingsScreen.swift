@@ -59,6 +59,7 @@ struct PlaybackSettingsScreen: View {
                 .disabled(!model.holdForSpeedEnabled)
                 Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                 Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
+                Toggle("Resume after interruptions", isOn: Bindable(model).resumeAfterAudioInterruption)
             } header: {
                 Text("Playback")
             } footer: {
@@ -66,6 +67,11 @@ struct PlaybackSettingsScreen: View {
             }
 
             Section("Player") {
+                Picker("Double-tap seek", selection: Bindable(model).doubleTapSeekSeconds) {
+                    ForEach([5, 10, 15, 30], id: \.self) { seconds in
+                        Text("\(seconds) seconds").tag(seconds)
+                    }
+                }
                 Picker("Seek preview", selection: Bindable(model).seekPreviewStyle) {
                     Text("Compact").tag(SeekPreviewStyle.compact)
                     Text("Large").tag(SeekPreviewStyle.large)
@@ -76,6 +82,7 @@ struct PlaybackSettingsScreen: View {
                     Text("Brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
                     Text("Off").tag(PlayerVerticalSwipeAction.off)
                 }
+                Toggle("Remember floating player placement", isOn: Bindable(model).rememberFloatingPlayerPlacement)
                 Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
                 Toggle("Show description", isOn: Bindable(model).showDescription)
                 Toggle("Show comments", isOn: Bindable(model).showComments)

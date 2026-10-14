@@ -11,6 +11,13 @@ final class SettingsSearchIndexTests: XCTestCase {
 
         let importSubscriptions = SettingsSearchIndex.results(matching: String(localized: "Import Subscriptions CSV"))
         XCTAssertTrue(importSubscriptions.contains { $0.destination == .importExport })
+
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Double-tap seek"))
+            .contains { $0.destination == .playback })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Resume after interruptions"))
+            .contains { $0.destination == .playback })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Remember floating player placement"))
+            .contains { $0.destination == .playback })
     }
 
     func testEmptySearchShowsSettingsIndex() {

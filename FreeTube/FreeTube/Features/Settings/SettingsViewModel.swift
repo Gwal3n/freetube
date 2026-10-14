@@ -90,6 +90,15 @@ final class SettingsViewModel {
     var seekPreviewStyle: SeekPreviewStyle {
         didSet { preferences.seekPreviewStyle = seekPreviewStyle }
     }
+    var doubleTapSeekSeconds: Int {
+        didSet { preferences.doubleTapSeekSeconds = doubleTapSeekSeconds }
+    }
+    var resumeAfterAudioInterruption: Bool {
+        didSet { preferences.resumeAfterAudioInterruption = resumeAfterAudioInterruption }
+    }
+    var rememberFloatingPlayerPlacement: Bool {
+        didSet { preferences.rememberFloatingPlayerPlacement = rememberFloatingPlayerPlacement }
+    }
     var automaticFeedRefreshEnabled: Bool {
         didSet { preferences.automaticFeedRefreshEnabled = automaticFeedRefreshEnabled }
     }
@@ -127,6 +136,9 @@ final class SettingsViewModel {
         self.defaultDownloadQuality = preferences.defaultDownloadQuality
         self.cellularPlaybackQuality = preferences.cellularPlaybackQuality
         self.seekPreviewStyle = preferences.seekPreviewStyle
+        self.doubleTapSeekSeconds = preferences.doubleTapSeekSeconds
+        self.resumeAfterAudioInterruption = preferences.resumeAfterAudioInterruption
+        self.rememberFloatingPlayerPlacement = preferences.rememberFloatingPlayerPlacement
         self.automaticFeedRefreshEnabled = preferences.automaticFeedRefreshEnabled
         self.automaticFeedRefreshInterval = preferences.automaticFeedRefreshInterval
     }
