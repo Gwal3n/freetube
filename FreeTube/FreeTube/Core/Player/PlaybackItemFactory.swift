@@ -12,25 +12,31 @@ struct PlaybackItemFactory {
 
     /// Extensionless remote audio URLs need their actual container type. A selected HLS audio
     /// rendition is a playlist, not an MP4, so source MIME overrides must travel with candidates.
-    func makeItem(for candidate: PlaybackCandidate) async throws -> AVPlayerItem {
+    func makeItem(for candidate: PlaybackCandidate, videoID: String? = nil) async throws -> AVPlayerItem {
         if case .composite(let videoURL, let audioURL) = candidate.source {
             // AVMutableComposition references both remote tracks. It does not mux or persist a
             // file. Extensionless signed URLs need their actual media types.
             let videoAsset = AVURLAsset(url: videoURL, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])
             let audioAsset = AVURLAsset(url: audioURL, options: [AVURLAssetOverrideMIMETypeKey: "audio/mp4"])
             var stage = "video-track"
+            let startedAt = Date()
             do {
+                log.info("Paired source preparation video=\(videoID ?? "unknown", privacy: .public) stage=video-track")
                 guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first else {
                     throw YouTubeServiceError.streamExtractionFailed
                 }
+                try Task.checkCancellation()
                 stage = "audio-track"
+                log.info("Paired source preparation video=\(videoID ?? "unknown", privacy: .public) stage=audio-track after=\(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 guard let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first else {
                     throw YouTubeServiceError.streamExtractionFailed
                 }
+                try Task.checkCancellation()
                 stage = "video-duration"
                 let videoDuration = try await videoAsset.load(.duration)
                 stage = "audio-duration"
                 let audioDuration = try await audioAsset.load(.duration)
+                try Task.checkCancellation()
                 stage = "duration-validation"
                 guard videoDuration.isValid, audioDuration.isValid,
                       videoDuration.seconds.isFinite, audioDuration.seconds.isFinite,
@@ -57,16 +63,17 @@ struct PlaybackItemFactory {
                 )
                 stage = "preferred-transform"
                 compositionVideo.preferredTransform = try await videoTrack.load(.preferredTransform)
+                try Task.checkCancellation()
                 stage = "composition-copy"
                 guard let playbackComposition = composition.copy() as? AVComposition else {
                     throw YouTubeServiceError.streamExtractionFailed
                 }
-                log.info("Prepared paired video/audio composition duration=\(videoDuration.seconds, privacy: .public)s")
+                log.info("Prepared paired video/audio composition video=\(videoID ?? "unknown", privacy: .public) duration=\(videoDuration.seconds, privacy: .public)s elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s")
                 return AVPlayerItem(asset: playbackComposition)
             } catch {
                 let nsError = error as NSError
-                log.notice("Paired source preparation failed stage=\(stage, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
-                if stage == "video-track" {
+                log.notice("Paired source preparation failed video=\(videoID ?? "unknown", privacy: .public) stage=\(stage, privacy: .public) elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
+                if stage == "video-track", !(error is CancellationError) {
                     // Probe only the response and first byte after AVFoundation rejects the URL.
                     // Never log the signed URL or delay the resolver's next candidate.
                     Task { [videoURL] in

@@ -28,6 +28,17 @@ final class PlaybackResolver: PlaybackResolving {
         self.videoService = videoService
     }
 
+    func invalidateRejectedCandidate(
+        _ candidate: PlaybackCandidate,
+        videoID: String,
+        quality: VideoQuality
+    ) async {
+        // The primary native URL is cached before AVPlayer validates its HLS resources.
+        // Keep the separately resolved paired fallback warm while forgetting a rejected URL.
+        guard candidate.strategy == .native else { return }
+        await nativeStreams.invalidateCachedPrimaryStream(videoID: videoID, quality: quality)
+    }
+
     func resolve(
         video: Video,
         quality: VideoQuality,

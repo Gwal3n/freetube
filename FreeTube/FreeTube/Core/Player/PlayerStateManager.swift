@@ -151,6 +151,7 @@ final class PlayerStateManager {
     let queue: QueueManager
     private let resolver: any PlaybackResolving
     private let itemFactory = PlaybackItemFactory()
+    private let preparationGate = PlayerItemPreparationGate()
     private let readinessGate = PlayerItemReadinessGate()
     private let sponsorBlockService: any SponsorBlockServicing
     private let sponsorBlockCoordinator = PlayerSponsorBlockCoordinator()
@@ -2265,6 +2266,7 @@ final class PlayerStateManager {
 
         while !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id {
             let candidate: PlaybackCandidate
+            let candidateQuality = playbackQuality
             do {
                 if let localFileURL {
                     guard !excludedStrategies.contains(.localFile) else {
@@ -2275,7 +2277,7 @@ final class PlayerStateManager {
                 } else {
                     candidate = try await resolver.resolve(
                         video: video,
-                        quality: playbackQuality,
+                        quality: candidateQuality,
                         excluding: excludedStrategies
                     )
                 }
@@ -2296,15 +2298,43 @@ final class PlayerStateManager {
 
             log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
             let item: AVPlayerItem
-            do {
-                item = try await itemFactory.makeItem(for: candidate)
-            } catch is CancellationError {
-                return
-            } catch {
-                guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
-                log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(PlayerItemReadinessGate.describe(itemError: error), privacy: .public)")
-                excludedStrategies.insert(candidate.strategy)
-                continue
+            if candidate.strategy == .nativePaired {
+                let preparationStartedAt = Date()
+                log.info("resolveAndPlay: preparing paired candidate for \(video.id, privacy: .public) (limit=30s)")
+                let outcome = await preparationGate.prepare(
+                    candidate: candidate,
+                    factory: itemFactory,
+                    videoID: video.id,
+                    timeout: .seconds(30)
+                )
+                guard !Task.isCancelled, playbackSessionID == sessionID,
+                      currentVideo?.id == video.id else { return }
+                switch outcome {
+                case .ready(let preparedItem):
+                    item = preparedItem
+                    log.info("resolveAndPlay: paired candidate prepared for \(video.id, privacy: .public) in \(Date().timeIntervalSince(preparationStartedAt), privacy: .public)s")
+                case .failed(let detail):
+                    log.notice("resolveAndPlay: paired candidate preparation failed for \(video.id, privacy: .public) after \(Date().timeIntervalSince(preparationStartedAt), privacy: .public)s \(detail, privacy: .public)")
+                    excludedStrategies.insert(candidate.strategy)
+                    continue
+                case .timedOut:
+                    log.notice("resolveAndPlay: paired candidate preparation timed out for \(video.id, privacy: .public) after \(Date().timeIntervalSince(preparationStartedAt), privacy: .public)s")
+                    excludedStrategies.insert(candidate.strategy)
+                    continue
+                case .cancelled:
+                    return
+                }
+            } else {
+                do {
+                    item = try await itemFactory.makeItem(for: candidate)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
+                    log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(PlayerItemReadinessGate.describe(itemError: error), privacy: .public)")
+                    excludedStrategies.insert(candidate.strategy)
+                    continue
+                }
             }
             guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
             applyQualityCap(to: item)
@@ -2424,6 +2454,13 @@ final class PlayerStateManager {
                 log.notice("resolveAndPlay: rejected candidate=\(candidate.strategy.rawValue, privacy: .public) reason=readiness-timeout")
             }
 
+            await resolver.invalidateRejectedCandidate(
+                candidate,
+                videoID: video.id,
+                quality: candidateQuality
+            )
+            guard !Task.isCancelled, playbackSessionID == sessionID,
+                  currentVideo?.id == video.id else { return }
             excludedStrategies.insert(candidate.strategy)
             // The optimistic `play()` left the transport running (rate 1, possibly stalled) on a
             // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`

@@ -66,4 +66,19 @@ protocol PlaybackResolving {
 
     /// Resolves a file-style source for AVPlayer's rates above 2x. HLS is not a fallback here.
     func resolveForFastPlayback(video: Video, quality: VideoQuality) async throws -> PlaybackCandidate
+
+    /// Forgets a URL that AVPlayer actually rejected, without evicting unrelated videos.
+    func invalidateRejectedCandidate(
+        _ candidate: PlaybackCandidate,
+        videoID: String,
+        quality: VideoQuality
+    ) async
+}
+
+extension PlaybackResolving {
+    func invalidateRejectedCandidate(
+        _ candidate: PlaybackCandidate,
+        videoID: String,
+        quality: VideoQuality
+    ) async {}
 }

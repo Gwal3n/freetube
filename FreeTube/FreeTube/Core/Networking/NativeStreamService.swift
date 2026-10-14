@@ -10,6 +10,12 @@ protocol NativeStreamServicing: Sendable {
     func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolveProgressive(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolvePaired(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
+
+    func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async
+}
+
+extension NativeStreamServicing {
+    func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async {}
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -18,6 +24,10 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
 
     init(cache: StreamURLCache = .shared) {
         self.cache = cache
+    }
+
+    func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async {
+        await cache.remove(videoID: videoID, formatID: "native-\(quality.rawValue)")
     }
 
     /// Returns an HLS, progressive video, or audio-only URL suitable for `AVPlayer`.

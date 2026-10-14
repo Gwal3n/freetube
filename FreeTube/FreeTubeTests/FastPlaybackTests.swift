@@ -106,6 +106,34 @@ final class FastPlaybackTests: XCTestCase {
         XCTAssertNil(purged)
     }
 
+    func testRejectedNativeURLDoesNotEvictPairedFallback() async {
+        let cache = StreamURLCache()
+        let videoID = "testvideo01"
+        let hlsURL = URL(string: "https://example.com/broken.m3u8")!
+        let videoURL = URL(string: "https://example.com/video.mp4")!
+        let audioURL = URL(string: "https://example.com/audio.m4a")!
+        await cache.set(videoID: videoID, formatID: "native-auto", url: hlsURL, mediaKind: .hls)
+        await cache.set(
+            videoID: videoID, formatID: "native-paired-auto",
+            url: videoURL, audioURL: audioURL, mediaKind: .paired
+        )
+
+        let resolver = PlaybackResolver(
+            downloads: NoDownloads(), nativeStreams: NativeStreamService(cache: cache)
+        )
+        await resolver.invalidateRejectedCandidate(
+            PlaybackCandidate(source: .direct(hlsURL), strategy: .native),
+            videoID: videoID,
+            quality: .auto
+        )
+
+        let rejected = await cache.getEntry(videoID: videoID, formatID: "native-auto")
+        let fallback = await cache.getEntry(videoID: videoID, formatID: "native-paired-auto")
+        XCTAssertNil(rejected)
+        XCTAssertEqual(fallback?.url, videoURL)
+        XCTAssertEqual(fallback?.audioURL, audioURL)
+    }
+
     private var video: Video {
         Video(id: "testvideo01", title: "Test", channelID: "channel", channelName: "Channel",
               channelThumbnailURL: nil, thumbnailURL: nil, duration: 120, viewCount: nil,
