@@ -221,8 +221,7 @@ final class PlayerStateManager {
     private var itemLoadStartedAt: Date?
     private var itemErrorLogObservation: NSObjectProtocol?
     private var itemAccessLogObservation: NSObjectProtocol?
-    private var lastAccessLogAt = Date.distantPast
-    private var lastLiveDVRLogAt = Date.distantPast
+    private let itemDiagnostics = PlayerItemDiagnostics()
     private var playerErrorObservation: NSKeyValueObservation?
     private var fastPlaybackTask: Task<Void, Never>?
     private var fastPlaybackTimeoutTask: Task<Void, Never>?
@@ -2001,84 +2000,14 @@ final class PlayerStateManager {
         }
         player.insert(item, after: nil)
         applyEffectivePlaybackRate()
-        disableLegibleMediaSelection(on: item)
-        selectOriginalAudio(on: item, languageCode: originalAudioLanguageCode)
+        PlayerMediaSelection.configure(
+            item: item,
+            on: player,
+            originalAudioLanguageCode: originalAudioLanguageCode,
+            log: log
+        )
         log.debug("loadItem: queue size after insert=\(self.player.items().count, privacy: .public)")
         observe(item: item)
-    }
-
-    /// Keep every newly installed asset caption-free. The player-level automatic-selection flag
-    /// handles normal HLS manifests; the explicit nil selection also clears a default/forced
-    /// legible option embedded by a particular stream variant once its media groups are available.
-    private func disableLegibleMediaSelection(on item: AVPlayerItem) {
-        Task { @MainActor [weak item] in
-            guard let item else { return }
-            do {
-                let group = try await item.asset.loadMediaSelectionGroup(
-                    for: .legible
-                )
-                guard let group else { return }
-                item.select(nil, in: group)
-            } catch {
-                // Most progressive assets have no legible group. Absence is the expected case.
-            }
-        }
-    }
-
-    /// YouTube HLS manifests can expose the source soundtrack alongside localized dubs.
-    /// AVPlayer's automatic language matching may choose a dub based on the device locale even
-    /// when YouTube marks the original track as the default. Prefer the explicitly labelled
-    /// original option, then the manifest default. Progressive assets have no audible group.
-    private func selectOriginalAudio(on item: AVPlayerItem, languageCode: String?) {
-        Task { @MainActor [weak self, weak item] in
-            guard let self, let item else { return }
-            do {
-                guard let group = try await item.asset.loadMediaSelectionGroup(for: .audible),
-                      self.player.currentItem === item else { return }
-
-                let languageMatch = languageCode.flatMap { code in
-                    group.options.first { Self.audioOption($0, matches: code) }
-                }
-                let originalLabel = group.options.first {
-                    $0.displayName.localizedCaseInsensitiveContains("original")
-                }
-                guard let selection = languageMatch
-                    ?? originalLabel
-                    ?? group.defaultOption else {
-                    self.log.notice(
-                        "Did not force HLS audio selection: sourceLanguage=\(languageCode ?? "unknown", privacy: .public) options=\(group.options.count, privacy: .public)"
-                    )
-                    return
-                }
-
-                item.select(selection, in: group)
-                self.log.info(
-                    "Selected HLS audio option=\(selection.displayName, privacy: .public) sourceLanguage=\(languageCode ?? "unknown", privacy: .public) metadataMatch=\(languageMatch != nil, privacy: .public) options=\(group.options.count, privacy: .public)"
-                )
-            } catch {
-                // Absence is expected for progressive assets.
-            }
-        }
-    }
-
-    private nonisolated static func audioOption(
-        _ option: AVMediaSelectionOption,
-        matches languageCode: String
-    ) -> Bool {
-        let requested = normalizedLanguageIdentifier(languageCode)
-        guard !requested.isEmpty else { return false }
-        return [option.extendedLanguageTag, option.locale?.identifier]
-            .compactMap { $0 }
-            .map(normalizedLanguageIdentifier)
-            .contains {
-                $0 == requested
-                    || $0.hasPrefix(requested + "-")
-                    || requested.hasPrefix($0 + "-")
-            }
-    }
-
-    private nonisolated static func normalizedLanguageIdentifier(_ value: String) -> String {
-        value.replacingOccurrences(of: "_", with: "-").lowercased()
     }
 
     private func observe(item: AVPlayerItem) {
@@ -2088,8 +2017,7 @@ final class PlayerStateManager {
         bufferedRanges = []
         liveSeekableRange = nil
         observedFrameRate = nil
-        lastAccessLogAt = .distantPast
-        lastLiveDVRLogAt = .distantPast
+        itemDiagnostics.reset()
         if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
         if let token = itemFailedToEndObservation { NotificationCenter.default.removeObserver(token) }
@@ -2106,7 +2034,10 @@ final class PlayerStateManager {
                     self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
                     self.log.info("AVPlayerItem fast playback: canPlayFastForward=\(item.canPlayFastForward, privacy: .public) defaultRate=\(self.player.defaultRate, privacy: .public) audioPitchAlgorithm=\(item.audioTimePitchAlgorithm, privacy: .public)")
                     self.log.info("AVPlayerItem frame stepping: backward=\(item.canStepBackward, privacy: .public) forward=\(item.canStepForward, privacy: .public) tracks=\(item.tracks.count, privacy: .public)")
-                    self.logAudioDiagnostics(for: item)
+                    self.itemDiagnostics.logAudio(
+                        for: item,
+                        allowsMixing: self.preferences.allowAudioMixing
+                    )
                     self.itemLoadStartedAt = nil
                     self.readinessGate.finish(.ready, for: item)
                     // Local-file playback has no resolveAndPlay readiness branch. Normal stream
@@ -2181,66 +2112,9 @@ final class PlayerStateManager {
         ) { [weak self, weak item] _ in
             Task { @MainActor in
                 guard let self, let item, self.player.currentItem === item else { return }
-                // Some HLS streams post this notification dozens of times per second above 2x.
-                // Each AppLog entry also schedules a main-thread file write when diagnostics are on.
-                // A periodic snapshot preserves bitrate/stall evidence without flooding playback.
-                let now = Date()
-                guard now.timeIntervalSince(self.lastAccessLogAt) >= 5 else { return }
-                self.lastAccessLogAt = now
-                guard let entry = item.accessLog()?.events.last else { return }
-                // Access-log URIs and server addresses may contain signed playback credentials. Only
-                // record aggregate ABR measurements needed to diagnose low-quality HLS renditions.
-                self.log.info("AVPlayerItem access-log: indicatedBitrate=\(entry.indicatedBitrate, privacy: .public) indicatedAverageBitrate=\(entry.indicatedAverageBitrate, privacy: .public) averageAudioBitrate=\(entry.averageAudioBitrate, privacy: .public) averageVideoBitrate=\(entry.averageVideoBitrate, privacy: .public) observedBitrate=\(entry.observedBitrate, privacy: .public) switchBitrate=\(entry.switchBitrate, privacy: .public) downloadedDuration=\(entry.segmentsDownloadedDuration, privacy: .public)s watchedDuration=\(entry.durationWatched, privacy: .public)s droppedFrames=\(entry.numberOfDroppedVideoFrames, privacy: .public) stalls=\(entry.numberOfStalls, privacy: .public)")
+                self.itemDiagnostics.logAccessIfNeeded(for: item)
             }
         }
-    }
-
-    /// Captures the facts needed to separate a poor source rendition from output-route degradation
-    /// (most notably Bluetooth hands-free mode). Signed URLs and route names are deliberately
-    /// omitted from diagnostics.
-    private func logAudioDiagnostics(for item: AVPlayerItem) {
-        let session = AVAudioSession.sharedInstance()
-        let outputTypes = session.currentRoute.outputs.map(\.portType.rawValue).joined(separator: ",")
-        log.info("Audio session: category=\(session.category.rawValue, privacy: .public) mode=\(session.mode.rawValue, privacy: .public) route=\(outputTypes, privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)Hz channels=\(session.outputNumberOfChannels, privacy: .public) mixing=\(self.preferences.allowAudioMixing, privacy: .public)")
-
-        Task { @MainActor [weak self, weak item] in
-            guard let self, let item else { return }
-            do {
-                let tracks = try await item.asset.loadTracks(withMediaType: .audio)
-                guard !tracks.isEmpty else {
-                    self.log.notice("Audio diagnostics: AVPlayer asset exposes no audio track")
-                    return
-                }
-                for (index, track) in tracks.enumerated() {
-                    async let dataRate = track.load(.estimatedDataRate)
-                    async let descriptions = track.load(.formatDescriptions)
-                    let (estimatedDataRate, formatDescriptions) = try await (dataRate, descriptions)
-                    if formatDescriptions.isEmpty {
-                        self.log.info("Audio track[\(index, privacy: .public)]: estimatedDataRate=\(estimatedDataRate, privacy: .public)bps formatDescriptions=0")
-                    }
-                    for description in formatDescriptions {
-                        let codec = Self.fourCCString(CMFormatDescriptionGetMediaSubType(description))
-                        if let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee {
-                            self.log.info("Audio track[\(index, privacy: .public)]: codec=\(codec, privacy: .public) estimatedDataRate=\(estimatedDataRate, privacy: .public)bps sampleRate=\(stream.mSampleRate, privacy: .public)Hz channels=\(stream.mChannelsPerFrame, privacy: .public) bitsPerChannel=\(stream.mBitsPerChannel, privacy: .public)")
-                        } else {
-                            self.log.info("Audio track[\(index, privacy: .public)]: codec=\(codec, privacy: .public) estimatedDataRate=\(estimatedDataRate, privacy: .public)bps streamDescription=unavailable")
-                        }
-                    }
-                }
-            } catch {
-                self.log.notice("Audio diagnostics failed: \(String(describing: error), privacy: .public)")
-            }
-        }
-    }
-
-    private nonisolated static func fourCCString(_ value: FourCharCode) -> String {
-        let bytes: [UInt8] = [
-            UInt8((value >> 24) & 0xff),
-            UInt8((value >> 16) & 0xff),
-            UInt8((value >> 8) & 0xff),
-            UInt8(value & 0xff)
-        ]
-        return String(bytes: bytes, encoding: .ascii) ?? String(value)
     }
 
     /// Only a terminal failure of the accepted, visible stream starts recovery. A stall alone
@@ -2704,33 +2578,6 @@ final class PlayerStateManager {
         if liveSeekableRange != newest { liveSeekableRange = newest }
     }
 
-    /// Keep DVR diagnostics sparse and never log the signed playback URL.
-    private func logLiveDVRIfNeeded(for item: AVPlayerItem) {
-        guard currentVideo?.isLive == true,
-              loadState == .readyToPlay,
-              item.status == .readyToPlay else { return }
-        let now = Date()
-        guard now.timeIntervalSince(lastLiveDVRLogAt) >= 15 else { return }
-        lastLiveDVRLogAt = now
-
-        let ranges = item.seekableTimeRanges.compactMap { value -> (start: Double, end: Double)? in
-            let range = value.timeRangeValue
-            let start = range.start.seconds
-            let end = range.end.seconds
-            guard start.isFinite, end.isFinite, end > start else { return nil }
-            return (start, end)
-        }
-        guard let firstStart = ranges.map({ $0.start }).min(),
-              let lastEnd = ranges.map({ $0.end }).max() else {
-            log.info("Live DVR range video=\(currentVideo?.id ?? "unknown", privacy: .public) count=0")
-            return
-        }
-        let playableSeconds = ranges.reduce(0) { $0 + $1.end - $1.start }
-        let playhead = item.currentTime().seconds
-        let behindLive = playhead.isFinite ? max(0, lastEnd - playhead) : 0
-        log.info("Live DVR range video=\(currentVideo?.id ?? "unknown", privacy: .public) count=\(ranges.count, privacy: .public) span=\(lastEnd - firstStart, privacy: .public)s playable=\(playableSeconds, privacy: .public)s behindLive=\(behindLive, privacy: .public)s")
-    }
-
     private func installObservers() {
         // Periodic time observation via Combine-friendly bridging.
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
@@ -2752,7 +2599,14 @@ final class PlayerStateManager {
                     let total = item.duration.seconds
                     if total.isFinite { self.duration = total }
                     self.updateLiveSeekableRange(for: item)
-                    self.logLiveDVRIfNeeded(for: item)
+                    if self.currentVideo?.isLive == true,
+                       self.loadState == .readyToPlay,
+                       item.status == .readyToPlay {
+                        self.itemDiagnostics.logLiveDVRIfNeeded(
+                            for: item,
+                            videoID: self.currentVideo?.id ?? "unknown"
+                        )
+                    }
                 }
                 self.accumulateHistoryPlaybackTime()
                 self.persistCurrentPlaybackProgress(force: false)
