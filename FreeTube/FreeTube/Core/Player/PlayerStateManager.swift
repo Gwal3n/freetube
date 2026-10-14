@@ -60,6 +60,23 @@ final class PlayerStateManager {
     /// The newest contiguous DVR window offered by the current live AVPlayerItem. Unlike a
     /// video's duration, this range moves forward as the broadcast advances.
     private(set) var liveSeekableRange: ClosedRange<TimeInterval>?
+    /// AVFoundation exposes true decoded-frame stepping only for capable, ready video items.
+    /// Live streams and audio-only playback never offer this transport mode.
+    var canStepFrameBackward: Bool {
+        guard case .readyToPlay = loadState,
+              currentVideo?.isLive != true,
+              !isAudioOnly,
+              pendingSeekTarget == nil else { return false }
+        return player.currentItem?.canStepBackward == true
+    }
+
+    var canStepFrameForward: Bool {
+        guard case .readyToPlay = loadState,
+              currentVideo?.isLive != true,
+              !isAudioOnly,
+              pendingSeekTarget == nil else { return false }
+        return player.currentItem?.canStepForward == true
+    }
     private(set) var playbackRate: Double
     /// Actual requested transport rate, capped at 2x until a ready item supports fast-forward.
     private(set) var effectivePlaybackRate: Double
@@ -1445,6 +1462,22 @@ final class PlayerStateManager {
             seek(to: min(max(elapsed, range.lowerBound), range.upperBound) + delta)
         } else {
             seek(to: max(0, min(elapsed + delta, duration)))
+        }
+    }
+
+    /// Step one decoded frame while paused, using the current AVPlayerItem rather than assuming
+    /// a fixed frame rate. Unsupported HLS/items simply leave the normal scrubber unchanged.
+    func stepFrame(by count: Int) {
+        guard count == -1 || count == 1,
+              !isPlaying,
+              player.timeControlStatus == .paused,
+              (count < 0 ? canStepFrameBackward : canStepFrameForward),
+              let item = player.currentItem else { return }
+        item.step(byCount: count)
+        let steppedTime = item.currentTime().seconds
+        if steppedTime.isFinite {
+            elapsed = steppedTime
+            updateNowPlaying()
         }
     }
 
