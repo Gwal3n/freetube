@@ -38,6 +38,7 @@ struct FullScreenPlayer: View {
     @State private var saveToPlaylistVideo: Video?
     @State private var gestureSeekPreview: TimeInterval?
     @State private var scrubberSeekPreview: TimeInterval?
+    @State private var isFrameStepping = false
     @State private var panelScrollOffset: CGFloat = 0
     @State private var isPlaylistPanelPresented = false
     @State private var playlistPanelExpansion: CGFloat = 0
@@ -279,6 +280,7 @@ struct FullScreenPlayer: View {
                         isVisible: showsPlayerControls,
                         isPreparing: isPreparingPlayback,
                         isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
+                        isFrameStepping: isFrameStepping,
                         previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
                         hasPrevious: hasPrevious,
                         hasNext: hasNext,
@@ -300,6 +302,9 @@ struct FullScreenPlayer: View {
                                 isAudioOnly: player.isAudioOnly,
                                 isSwitchingAudioMode: player.isSwitchingAudioMode || player.isPreparingFastPlayback,
                                 isPreparingFastPlayback: player.isPreparingFastPlayback,
+                                isFrameStepping: isFrameStepping,
+                                canUseFineSeeking: !player.isPlaying
+                                    && (player.canStepFrameBackward || player.canStepFrameForward),
                                 sleepTimerOption: player.sleepTimerOption,
                                 captionsModel: captionsModel,
                                 onSetPlaybackRate: { rate in
@@ -329,6 +334,12 @@ struct FullScreenPlayer: View {
                                 },
                                 onSetSleepTimer: { option in
                                     player.setSleepTimer(option)
+                                    showPlayerControls()
+                                },
+                                onToggleFrameStepping: {
+                                    guard !player.isPlaying,
+                                          player.canStepFrameBackward || player.canStepFrameForward else { return }
+                                    isFrameStepping.toggle()
                                     showPlayerControls()
                                 },
                                 onShowTranscript: {
@@ -365,6 +376,10 @@ struct FullScreenPlayer: View {
                         },
                         onNext: {
                             player.playNext()
+                            showPlayerControls()
+                        },
+                        onStepFrame: { count in
+                            player.stepFrame(by: count)
                             showPlayerControls()
                         },
                         onCollapse: {
@@ -494,6 +509,7 @@ struct FullScreenPlayer: View {
                 }
                 .onDisappear { controlsVisibility.cancelAutoHide() }
                 .onChange(of: player.currentVideo?.id) { _, _ in
+                    isFrameStepping = false
                     gestureSeekPreview = nil
                     scrubberSeekPreview = nil
                     swipeAdjustment.cancel()
@@ -536,6 +552,14 @@ struct FullScreenPlayer: View {
                     // leave it visible instead of retaining the playback auto-hide state.
                     if hasEnded {
                         controlsVisibility.show(isPlaying: false, reduceMotion: reduceMotion)
+                    }
+                }
+                .onChange(of: player.isPlaying) { _, playing in
+                    if playing { isFrameStepping = false }
+                }
+                .onChange(of: playerControlLayoutRaw) { _, _ in
+                    if playerControlLayout.hidden.contains(.frameStepping) {
+                        isFrameStepping = false
                     }
                 }
             if !isFloating, let video = player.currentVideo, !usesPortraitFullscreen {
@@ -683,6 +707,7 @@ struct FullScreenPlayer: View {
         ))
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if !isPresented {
+                isFrameStepping = false
                 isTranscriptPresented = false
                 swipeAdjustment.cancel()
                 portraitVideoFullscreen = false

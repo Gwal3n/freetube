@@ -10,6 +10,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
     case quality
     case captions
     case sleepTimer
+    case frameStepping
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
         case .quality: return String(localized: "Quality limit")
         case .captions: return String(localized: "Captions")
         case .sleepTimer: return String(localized: "Sleep timer")
+        case .frameStepping: return String(localized: "Fine seeking")
         }
     }
 
@@ -38,6 +40,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
         case .quality: return "slider.horizontal.3"
         case .captions: return "captions.bubble"
         case .sleepTimer: return "moon.zzz"
+        case .frameStepping: return "film"
         }
     }
 

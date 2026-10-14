@@ -69,7 +69,19 @@ final class PlayerPolishTests: XCTestCase {
         XCTAssertEqual(layout.hidden, [.mute])
         XCTAssertTrue(layout.moreMenu.contains(.quality))
         XCTAssertTrue(layout.moreMenu.contains(.sleepTimer))
+        XCTAssertTrue(layout.moreMenu.contains(.frameStepping))
         XCTAssertEqual(layout.onPlayer, [.loop, .fullscreen, .speed, .audioOnly, .autoplay])
+    }
+
+    func testFineSeekingCanBeHiddenFromPlayerControls() {
+        var layout = PlayerControlLayout.standard
+        XCTAssertTrue(layout.moreMenu.contains(.frameStepping))
+        layout.move(.frameStepping, to: .hidden)
+        XCTAssertTrue(layout.hidden.contains(.frameStepping))
+        XCTAssertEqual(
+            PlayerControlLayout.restored(from: layout.encoded, legacyOrder: "", legacyHidden: ""),
+            layout
+        )
     }
 
     func testPlayerControlLayoutMovesAndRoundTrips() {

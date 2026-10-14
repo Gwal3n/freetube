@@ -22,6 +22,8 @@ struct PlayerTopControls: View {
     let isAudioOnly: Bool
     let isSwitchingAudioMode: Bool
     let isPreparingFastPlayback: Bool
+    let isFrameStepping: Bool
+    let canUseFineSeeking: Bool
     let sleepTimerOption: SleepTimerOption
     let captionsModel: PlayerCaptionsModel
     let onSetPlaybackRate: (Double) -> Void
@@ -32,6 +34,7 @@ struct PlayerTopControls: View {
     let onToggleAutoplay: () -> Void
     let onToggleAudioOnly: () -> Void
     let onSetSleepTimer: (SleepTimerOption) -> Void
+    let onToggleFrameStepping: () -> Void
     let onShowTranscript: () -> Void
 
     var body: some View {
@@ -158,6 +161,14 @@ struct PlayerTopControls: View {
             }
             .accessibilityLabel("Sleep timer")
             .accessibilityValue(sleepTimerOption == .off ? "Off" : "On")
+        case .frameStepping:
+            Button(action: onToggleFrameStepping) {
+                Image(systemName: isFrameStepping ? "film.fill" : "film")
+                    .playerTopControl()
+            }
+            .disabled(!canUseFineSeeking)
+            .accessibilityLabel("Fine seeking")
+            .accessibilityValue(isFrameStepping ? "On" : "Off")
         }
     }
 
@@ -202,6 +213,11 @@ struct PlayerTopControls: View {
             sleepTimerMenu
         case .captions:
             captionsMenu(onPlayer: false)
+        case .frameStepping:
+            Button(action: onToggleFrameStepping) {
+                Label("Fine seeking", systemImage: isFrameStepping ? "checkmark" : "film")
+            }
+            .disabled(!canUseFineSeeking)
         }
     }
 

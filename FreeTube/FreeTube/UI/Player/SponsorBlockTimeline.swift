@@ -5,9 +5,6 @@ struct SponsorBlockTimeline: View {
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
     let duration: TimeInterval
-    let isPlaying: Bool
-    let canStepBackward: Bool
-    let canStepForward: Bool
     let bufferedRanges: [ClosedRange<TimeInterval>]
     let isLive: Bool
     let segments: [SponsorBlockSegment]
@@ -15,13 +12,11 @@ struct SponsorBlockTimeline: View {
     let onSeek: (TimeInterval) -> Void
     let onPreviewChanged: (TimeInterval?) -> Void
     let onShowChapters: () -> Void
-    let onStepFrame: (Int) -> Void
 
     @State private var dragTime: TimeInterval?
     @State private var isPreviewingDrag = false
     @State private var scrubChapterID: VideoChapter.ID?
     @State private var chapterHapticTrigger = 0
-    @State private var isFrameStepMode = false
 
     private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
     private var currentChapter: VideoChapter? {
@@ -50,29 +45,7 @@ struct SponsorBlockTimeline: View {
                 // The track follows the finger, but the elapsed clock remains the real
                 // playback position until the seek is committed.
                 Text(verbatim: format(elapsed))
-                if isFrameStepMode {
-                    HStack(spacing: 2) {
-                        Button {
-                            onStepFrame(-1)
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .frame(width: 34, height: 28)
-                        }
-                        .disabled(!canStepBackward)
-                        .accessibilityLabel("Fine step backward")
-
-                        Button {
-                            onStepFrame(1)
-                        } label: {
-                            Image(systemName: "chevron.right")
-                                .frame(width: 34, height: 28)
-                        }
-                        .disabled(!canStepForward)
-                        .accessibilityLabel("Fine step forward")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.plain)
-                } else if let currentChapter {
+                if let currentChapter {
                     Button(action: onShowChapters) {
                         HStack(spacing: 3) {
                             Text(verbatim: currentChapter.title)
@@ -89,17 +62,6 @@ struct SponsorBlockTimeline: View {
                     .accessibilityLabel("Current chapter, \(currentChapter.title)")
                 }
                 Spacer()
-                if !isPlaying && (canStepBackward || canStepForward) {
-                    Button {
-                        isFrameStepMode.toggle()
-                    } label: {
-                        Image(systemName: isFrameStepMode ? "film.fill" : "film")
-                            .frame(width: 34, height: 28)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isFrameStepMode ? "Close fine seeking" : "Fine seeking")
-                }
                 Text(verbatim: format(duration))
             }
             .font(.caption2.monospacedDigit())
@@ -195,12 +157,6 @@ struct SponsorBlockTimeline: View {
             .frame(height: 24)
         }
         .sensoryFeedback(.selection, trigger: chapterHapticTrigger)
-        .onChange(of: isPlaying) { _, playing in
-            if playing { isFrameStepMode = false }
-        }
-        .onChange(of: canStepBackward || canStepForward) { _, available in
-            if !available { isFrameStepMode = false }
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Playback position")
         .accessibilityValue("\(format(displayedTime)) of \(format(duration))")

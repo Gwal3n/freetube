@@ -24,17 +24,13 @@ struct PlayerTimelineOverlay: View {
                 elapsed: player.elapsed,
                 previewElapsed: previewElapsed,
                 duration: player.duration,
-                isPlaying: player.isPlaying,
-                canStepBackward: player.canStepFrameBackward,
-                canStepForward: player.canStepFrameForward,
                 bufferedRanges: player.bufferedRanges,
                 isLive: false,
                 segments: player.sponsorBlockSegments,
                 chapters: player.chapters,
                 onSeek: onSeek,
                 onPreviewChanged: onPreviewChanged,
-                onShowChapters: onShowChapters,
-                onStepFrame: { player.stepFrame(by: $0) }
+                onShowChapters: onShowChapters
             )
         }
     }

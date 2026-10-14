@@ -6,11 +6,14 @@ struct CustomPlayerControls: View {
     let isVisible: Bool
     let isPreparing: Bool
     let isSeekPreviewActive: Bool
+    let isFrameStepping: Bool
     let isPlaying: Bool
     let hasEnded: Bool
     let previewElapsed: TimeInterval?
     let hasPrevious: Bool
     let hasNext: Bool
+    let canStepBackward: Bool
+    let canStepForward: Bool
     let videoTitle: String
     let channelName: String
     let usesLandscapeLayout: Bool
@@ -24,6 +27,7 @@ struct CustomPlayerControls: View {
     let onShowChapters: () -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
+    let onStepFrame: (Int) -> Void
     let onCollapse: () -> Void
 
     var body: some View {
@@ -66,11 +70,14 @@ struct CustomPlayerControls: View {
                 Spacer()
 
                 HStack(spacing: 42) {
-                    Button(action: onPrevious) {
-                        Image(systemName: "backward.end.fill").playerCenterControl()
+                    Button {
+                        if isFrameStepping { onStepFrame(-1) } else { onPrevious() }
+                    } label: {
+                        Image(systemName: isFrameStepping ? "chevron.left" : "backward.end.fill")
+                            .playerCenterControl()
                     }
-                    .disabled(!hasPrevious)
-                    .accessibilityLabel("Previous video")
+                    .disabled(isFrameStepping ? !canStepBackward : !hasPrevious)
+                    .accessibilityLabel(isFrameStepping ? "Fine step backward" : "Previous video")
                     Group {
                         if isPreparing {
                             PlaybackActivityIndicator(size: 34, lineWidth: 3.5)
@@ -102,11 +109,14 @@ struct CustomPlayerControls: View {
                         }
                     }
                     .frame(width: 68, height: 68)
-                    Button(action: onNext) {
-                        Image(systemName: "forward.end.fill").playerCenterControl()
+                    Button {
+                        if isFrameStepping { onStepFrame(1) } else { onNext() }
+                    } label: {
+                        Image(systemName: isFrameStepping ? "chevron.right" : "forward.end.fill")
+                            .playerCenterControl()
                     }
-                    .disabled(!hasNext)
-                    .accessibilityLabel("Next video")
+                    .disabled(isFrameStepping ? !canStepForward : !hasNext)
+                    .accessibilityLabel(isFrameStepping ? "Fine step forward" : "Next video")
                 }
                 .buttonStyle(.plain)
                 .opacity(isVisible ? 1 : 0)

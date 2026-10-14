@@ -1453,6 +1453,8 @@ final class PlayerStateManager {
                     self.elapsed = settledTime
                     if evaluateSponsorBlockAfterSeek {
                         self.handleSponsorBlockSegment(at: settledTime)
+                    } else {
+                        self.log.info("Fine seek settled target=\(boundedSeconds, privacy: .public)s actual=\(settledTime, privacy: .public)s")
                     }
                     if self.currentVideo?.isLive == true {
                         self.log.info("Live DVR seek settled target=\(boundedSeconds, privacy: .public)s actual=\(settledTime, privacy: .public)s")
@@ -1478,6 +1480,7 @@ final class PlayerStateManager {
     /// Use AVFoundation's decoded-frame step when supported. HLS commonly lacks that capability;
     /// for those items, seek by the observed frame interval (or approximately 1/30 second).
     func stepFrame(by count: Int) {
+        log.info("Fine step requested direction=\(count, privacy: .public)")
         guard count == -1 || count == 1,
               !isPlaying,
               player.timeControlStatus == .paused,
@@ -1486,6 +1489,7 @@ final class PlayerStateManager {
         if hasEnded && count < 0 { hasEnded = false }
         if pendingSeekTarget == nil,
            (count < 0 ? item.canStepBackward : item.canStepForward) {
+            log.info("Native frame step direction=\(count, privacy: .public)")
             item.step(byCount: count)
             let steppedTime = item.currentTime().seconds
             if steppedTime.isFinite {
@@ -1499,9 +1503,13 @@ final class PlayerStateManager {
             } else {
                 frameRate = 30
             }
-            let position = pendingSeekTarget ?? elapsed
+            let playerTime = item.currentTime().seconds
+            let position = pendingSeekTarget
+                ?? (playerTime.isFinite ? playerTime : elapsed)
+            let target = position + Double(count) / frameRate
+            log.info("Timed fine step direction=\(count, privacy: .public) fps=\(frameRate, privacy: .public) target=\(target, privacy: .public)s")
             seek(
-                to: position + Double(count) / frameRate,
+                to: target,
                 rearmSponsorBlock: false,
                 resumeAfterEnded: false,
                 evaluateSponsorBlockAfterSeek: false

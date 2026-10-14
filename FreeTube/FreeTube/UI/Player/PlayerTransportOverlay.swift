@@ -12,6 +12,7 @@ struct PlayerTransportOverlay: View {
     let isVisible: Bool
     let isPreparing: Bool
     let isSeekPreviewActive: Bool
+    let isFrameStepping: Bool
     let previewElapsed: TimeInterval?
     let hasPrevious: Bool
     let hasNext: Bool
@@ -28,6 +29,7 @@ struct PlayerTransportOverlay: View {
     let onShowChapters: () -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
+    let onStepFrame: (Int) -> Void
     let onCollapse: () -> Void
 
     var body: some View {
@@ -35,11 +37,14 @@ struct PlayerTransportOverlay: View {
             isVisible: isVisible,
             isPreparing: isPreparing,
             isSeekPreviewActive: isSeekPreviewActive,
+            isFrameStepping: isFrameStepping,
             isPlaying: player.isPlaying,
             hasEnded: player.hasEnded,
             previewElapsed: previewElapsed,
             hasPrevious: hasPrevious,
             hasNext: hasNext,
+            canStepBackward: isFrameStepping && player.canStepFrameBackward,
+            canStepForward: isFrameStepping && player.canStepFrameForward,
             videoTitle: videoTitle,
             channelName: channelName,
             usesLandscapeLayout: usesLandscapeLayout,
@@ -53,6 +58,7 @@ struct PlayerTransportOverlay: View {
             onShowChapters: onShowChapters,
             onPrevious: onPrevious,
             onNext: onNext,
+            onStepFrame: onStepFrame,
             onCollapse: onCollapse
         )
     }
