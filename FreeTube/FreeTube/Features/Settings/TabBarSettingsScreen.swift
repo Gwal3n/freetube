@@ -10,6 +10,11 @@ struct TabBarSettingsScreen: View {
     @AppStorage("showDownloadsTab") private var showDownloadsTab = true
     @AppStorage("showSearchTab") private var showSearchTab = true
     @AppStorage("showSettingsTab") private var showSettingsTab = false
+    @State private var editedTabs: [RootView.Tab]?
+
+    private var tabs: [RootView.Tab] {
+        editedTabs ?? TabBarOrder.tabs(from: tabBarOrderRaw)
+    }
 
     var body: some View {
         List {
@@ -20,7 +25,7 @@ struct TabBarSettingsScreen: View {
             }
 
             Section {
-                ForEach(TabBarOrder.tabs(from: tabBarOrderRaw), id: \.self) { tab in
+                ForEach(tabs, id: \.self) { tab in
                     Toggle(isOn: visibility(for: tab)) {
                         Label(tab.title, systemImage: tab.symbol)
                     }
@@ -41,12 +46,17 @@ struct TabBarSettingsScreen: View {
         .environment(\.editMode, .constant(.active))
         .navigationTitle("Tab Bar")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: tabBarOrderRaw) { _, rawValue in
+            let storedTabs = TabBarOrder.tabs(from: rawValue)
+            if editedTabs != storedTabs { editedTabs = storedTabs }
+        }
     }
 
     private func moveTabs(from source: IndexSet, to destination: Int) {
-        var tabs = TabBarOrder.tabs(from: tabBarOrderRaw)
-        tabs.move(fromOffsets: source, toOffset: min(destination, tabs.count))
-        tabBarOrderRaw = TabBarOrder.rawValue(for: tabs)
+        var reordered = tabs
+        reordered.move(fromOffsets: source, toOffset: min(destination, reordered.count))
+        editedTabs = reordered
+        tabBarOrderRaw = TabBarOrder.rawValue(for: reordered)
     }
 
     private func visibility(for tab: RootView.Tab) -> Binding<Bool> {

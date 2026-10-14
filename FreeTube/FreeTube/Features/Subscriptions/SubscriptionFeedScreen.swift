@@ -409,21 +409,27 @@ struct SubscriptionFeedScreen: View {
         "\(selectedTab == .feed):\(scenePhase == .active):\(automaticFeedRefreshEnabled):\(automaticFeedRefreshIntervalRaw)"
     }
 
-    /// Foreground, Feed-only timer. A manual pull-to-refresh moves the due time forward; a
-    /// failed automatic attempt still waits one interval before retrying. Nothing is scheduled
-    /// through BackgroundTasks and the timer stops when the tab or app becomes inactive.
+    /// Foreground, Feed-only timer. A completed run waits for the chosen interval; a partial
+    /// run can retry after a bounded cooldown. Nothing is scheduled through BackgroundTasks.
     private func loadAndScheduleAutomaticRefresh() async {
         guard selectedTab == .feed, scenePhase == .active else { return }
         if !model.hasLoaded { await model.load() }
-        guard automaticFeedRefreshEnabled, scenePhase == .active else { return }
+        guard !Task.isCancelled, selectedTab == .feed,
+              automaticFeedRefreshEnabled, scenePhase == .active else { return }
         let interval = FeedRefreshInterval(rawValue: automaticFeedRefreshIntervalRaw) ?? .everySixHours
         while !Task.isCancelled {
-            guard model.hasSubscriptions, !player.fullScreenPresented else {
+            guard model.hasSubscriptions, !model.isRefreshing,
+                  !player.fullScreenPresented else {
                 try? await Task.sleep(for: .seconds(60))
                 continue
             }
-            let mostRecent = max(model.lastRefreshAt ?? .distantPast, model.lastRefreshAttemptAt ?? .distantPast)
-            if Date.now.timeIntervalSince(mostRecent) >= interval.seconds {
+            if FeedRefreshSchedule.isDue(
+                now: .now,
+                lastComplete: model.lastCompleteRefreshForCurrentSubscriptions,
+                lastAttempt: model.lastRefreshAttemptAt,
+                interval: interval
+            ) {
+                log.info("Automatic feed refresh due; starting channel refresh")
                 await model.refresh()
             } else {
                 try? await Task.sleep(for: .seconds(60))
