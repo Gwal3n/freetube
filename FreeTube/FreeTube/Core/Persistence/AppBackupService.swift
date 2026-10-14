@@ -151,10 +151,10 @@ final class AppBackupService {
 
     private static let settingKeys: Set<String> = [
         "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appFontPreset",
-        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval",
+        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "cellularPlaybackQuality",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
-        "concurrentFragments", "customPlaybackSpeeds", "playbackSpeedChoices", "defaultPlaybackRate", "formattedCaptions",
+        "concurrentFragments", "customPlaybackSpeeds", "playbackSpeedChoices", "defaultDownloadQuality", "defaultPlaybackRate", "formattedCaptions",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",
         "com.leshko.freetube.deArrowRandomThumbnails",
         "hiddenPlayerTopControls", "historyRetentionPolicy", "holdForSpeedEnabled", "holdSpeedRate",
@@ -165,7 +165,7 @@ final class AppBackupService {
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder",
         "libraryShelfContent", "recentLibraryVideoCount",
         "preferredQuality", "prefetchVideoDetails",
-        "saveSearchHistory", "saveWatchHistory", "showChannelAboutTab", "showChannelLiveTab",
+        "saveSearchHistory", "saveWatchHistory", "seekPreviewStyle", "showChannelAboutTab", "showChannelLiveTab",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview",
         "showContinueWatchingMenu", "showHistoryProgressBars", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",

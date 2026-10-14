@@ -4,10 +4,15 @@ import SwiftUI
 /// Lightweight user preferences stored in `UserDefaults` via `@AppStorage`. Use this for primitive flags only;
 /// anything queryable belongs in SwiftData.
 struct UserPreferences {
-    /// Default to 360p on a fresh install — it's the only YouTube format that ships as a single
-    /// combined progressive mp4 (itag 18), so downloads complete fast and skip the Swift-side
-    /// ffmpeg mux step. Users can bump it higher in Settings.
+    /// Preserve the established 360p playback default. Download quality is migrated once from
+    /// this choice, then stored separately so later playback changes do not affect downloads.
     @AppStorage("preferredQuality") var preferredQualityRaw: String = VideoQuality.p360.rawValue
+    /// Distinct from playback quality. On upgrade, initialize this from the previous shared
+    /// preference so existing playlist downloads keep their chosen quality.
+    @AppStorage("defaultDownloadQuality") var defaultDownloadQualityRaw: String = VideoQuality.p360.rawValue
+    /// An additional HLS cap only on networks iOS classifies as expensive (usually cellular).
+    @AppStorage("cellularPlaybackQuality") var cellularPlaybackQualityRaw: String = VideoQuality.auto.rawValue
+    @AppStorage("seekPreviewStyle") var seekPreviewStyleRaw: String = SeekPreviewStyle.compact.rawValue
     @AppStorage("alwaysDownloadBeforePlayback") var alwaysDownloadBeforePlayback: Bool = false
     /// When `true`, downloads (and playback-time fetches, since those use the same path) are
     /// allowed to run over cellular. Default is `true` — permissive — so a fresh install
@@ -117,9 +122,37 @@ struct UserPreferences {
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
     @AppStorage("sponsorBlockChapterBehavior") var sponsorBlockChapterBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
 
+    init() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: "defaultDownloadQuality") == nil else { return }
+        let previous = defaults.string(forKey: "preferredQuality") ?? VideoQuality.p360.rawValue
+        defaults.set(
+            (VideoQuality(rawValue: previous) ?? .p360).rawValue,
+            forKey: "defaultDownloadQuality"
+        )
+    }
+
     var preferredQuality: VideoQuality {
         get { VideoQuality(rawValue: preferredQualityRaw) ?? .auto }
         nonmutating set { preferredQualityRaw = newValue.rawValue }
+    }
+
+    var defaultDownloadQuality: VideoQuality {
+        get { VideoQuality(rawValue: defaultDownloadQualityRaw) ?? .p360 }
+        nonmutating set { defaultDownloadQualityRaw = newValue.rawValue }
+    }
+
+    var cellularPlaybackQuality: VideoQuality {
+        get {
+            let quality = VideoQuality(rawValue: cellularPlaybackQualityRaw) ?? .auto
+            return quality == .audioOnly ? .auto : quality
+        }
+        nonmutating set { cellularPlaybackQualityRaw = newValue.rawValue }
+    }
+
+    var seekPreviewStyle: SeekPreviewStyle {
+        get { SeekPreviewStyle(rawValue: seekPreviewStyleRaw) ?? .compact }
+        nonmutating set { seekPreviewStyleRaw = newValue.rawValue }
     }
 
     var playerVerticalSwipeAction: PlayerVerticalSwipeAction {

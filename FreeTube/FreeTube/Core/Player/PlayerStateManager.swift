@@ -2435,14 +2435,35 @@ final class PlayerStateManager {
         applyQualityCap(to: item, quality: playbackQuality)
     }
 
+    /// Reapply the adaptive cap when Settings changes without replacing the current item.
+    func refreshPlaybackQualityLimits() {
+        guard let item = player.currentItem else { return }
+        applyQualityCap(to: item)
+    }
+
     private func applyQualityCap(to item: AVPlayerItem, quality: VideoQuality) {
         // `.zero` means unrestricted. Reset first so moving from a capped choice back to Auto
         // takes effect on the already-playing HLS asset.
         item.preferredMaximumResolution = .zero
-        guard quality != .auto, let heightCap = quality.heightCap, heightCap > 0 else { return }
-        // AVPlayer treats this as an upper bound on a variant's frame size, not an exact match,
-        // so deriving the width from 16:9 is safe for taller and wider aspect ratios alike.
-        item.preferredMaximumResolution = CGSize(width: heightCap * 16 / 9, height: heightCap)
+        item.preferredMaximumResolutionForExpensiveNetworks = .zero
+        guard quality != .audioOnly else { return }
+
+        // AVPlayer applies these preferences only to HLS. Local and progressive files retain
+        // their encoded quality; neither setting causes a source swap or playback interruption.
+        let globalHeightCap = quality == .auto ? nil : quality.heightCap
+        if let globalHeightCap, globalHeightCap > 0 {
+            item.preferredMaximumResolution = CGSize(
+                width: globalHeightCap * 16 / 9, height: globalHeightCap
+            )
+        }
+        let cellularQuality = preferences.cellularPlaybackQuality
+        if cellularQuality != .auto, let cellularHeightCap = cellularQuality.heightCap,
+           cellularHeightCap > 0 {
+            let heightCap = min(globalHeightCap ?? cellularHeightCap, cellularHeightCap)
+            item.preferredMaximumResolutionForExpensiveNetworks = CGSize(
+                width: heightCap * 16 / 9, height: heightCap
+            )
+        }
     }
 
     private func readinessTimeout(for strategy: PlaybackStrategy) -> Duration {

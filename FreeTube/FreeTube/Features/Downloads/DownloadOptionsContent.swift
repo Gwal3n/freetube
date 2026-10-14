@@ -3,6 +3,7 @@ import SwiftUI
 /// Quality choices shared by the player download button and native video action menus.
 @available(iOS 17.0, *)
 struct DownloadOptionsContent: View {
+    @AppStorage("defaultDownloadQuality") private var defaultDownloadQualityRaw = VideoQuality.p360.rawValue
     @State private var model = DownloadOptionsViewModel()
 
     let video: Video
@@ -12,7 +13,17 @@ struct DownloadOptionsContent: View {
         .auto, .p2160, .p1440, .p1080, .p720, .p480, .p360, .p240, .p144
     ]
 
+    private var defaultQuality: VideoQuality {
+        VideoQuality(rawValue: defaultDownloadQualityRaw) ?? .p360
+    }
+
     var body: some View {
+        Button {
+            onSelect(defaultQuality)
+        } label: {
+            Label("Use default quality", systemImage: "arrow.down.circle")
+            Text(verbatim: defaultQuality.displayName)
+        }
         Section("Video") {
             ForEach(videoQualities) { quality in
                 option(quality, title: quality == .auto

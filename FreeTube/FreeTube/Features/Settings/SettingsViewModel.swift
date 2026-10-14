@@ -81,6 +81,15 @@ final class SettingsViewModel {
     var formattedCaptions: Bool {
         didSet { preferences.formattedCaptions = formattedCaptions }
     }
+    var defaultDownloadQuality: VideoQuality {
+        didSet { preferences.defaultDownloadQuality = defaultDownloadQuality }
+    }
+    var cellularPlaybackQuality: VideoQuality {
+        didSet { preferences.cellularPlaybackQuality = cellularPlaybackQuality }
+    }
+    var seekPreviewStyle: SeekPreviewStyle {
+        didSet { preferences.seekPreviewStyle = seekPreviewStyle }
+    }
     var automaticFeedRefreshEnabled: Bool {
         didSet { preferences.automaticFeedRefreshEnabled = automaticFeedRefreshEnabled }
     }
@@ -115,6 +124,9 @@ final class SettingsViewModel {
         self.captionBackgroundEnabled = preferences.captionBackgroundEnabled
         self.captionTextScale = preferences.captionTextScale
         self.formattedCaptions = preferences.formattedCaptions
+        self.defaultDownloadQuality = preferences.defaultDownloadQuality
+        self.cellularPlaybackQuality = preferences.cellularPlaybackQuality
+        self.seekPreviewStyle = preferences.seekPreviewStyle
         self.automaticFeedRefreshEnabled = preferences.automaticFeedRefreshEnabled
         self.automaticFeedRefreshInterval = preferences.automaticFeedRefreshInterval
     }

@@ -216,7 +216,7 @@ struct PlaylistScreen: View {
                 }
             }
             PlaylistHeaderActionButton(title: downloadActionTitle(for: details.playlist.id), systemImage: "arrow.down.circle.fill") {
-                playlistDownloads.start(details, quality: UserPreferences().preferredQuality)
+                playlistDownloads.start(details, quality: UserPreferences().defaultDownloadQuality)
             }
             .disabled(isPlaylistDownloadActive(details.playlist.id)
                 || (details.videos.isEmpty && details.continuationToken == nil))

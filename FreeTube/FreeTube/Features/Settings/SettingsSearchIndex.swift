@@ -57,9 +57,9 @@ enum SettingsSearchIndex {
     // at runtime. SwiftUI views do not expose a reliable searchable control hierarchy.
     private static let groups: [Group] = [
         Group(destination: .playback, titles: [
-            "Playback", "Preferred quality", "Hold for speed", "Hold speed",
+            "Playback", "Default playback quality", "Cellular streaming limit", "Hold for speed", "Hold speed",
             "Autoplay next video", "Allow audio from other apps",
-            "Vertical swipe in fullscreen", "Show watch progress bars", "Show description",
+            "Seek preview", "Vertical swipe in fullscreen", "Show watch progress bars", "Show description",
             "Show comments", "Show featured comment preview", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments",
             "Captions", "Dark caption background", "Use source formatting", "Caption text size"
@@ -90,7 +90,7 @@ enum SettingsSearchIndex {
             "Export Subscriptions CSV", "Import Subscriptions CSV", "Export Local Playlists",
             "Import Playlist Archive", "Import Playlist CSV Files"
         ]),
-        Group(destination: .downloads, titles: ["Downloads", "Allow cellular data", "Parallel fragments"]),
+        Group(destination: .downloads, titles: ["Downloads", "Default download quality", "Allow cellular data", "Parallel fragments"]),
         Group(destination: .privacy, titles: ["Privacy"]),
         Group(destination: .incognito, titles: [
             "Incognito", "Don't save searches", "Don't save watch history",

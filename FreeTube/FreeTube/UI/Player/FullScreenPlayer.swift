@@ -65,11 +65,16 @@ struct FullScreenPlayer: View {
     @AppStorage("captionBackgroundEnabled") private var captionBackgroundEnabled = true
     @AppStorage("captionTextScale") private var captionTextScale = 1.0
     @AppStorage("formattedCaptions") private var formattedCaptions = true
+    @AppStorage("seekPreviewStyle") private var seekPreviewStyleRaw = SeekPreviewStyle.compact.rawValue
     @AppStorage("holdForSpeedEnabled") private var holdForSpeedEnabled = true
     @AppStorage("holdSpeedRate") private var holdSpeedRate = 2.0
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") private var hiddenPlayerTopControlsRaw = ""
     @AppStorage("playerControlLayout") private var playerControlLayoutRaw = ""
+
+    private var seekPreviewStyle: SeekPreviewStyle {
+        SeekPreviewStyle(rawValue: seekPreviewStyleRaw) ?? .compact
+    }
 
     private var liveRefreshVideoID: String? {
         guard scenePhase == .active,
@@ -438,24 +443,27 @@ struct FullScreenPlayer: View {
                         .allowsHitTesting(collapseProgress < 0.05)
                         .zIndex(6)
                     }
-                    if !isFloating, let previewTime = scrubberSeekPreview {
+                    if !isFloating, seekPreviewStyle != .off,
+                       let previewTime = scrubberSeekPreview {
                         Group {
                             if player.isAudioOnly {
                                 AudioOnlySeekPreview(
                                     artwork: player.currentArtwork,
                                     thumbnailURL: player.currentVideo?.thumbnailURL,
-                                    previewTime: previewTime
+                                    previewTime: previewTime,
+                                    style: seekPreviewStyle
                                 )
                             } else if let tile = player.storyboard?.tile(
                                 at: previewTime,
                                 duration: player.duration,
-                                maximumWidth: 320,
-                                maximumHeight: 180
+                                maximumWidth: seekPreviewStyle.storyboardTileMaximumWidth,
+                                maximumHeight: seekPreviewStyle.storyboardTileMaximumHeight
                             ) {
                                 StoryboardPreview(
                                     tile: tile,
                                     videoPresentationSize: player.videoPresentationSize,
-                                    previewTime: previewTime
+                                    previewTime: previewTime,
+                                    style: seekPreviewStyle
                                 )
                             }
                         }
@@ -463,15 +471,17 @@ struct FullScreenPlayer: View {
                             x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
                                 time: previewTime,
                                 duration: player.duration,
-                                surfaceWidth: controlFrame.width
+                                surfaceWidth: controlFrame.width,
+                                previewWidth: seekPreviewStyle.maximumWidth
                             ),
                             y: max(
-                                58,
+                                58 + (seekPreviewStyle.maximumHeight - 96) / 2,
                                 // Align the preview time with the elapsed/duration row;
                                 // the image above it stays clear of the timeline.
                                 controlFrame.maxY
                                     - timelineBottomPadding
                                     - 84.5
+                                    - (seekPreviewStyle.maximumHeight - 96) / 2
                             )
                         )
                         .allowsHitTesting(false)

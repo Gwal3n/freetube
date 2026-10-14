@@ -9,9 +9,7 @@ struct StoryboardPreview: View {
     let tile: VideoStoryboard.Tile
     let videoPresentationSize: CGSize
     let previewTime: TimeInterval
-
-    private let maximumPreviewWidth: CGFloat = 116
-    private let maximumPreviewHeight: CGFloat = 96
+    let style: SeekPreviewStyle
 
     private var previewSize: CGSize {
         let sourceAspect = tile.width > 0 && tile.height > 0
@@ -21,7 +19,7 @@ struct StoryboardPreview: View {
             ? videoPresentationSize.width / videoPresentationSize.height
             : sourceAspect
         let aspect = max(0.2, min(videoAspect, 5))
-        let width = min(maximumPreviewWidth, maximumPreviewHeight * aspect)
+        let width = min(style.maximumWidth, style.maximumHeight * aspect)
         return CGSize(width: width, height: width / aspect)
     }
 
@@ -48,7 +46,7 @@ struct StoryboardPreview: View {
             }
             // Keep the image's lower edge fixed across wide and tall videos so the preview
             // timestamp lines up with the player's existing time labels.
-            .frame(width: maximumPreviewWidth, height: maximumPreviewHeight, alignment: .bottom)
+            .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
             Text(verbatim: seekPreviewTimestamp(previewTime))
                 .font(.caption2.monospacedDigit().weight(.semibold))
@@ -66,6 +64,7 @@ struct AudioOnlySeekPreview: View {
     let artwork: UIImage?
     let thumbnailURL: URL?
     let previewTime: TimeInterval
+    let style: SeekPreviewStyle
 
     var body: some View {
         VStack(spacing: 3) {
@@ -81,14 +80,14 @@ struct AudioOnlySeekPreview: View {
                 }
             }
             .aspectRatio(contentMode: .fill)
-            .frame(width: 116, height: 65)
+            .frame(width: style.maximumWidth, height: style.maximumWidth * 9 / 16)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
             }
-            .frame(width: 116, height: 96, alignment: .bottom)
+            .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
             Text(verbatim: seekPreviewTimestamp(previewTime))
                 .font(.caption2.monospacedDigit().weight(.semibold))

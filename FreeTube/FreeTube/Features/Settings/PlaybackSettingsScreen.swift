@@ -12,10 +12,19 @@ struct PlaybackSettingsScreen: View {
     var body: some View {
         Form {
             Section {
-                Picker("Preferred quality", selection: Bindable(model).preferredQuality) {
+                Picker("Default playback quality", selection: Bindable(model).preferredQuality) {
                     ForEach(VideoQuality.allCases) { quality in
                         Text(quality.displayName).tag(quality)
                     }
+                }
+                Picker("Cellular streaming limit", selection: Bindable(model).cellularPlaybackQuality) {
+                    Text("No extra limit").tag(VideoQuality.auto)
+                    ForEach(VideoQuality.allCases.filter { $0 != .auto && $0 != .audioOnly }) { quality in
+                        Text("Up to \(quality.displayName)").tag(quality)
+                    }
+                }
+                .onChange(of: model.cellularPlaybackQuality) { _, _ in
+                    player.refreshPlaybackQualityLimits()
                 }
                 NavigationLink {
                     CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
@@ -53,10 +62,15 @@ struct PlaybackSettingsScreen: View {
             } header: {
                 Text("Playback")
             } footer: {
-                Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. Allowing other audio may leave another app in control of Lock Screen playback.")
+                Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. The cellular limit applies to HLS on expensive networks; fixed-quality and downloaded files keep their encoded resolution. Allowing other audio may leave another app in control of Lock Screen playback.")
             }
 
             Section("Player") {
+                Picker("Seek preview", selection: Bindable(model).seekPreviewStyle) {
+                    Text("Compact").tag(SeekPreviewStyle.compact)
+                    Text("Large").tag(SeekPreviewStyle.large)
+                    Text("Off").tag(SeekPreviewStyle.off)
+                }
                 Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
                     Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
                     Text("Brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
