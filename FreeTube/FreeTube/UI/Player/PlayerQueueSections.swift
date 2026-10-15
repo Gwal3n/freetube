@@ -337,6 +337,7 @@ struct PlayerQueueSections: View {
             }
             .videoContextMenu(
                 video: video,
+                previewBranding: branding,
                 offersPlayNext: true,
                 onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
             )

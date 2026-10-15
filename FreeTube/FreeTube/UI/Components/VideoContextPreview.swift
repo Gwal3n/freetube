@@ -8,6 +8,9 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct VideoContextPreview: View {
     let video: Video
+    /// Reuse the visible row's branding when available. Starting a second DeArrow task inside
+    /// the transient system preview can change its contents while iOS is returning it to the row.
+    var branding: DeArrowVideoViewModel?
 
     private let previewWidth: CGFloat = 320
 
@@ -18,39 +21,48 @@ struct VideoContextPreview: View {
     }
 
     var body: some View {
-        DeArrowVideoContent(video: video) { branding in
-            VStack(alignment: .leading, spacing: 0) {
-                VideoThumbnail(
-                    video: video,
-                    size: CGSize(width: previewWidth, height: previewWidth * 9 / 16),
-                    cornerRadius: 0,
-                    replacementData: branding.thumbnailData(for: video),
-                    replacementCacheKey: branding.thumbnailCacheKey(for: video)
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(branding.title(for: video))
-                        .contentTransition(.opacity)
-                        .appFont(.headline, weight: .semibold)
-                        .lineLimit(2)
-
-                    if !metadata.isEmpty {
-                        Text(metadata)
-                            .appFont(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
+        if let branding {
+            previewContent(branding: branding)
+        } else {
+            // Standalone sources, such as the Library history shelf, do not already own a
+            // DeArrow model. Preserve their existing replacement-aware preview behavior.
+            DeArrowVideoContent(video: video) { previewBranding in
+                previewContent(branding: previewBranding)
             }
-            .frame(width: previewWidth)
-            .background(.background)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(accessibilityLabel(title: branding.title(for: video)))
         }
+    }
+
+    private func previewContent(branding: DeArrowVideoViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VideoThumbnail(
+                video: video,
+                size: CGSize(width: previewWidth, height: previewWidth * 9 / 16),
+                cornerRadius: 0,
+                replacementData: branding.thumbnailData(for: video),
+                replacementCacheKey: branding.thumbnailCacheKey(for: video)
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(branding.title(for: video))
+                    .appFont(.headline, weight: .semibold)
+                    .lineLimit(2, reservesSpace: true)
+
+                if !metadata.isEmpty {
+                    Text(metadata)
+                        .appFont(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+        }
+        .frame(width: previewWidth)
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel(title: branding.title(for: video)))
     }
 
     private func accessibilityLabel(title: String) -> String {

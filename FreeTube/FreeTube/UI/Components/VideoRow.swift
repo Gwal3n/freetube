@@ -92,7 +92,8 @@ struct VideoRow: View {
                     .tint(.indigo)
                 }
             }
-            .videoContextMenu(video: video, offersPlayNext: true, onOpenChannel: onOpenChannel)
+            .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true,
+                              onOpenChannel: onOpenChannel)
             .mediaListRow()
         }
     }

@@ -257,6 +257,7 @@ private struct VideoActionsContent: View {
 @available(iOS 17.0, *)
 private struct VideoContextMenuModifier: ViewModifier {
     let video: Video
+    let previewBranding: DeArrowVideoViewModel?
     let offersPlayNext: Bool
     let onPlay: (() -> Void)?
     let onRemoveFromUpNext: (() -> Void)?
@@ -300,7 +301,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                     }
                 }
             } preview: {
-                VideoContextPreview(video: video)
+                VideoContextPreview(video: video, branding: previewBranding)
             }
             .sheet(isPresented: Binding(
                 get: { shareFileURL != nil },
@@ -337,6 +338,7 @@ private struct VideoContextMenuModifier: ViewModifier {
 extension View {
     func videoContextMenu(
         video: Video,
+        previewBranding: DeArrowVideoViewModel? = nil,
         offersPlayNext: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemoveFromUpNext: (() -> Void)? = nil,
@@ -346,6 +348,7 @@ extension View {
     ) -> some View {
         modifier(VideoContextMenuModifier(
             video: video,
+            previewBranding: previewBranding,
             offersPlayNext: offersPlayNext,
             onPlay: onPlay,
             onRemoveFromUpNext: onRemoveFromUpNext,

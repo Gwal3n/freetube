@@ -54,7 +54,7 @@ struct VideoCard: View {
                 // Menu, since SwiftUI's outer Button consumes the gesture first.
                 metadataRow(branding: branding)
             }
-            .videoContextMenu(video: video, offersPlayNext: true)
+            .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true)
         }
     }
 
