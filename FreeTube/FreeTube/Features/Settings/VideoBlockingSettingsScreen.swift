@@ -14,6 +14,7 @@ struct VideoBlockingSettingsScreen: View {
                     get: { blocklist.hideShorts },
                     set: { blocklist.hideShorts = $0 }
                 ))
+                .settingsSearchRow("Hide Shorts")
             } footer: {
                 Text("Shorts are hidden where YouTube identifies a video as a Short.")
             }
@@ -29,6 +30,7 @@ struct VideoBlockingSettingsScreen: View {
                     .disabled(keywordInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityLabel("Add blocked keyword")
                 }
+                .settingsSearchRow("Blocked keywords")
                 ForEach(blocklist.rules.keywords, id: \.self) { keyword in
                     Text(verbatim: keyword)
                 }
@@ -54,6 +56,7 @@ struct VideoBlockingSettingsScreen: View {
                     .disabled(channelInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityLabel("Add blocked channel")
                 }
+                .settingsSearchRow("Blocked channels")
                 ForEach(blocklist.rules.channels) { channel in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: channel.name)
@@ -75,6 +78,7 @@ struct VideoBlockingSettingsScreen: View {
                 Text("Enter an exact channel name, channel ID, or YouTube /channel/ link. You can also block a channel from its page. Swipe a rule left to remove it.")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Blocked content")
         .navigationBarTitleDisplayMode(.inline)
     }

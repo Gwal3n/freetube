@@ -607,16 +607,16 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func makeFeedbackLabel(in view: UIView) -> UILabel {
-        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
         blurView.clipsToBounds = true
         blurView.isUserInteractionEnabled = false
         blurView.accessibilityElementsHidden = true
-        blurView.contentView.backgroundColor = UIColor.black.withAlphaComponent(0.12)
+        blurView.contentView.backgroundColor = .clear
         view.addSubview(blurView)
 
         let label = UILabel()
         label.font = .preferredFont(forTextStyle: .headline)
-        label.textColor = .white
+        label.textColor = .black
         label.textAlignment = .center
         label.backgroundColor = .clear
         label.bounds.size = CGSize(width: 68, height: 38)
@@ -660,9 +660,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             stroke.lineWidth = 3
             stroke.lineCap = .round
             stroke.lineJoin = .round
-            stroke.shadowColor = UIColor.black.cgColor
-            stroke.shadowOpacity = 0.9
-            stroke.shadowRadius = 1.5
             chevrons.layer.addSublayer(stroke)
         }
         view.addSubview(chevrons)

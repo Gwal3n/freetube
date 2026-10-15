@@ -9,6 +9,7 @@ struct CommunityEnhancementsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Enable SponsorBlock", isOn: $model.sponsorBlockEnabled)
+                    .settingsSearchRow("Enable SponsorBlock")
             } header: {
                 Text("SponsorBlock")
             } footer: {
@@ -22,9 +23,11 @@ struct CommunityEnhancementsSettingsScreen: View {
                             Text(behavior.displayName).tag(behavior)
                         }
                     }
+                    .settingsSearchRow(localizedTitle: category.displayName)
                 }
             } header: {
                 Text("Categories")
+                    .settingsSearchRow("Categories")
             } footer: {
                 Text("Show only marks skip segments on the timeline. Community chapters appear in the chapter list, and full-video labels mark the whole timeline. Ask offers to jump to a highlight.")
             }
@@ -42,20 +45,25 @@ struct CommunityEnhancementsSettingsScreen: View {
                         }
                     }
                 }
+                .settingsSearchRow("Minimum segment length")
                 Stepper(value: $model.sponsorBlockNoticeSeconds, in: 1...15, step: 1) {
                     LabeledContent("Skip notice duration") {
                         Text("\(Int(model.sponsorBlockNoticeSeconds)) seconds")
                             .foregroundStyle(.secondary)
                     }
                 }
+                .settingsSearchRow("Skip notice duration")
             }
             .disabled(!model.sponsorBlockEnabled)
 
             Section {
                 Toggle("Replace video titles", isOn: $model.deArrowTitles)
+                    .settingsSearchRow("Replace video titles")
                 Toggle("Replace video thumbnails", isOn: $model.deArrowThumbnails)
+                    .settingsSearchRow("Replace video thumbnails")
                 if model.deArrowThumbnails {
                     Toggle("Random thumbnail when no submission exists", isOn: $model.deArrowRandomThumbnails)
+                        .settingsSearchRow("Random thumbnail when no submission exists")
                 }
             } header: {
                 Text(verbatim: "DeArrow")
@@ -63,6 +71,7 @@ struct CommunityEnhancementsSettingsScreen: View {
                 Text("Use community titles and video frames to reduce clickbait. If no thumbnail has been submitted, a stable random frame can be requested instead. Tap the small switch on a video to see its original title and thumbnail. Originals stay saved on this device. Enabling this sends anonymous requests to DeArrow; thumbnail requests include the video ID. If the service is unavailable, the originals remain visible.")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Community enhancements")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -71,6 +71,7 @@ struct UserPreferences {
     /// Fetches expanded details and the first comments page only after playback is ready. Further
     /// comment pages and replies always remain user initiated.
     @AppStorage("prefetchVideoDetails") var prefetchVideoDetails: Bool = true
+    @AppStorage("cacheRecentVideoContent") var cacheRecentVideoContent: Bool = true
     /// Lets FreeTube coexist with audio already playing in another app. The default remains the
     /// normal primary-media behavior, where activating FreeTube interrupts other non-mixable audio.
     @AppStorage("allowAudioMixing") var allowAudioMixing: Bool = false

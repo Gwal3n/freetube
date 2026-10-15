@@ -8,7 +8,9 @@ struct BrowsingSettingsScreen: View {
         Form {
             Section {
                 Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
+                    .settingsSearchRow("Show search suggestions")
                 Toggle("Save recent searches", isOn: Bindable(model).saveSearchHistory)
+                    .settingsSearchRow("Save recent searches")
             } header: {
                 Text("Search")
             } footer: {
@@ -17,8 +19,11 @@ struct BrowsingSettingsScreen: View {
 
             Section {
                 Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
+                    .settingsSearchRow("Large video thumbnails")
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
+                    .settingsSearchRow("Mark new uploads")
                 Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
+                    .settingsSearchRow("Refresh feed automatically")
                 if model.automaticFeedRefreshEnabled {
                     Picker("Refresh interval", selection: Bindable(model).automaticFeedRefreshInterval) {
                         ForEach(FeedRefreshInterval.allCases) { interval in
@@ -30,6 +35,7 @@ struct BrowsingSettingsScreen: View {
                             }
                         }
                     }
+                    .settingsSearchRow("Refresh interval")
                 }
             } header: {
                 Text("Feed")
@@ -44,14 +50,17 @@ struct BrowsingSettingsScreen: View {
                     Label("Manage subscription groups", systemImage: "square.stack.3d.up")
                 }
                 .tint(.primary)
+                .settingsSearchRow("Manage subscription groups")
                 NavigationLink {
                     ChannelTabsSettingsScreen()
                 } label: {
                     Label("Channel tabs", systemImage: "rectangle.stack")
                 }
                 .tint(.primary)
+                .settingsSearchRow("Channel tabs")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Browsing")
         .navigationBarTitleDisplayMode(.inline)
     }

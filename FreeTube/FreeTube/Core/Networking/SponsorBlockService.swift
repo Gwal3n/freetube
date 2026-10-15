@@ -3,6 +3,11 @@ import Foundation
 
 protocol SponsorBlockServicing: Sendable {
     func fetchSegments(videoID: String, categories: Set<SponsorBlockCategory>) async throws -> [SponsorBlockSegment]
+    func clearCache()
+}
+
+extension SponsorBlockServicing {
+    func clearCache() {}
 }
 
 /// Read-only SponsorBlock client. Lookups use the service's k-anonymity endpoint and never report
@@ -43,6 +48,10 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
     init(session: URLSession = .shared) {
         self.session = session
         cache.countLimit = 64
+    }
+
+    func clearCache() {
+        cache.removeAllObjects()
     }
 
     func fetchSegments(

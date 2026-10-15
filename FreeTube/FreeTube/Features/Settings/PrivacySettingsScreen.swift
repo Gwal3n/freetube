@@ -20,14 +20,17 @@ struct PrivacySettingsScreen: View {
                     }
                 }
                 .tint(.primary)
+                .settingsSearchRow("Incognito")
                 NavigationLink {
                     VideoBlockingSettingsScreen()
                 } label: {
                     Label("Blocked content", systemImage: "hand.raised")
                 }
                 .tint(.primary)
+                .settingsSearchRow("Blocked content")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
     }

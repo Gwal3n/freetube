@@ -19,12 +19,15 @@ struct DownloadsSettingsScreen: View {
                         }
                     }
                 }
+                .settingsSearchRow("Default download quality")
                 Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
+                    .settingsSearchRow("Allow cellular data")
                 Picker("Parallel fragments", selection: Bindable(model).concurrentFragments) {
                     ForEach([1, 2, 4, 8, 16], id: \.self) { value in
                         Text(value == 1 ? "1 (sequential)" : "\(value)").tag(value)
                     }
                 }
+                .settingsSearchRow("Parallel fragments")
             } header: {
                 Text("Downloads")
             } footer: {
@@ -34,6 +37,7 @@ struct DownloadsSettingsScreen: View {
                 }
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Downloads")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -12,6 +12,7 @@ struct DiagnosticsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Save logs to file", isOn: Bindable(model).logToFile)
+                    .settingsSearchRow("Save logs to file")
                 if model.logToFile, let url = logWriter.currentLogFileURL {
                     LabeledContent("Current log") {
                         Text(url.lastPathComponent)
@@ -27,12 +28,14 @@ struct DiagnosticsSettingsScreen: View {
                     Label("Share latest log…", systemImage: "square.and.arrow.up")
                 }
                 .disabled(LogFileWriter.allLogFiles().isEmpty)
+                .settingsSearchRow("Share latest log…")
                 if MacIntegration.isRunningOnMac {
                     Button {
                         MacIntegration.revealInFinder(LogFileWriter.logsDirectory())
                     } label: {
                         Label("Show log folder", systemImage: "folder")
                     }
+                    .settingsSearchRow("Show log folder")
                 }
                 Button(role: .destructive) {
                     showingClearLogsConfirmation = true
@@ -40,10 +43,12 @@ struct DiagnosticsSettingsScreen: View {
                     Label("Clear all logs", systemImage: "trash")
                 }
                 .disabled(LogFileWriter.allLogFiles().isEmpty)
+                .settingsSearchRow("Clear all logs")
             } footer: {
                 Text("Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries.")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Diagnostics")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: Binding(

@@ -19,6 +19,7 @@ struct ChannelTabsSettingsScreen: View {
                 Text("The Videos tab is always first. Tabs unavailable on a channel stay hidden regardless of these settings.")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Channel tabs")
         .navigationBarTitleDisplayMode(.inline)
     }

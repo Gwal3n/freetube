@@ -1975,6 +1975,11 @@ final class PlayerStateManager {
         }
     }
 
+    /// Clears cached segment responses without changing the currently playing video's markers.
+    func clearSponsorBlockCache() {
+        sponsorBlockService.clearCache()
+    }
+
     private func clearSponsorBlockState() {
         sponsorBlockTask?.cancel()
         sponsorBlockTask = nil
@@ -2387,7 +2392,7 @@ final class PlayerStateManager {
                 updateNowPlaying()
                 contentPrefetchTask?.cancel()
                 contentPrefetchTask = Task {
-                    if preferences.prefetchVideoDetails {
+                    if preferences.prefetchVideoDetails && preferences.cacheRecentVideoContent {
                         if let info = try? await VideoContentPrefetchStore.shared.fetchDetails(videoID: video.id) {
                             self.installVideoDetails(info, for: video.id)
                         }

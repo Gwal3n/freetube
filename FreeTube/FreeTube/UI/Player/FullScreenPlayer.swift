@@ -60,6 +60,7 @@ struct FullScreenPlayer: View {
     @AppStorage("leftFullscreenSwipeAction") private var leftFullscreenSwipeActionRaw = PlayerSwipeAdjustmentAction.brightness.rawValue
     @AppStorage("rightFullscreenSwipeAction") private var rightFullscreenSwipeActionRaw = PlayerSwipeAdjustmentAction.volume.rawValue
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
+    @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("showComments") private var showComments = true
     @AppStorage("showDescription") private var showDescription = true
     @AppStorage("showUpNext") private var showUpNext = true
@@ -575,6 +576,7 @@ struct FullScreenPlayer: View {
                     }
                     guard state == .readyToPlay,
                           prefetchVideoDetails,
+                          cacheRecentVideoContent,
                           let video = player.currentVideo else { return }
                     detailsModel.loadIfNeeded(for: video, player: player)
                 }

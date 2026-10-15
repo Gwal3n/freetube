@@ -92,12 +92,14 @@ struct ImportDataScreen: View {
                     Label("Export All Settings and Data", systemImage: "square.and.arrow.up")
                 }
                 .disabled(isWorking)
+                .settingsSearchRow("Export All Settings and Data")
                 Button {
                     presentImporter(.backup)
                 } label: {
                     Label("Import Full Backup", systemImage: "square.and.arrow.down")
                 }
                 .disabled(isWorking)
+                .settingsSearchRow("Import Full Backup")
             } header: {
                 Text("Full Backup")
             } footer: {
@@ -112,12 +114,14 @@ struct ImportDataScreen: View {
                     Label("Export Subscriptions CSV", systemImage: "square.and.arrow.up")
                 }
                 .disabled(isWorking || LocalSubscriptionStore.shared.subscriptions.isEmpty)
+                .settingsSearchRow("Export Subscriptions CSV")
                 Button {
                     presentImporter(.subscriptions)
                 } label: {
                     Label("Import Subscriptions CSV", systemImage: "person.2.badge.plus")
                 }
                 .disabled(isWorking)
+                .settingsSearchRow("Import Subscriptions CSV")
             } header: {
                 Text("Subscriptions")
             } footer: {
@@ -131,18 +135,21 @@ struct ImportDataScreen: View {
                     Label("Export Local Playlists", systemImage: "square.and.arrow.up")
                 }
                 .disabled(isWorking)
+                .settingsSearchRow("Export Local Playlists")
                 Button {
                     presentImporter(.playlistArchive)
                 } label: {
                     Label("Import Playlist Archive", systemImage: "square.and.arrow.down")
                 }
                 .disabled(isWorking)
+                .settingsSearchRow("Import Playlist Archive")
                 Button {
                     presentImporter(.playlists)
                 } label: {
                     Label("Import Playlist CSV Files", systemImage: "music.note.list")
                 }
                 .disabled(isWorking)
+                .settingsSearchRow("Import Playlist CSV Files")
             } header: {
                 Text("Playlists")
             } footer: {
@@ -166,6 +173,7 @@ struct ImportDataScreen: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .scrollToSearchedSetting()
         .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isWorking)
         .navigationTitle("Import & Export")
         .navigationBarTitleDisplayMode(.inline)

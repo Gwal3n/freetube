@@ -18,6 +18,7 @@ final class VideoContentPrefetchStore {
     private var detailTasks: [String: Task<VideoInfo, Error>] = [:]
     private var commentTasks: [String: Task<CommentThread, Error>] = [:]
     private var recency: [String] = []
+    private var cacheGeneration = 0
     private let capacity = 12
     private let videoService: any VideoServicing
     private let commentService: any CommentServicing
@@ -32,9 +33,12 @@ final class VideoContentPrefetchStore {
     }
 
     func prefetch(videoID: String) async {
+        guard UserPreferences().cacheRecentVideoContent else { return }
+        let generation = cacheGeneration
         do {
             let details = try await fetchDetails(videoID: videoID)
             try Task.checkCancellation()
+            guard generation == cacheGeneration else { return }
             _ = try await fetchComments(videoID: videoID, details: details)
             log.info("Prefetched details and first comments page for \(videoID, privacy: .public)")
         } catch is CancellationError {
@@ -46,7 +50,8 @@ final class VideoContentPrefetchStore {
     }
 
     func fetchDetails(videoID: String, maxAge: TimeInterval? = nil) async throws -> VideoInfo {
-        if let entry = entries[videoID], let cached = entry.details {
+        if UserPreferences().cacheRecentVideoContent,
+           let entry = entries[videoID], let cached = entry.details {
             if let maxAge {
                 if let fetchedAt = entry.detailsFetchedAt,
                    Date().timeIntervalSince(fetchedAt) < maxAge {
@@ -61,17 +66,20 @@ final class VideoContentPrefetchStore {
         if let task = detailTasks[videoID] { return try await task.value }
 
         let service = videoService
+        let generation = cacheGeneration
         let task = Task { try await service.fetchMoreInfo(id: videoID) }
         detailTasks[videoID] = task
         do {
             let details = try await task.value
-            var entry = entries[videoID] ?? Entry()
-            entry.details = details
-            entry.detailsFetchedAt = .now
-            entries[videoID] = entry
             detailTasks[videoID] = nil
-            markRecentlyUsed(videoID)
-            trimIfNeeded()
+            if UserPreferences().cacheRecentVideoContent && generation == cacheGeneration {
+                var entry = entries[videoID] ?? Entry()
+                entry.details = details
+                entry.detailsFetchedAt = .now
+                entries[videoID] = entry
+                markRecentlyUsed(videoID)
+                trimIfNeeded()
+            }
             return details
         } catch {
             detailTasks[videoID] = nil
@@ -80,7 +88,8 @@ final class VideoContentPrefetchStore {
     }
 
     func fetchComments(videoID: String) async throws -> CommentThread {
-        if let cached = entries[videoID]?.comments {
+        if UserPreferences().cacheRecentVideoContent,
+           let cached = entries[videoID]?.comments {
             markRecentlyUsed(videoID)
             return cached
         }
@@ -90,13 +99,15 @@ final class VideoContentPrefetchStore {
     }
 
     private func fetchComments(videoID: String, details: VideoInfo) async throws -> CommentThread {
-        if let cached = entries[videoID]?.comments {
+        if UserPreferences().cacheRecentVideoContent,
+           let cached = entries[videoID]?.comments {
             markRecentlyUsed(videoID)
             return cached
         }
         if let task = commentTasks[videoID] { return try await task.value }
 
         let service = commentService
+        let generation = cacheGeneration
         let task = Task<CommentThread, Error> {
             if details.commentsAvailability == .disabled {
                 return CommentThread(comments: [], continuationToken: nil, availability: .disabled)
@@ -109,17 +120,27 @@ final class VideoContentPrefetchStore {
         commentTasks[videoID] = task
         do {
             let thread = try await task.value
-            var entry = entries[videoID] ?? Entry()
-            entry.comments = thread
-            entries[videoID] = entry
             commentTasks[videoID] = nil
-            markRecentlyUsed(videoID)
-            trimIfNeeded()
+            if UserPreferences().cacheRecentVideoContent && generation == cacheGeneration {
+                var entry = entries[videoID] ?? Entry()
+                entry.comments = thread
+                entries[videoID] = entry
+                markRecentlyUsed(videoID)
+                trimIfNeeded()
+            }
             return thread
         } catch {
             commentTasks[videoID] = nil
             throw error
         }
+    }
+
+    /// Forget stored metadata without cancelling a request already needed by an open view.
+    /// The generation stops an in-flight response from silently repopulating a cleared cache.
+    func clearCache() {
+        cacheGeneration += 1
+        entries.removeAll()
+        recency.removeAll()
     }
 
     private func trimIfNeeded() {

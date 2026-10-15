@@ -276,12 +276,12 @@ struct ChapterListPanel: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(chapter.title)
                     .font(.subheadline.weight(isCurrent ? .semibold : .regular))
-                    .foregroundStyle(isCurrent ? accentColor : .primary)
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                 if isCurrent {
                     Label("Playing", systemImage: "speaker.wave.2.fill")
                         .font(.caption2.weight(.medium))
-                        .foregroundStyle(accentColor)
+                        .foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)

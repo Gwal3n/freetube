@@ -16,6 +16,12 @@ actor PlaylistCountResolver {
     private var inFlight: [String: Task<Int?, Never>] = [:]
     private var activeRequests = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var cacheGeneration = 0
+
+    func clearCache() {
+        cacheGeneration += 1
+        cached.removeAll()
+    }
 
     init(service: any PlaylistServicing = PlaylistService()) {
         self.service = service
@@ -28,10 +34,13 @@ actor PlaylistCountResolver {
         if let pending = inFlight[playlistID] { return await pending.value }
 
         let task = Task { await fetchCount(playlistID: playlistID) }
+        let generation = cacheGeneration
         inFlight[playlistID] = task
         let count = await task.value
         inFlight[playlistID] = nil
-        cached[playlistID] = CacheEntry(count: count, fetchedAt: .now)
+        if generation == cacheGeneration {
+            cached[playlistID] = CacheEntry(count: count, fetchedAt: .now)
+        }
         return count
     }
 

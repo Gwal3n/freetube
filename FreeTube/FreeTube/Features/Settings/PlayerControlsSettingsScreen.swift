@@ -17,6 +17,7 @@ struct PlayerControlsSettingsScreen: View {
                 menuDividerSection
             }
         }
+        .scrollToSearchedSetting()
         .listStyle(.insetGrouped)
         .tint(Color.primary)
         .environment(\.editMode, $editMode)
@@ -34,6 +35,7 @@ struct PlayerControlsSettingsScreen: View {
             } else {
                 ForEach(controls) { control in
                     controlRow(for: control, in: section)
+                        .settingsSearchRow(localizedTitle: control.displayName)
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 8))
                 }
                 .onMove { offsets, destination in
@@ -46,6 +48,7 @@ struct PlayerControlsSettingsScreen: View {
             }
         } header: {
             Text(verbatim: section.title)
+                .settingsSearchRow(localizedTitle: section.title)
         }
     }
 
@@ -108,6 +111,7 @@ struct PlayerControlsSettingsScreen: View {
                     .tint(.green)
                 }
             }
+            .settingsSearchRow("More menu separators")
         }
     }
 

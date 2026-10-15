@@ -23,6 +23,7 @@ struct CustomPlaybackSpeedsScreen: View {
                         Text(verbatim: PlaybackSpeedPresets.label(rate)).tag(rate)
                     }
                 }
+                .settingsSearchRow("Default playback speed")
             } footer: {
                 Text("Used when a new video opens. Player menu changes affect only the current video.")
             }
@@ -34,10 +35,12 @@ struct CustomPlaybackSpeedsScreen: View {
                 .onDelete(perform: deleteSpeeds)
             } header: {
                 Text("Available speeds")
+                    .settingsSearchRow("Available speeds")
             } footer: {
                 Text("Swipe left to remove a speed. 1× cannot be removed.")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Playback speeds")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

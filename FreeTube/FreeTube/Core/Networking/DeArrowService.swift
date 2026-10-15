@@ -74,6 +74,13 @@ actor DeArrowService {
     private var activeRequests = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var nextRequestAt = Date.distantPast
+    private var cacheGeneration = 0
+
+    func clearCache() {
+        cacheGeneration += 1
+        cache.removeAll()
+        payloadCache.removeAll()
+    }
 
     init(session: URLSession? = nil) {
         if let session {
@@ -109,6 +116,7 @@ actor DeArrowService {
         guard Date() >= nextRequestAt else { return .empty }
 
         let task = Task { try await requestBranding(for: video, includeThumbnails: includeThumbnails, randomFallback: randomFallback) }
+        let generation = cacheGeneration
         inFlight[key] = task
         defer { inFlight[key] = nil }
         do {
@@ -116,10 +124,10 @@ actor DeArrowService {
             // Missing images may still be in the generation queue. Retry on a later appearance,
             // not in a polling loop. Successful images and titles can stay cached for six hours.
             let ttl: TimeInterval = includeThumbnails && result.thumbnailData == nil ? 300 : 21_600
-            store(result, key: key, ttl: ttl)
+            if generation == cacheGeneration { store(result, key: key, ttl: ttl) }
             return result
         } catch {
-            store(.empty, key: key, ttl: 60)
+            if generation == cacheGeneration { store(.empty, key: key, ttl: 60) }
             throw error
         }
     }
@@ -149,6 +157,7 @@ actor DeArrowService {
 
     private func fetchPayload(videoID: String) async throws -> Payload {
         if let entry = payloadCache[videoID], entry.expiresAt > Date() { return entry.payload }
+        let generation = cacheGeneration
         let digest = SHA256.hash(data: Data(videoID.utf8))
         let prefix = digest.prefix(2).map { String(format: "%02x", $0) }.joined()
         guard var components = URLComponents(string: "https://sponsor.ajay.app/api/branding/\(prefix)") else {
@@ -169,6 +178,7 @@ actor DeArrowService {
         } else {
             payload = try JSONDecoder().decode([String: Payload].self, from: data)[videoID] ?? .empty
         }
+        guard generation == cacheGeneration else { return payload }
         payloadCache[videoID] = (payload, Date().addingTimeInterval(21_600))
         if payloadCache.count > 128,
            let oldest = payloadCache.min(by: { $0.value.expiresAt < $1.value.expiresAt })?.key {

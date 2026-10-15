@@ -18,6 +18,18 @@ struct SettingsScreen: View {
                         settingsLink("Playback", systemImage: "play.circle") {
                             PlaybackSettingsScreen(model: model)
                         }
+                        settingsLink("Player", systemImage: "play.rectangle") {
+                            PlayerSettingsScreen(model: model)
+                        }
+                        settingsLink("Captions", systemImage: "captions.bubble") {
+                            CaptionsSettingsScreen(model: model)
+                        }
+                        settingsLink("Downloads", systemImage: "arrow.down.circle") {
+                            DownloadsSettingsScreen(model: model)
+                        }
+                    }
+
+                    Section {
                         settingsLink("Browsing", systemImage: "rectangle.stack") {
                             BrowsingSettingsScreen(model: model)
                         }
@@ -27,8 +39,11 @@ struct SettingsScreen: View {
                         settingsLink("Library & Data", systemImage: "books.vertical") {
                             LibraryDataSettingsScreen(model: model)
                         }
-                        settingsLink("Downloads", systemImage: "arrow.down.circle") {
-                            DownloadsSettingsScreen(model: model)
+                        settingsLink("Cache", systemImage: "externaldrive") {
+                            CacheSettingsScreen()
+                        }
+                        settingsLink("Import & Export", systemImage: "square.and.arrow.up.on.square") {
+                            ImportDataScreen()
                         }
                     }
 
@@ -63,6 +78,7 @@ struct SettingsScreen: View {
                             ForEach(results) { result in
                                 NavigationLink {
                                     searchDestination(result.destination)
+                                        .environment(\.settingsSearchTarget, result.focusTitle)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(result.displayTitle)
@@ -84,7 +100,7 @@ struct SettingsScreen: View {
             .navigationBarTitleDisplayMode(onClose == nil ? .large : .inline)
             .searchable(
                 text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
+                placement: .navigationBarDrawer(displayMode: .automatic),
                 prompt: "Search Settings"
             )
             .navigationDestination(item: $externalDestination) { destination in
@@ -116,9 +132,12 @@ struct SettingsScreen: View {
     private func searchDestination(_ destination: SettingsSearchIndex.Destination) -> some View {
         switch destination {
         case .playback: PlaybackSettingsScreen(model: model)
+        case .player: PlayerSettingsScreen(model: model)
+        case .captions: CaptionsSettingsScreen(model: model)
         case .browsing: BrowsingSettingsScreen(model: model)
         case .appearance: AppearanceSettingsScreen(model: model)
         case .libraryData: LibraryDataSettingsScreen(model: model)
+        case .cache: CacheSettingsScreen()
         case .downloads: DownloadsSettingsScreen(model: model)
         case .privacy: PrivacySettingsScreen()
         case .community: CommunityEnhancementsSettingsScreen(model: model)

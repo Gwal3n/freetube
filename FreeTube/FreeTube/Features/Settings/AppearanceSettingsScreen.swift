@@ -14,17 +14,20 @@ struct AppearanceSettingsScreen: View {
                     Text("Light").tag(AppearanceMode.light.rawValue)
                     Text("Dark").tag(AppearanceMode.dark.rawValue)
                 }
+                .settingsSearchRow("Appearance")
                 Picker("Accent color", selection: $appAccentPresetRaw) {
                     ForEach(AppAccentPreset.allCases) { preset in
-                        Label {
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(preset.color)
+                                .frame(width: 18, height: 18)
                             Text(preset.label)
-                        } icon: {
-                            Image(systemName: "circle.fill")
-                                .foregroundStyle(preset.color)
+                                .foregroundStyle(.primary)
                         }
                         .tag(preset.rawValue)
                     }
                 }
+                .settingsSearchRow("Accent color")
                 Picker("Text font", selection: Bindable(model).appFontPreset) {
                     ForEach(AppFontPreset.allCases) { preset in
                         preset.label
@@ -32,6 +35,7 @@ struct AppearanceSettingsScreen: View {
                             .tag(preset)
                     }
                 }
+                .settingsSearchRow("Text font")
             } footer: {
                 Text("The player interface follows your appearance; the video canvas stays black.")
             }
@@ -43,8 +47,10 @@ struct AppearanceSettingsScreen: View {
                     Label("Tab Bar", systemImage: "square.grid.2x2")
                 }
                 .tint(.primary)
+                .settingsSearchRow("Tab Bar")
             }
         }
+        .scrollToSearchedSetting()
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
     }
