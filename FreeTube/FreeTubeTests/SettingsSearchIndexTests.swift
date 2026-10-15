@@ -24,6 +24,8 @@ final class SettingsSearchIndexTests: XCTestCase {
             .contains { $0.destination == .player })
         XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Clear all temporary caches"))
             .contains { $0.destination == .cache })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Storage used"))
+            .contains { $0.destination == .cache })
     }
 
     func testSearchResultsFocusTheOwningControl() {

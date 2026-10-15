@@ -7,6 +7,8 @@ struct CacheSettingsScreen: View {
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @State private var showingClearAllConfirmation = false
     @State private var isClearing = false
+    @State private var isMeasuringDiskUsage = true
+    @State private var diskUsageBytes: Int64?
     @State private var resultMessage: String?
 
     var body: some View {
@@ -17,6 +19,23 @@ struct CacheSettingsScreen: View {
                     .settingsSearchRow("Cache recent video details")
             } footer: {
                 Text("Keeps details and the first comments page for up to 12 recently opened videos in memory. Nothing is saved to disk. Turning this off also stops detail prefetching.")
+            }
+
+            Section {
+                LabeledContent("Storage used") {
+                    if isMeasuringDiskUsage {
+                        ProgressView()
+                    } else if let diskUsageBytes {
+                        Text(ByteCountFormatter.string(fromByteCount: diskUsageBytes, countStyle: .file))
+                            .monospacedDigit()
+                    } else {
+                        Text("Unavailable")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .settingsSearchRow("Storage used")
+            } footer: {
+                Text("Includes cached images and HTTP responses on disk. Recent video details and stream links are held only in memory.")
             }
 
             Section {
@@ -44,6 +63,7 @@ struct CacheSettingsScreen: View {
         .scrollToSearchedSetting()
         .navigationTitle("Cache")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await refreshDiskUsage() }
         .onChange(of: cacheRecentVideoContent) { _, enabled in
             if !enabled { TemporaryCacheService.clearRecentVideoContent() }
         }
@@ -56,6 +76,7 @@ struct CacheSettingsScreen: View {
                 isClearing = true
                 Task {
                     await TemporaryCacheService.clearAll(player: player)
+                    await refreshDiskUsage()
                     isClearing = false
                     resultMessage = String(localized: "Temporary caches cleared")
                 }
@@ -64,5 +85,11 @@ struct CacheSettingsScreen: View {
         } message: {
             Text("Downloads and personal data will not be removed.")
         }
+    }
+
+    private func refreshDiskUsage() async {
+        isMeasuringDiskUsage = true
+        diskUsageBytes = await TemporaryCacheService.diskUsageBytes()
+        isMeasuringDiskUsage = false
     }
 }

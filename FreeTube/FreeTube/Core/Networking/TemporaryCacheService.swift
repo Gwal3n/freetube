@@ -5,6 +5,12 @@ import Kingfisher
 @available(iOS 17.0, *)
 @MainActor
 enum TemporaryCacheService {
+    /// On-disk cache usage only; recent metadata and signed stream URLs are memory-only.
+    static func diskUsageBytes() async -> Int64? {
+        guard let imageBytes = try? await ImageCache.default.diskStorageSize else { return nil }
+        return Int64(clamping: imageBytes) + Int64(URLCache.shared.currentDiskUsage)
+    }
+
     static func clearRecentVideoContent() {
         VideoContentPrefetchStore.shared.clearCache()
     }

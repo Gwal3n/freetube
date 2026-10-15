@@ -560,7 +560,9 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         let font: UIFont = outlined
             ? .systemFont(ofSize: 20, weight: .bold)
             : compact
-            ? .preferredFont(forTextStyle: .subheadline)
+            ? UIFontMetrics(forTextStyle: .subheadline).scaledFont(
+                for: .systemFont(ofSize: 15, weight: .semibold)
+            )
             : .preferredFont(forTextStyle: .headline)
         label.font = font
         label.text = text
@@ -607,7 +609,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func makeFeedbackLabel(in view: UIView) -> UILabel {
-        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
         blurView.clipsToBounds = true
         blurView.isUserInteractionEnabled = false
         blurView.accessibilityElementsHidden = true
@@ -616,7 +618,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         let label = UILabel()
         label.font = .preferredFont(forTextStyle: .headline)
-        label.textColor = .black
+        label.textColor = .white
         label.textAlignment = .center
         label.backgroundColor = .clear
         label.bounds.size = CGSize(width: 68, height: 38)
