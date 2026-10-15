@@ -37,6 +37,7 @@ struct FullScreenPlayer: View {
     @State private var shareFileURL: URL?
     @State private var saveToPlaylistVideo: Video?
     @State private var gestureSeekPreview: TimeInterval?
+    @State private var gestureSeekFeedback: String?
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var isFrameStepping = false
     @State private var isHoldingForSpeed = false
@@ -197,6 +198,9 @@ struct FullScreenPlayer: View {
                         onSeekPreview: { seconds in
                             gestureSeekPreview = seconds
                         },
+                        onSeekFeedback: { text in
+                            gestureSeekFeedback = text
+                        },
                         liveSeekableRange: { player.liveSeekableRange },
                         onTogglePlayback: {
                             player.togglePlayPause()
@@ -261,13 +265,8 @@ struct FullScreenPlayer: View {
                         anchor: .bottom
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
-                    if !isFloating && isHoldingForSpeed {
-                        Text(PlaybackSpeedPresets.label(player.effectivePlaybackRate))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 52, minHeight: 26)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .environment(\.colorScheme, .dark)
+                    if !isFloating, let badgeText = gestureBadgeText {
+                        gestureBadge(badgeText)
                             .position(
                                 x: controlFrame.midX,
                                 y: controlFrame.minY + max(26, controlFrame.height * 0.10)
@@ -543,6 +542,7 @@ struct FullScreenPlayer: View {
                     isFrameStepping = false
                     isHoldingForSpeed = false
                     gestureSeekPreview = nil
+                    gestureSeekFeedback = nil
                     scrubberSeekPreview = nil
                     swipeAdjustment.cancel()
                     player.chapterListPresented = false
@@ -791,6 +791,7 @@ struct FullScreenPlayer: View {
         }
         .onDisappear {
             swipeAdjustment.cancel()
+            gestureSeekFeedback = nil
             player.playerPresentationGestureEnabled = true
             player.playlistPanelPresented = false
             player.portraitPlayerFullscreenActive = false
@@ -803,6 +804,20 @@ struct FullScreenPlayer: View {
         // (Mac maximized) you'd see an unfilled gap below the panel.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+    }
+
+    private func gestureBadge(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .frame(minWidth: 52, minHeight: 26)
+            .background(.ultraThinMaterial, in: Capsule())
+            .environment(\.colorScheme, .dark)
+    }
+
+    private var gestureBadgeText: String? {
+        isHoldingForSpeed ? PlaybackSpeedPresets.label(player.effectivePlaybackRate) : gestureSeekFeedback
     }
 
     // MARK: - Playlist presentation

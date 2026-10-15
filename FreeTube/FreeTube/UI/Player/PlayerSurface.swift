@@ -16,6 +16,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var onSeekRelative: (TimeInterval) -> Void
     var onSeekAbsolute: (TimeInterval) -> Void
     var onSeekPreview: (TimeInterval?) -> Void
+    var onSeekFeedback: (String?) -> Void
     var liveSeekableRange: () -> ClosedRange<TimeInterval>?
     var onTogglePlayback: () -> Void
     var onToggleControls: () -> Void
@@ -39,6 +40,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
+            onSeekFeedback: onSeekFeedback,
             liveSeekableRange: liveSeekableRange,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls,
@@ -92,6 +94,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             onSeekRelative: onSeekRelative,
             onSeekAbsolute: onSeekAbsolute,
             onSeekPreview: onSeekPreview,
+            onSeekFeedback: onSeekFeedback,
             liveSeekableRange: liveSeekableRange,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls,
