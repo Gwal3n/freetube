@@ -22,6 +22,7 @@ struct CaptionsSettingsScreen: View {
                             .foregroundStyle(.secondary)
                     }
                     Slider(value: Bindable(model).captionTextScale, in: 0.8...1.5, step: 0.1)
+                        .tint(.blue)
                         .accessibilityLabel("Caption text size")
                 }
                 .settingsSearchRow("Caption text size")

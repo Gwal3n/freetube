@@ -123,7 +123,13 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             longPressGesture?.isEnabled = holdForSpeedEnabled
         }
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
-        self.doubleTapSeekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
+        let seekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
+        if seekSeconds == 0, self.doubleTapSeekSeconds != 0 {
+            pendingSingleTapWorkItem?.cancel()
+            pendingSingleTapWorkItem = nil
+            endSeekSession(hideFeedback: true)
+        }
+        self.doubleTapSeekSeconds = seekSeconds
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
         self.onSeekRelative = onSeekRelative
@@ -250,6 +256,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     @objc private func didPrimaryTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else { return }
+        if doubleTapSeekSeconds == 0 {
+            onToggleControls()
+            return
+        }
         if let pendingSingleTapWorkItem {
             pendingSingleTapWorkItem.cancel()
             self.pendingSingleTapWorkItem = nil
@@ -266,6 +276,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func performDoubleTapSeek(at location: CGPoint) {
+        guard doubleTapSeekSeconds > 0 else { return }
         guard let view = gestureView, let item = player?.currentItem else { return }
         let itemDuration = item.duration.seconds
         guard (itemDuration.isFinite && itemDuration > 0) || liveSeekableRange() != nil else { return }
@@ -300,6 +311,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     @objc private func didContinueSeeking(_ gesture: UITapGestureRecognizer) {
+        guard doubleTapSeekSeconds > 0 else { return }
         guard let view = gestureView else { return }
         let isForward = gesture.location(in: view).x >= view.bounds.midX
         let interval = seekInterval(isForward: isForward)
@@ -452,7 +464,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private static func validatedSeekInterval(_ seconds: Int) -> Int {
-        [5, 10, 15, 30].contains(seconds) ? seconds : 10
+        (0...120).contains(seconds) ? seconds : 10
     }
 
     private func seekInterval(isForward: Bool) -> TimeInterval {

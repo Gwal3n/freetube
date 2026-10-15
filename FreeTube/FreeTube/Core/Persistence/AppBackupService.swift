@@ -154,7 +154,7 @@ final class AppBackupService {
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "cacheRecentVideoContent", "cellularPlaybackQuality",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
-        "concurrentFragments", "customPlaybackSpeeds", "playbackSpeedChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "formattedCaptions",
+        "concurrentFragments", "customDoubleTapSeekSeconds", "customPlaybackSpeeds", "playbackSpeedChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "formattedCaptions",
         "floatingPlayerWidth", "floatingPlayerCorner", "floatingPlayerVerticalFraction",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",
         "com.leshko.freetube.deArrowRandomThumbnails",

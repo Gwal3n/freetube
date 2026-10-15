@@ -4,16 +4,35 @@ import SwiftUI
 struct PlayerSettingsScreen: View {
     let model: SettingsViewModel
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
+    @AppStorage("customDoubleTapSeekSeconds") private var customDoubleTapSeekSeconds = 20
+    @State private var showingCustomSeekEditor = false
+    @State private var customSeekSecondsText = ""
+
+    private let presetSeekIntervals = [5, 10, 15, 30]
 
     var body: some View {
         Form {
             Section {
-                Picker("Double-tap seek", selection: Bindable(model).doubleTapSeekSeconds) {
-                    ForEach([5, 10, 15, 30], id: \.self) { seconds in
+                Picker("Double-tap seek", selection: seekIntervalSelection) {
+                    Text("Off").tag(0)
+                    ForEach(presetSeekIntervals, id: \.self) { seconds in
                         Text("\(seconds) seconds").tag(seconds)
                     }
+                    Text("Custom (\(customDoubleTapSeekSeconds) seconds)").tag(-1)
                 }
                 .settingsSearchRow("Double-tap seek")
+                if isCustomSeekIntervalSelected {
+                    Button {
+                        editCustomSeekInterval()
+                    } label: {
+                        LabeledContent("Custom interval") {
+                            Text("\(model.doubleTapSeekSeconds) seconds")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(.primary)
+                    .settingsSearchRow("Custom interval")
+                }
                 Picker("Seek preview", selection: Bindable(model).seekPreviewStyle) {
                     Text("Compact").tag(SeekPreviewStyle.compact)
                     Text("Large").tag(SeekPreviewStyle.large)
@@ -97,5 +116,51 @@ struct PlayerSettingsScreen: View {
         .scrollToSearchedSetting()
         .navigationTitle("Player")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if isCustomSeekIntervalSelected {
+                customDoubleTapSeekSeconds = model.doubleTapSeekSeconds
+            }
+        }
+        .alert("Custom seek interval", isPresented: $showingCustomSeekEditor) {
+            TextField("Seconds", text: $customSeekSecondsText)
+                .keyboardType(.numberPad)
+            Button("Set Interval") {
+                guard let seconds = parsedCustomSeekInterval else { return }
+                customDoubleTapSeekSeconds = seconds
+                model.doubleTapSeekSeconds = seconds
+            }
+            .disabled(parsedCustomSeekInterval == nil)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter 1 to 120 seconds.")
+        }
+    }
+
+    private var isCustomSeekIntervalSelected: Bool {
+        model.doubleTapSeekSeconds != 0 && !presetSeekIntervals.contains(model.doubleTapSeekSeconds)
+    }
+
+    private var seekIntervalSelection: Binding<Int> {
+        Binding(
+            get: { isCustomSeekIntervalSelected ? -1 : model.doubleTapSeekSeconds },
+            set: { selection in
+                if selection == -1 {
+                    editCustomSeekInterval()
+                } else {
+                    model.doubleTapSeekSeconds = selection
+                }
+            }
+        )
+    }
+
+    private var parsedCustomSeekInterval: Int? {
+        guard let seconds = Int(customSeekSecondsText.trimmingCharacters(in: .whitespacesAndNewlines)),
+              (1...120).contains(seconds) else { return nil }
+        return seconds
+    }
+
+    private func editCustomSeekInterval() {
+        customSeekSecondsText = String(isCustomSeekIntervalSelected ? model.doubleTapSeekSeconds : customDoubleTapSeekSeconds)
+        showingCustomSeekEditor = true
     }
 }
