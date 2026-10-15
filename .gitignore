@@ -21,6 +21,9 @@ xcuserdata/
 *.xcuserstate
 *.xcuserdatad/
 
+# Editor swap files
+*.sw?
+
 # Xcode — build artifacts
 build/
 DerivedData/
@@ -78,4 +81,3 @@ Thumbs.db
 *.wmv
 
 TODO.md
-
