@@ -126,7 +126,8 @@ enum SettingsSearchIndex {
             "Autoplay next video", "Allow audio from other apps", "Resume after interruptions"
         ]),
         Group(destination: .player, titles: [
-            "Player", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
+            "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
+            "Save button", "Share button", "Download button",
             "Remember floating player placement", "Show watch progress bars", "Show description",
             "Show comments", "Show featured comment preview", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments"

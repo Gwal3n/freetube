@@ -4,6 +4,10 @@ import SwiftUI
 struct PlayerSettingsScreen: View {
     let model: SettingsViewModel
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
+    @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
+    @AppStorage("showPlayerSaveButton") private var showPlayerSaveButton = true
+    @AppStorage("showPlayerShareButton") private var showPlayerShareButton = true
+    @AppStorage("showPlayerDownloadButton") private var showPlayerDownloadButton = true
     @AppStorage("customDoubleTapSeekSeconds") private var customDoubleTapSeekSeconds = 20
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
@@ -13,6 +17,9 @@ struct PlayerSettingsScreen: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Swipe horizontally to seek", isOn: $horizontalSwipeToSeekEnabled)
+                    .tint(.green)
+                    .settingsSearchRow("Swipe horizontally to seek")
                 Picker("Double-tap seek", selection: seekIntervalSelection) {
                     Text("Off").tag(0)
                     ForEach(presetSeekIntervals, id: \.self) { seconds in
@@ -65,6 +72,22 @@ struct PlayerSettingsScreen: View {
                 if model.playerVerticalSwipeAction == .adjustPlayback {
                     Text("Volume swipes adjust FreeTube playback, not the iPhone's system volume.")
                 }
+            }
+
+            Section {
+                Toggle("Save", isOn: $showPlayerSaveButton)
+                    .tint(.green)
+                    .settingsSearchRow("Save button")
+                Toggle("Share", isOn: $showPlayerShareButton)
+                    .tint(.green)
+                    .settingsSearchRow("Share button")
+                Toggle("Download", isOn: $showPlayerDownloadButton)
+                    .tint(.green)
+                    .settingsSearchRow("Download button")
+            } header: {
+                Text("Buttons below video")
+            } footer: {
+                Text("These switches hide shortcuts below the video without removing saved items or downloads.")
             }
 
             Section {

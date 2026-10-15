@@ -26,6 +26,9 @@ struct PlayerActionBar: View {
     let onShareDownloadedFile: () -> Void
     let onDownload: () -> Void
     let onDownloadChoice: (VideoQuality) -> Void
+    @AppStorage("showPlayerSaveButton") private var showSaveButton = true
+    @AppStorage("showPlayerShareButton") private var showShareButton = true
+    @AppStorage("showPlayerDownloadButton") private var showDownloadButton = true
     @State private var savedMomentStore = SavedMomentStore.shared
 
     private var isSaved: Bool {
@@ -33,64 +36,72 @@ struct PlayerActionBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
-            Button(action: onSaveToPlaylist) {
-                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    .contentShape(Rectangle())
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .foregroundStyle(.primary)
-            .accessibilityLabel("Save")
-            .accessibilityValue(isSaved ? "Saved" : "Not saved")
-
-            Menu {
-                if let watchURL {
-                    ShareLink(item: watchURL) {
-                        Label("Share…", systemImage: "square.and.arrow.up")
+        if showSaveButton || showShareButton || showDownloadButton {
+            HStack(spacing: 4) {
+                if showSaveButton {
+                    Button(action: onSaveToPlaylist) {
+                        Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                            .font(.title3.weight(.semibold))
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Rectangle())
+                            .contentTransition(.symbolEffect(.replace))
                     }
-                    Link(destination: watchURL) {
-                        Label("Open in browser", systemImage: "safari")
-                    }
-                    Button(action: onCopyURL) {
-                        Label("Copy URL", systemImage: "link")
-                    }
-                }
-                Button(action: onCopyURLAtCurrentTime) {
-                    Label("Copy URL at current time", systemImage: "clock")
-                }
-                if downloadedFileURL != nil {
-                    Button(action: onShareDownloadedFile) {
-                        Label("Share downloaded file…", systemImage: "doc")
-                    }
-                }
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .foregroundStyle(.primary)
-            .accessibilityLabel("Share")
-
-            if downloadState == .available {
-                DownloadOptionsMenu(video: video, onSelect: onDownloadChoice)
-                    .id(video.id)
                     .buttonStyle(ResponsiveButtonStyle())
                     .foregroundStyle(.primary)
-            } else {
-                Button(action: onDownload) {
-                    downloadLabel
-                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                        .contentShape(Rectangle())
+                    .accessibilityLabel("Save")
+                    .accessibilityValue(isSaved ? "Saved" : "Not saved")
                 }
-                .buttonStyle(ResponsiveButtonStyle())
-                .foregroundStyle(.primary)
-                .opacity(downloadState == .downloading ? 0.72 : 1)
-                .accessibilityLabel(downloadAccessibilityLabel)
+
+                if showShareButton {
+                    Menu {
+                        if let watchURL {
+                            ShareLink(item: watchURL) {
+                                Label("Share…", systemImage: "square.and.arrow.up")
+                            }
+                            Link(destination: watchURL) {
+                                Label("Open in browser", systemImage: "safari")
+                            }
+                            Button(action: onCopyURL) {
+                                Label("Copy URL", systemImage: "link")
+                            }
+                        }
+                        Button(action: onCopyURLAtCurrentTime) {
+                            Label("Copy URL at current time", systemImage: "clock")
+                        }
+                        if downloadedFileURL != nil {
+                            Button(action: onShareDownloadedFile) {
+                                Label("Share downloaded file…", systemImage: "doc")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title3.weight(.semibold))
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .foregroundStyle(.primary)
+                    .accessibilityLabel("Share")
+                }
+
+                if showDownloadButton {
+                    if downloadState == .available {
+                        DownloadOptionsMenu(video: video, onSelect: onDownloadChoice)
+                            .id(video.id)
+                            .buttonStyle(ResponsiveButtonStyle())
+                            .foregroundStyle(.primary)
+                    } else {
+                        Button(action: onDownload) {
+                            downloadLabel
+                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .foregroundStyle(.primary)
+                        .opacity(downloadState == .downloading ? 0.72 : 1)
+                        .accessibilityLabel(downloadAccessibilityLabel)
+                    }
+                }
             }
         }
     }

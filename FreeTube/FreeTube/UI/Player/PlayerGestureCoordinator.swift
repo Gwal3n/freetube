@@ -45,6 +45,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var isHoldingForSpeed = false
     private var holdForSpeedEnabled: Bool
     private var holdSpeedRate: Float
+    private var horizontalSeekEnabled: Bool
     private var doubleTapSeekSeconds: Int
     private var lastPiPDismissalRequest: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
@@ -54,6 +55,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         pipDismissalRequest: Int,
         holdForSpeedEnabled: Bool,
         holdSpeedRate: Double,
+        horizontalSeekEnabled: Bool,
         doubleTapSeekSeconds: Int,
         effectivePlaybackRate: Double,
         onHoldSpeedChange: @escaping (Double?) -> Double,
@@ -70,6 +72,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.lastPiPDismissalRequest = pipDismissalRequest
         self.holdForSpeedEnabled = holdForSpeedEnabled
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
+        self.horizontalSeekEnabled = horizontalSeekEnabled
         self.doubleTapSeekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
@@ -102,6 +105,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         player: AVPlayer,
         holdForSpeedEnabled: Bool,
         holdSpeedRate: Double,
+        horizontalSeekEnabled: Bool,
         doubleTapSeekSeconds: Int,
         effectivePlaybackRate: Double,
         onHoldSpeedChange: @escaping (Double?) -> Double,
@@ -124,6 +128,10 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             longPressGesture?.isEnabled = holdForSpeedEnabled
         }
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
+        if self.horizontalSeekEnabled != horizontalSeekEnabled {
+            self.horizontalSeekEnabled = horizontalSeekEnabled
+            horizontalPanGesture?.isEnabled = horizontalSeekEnabled
+        }
         let seekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
         if seekSeconds == 0, self.doubleTapSeekSeconds != 0 {
             pendingSingleTapWorkItem?.cancel()
@@ -173,6 +181,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         horizontalPan.maximumNumberOfTouches = 1
         horizontalPan.cancelsTouchesInView = false
         horizontalPan.delegate = self
+        horizontalPan.isEnabled = horizontalSeekEnabled
 
         let twoFingerTap = UITapGestureRecognizer(target: self, action: #selector(didTwoFingerTap(_:)))
         twoFingerTap.numberOfTapsRequired = 1
@@ -682,6 +691,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         MainActor.assumeIsolated {
             guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
             if pan === twoFingerPanGesture { return isZoomEnabled }
+            if pan === horizontalPanGesture, !horizontalSeekEnabled { return false }
             let velocity = pan.velocity(in: pan.view)
             return abs(velocity.x) > abs(velocity.y) * 1.15
         }
