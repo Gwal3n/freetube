@@ -371,6 +371,15 @@ actor PersistenceWriter {
         NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
     }
 
+    /// Removes resume positions and progress indicators without deleting the history list.
+    func clearWatchProgress() {
+        let descriptor = FetchDescriptor<WatchHistoryEntry>()
+        guard let entries = try? modelContext.fetch(descriptor), !entries.isEmpty else { return }
+        for entry in entries { entry.lastPosition = 0 }
+        try? modelContext.save()
+        NotificationCenter.default.post(name: .watchHistoryDidChange, object: nil)
+    }
+
     func clearWatchHistory(olderThan cutoff: Date) {
         let descriptor = FetchDescriptor<WatchHistoryEntry>(
             predicate: #Predicate { $0.watchedAt < cutoff }

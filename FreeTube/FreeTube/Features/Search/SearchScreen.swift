@@ -83,6 +83,13 @@ struct SearchContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .toolbar {
+            if let results = model.results, !results.videos.isEmpty, !model.isEditingNewQuery {
+                ToolbarItem(placement: .topBarTrailing) {
+                    videoFilterMenu
+                }
+            }
+        }
         .onChange(of: model.submittedQuery) { _, _ in
             arePlaylistsExpanded = false
             areChannelsExpanded = true
@@ -256,11 +263,7 @@ struct SearchContent: View {
                             }
                         }
                     } header: {
-                        HStack(spacing: 0) {
-                            collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
-                                .frame(maxWidth: .infinity)
-                            videoFilterMenu
-                        }
+                        collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
                     }
                 }
                 if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {

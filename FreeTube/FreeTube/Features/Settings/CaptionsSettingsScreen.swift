@@ -8,8 +8,10 @@ struct CaptionsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Dark caption background", isOn: Bindable(model).captionBackgroundEnabled)
+                    .tint(.green)
                     .settingsSearchRow("Dark caption background")
                 Toggle("Use source formatting", isOn: Bindable(model).formattedCaptions)
+                    .tint(.green)
                     .settingsSearchRow("Use source formatting")
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {

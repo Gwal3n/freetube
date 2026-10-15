@@ -152,7 +152,7 @@ enum SettingsSearchIndex {
         Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Tab order"]),
         Group(destination: .libraryData, titles: [
             "Library & Data", "Save watch history", "Add to history when opened",
-            "Keep watch history", "Clear Watch History", "Continue Watching in Library",
+            "Keep watch history", "Clear Watch Progress", "Clear Watch History", "Continue Watching in Library",
             "Library video shelf", "Shelf content", "Shelf videos"
         ]),
         Group(destination: .cache, titles: [

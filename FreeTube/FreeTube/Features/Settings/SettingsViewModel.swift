@@ -199,6 +199,10 @@ final class SettingsViewModel {
         Task { await PersistenceWriter.shared.clearWatchHistory() }
     }
 
+    func clearWatchProgress() {
+        Task { await PersistenceWriter.shared.clearWatchProgress() }
+    }
+
     var showSubscriptionFeedTab: Bool {
         get { preferences.showSubscriptionFeedTab }
         set { preferences.showSubscriptionFeedTab = newValue }

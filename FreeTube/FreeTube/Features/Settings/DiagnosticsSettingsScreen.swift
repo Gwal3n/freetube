@@ -12,6 +12,7 @@ struct DiagnosticsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Save logs to file", isOn: Bindable(model).logToFile)
+                    .tint(.green)
                     .settingsSearchRow("Save logs to file")
                 if model.logToFile, let url = logWriter.currentLogFileURL {
                     LabeledContent("Current log") {

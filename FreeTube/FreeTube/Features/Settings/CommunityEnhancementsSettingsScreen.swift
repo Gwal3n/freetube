@@ -9,6 +9,7 @@ struct CommunityEnhancementsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Enable SponsorBlock", isOn: $model.sponsorBlockEnabled)
+                    .tint(.green)
                     .settingsSearchRow("Enable SponsorBlock")
             } header: {
                 Text("SponsorBlock")
@@ -58,11 +59,14 @@ struct CommunityEnhancementsSettingsScreen: View {
 
             Section {
                 Toggle("Replace video titles", isOn: $model.deArrowTitles)
+                    .tint(.green)
                     .settingsSearchRow("Replace video titles")
                 Toggle("Replace video thumbnails", isOn: $model.deArrowThumbnails)
+                    .tint(.green)
                     .settingsSearchRow("Replace video thumbnails")
                 if model.deArrowThumbnails {
                     Toggle("Random thumbnail when no submission exists", isOn: $model.deArrowRandomThumbnails)
+                        .tint(.green)
                         .settingsSearchRow("Random thumbnail when no submission exists")
                 }
             } header: {

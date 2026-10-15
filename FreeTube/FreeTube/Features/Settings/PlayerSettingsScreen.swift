@@ -50,18 +50,24 @@ struct PlayerSettingsScreen: View {
 
             Section {
                 Toggle("Remember floating player placement", isOn: Bindable(model).rememberFloatingPlayerPlacement)
+                    .tint(.green)
                     .settingsSearchRow("Remember floating player placement")
                 Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
+                    .tint(.green)
                     .settingsSearchRow("Show watch progress bars")
                 Toggle("Show description", isOn: Bindable(model).showDescription)
+                    .tint(.green)
                     .settingsSearchRow("Show description")
                 Toggle("Show comments", isOn: Bindable(model).showComments)
+                    .tint(.green)
                     .settingsSearchRow("Show comments")
                 if model.showComments {
                     Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
+                        .tint(.green)
                         .settingsSearchRow("Show featured comment preview")
                 }
                 Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
+                    .tint(.green)
                     .settingsSearchRow("Show Up Next")
                 if model.showUpNext {
                     Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
@@ -74,6 +80,7 @@ struct PlayerSettingsScreen: View {
                     .settingsSearchRow("Initial Up Next videos")
                 }
                 Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
+                    .tint(.green)
                     .disabled(!cacheRecentVideoContent)
                     .settingsSearchRow("Prefetch details and comments")
                 NavigationLink {

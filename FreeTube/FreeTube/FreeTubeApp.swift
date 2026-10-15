@@ -26,13 +26,9 @@ struct FreeTubeApp: App {
                 .environment(appEnvironment.playerStateManager)
                 .environment(appEnvironment.appVisitState)
                 .modelContainer(PersistenceController.sharedContainer)
-                // Keep system controls neutral. The chosen accent is used only by app-owned
-                // selection highlights, not every switch, menu item, and player button.
+                // Keep navigation and player controls neutral. Switches set their native
+                // green tint locally so their enabled track remains distinct from the thumb.
                 .tint(.primary)
-                // A neutral app tint makes an enabled switch's track and thumb both white.
-                // Keep the native switch, with the system's standard on color, without
-                // recoloring navigation links and other controls.
-                .toggleStyle(SwitchToggleStyle(tint: Color(uiColor: .systemGreen)))
                 // The app and player interface follow the chosen appearance.
                 .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)
         }

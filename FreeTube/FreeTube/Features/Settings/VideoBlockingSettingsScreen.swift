@@ -14,6 +14,7 @@ struct VideoBlockingSettingsScreen: View {
                     get: { blocklist.hideShorts },
                     set: { blocklist.hideShorts = $0 }
                 ))
+                .tint(.green)
                 .settingsSearchRow("Hide Shorts")
             } footer: {
                 Text("Shorts are hidden where YouTube identifies a video as a Short.")

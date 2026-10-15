@@ -12,9 +12,13 @@ struct ChannelTabsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Shorts", isOn: $showShorts)
+                    .tint(.green)
                 Toggle("Live", isOn: $showLive)
+                    .tint(.green)
                 Toggle("Playlists", isOn: $showPlaylists)
+                    .tint(.green)
                 Toggle("About", isOn: $showAbout)
+                    .tint(.green)
             } footer: {
                 Text("The Videos tab is always first. Tabs unavailable on a channel stay hidden regardless of these settings.")
             }

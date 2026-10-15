@@ -13,6 +13,7 @@ struct CacheSettingsScreen: View {
         Form {
             Section {
                 Toggle("Cache recent video details", isOn: $cacheRecentVideoContent)
+                    .tint(.green)
                     .settingsSearchRow("Cache recent video details")
             } footer: {
                 Text("Keeps details and the first comments page for up to 12 recently opened videos in memory. Nothing is saved to disk. Turning this off also stops detail prefetching.")

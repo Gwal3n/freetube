@@ -8,8 +8,10 @@ struct BrowsingSettingsScreen: View {
         Form {
             Section {
                 Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
+                    .tint(.green)
                     .settingsSearchRow("Show search suggestions")
                 Toggle("Save recent searches", isOn: Bindable(model).saveSearchHistory)
+                    .tint(.green)
                     .settingsSearchRow("Save recent searches")
             } header: {
                 Text("Search")
@@ -19,10 +21,13 @@ struct BrowsingSettingsScreen: View {
 
             Section {
                 Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
+                    .tint(.green)
                     .settingsSearchRow("Large video thumbnails")
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
+                    .tint(.green)
                     .settingsSearchRow("Mark new uploads")
                 Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
+                    .tint(.green)
                     .settingsSearchRow("Refresh feed automatically")
                 if model.automaticFeedRefreshEnabled {
                     Picker("Refresh interval", selection: Bindable(model).automaticFeedRefreshInterval) {

@@ -49,6 +49,7 @@ struct PlaybackSettingsScreen: View {
                     }
                 }
                 Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
+                    .tint(.green)
                     .settingsSearchRow("Hold for speed")
                 Button {
                     holdSpeedText = model.holdSpeedRate.formatted(.number.precision(.fractionLength(0...2)))
@@ -63,10 +64,13 @@ struct PlaybackSettingsScreen: View {
                 .disabled(!model.holdForSpeedEnabled)
                 .settingsSearchRow("Hold speed")
                 Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
+                    .tint(.green)
                     .settingsSearchRow("Autoplay next video")
                 Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
+                    .tint(.green)
                     .settingsSearchRow("Allow audio from other apps")
                 Toggle("Resume after interruptions", isOn: Bindable(model).resumeAfterAudioInterruption)
+                    .tint(.green)
                     .settingsSearchRow("Resume after interruptions")
             } header: {
                 Text("Video & audio")

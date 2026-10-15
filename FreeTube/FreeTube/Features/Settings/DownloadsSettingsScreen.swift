@@ -21,6 +21,7 @@ struct DownloadsSettingsScreen: View {
                 }
                 .settingsSearchRow("Default download quality")
                 Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
+                    .tint(.green)
                     .settingsSearchRow("Allow cellular data")
                 Picker("Parallel fragments", selection: Bindable(model).concurrentFragments) {
                     ForEach([1, 2, 4, 8, 16], id: \.self) { value in

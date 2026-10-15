@@ -20,6 +20,7 @@ struct TabBarSettingsScreen: View {
         List {
             Section {
                 Toggle("Show tab names", isOn: $showTabBarLabels)
+                    .tint(.green)
                     .settingsSearchRow("Show tab names")
             } footer: {
                 Text("Icons remain accessible by name when labels are hidden.")
@@ -30,6 +31,7 @@ struct TabBarSettingsScreen: View {
                     Toggle(isOn: visibility(for: tab)) {
                         Label(tab.title, systemImage: tab.symbol)
                     }
+                    .tint(.green)
                     .disabled(tab == .settings && !showLibraryTab)
                 }
                 .onMove(perform: moveTabs)
@@ -37,6 +39,7 @@ struct TabBarSettingsScreen: View {
                 Toggle(isOn: $showSearchTab) {
                     Label("Search", systemImage: "magnifyingglass")
                 }
+                .tint(.green)
                 .moveDisabled(true)
             } header: {
                 Text("Tab order")
