@@ -23,6 +23,10 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("feedCustomDurationMaximumMinutes") private var customMaximumMinutes = 60
     @AppStorage("automaticFeedRefreshEnabled") private var automaticFeedRefreshEnabled = false
     @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
+    @AppStorage("spaceSubscriptionFeedVideos") private var spaceSubscriptionFeedVideos = true
+    @AppStorage("feedChannelSpacing") private var feedChannelSpacing = 2
+    @AppStorage("feedGroupSpacing") private var feedGroupSpacing = 2
+    @AppStorage("feedSpacingMaximumShiftHours") private var feedSpacingMaximumShiftHours = 24
     @State private var currentDate = Date.now
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
@@ -211,6 +215,7 @@ struct SubscriptionFeedScreen: View {
             .onChange(of: groups.groups) { _, _ in
                 Task { await model.groupsChanged() }
             }
+            .onChange(of: feedOrderingKey) { _, _ in model.refreshOrdering() }
             .onChange(of: model.failedChannels) { _, _ in
                 failedChannelsExpanded = false
             }
@@ -241,6 +246,10 @@ struct SubscriptionFeedScreen: View {
 
     private var automaticLoadKey: String {
         "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
+    }
+
+    private var feedOrderingKey: String {
+        "\(spaceSubscriptionFeedVideos):\(feedChannelSpacing):\(feedGroupSpacing):\(feedSpacingMaximumShiftHours)"
     }
 
     private var filteredFillKey: String {

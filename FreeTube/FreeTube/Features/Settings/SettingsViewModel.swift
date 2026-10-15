@@ -114,6 +114,18 @@ final class SettingsViewModel {
     var automaticFeedRefreshInterval: FeedRefreshInterval {
         didSet { preferences.automaticFeedRefreshInterval = automaticFeedRefreshInterval }
     }
+    var spaceSubscriptionFeedVideos: Bool {
+        didSet { preferences.spaceSubscriptionFeedVideos = spaceSubscriptionFeedVideos }
+    }
+    var feedChannelSpacing: Int {
+        didSet { preferences.feedChannelSpacing = feedChannelSpacing }
+    }
+    var feedGroupSpacing: Int {
+        didSet { preferences.feedGroupSpacing = feedGroupSpacing }
+    }
+    var feedSpacingMaximumShiftHours: Int {
+        didSet { preferences.feedSpacingMaximumShiftHours = feedSpacingMaximumShiftHours }
+    }
 
     init() {
         let preferences = UserPreferences()
@@ -153,6 +165,10 @@ final class SettingsViewModel {
         self.rememberFloatingPlayerPlacement = preferences.rememberFloatingPlayerPlacement
         self.automaticFeedRefreshEnabled = preferences.automaticFeedRefreshEnabled
         self.automaticFeedRefreshInterval = preferences.automaticFeedRefreshInterval
+        self.spaceSubscriptionFeedVideos = preferences.spaceSubscriptionFeedVideos
+        self.feedChannelSpacing = preferences.feedChannelSpacing
+        self.feedGroupSpacing = preferences.feedGroupSpacing
+        self.feedSpacingMaximumShiftHours = preferences.feedSpacingMaximumShiftHours
     }
 
     var preferredQuality: VideoQuality {
@@ -236,6 +252,11 @@ final class SettingsViewModel {
     var showFeaturedCommentPreview: Bool {
         get { preferences.showFeaturedCommentPreview }
         set { preferences.showFeaturedCommentPreview = newValue }
+    }
+
+    var featuredCommentsNearPlaybackOnly: Bool {
+        get { preferences.featuredCommentsNearPlaybackOnly }
+        set { preferences.featuredCommentsNearPlaybackOnly = newValue }
     }
 
     var prefetchVideoDetails: Bool {

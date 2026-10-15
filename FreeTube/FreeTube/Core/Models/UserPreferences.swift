@@ -48,6 +48,12 @@ struct UserPreferences {
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     /// Shows a quiet New label for subscription uploads estimated after the previous app visit.
     @AppStorage("showNewSubscriptionUploads") var showNewSubscriptionUploads: Bool = true
+    /// Reorder only nearby feed uploads; the independent gap controls can be zero to disable
+    /// either same-channel or shared-group spacing without turning off the other one.
+    @AppStorage("spaceSubscriptionFeedVideos") var spaceSubscriptionFeedVideos: Bool = true
+    @AppStorage("feedChannelSpacing") var feedChannelSpacing: Int = 2
+    @AppStorage("feedGroupSpacing") var feedGroupSpacing: Int = 2
+    @AppStorage("feedSpacingMaximumShiftHours") var feedSpacingMaximumShiftHours: Int = 24
     /// Opt-in, foreground-only refresh of the local subscription feed.
     @AppStorage("automaticFeedRefreshEnabled") var automaticFeedRefreshEnabled: Bool = false
     @AppStorage("automaticFeedRefreshInterval") var automaticFeedRefreshIntervalRaw: String = FeedRefreshInterval.everySixHours.rawValue
@@ -56,6 +62,7 @@ struct UserPreferences {
     /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit
     /// cannot decode the current teaser shape, the first top-level comment is used as a fallback.
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
+    @AppStorage("featuredCommentsNearPlaybackOnly") var featuredCommentsNearPlaybackOnly: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true

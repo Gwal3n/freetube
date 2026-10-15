@@ -107,6 +107,11 @@ struct PlayerSettingsScreen: View {
                     Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
                         .tint(.green)
                         .settingsSearchRow("Show featured comment preview")
+                    if model.showFeaturedCommentPreview {
+                        Toggle("Only near playback time", isOn: Bindable(model).featuredCommentsNearPlaybackOnly)
+                            .tint(.green)
+                            .settingsSearchRow("Only near playback time")
+                    }
                 }
                 Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
                     .tint(.green)

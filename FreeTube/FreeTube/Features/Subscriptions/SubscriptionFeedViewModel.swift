@@ -27,6 +27,7 @@ final class SubscriptionFeedViewModel {
     private let pageSize = 100
     private var visibleLimit = 100
     private var cacheGeneration = 0
+    private var cachedSnapshots: [SubscriptionFeedSnapshot] = []
     @ObservationIgnored private var activeRefreshTask: Task<SubscriptionFeedRefresh, Never>?
     @ObservationIgnored private var activeRefreshID: UUID?
 
@@ -188,6 +189,28 @@ final class SubscriptionFeedViewModel {
         await loadCache()
     }
 
+    /// Settings may change while Feed stays mounted behind the Settings sheet. Reorder the
+    /// already-loaded snapshots immediately; do not refetch or disturb watch progress.
+    func refreshOrdering() {
+        guard !cachedSnapshots.isEmpty else { return }
+        videos = orderedVideos(from: cachedSnapshots)
+    }
+
+    private func orderedVideos(from snapshots: [SubscriptionFeedSnapshot]) -> [Video] {
+        let preferences = UserPreferences()
+        let configuration = SubscriptionFeedOrdering.Configuration(
+            isEnabled: preferences.spaceSubscriptionFeedVideos,
+            channelGap: preferences.feedChannelSpacing,
+            groupGap: preferences.feedGroupSpacing,
+            maximumDateShift: TimeInterval(preferences.feedSpacingMaximumShiftHours) * 60 * 60,
+            groups: groups.groups,
+            selectedGroupID: selectedGroupID
+        )
+        return SubscriptionFeedOrdering.diversified(
+            snapshots, pageSize: pageSize, configuration: configuration
+        ).map(\.video)
+    }
+
     private func loadCache() async {
         cacheGeneration += 1
         let generation = cacheGeneration
@@ -196,13 +219,14 @@ final class SubscriptionFeedViewModel {
             groups.groups.first(where: { $0.id == id })?.channelIDs
         }
         let snapshots = await writer.fetchSubscriptionFeed(limit: visibleLimit, channelIDs: channelIDs)
-        let refreshedVideos = SubscriptionFeedOrdering.diversified(snapshots, pageSize: pageSize).map(\.video)
+        let refreshedVideos = orderedVideos(from: snapshots)
         let totalCount = await writer.subscriptionFeedCount(channelIDs: channelIDs)
         let watchSummary = await writer.watchHistorySummary(videoIDs: refreshedVideos.map(\.id))
         let refreshDate = await writer.latestSubscriptionFeedRefreshDate()
         guard generation == cacheGeneration else { return }
         // Commit rows and their progress together, rather than painting fresh rows with stale
         // progress while the remaining persistence reads are suspended.
+        cachedSnapshots = snapshots
         videos = refreshedVideos
         canLoadMore = refreshedVideos.count < totalCount
         playbackProgress = watchSummary.progress

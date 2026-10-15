@@ -11,6 +11,7 @@ struct CommentsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showFeaturedCommentPreview") private var showsFeaturedCommentPreview = false
+    @AppStorage("featuredCommentsNearPlaybackOnly") private var featuredCommentsNearPlaybackOnly = false
 
     init(videoID: String, countText: String? = nil) {
         self.countText = countText
@@ -22,7 +23,7 @@ struct CommentsSection: View {
             header
 
             if showsFeaturedCommentPreview && !isExpanded {
-                FeaturedCommentPreview(model: model) { commentID in
+                FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
                     model.focusComment(commentID)
                     expandComments()
                 }
@@ -74,9 +75,9 @@ struct CommentsSection: View {
         .errorToast(Bindable(model).errorState)
         // Covers state restoration where the section mounts expanded. Collapsed sections remain
         // unloaded unless the user explicitly enables the featured-comment preview.
-        .task(id: showsFeaturedCommentPreview) {
+        .task(id: "\(showsFeaturedCommentPreview):\(featuredCommentsNearPlaybackOnly)") {
             if showsFeaturedCommentPreview {
-                await model.loadTeaser()
+                await model.loadTeaser(onlyTimed: featuredCommentsNearPlaybackOnly)
             } else if isExpanded, model.comments.isEmpty, !model.isLoading {
                 await model.load()
             }

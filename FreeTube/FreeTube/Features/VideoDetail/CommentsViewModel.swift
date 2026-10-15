@@ -49,24 +49,28 @@ final class CommentsViewModel {
 
     /// Keep the native excerpt as a fallback, then use the shared first comments page for
     /// playback-time matches. The preview setting is opt-in, and expansion reuses this page.
-    func loadTeaser() async {
-        guard teaserText == nil && comments.isEmpty else { return }
+    func loadTeaser(onlyTimed: Bool = false) async {
+        guard comments.isEmpty || (!onlyTimed && teaserText == nil) else { return }
         do {
-            let details = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
-            let nativeTeaser = details.teaserCommentText?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if let nativeTeaser, !nativeTeaser.isEmpty {
-                teaserText = nativeTeaser
+            if !onlyTimed && teaserText == nil {
+                let details = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: videoID)
+                let nativeTeaser = details.teaserCommentText?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let nativeTeaser, !nativeTeaser.isEmpty {
+                    teaserText = nativeTeaser
+                }
             }
 
-            let thread = try await VideoContentPrefetchStore.shared.fetchComments(videoID: videoID)
-            comments = thread.comments
-            refreshTimedComments()
-            continuationToken = thread.continuationToken
-            commentsDisabled = thread.availability == .disabled
-            sortingModes = thread.sortingModes
-            if teaserText == nil {
-                teaserText = thread.comments.first?.bodyText
+            if comments.isEmpty {
+                let thread = try await VideoContentPrefetchStore.shared.fetchComments(videoID: videoID)
+                comments = thread.comments
+                refreshTimedComments()
+                continuationToken = thread.continuationToken
+                commentsDisabled = thread.availability == .disabled
+                sortingModes = thread.sortingModes
+            }
+            if !onlyTimed && teaserText == nil {
+                teaserText = comments.first?.bodyText
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
         } catch {

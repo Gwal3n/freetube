@@ -26,6 +26,37 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
                     .tint(.green)
                     .settingsSearchRow("Mark new uploads")
+                Toggle("Space out related uploads", isOn: Bindable(model).spaceSubscriptionFeedVideos)
+                    .tint(.green)
+                    .settingsSearchRow("Space out related uploads")
+                if model.spaceSubscriptionFeedVideos {
+                    Stepper(value: Bindable(model).feedChannelSpacing, in: 0...5) {
+                        LabeledContent("Same channel gap") {
+                            if model.feedChannelSpacing == 0 {
+                                Text("Off").foregroundStyle(.secondary)
+                            } else {
+                                Text(verbatim: "\(model.feedChannelSpacing)").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .settingsSearchRow("Same channel gap")
+                    Stepper(value: Bindable(model).feedGroupSpacing, in: 0...5) {
+                        LabeledContent("Same group gap") {
+                            if model.feedGroupSpacing == 0 {
+                                Text("Off").foregroundStyle(.secondary)
+                            } else {
+                                Text(verbatim: "\(model.feedGroupSpacing)").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .settingsSearchRow("Same group gap")
+                    Picker("Maximum date shift", selection: Bindable(model).feedSpacingMaximumShiftHours) {
+                        Text("6 hours").tag(6)
+                        Text("24 hours").tag(24)
+                        Text("3 days").tag(72)
+                    }
+                    .settingsSearchRow("Maximum date shift")
+                }
                 Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
                     .tint(.green)
                     .settingsSearchRow("Refresh feed automatically")
@@ -45,7 +76,7 @@ struct BrowsingSettingsScreen: View {
             } header: {
                 Text("Feed")
             } footer: {
-                Text("Automatic refresh runs only while Feed is selected and the app is active. Tab visibility is set in Appearance.")
+                Text("Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic refresh runs only while Feed is selected and the app is active.")
             }
 
             Section("Channels") {
