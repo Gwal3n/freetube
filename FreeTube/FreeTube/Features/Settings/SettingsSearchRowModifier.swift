@@ -11,11 +11,13 @@ struct SettingsSearchRowModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .id(rowID)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(highlighted ? 0.10 : 0))
+            .listRowBackground(
+                Color(uiColor: .secondarySystemGroupedBackground)
+                    .overlay {
+                        Color.primary.opacity(highlighted ? 0.16 : 0)
+                    }
                     .allowsHitTesting(false)
-            }
+            )
             .task(id: searchTarget) {
                 guard searchTarget == rowID else {
                     highlighted = false
