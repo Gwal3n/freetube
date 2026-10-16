@@ -11,7 +11,7 @@ struct CommentRow: View {
     var onToggleReplies: (() -> Void)? = nil
     var onSeek: ((TimeInterval) -> Void)? = nil
     var onOpenAuthor: (() -> Void)? = nil
-    @AppStorage("showCommentAuthorPhotos") private var showAuthorPhotos = false
+    @AppStorage("showCommentAuthorPhotos") private var showAuthorPhotos = true
     @State private var isBodyExpanded = false
 
     private var isLongComment: Bool {
@@ -71,15 +71,25 @@ struct CommentRow: View {
 
     private var authorIdentity: some View {
         HStack(spacing: 6) {
-            if showAuthorPhotos, let url = comment.authorThumbnailURL {
-                KFImage(url)
-                    .thumbnail(size: CGSize(width: 28, height: 28)) {
-                        Circle().fill(MediaStyle.placeholderFill)
+            if showAuthorPhotos {
+                ZStack {
+                    Circle().fill(MediaStyle.placeholderFill)
+                    Text(comment.authorName.prefix(1).uppercased())
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    if let url = comment.authorThumbnailURL {
+                        KFImage(url)
+                            .thumbnail(size: CGSize(width: 28, height: 28)) {
+                                Color.clear
+                            }
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 28, height: 28)
                     }
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 28, height: 28)
-                    .clipShape(Circle())
+                }
+                .frame(width: 28, height: 28)
+                .clipShape(Circle())
+                .accessibilityHidden(true)
             }
             Text(comment.authorName).appFont(.caption, weight: .semibold)
         }
