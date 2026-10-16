@@ -258,6 +258,7 @@ private struct VideoActionsContent: View {
 private struct VideoContextMenuModifier: ViewModifier {
     let video: Video
     let previewBranding: DeArrowVideoViewModel?
+    let usesCustomPreview: Bool
     let offersPlayNext: Bool
     let onPlay: (() -> Void)?
     let onRemoveFromUpNext: (() -> Void)?
@@ -273,36 +274,7 @@ private struct VideoContextMenuModifier: ViewModifier {
     @State private var downloadModel: PlayerActionsModel?
 
     func body(content: Content) -> some View {
-        content
-            .contextMenu {
-                VideoActionsContent(
-                    video: video,
-                    offersPlay: true,
-                    onPlay: onPlay,
-                    offersPlayNext: offersPlayNext,
-                    onRemoveFromUpNext: onRemoveFromUpNext,
-                    onOpenChannel: onOpenChannel,
-                    onDownload: startDownload,
-                    shareFileURL: $shareFileURL,
-                    addToPlaylistVideo: $addToPlaylistVideo,
-                    savedMomentsVideo: $savedMomentsVideo
-                )
-                if onMarkComplete != nil || onRemoveFromHistory != nil {
-                    Divider()
-                    if let onMarkComplete {
-                        Button(action: onMarkComplete) {
-                            Label("Mark as complete", systemImage: "checkmark.circle")
-                        }
-                    }
-                    if let onRemoveFromHistory {
-                        Button(role: .destructive, action: onRemoveFromHistory) {
-                            Label("Remove from history", systemImage: "trash")
-                        }
-                    }
-                }
-            } preview: {
-                VideoContextPreview(video: video, branding: previewBranding)
-            }
+        menu(for: content)
             .sheet(isPresented: Binding(
                 get: { shareFileURL != nil },
                 set: { if !$0 { shareFileURL = nil } }
@@ -327,6 +299,50 @@ private struct VideoContextMenuModifier: ViewModifier {
             }
     }
 
+    @ViewBuilder
+    private func menu(for content: Content) -> some View {
+        if usesCustomPreview {
+            content.contextMenu {
+                menuItems
+            } preview: {
+                VideoContextPreview(video: video, branding: previewBranding)
+            }
+        } else {
+            content.contextMenu {
+                menuItems
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
+        VideoActionsContent(
+            video: video,
+            offersPlay: true,
+            onPlay: onPlay,
+            offersPlayNext: offersPlayNext,
+            onRemoveFromUpNext: onRemoveFromUpNext,
+            onOpenChannel: onOpenChannel,
+            onDownload: startDownload,
+            shareFileURL: $shareFileURL,
+            addToPlaylistVideo: $addToPlaylistVideo,
+            savedMomentsVideo: $savedMomentsVideo
+        )
+        if onMarkComplete != nil || onRemoveFromHistory != nil {
+            Divider()
+            if let onMarkComplete {
+                Button(action: onMarkComplete) {
+                    Label("Mark as complete", systemImage: "checkmark.circle")
+                }
+            }
+            if let onRemoveFromHistory {
+                Button(role: .destructive, action: onRemoveFromHistory) {
+                    Label("Remove from history", systemImage: "trash")
+                }
+            }
+        }
+    }
+
     private func startDownload(_ quality: VideoQuality) {
         let model = downloadModel ?? PlayerActionsModel()
         downloadModel = model
@@ -339,6 +355,7 @@ extension View {
     func videoContextMenu(
         video: Video,
         previewBranding: DeArrowVideoViewModel? = nil,
+        usesCustomPreview: Bool = true,
         offersPlayNext: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemoveFromUpNext: (() -> Void)? = nil,
@@ -349,6 +366,7 @@ extension View {
         modifier(VideoContextMenuModifier(
             video: video,
             previewBranding: previewBranding,
+            usesCustomPreview: usesCustomPreview,
             offersPlayNext: offersPlayNext,
             onPlay: onPlay,
             onRemoveFromUpNext: onRemoveFromUpNext,
