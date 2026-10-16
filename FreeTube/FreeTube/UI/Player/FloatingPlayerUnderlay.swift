@@ -13,6 +13,15 @@ struct FloatingPlayerUnderlay: View {
                 let origin = proxy.frame(in: .global).origin
                 ZStack {
                     FloatingPlayerVideoLayer(player: player.player)
+                    // The root player covers the video with its thumbnail until the first
+                    // frame is ready. Mirror that same artwork here so loading does not
+                    // leave a black, cut-off strip behind the native tab bar.
+                    PlayerArtworkBackdrop(
+                        artwork: player.currentArtwork,
+                        state: player.loadState,
+                        isAudioOnly: player.isAudioOnly
+                    )
+                    .frame(width: layout.frameInGlobal.width, height: layout.frameInGlobal.height)
                     // Mirror the existing compact chrome below the tab bar so its corner
                     // controls and progress track continue with the video during a drag.
                     // The root-owned chrome remains the only interactive copy.
