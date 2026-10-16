@@ -54,6 +54,8 @@ final class CommentService: CommentServicing {
                 data: [.continuation: token]
             )
             let comments = response.results.map { Mappers.comment(from: $0) }
+            let photoCount = comments.filter { $0.authorThumbnailURL != nil }.count
+            log.info("Comments decoded: count=\(comments.count, privacy: .public), authorPhotos=\(photoCount, privacy: .public)")
             return CommentThread(
                 comments: comments,
                 continuationToken: response.continuationToken,
@@ -78,6 +80,8 @@ final class CommentService: CommentServicing {
                 data: [.continuation: continuation]
             )
             let comments = response.results.map { Mappers.comment(from: $0) }
+            let photoCount = comments.filter { $0.authorThumbnailURL != nil }.count
+            log.info("Replies decoded: count=\(comments.count, privacy: .public), authorPhotos=\(photoCount, privacy: .public)")
             return CommentThread(
                 comments: comments,
                 continuationToken: response.continuationToken,

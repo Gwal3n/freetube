@@ -205,6 +205,7 @@ struct CommentsSection: View {
                                 }
                                 CommentRow(
                                     comment: item.comment,
+                                    isReply: true,
                                     onSeek: { player.seek(to: $0) },
                                     onOpenAuthor: authorAction(for: item.comment)
                                 )

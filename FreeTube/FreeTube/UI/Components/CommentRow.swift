@@ -6,6 +6,7 @@ import Kingfisher
 struct CommentRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let comment: Comment
+    var isReply = false
     var repliesTitle: String? = nil
     var repliesExpanded = false
     var onToggleReplies: (() -> Void)? = nil
@@ -18,82 +19,96 @@ struct CommentRow: View {
         comment.bodyText.count > 240 || comment.bodyText.filter(\.isNewline).count >= 3
     }
 
+    private var avatarSize: CGFloat { isReply ? 24 : 30 }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+        HStack(alignment: .top, spacing: 10) {
+            if showAuthorPhotos {
                 if let onOpenAuthor {
-                    Button(action: onOpenAuthor) { authorIdentity }
+                    Button(action: onOpenAuthor) { authorAvatar }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Open \(comment.authorName)'s channel")
                 } else {
-                    authorIdentity
+                    authorAvatar
+                        .accessibilityHidden(true)
                 }
-                Text(comment.publishedRelative).appFont(.caption2).foregroundStyle(.secondary)
             }
-            SelectableCommentText(
-                text: comment.bodyText,
-                maximumNumberOfLines: isLongComment && !isBodyExpanded ? 3 : 0,
-                onSeek: onSeek
-            )
 
-            if isLongComment {
-                Button(isBodyExpanded ? "Show less" : "Read more") {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                        isBodyExpanded.toggle()
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    if let onOpenAuthor {
+                        Button(action: onOpenAuthor) { authorIdentity }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Open \(comment.authorName)'s channel")
+                    } else {
+                        authorIdentity
+                    }
+                    Text(comment.publishedRelative).appFont(.caption2).foregroundStyle(.secondary)
+                }
+                SelectableCommentText(
+                    text: comment.bodyText,
+                    maximumNumberOfLines: isLongComment && !isBodyExpanded ? 3 : 0,
+                    onSeek: onSeek
+                )
+
+                if isLongComment {
+                    Button(isBodyExpanded ? "Show less" : "Read more") {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                            isBodyExpanded.toggle()
+                        }
+                    }
+                    .appFont(.caption, weight: .semibold)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 16) {
+                    Label("\(comment.likeCount)", systemImage: "hand.thumbsup")
+                        .labelStyle(.titleAndIcon)
+                        .appFont(.caption)
+                    if let repliesTitle, let onToggleReplies {
+                        Button(action: onToggleReplies) {
+                            HStack(spacing: 4) {
+                                Image(systemName: repliesExpanded ? "chevron.up" : "chevron.down")
+                                Text(repliesTitle)
+                            }
+                            .appFont(.caption)
+                        }
+                        .foregroundStyle(.primary)
                     }
                 }
-                .appFont(.caption, weight: .semibold)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
-
-            HStack(spacing: 16) {
-                Label("\(comment.likeCount)", systemImage: "hand.thumbsup")
-                    .labelStyle(.titleAndIcon)
-                    .appFont(.caption)
-                if let repliesTitle, let onToggleReplies {
-                    Button(action: onToggleReplies) {
-                        HStack(spacing: 4) {
-                            Image(systemName: repliesExpanded ? "chevron.up" : "chevron.down")
-                            Text(repliesTitle)
-                        }
-                        .appFont(.caption)
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
         }
         .padding(.horizontal)
         .padding(.vertical, 6)
     }
 
     private var authorIdentity: some View {
-        HStack(spacing: 6) {
-            if showAuthorPhotos {
-                ZStack {
-                    Circle().fill(MediaStyle.placeholderFill)
-                    Text(comment.authorName.prefix(1).uppercased())
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    if let url = comment.authorThumbnailURL {
-                        KFImage(url)
-                            .thumbnail(size: CGSize(width: 28, height: 28)) {
-                                Color.clear
-                            }
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 28, height: 28)
+        Text(comment.authorName)
+            .appFont(.caption, weight: .semibold)
+            .contentShape(Rectangle())
+    }
+
+    private var authorAvatar: some View {
+        ZStack {
+            Circle().fill(MediaStyle.placeholderFill)
+            Text(comment.authorName.prefix(1).uppercased())
+                .font(.system(size: isReply ? 10 : 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            if let url = comment.authorThumbnailURL {
+                KFImage(url)
+                    .thumbnail(size: CGSize(width: avatarSize, height: avatarSize)) {
+                        Color.clear
                     }
-                }
-                .frame(width: 28, height: 28)
-                .clipShape(Circle())
-                .accessibilityHidden(true)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: avatarSize, height: avatarSize)
             }
-            Text(comment.authorName).appFont(.caption, weight: .semibold)
         }
-        .contentShape(Rectangle())
+        .frame(width: avatarSize, height: avatarSize)
+        .clipShape(Circle())
     }
 }
 
