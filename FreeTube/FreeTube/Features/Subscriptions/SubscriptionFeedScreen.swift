@@ -16,6 +16,7 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
+    @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
     @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
     @AppStorage("feedWatchFilter") private var watchFilterRaw = FeedWatchFilter.all.rawValue
     @AppStorage("feedDurationFilter") private var durationFilterRaw = FeedDurationFilter.all.rawValue
@@ -554,6 +555,7 @@ struct SubscriptionFeedScreen: View {
                 onTap: { player.load(video) },
                 showsMoreMenu: true,
                 offersPlayNext: true,
+                showsChannelAvatar: showChannelAvatars,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
@@ -572,6 +574,7 @@ struct SubscriptionFeedScreen: View {
             VideoRow(
                 video: video,
                 accessory: .actions(offersPlayNext: true),
+                showsChannelAvatar: showChannelAvatars,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate

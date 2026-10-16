@@ -7,6 +7,7 @@ struct FloatingMiniPlayerChrome: View {
     static let cornerRadius: CGFloat = 14
 
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let actionsEnabled: Bool
     let onExpand: () -> Void
@@ -27,13 +28,32 @@ struct FloatingMiniPlayerChrome: View {
             VStack(spacing: 0) {
                 HStack {
                     cornerButton(
-                        player.hasEnded ? "arrow.counterclockwise" : player.isPlaying ? "pause.fill" : "play.fill",
-                        accessibilityLabel: player.hasEnded ? "Replay" : player.isPlaying ? "Pause" : "Play"
-                    ) {
-                        player.togglePlayPause()
-                    }
+                        accessibilityLabel: player.hasEnded ? "Replay" : player.isPlaying ? "Pause" : "Play",
+                        action: { player.togglePlayPause() },
+                        label: {
+                            Group {
+                                if player.hasEnded {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.system(size: 14, weight: .bold))
+                                } else {
+                                    PlaybackMorphShape(progress: player.isPlaying ? 1 : 0)
+                                        .fill(.white)
+                                        .frame(width: 14, height: 14)
+                                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: player.isPlaying)
+                                }
+                            }
+                            .frame(width: 14, height: 14)
+                        }
+                    )
                     Spacer(minLength: 0)
-                    cornerButton("xmark", accessibilityLabel: "Close player", action: onDismiss)
+                    cornerButton(
+                        accessibilityLabel: "Close player",
+                        action: onDismiss,
+                        label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                        }
+                    )
                 }
                 .padding(5)
 
@@ -47,17 +67,16 @@ struct FloatingMiniPlayerChrome: View {
         .contentShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
     }
 
-    private func cornerButton(
-        _ symbol: String,
+    private func cornerButton<Label: View>(
         accessibilityLabel: LocalizedStringKey,
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Label
     ) -> some View {
         Button {
             guard actionsEnabled else { return }
             action()
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .bold))
+            label()
                 .foregroundStyle(.white)
                 .frame(width: 30, height: 30)
                 .background(.black.opacity(0.6), in: Circle())

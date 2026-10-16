@@ -77,6 +77,16 @@ extension Video {
         )
     }
 
+    func withChannelThumbnailURL(_ url: URL) -> Video {
+        Video(
+            id: id, title: title, channelID: channelID, channelName: channelName,
+            channelThumbnailURL: url, thumbnailURL: thumbnailURL,
+            duration: duration, viewCount: viewCount, publishedAt: publishedAt,
+            publishedRelative: publishedRelative, descriptionSnippet: descriptionSnippet,
+            isLive: isLive, isShort: isShort
+        )
+    }
+
     func markedLive() -> Video {
         Video(
             id: id, title: title, channelID: channelID, channelName: channelName,

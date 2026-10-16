@@ -16,6 +16,7 @@ struct VideoCard: View {
     var onTap: () -> Void = {}
     var showsMoreMenu: Bool = false
     var offersPlayNext = false
+    var showsChannelAvatar = true
     var playbackProgress: Double? = nil
     var isNewSinceLastVisit = false
     var relativeDateReference: Date? = nil
@@ -84,14 +85,16 @@ struct VideoCard: View {
         HStack(alignment: .top, spacing: 12) {
             Button(action: openVideo) {
                 HStack(alignment: .top, spacing: 12) {
-                    KFImage(video.channelThumbnailURL)
-                        .thumbnail(size: CGSize(width: 36, height: 36)) {
-                            Circle().fill(MediaStyle.placeholderFill)
-                        }
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 36, height: 36)
-                        .clipShape(Circle())
+                    if showsChannelAvatar {
+                        KFImage(video.channelThumbnailURL)
+                            .thumbnail(size: CGSize(width: 36, height: 36)) {
+                                Circle().fill(MediaStyle.placeholderFill)
+                            }
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+                    }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(branding.title(for: video))

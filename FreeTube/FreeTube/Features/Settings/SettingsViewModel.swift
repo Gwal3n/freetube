@@ -229,6 +229,11 @@ final class SettingsViewModel {
         set { preferences.largeSubscriptionFeedThumbnails = newValue }
     }
 
+    var showFeedChannelAvatars: Bool {
+        get { preferences.showFeedChannelAvatars }
+        set { preferences.showFeedChannelAvatars = newValue }
+    }
+
     var showNewSubscriptionUploads: Bool {
         get { preferences.showNewSubscriptionUploads }
         set { preferences.showNewSubscriptionUploads = newValue }

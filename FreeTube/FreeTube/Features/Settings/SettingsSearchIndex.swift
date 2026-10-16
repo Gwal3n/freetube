@@ -156,7 +156,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .browsing, titles: [
             "Browsing", "Show search suggestions", "Save recent searches",
-            "Large video thumbnails", "Mark new uploads", "Space out related uploads",
+            "Large video thumbnails", "Show channel avatars", "Mark new uploads", "Space out related uploads",
             "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
             "Refresh interval"
         ]),

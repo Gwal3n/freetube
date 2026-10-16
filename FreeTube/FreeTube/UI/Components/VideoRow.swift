@@ -18,6 +18,7 @@ struct VideoRow: View {
     @State private var launchAnchor = VideoLaunchAnchor()
     let video: Video
     var accessory: Accessory
+    var showsChannelAvatar: Bool
     var playbackProgress: Double?
     var isNewSinceLastVisit = false
     var relativeDateReference: Date?
@@ -29,6 +30,7 @@ struct VideoRow: View {
     init(
         video: Video,
         accessory: Accessory = .none,
+        showsChannelAvatar: Bool = false,
         playbackProgress: Double? = nil,
         isNewSinceLastVisit: Bool = false,
         relativeDateReference: Date? = nil,
@@ -37,6 +39,7 @@ struct VideoRow: View {
     ) {
         self.video = video
         self.accessory = accessory
+        self.showsChannelAvatar = showsChannelAvatar
         self.playbackProgress = playbackProgress
         self.isNewSinceLastVisit = isNewSinceLastVisit
         self.relativeDateReference = relativeDateReference
@@ -150,10 +153,23 @@ struct VideoRow: View {
                     .contentTransition(.opacity)
                     .appFont(.subheadline, weight: .semibold)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
-                Text(video.channelName)
-                    .appFont(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    if showsChannelAvatar {
+                        KFImage(video.channelThumbnailURL)
+                            .thumbnail(size: CGSize(width: 18, height: 18)) {
+                                Circle().fill(MediaStyle.placeholderFill)
+                            }
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 18, height: 18)
+                            .clipShape(Circle())
+                            .accessibilityHidden(true)
+                    }
+                    Text(video.channelName)
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 if !statsLine.isEmpty {
                     HStack(spacing: 6) {
                         if isNewSinceLastVisit {

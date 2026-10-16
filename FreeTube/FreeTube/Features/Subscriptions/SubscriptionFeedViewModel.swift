@@ -206,9 +206,17 @@ final class SubscriptionFeedViewModel {
             groups: groups.groups,
             selectedGroupID: selectedGroupID
         )
+        let savedAvatars = subscriptions.subscriptions.reduce(into: [String: URL]()) { urls, subscription in
+            if let url = subscription.thumbnailURL { urls[subscription.id] = url }
+        }
         return SubscriptionFeedOrdering.diversified(
             snapshots, pageSize: pageSize, configuration: configuration
-        ).map(\.video)
+        ).map { snapshot in
+            let video = snapshot.video
+            guard video.channelThumbnailURL == nil,
+                  let savedAvatar = savedAvatars[video.channelID] else { return video }
+            return video.withChannelThumbnailURL(savedAvatar)
+        }
     }
 
     private func loadCache() async {
