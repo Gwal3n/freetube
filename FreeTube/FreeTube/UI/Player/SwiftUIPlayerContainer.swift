@@ -58,6 +58,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 ? 0
                 : systemInsets.top
             let miniBottomPadding = PlayerLayoutMetrics.bottomTabBarClearance
+            // The clearance includes six points of breathing room above the real tab bar.
+            let tabBarTop = proxy.size.height - miniBottomPadding + 6
             let floatingWidthRange = floatingWidthBounds(
                 in: proxy.size,
                 topInset: systemInsets.top,
@@ -109,6 +111,20 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     + (0.5 - floatingPinchAnchor.y) * (floatingChromeSize.height - floatingSize.height)
             )
             let containerOrigin = proxy.frame(in: .global).origin
+            let floatingUnderlay = FloatingPlayerUnderlayLayout(
+                frameInGlobal: CGRect(
+                    x: containerOrigin.x + floatingChromePosition.x - floatingChromeSize.width / 2,
+                    y: containerOrigin.y + floatingChromePosition.y - floatingChromeSize.height / 2,
+                    width: floatingChromeSize.width,
+                    height: floatingChromeSize.height
+                ),
+                tabBarTopInGlobal: containerOrigin.y + tabBarTop,
+                cornerRadius: FloatingMiniPlayerChrome.cornerRadius * floatingPinchScale,
+                opacity: floatingIsDismissing && floatingShouldFade ? 0 : 1,
+                isVisible: player.miniPlayerVisible && !player.fullScreenPresented
+                    && !floatingIsStashed && !floatingChromeHiddenForExpansion
+                    && player.launchSourceFrame == nil
+            )
             let launchFrame = player.launchSourceFrame?.offsetBy(
                 dx: -containerOrigin.x,
                 dy: -containerOrigin.y
@@ -135,6 +151,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
             ZStack(alignment: .bottom) {
                 content
+                    .environment(\.floatingPlayerUnderlayLayout, floatingUnderlay)
                     .allowsHitTesting(!player.fullScreenPresented)
 
                 if player.miniPlayerVisible {
@@ -183,8 +200,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         // to relayout on every pinch sample. The source frame is committed once
                         // the fingers lift, so the image tracks the gesture without lag.
                         .scaleEffect(floatingPinchScale, anchor: floatingPinchAnchor)
-                        // Do not mask the compact surface at the tab bar. A downward drag must
-                        // stay visible to the screen edge; its resting Y still stops above it.
+                        .modifier(FloatingTabBarOcclusion(
+                            tabBarTop: tabBarTop,
+                            isEnabled: !player.fullScreenPresented && !isLaunchingFromThumbnail
+                        ))
                         // Position the hosting view itself, not just its SwiftUI drawing. The
                         // AVPlayerViewController inside can commit a frame ahead of an `.offset`
                         // animation, exposing video at the destination while the chrome moves.
@@ -206,6 +225,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         onDismiss: dismissFloatingPlayer
                     )
                         .frame(width: floatingChromeSize.width, height: floatingChromeSize.height)
+                        .modifier(FloatingTabBarOcclusion(
+                            tabBarTop: tabBarTop,
+                            isEnabled: true
+                        ))
+                        .contentShape(FloatingAboveTabBarHitRegion(
+                            visibleHeight: tabBarTop - floatingChromePosition.y
+                                + floatingChromeSize.height / 2
+                        ))
                         .position(floatingChromePosition)
                         .opacity(floatingChromeHiddenForExpansion || player.fullScreenPresented || isLaunchingFromThumbnail
                             || (floatingIsDismissing && floatingShouldFade) ? 0 : 1)
@@ -229,6 +256,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         isLeading: floatingCorner.isLeading,
                         size: floatingSize
                     )
+                    .modifier(FloatingTabBarOcclusion(
+                        tabBarTop: tabBarTop,
+                        isEnabled: true
+                    ))
                     .position(floatingPosition)
                     .opacity(floatingStashOverlayVisible
                         ? max(0, 1 - abs(floatingStashPullX)

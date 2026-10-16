@@ -53,7 +53,7 @@ struct RootTabShell: View {
                 }
                 if showsSearch {
                     SwiftUI.Tab(value: RootView.Tab.search, role: .search) {
-                        HomeScreen()
+                        screen(for: .search)
                     } label: {
                         if showTabBarLabels {
                             Label("Search", systemImage: "magnifyingglass")
@@ -87,7 +87,7 @@ struct RootTabShell: View {
                     .tag(tab)
             }
             if showsSearch {
-                HomeScreen()
+                screen(for: .search)
                     .tabItem {
                         if showTabBarLabels {
                             Label("Search", systemImage: "magnifyingglass")
@@ -103,17 +103,24 @@ struct RootTabShell: View {
 
     @ViewBuilder
     private func screen(for tab: RootView.Tab) -> some View {
-        switch tab {
-        case .feed:
-            SubscriptionFeedScreen(selectedTab: $selection)
-        case .library:
-            NavigationStack { LibraryScreen() }
-        case .downloads:
-            DownloadsScreen()
-        case .search:
-            HomeScreen()
-        case .settings:
-            SettingsScreen(onClose: nil)
+        Group {
+            switch tab {
+            case .feed:
+                SubscriptionFeedScreen(selectedTab: $selection)
+            case .library:
+                NavigationStack { LibraryScreen() }
+            case .downloads:
+                DownloadsScreen()
+            case .search:
+                HomeScreen()
+            case .settings:
+                SettingsScreen(onClose: nil)
+            }
+        }
+        .overlay {
+            if tab == selection {
+                FloatingPlayerUnderlay()
+            }
         }
     }
 
