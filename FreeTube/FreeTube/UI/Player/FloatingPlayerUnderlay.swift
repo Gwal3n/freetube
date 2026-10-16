@@ -11,7 +11,17 @@ struct FloatingPlayerUnderlay: View {
         GeometryReader { proxy in
             if layout.isVisible {
                 let origin = proxy.frame(in: .global).origin
-                FloatingPlayerVideoLayer(player: player.player)
+                ZStack {
+                    FloatingPlayerVideoLayer(player: player.player)
+                    // Mirror the existing compact chrome below the tab bar so its corner
+                    // controls and progress track continue with the video during a drag.
+                    // The root-owned chrome remains the only interactive copy.
+                    FloatingMiniPlayerChrome(
+                        actionsEnabled: false,
+                        onExpand: {},
+                        onDismiss: {}
+                    )
+                }
                     .frame(width: layout.frameInGlobal.width, height: layout.frameInGlobal.height)
                     .clipShape(RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous))
                     .mask(alignment: .topLeading) {
