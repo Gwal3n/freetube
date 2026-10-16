@@ -268,7 +268,7 @@ struct FullScreenPlayer: View {
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
                     if !isFloating, let badgeText = gestureBadgeText {
-                        gestureBadge(badgeText)
+                        PlayerGestureBadge(text: badgeText)
                             .position(
                                 x: controlFrame.midX,
                                 y: controlFrame.minY + max(26, controlFrame.height * 0.10)
@@ -806,16 +806,6 @@ struct FullScreenPlayer: View {
         // (Mac maximized) you'd see an unfilled gap below the panel.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-    }
-
-    private func gestureBadge(_ text: String) -> some View {
-        Text(verbatim: text)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .frame(minWidth: 52, minHeight: 26)
-            .background(.ultraThinMaterial, in: Capsule())
-            .environment(\.colorScheme, .dark)
     }
 
     private var gestureBadgeText: String? {

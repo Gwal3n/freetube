@@ -48,10 +48,7 @@ struct StoryboardPreview: View {
             // timestamp lines up with the player's existing time labels.
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            Text(verbatim: seekPreviewTimestamp(previewTime))
-                .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.9), radius: 2, y: 1)
+            PlayerGestureBadge(text: seekPreviewTimestamp(previewTime))
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -89,10 +86,7 @@ struct AudioOnlySeekPreview: View {
             }
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            Text(verbatim: seekPreviewTimestamp(previewTime))
-                .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.9), radius: 2, y: 1)
+            PlayerGestureBadge(text: seekPreviewTimestamp(previewTime))
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
