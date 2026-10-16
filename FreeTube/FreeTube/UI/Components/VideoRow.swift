@@ -92,9 +92,10 @@ struct VideoRow: View {
                     .tint(.indigo)
                 }
             }
+            // Keep the system context-menu lift anchored to the row's final List geometry.
+            .mediaListRow()
             .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true,
                               onOpenChannel: onOpenChannel)
-            .mediaListRow()
         }
     }
 

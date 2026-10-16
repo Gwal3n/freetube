@@ -558,8 +558,6 @@ struct SubscriptionFeedScreen: View {
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             )
-            .padding(.top, 4)
-            .padding(.bottom, 14)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .swipeActions(edge: .leading, allowsFullSwipe: true) {

@@ -18,6 +18,7 @@ struct ChannelDetails: Sendable {
 protocol ChannelServicing: Sendable {
     func fetchChannel(id: String) async throws -> ChannelDetails
     func fetchChannelMetadata(id: String) async throws -> Channel
+    func fetchChannelAvatar(id: String) async -> URL?
     func fetchLatestVideos(channelID: String) async throws -> [Video]
     func fetchVideos(channelID: String, sort: ChannelVideoSort) async throws -> ChannelTab<Video>
     func fetchVideosNextPage(channelID: String, sort: ChannelVideoSort) async throws -> ChannelTab<Video>
@@ -25,6 +26,11 @@ protocol ChannelServicing: Sendable {
     func fetchShortsNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchDirectsNextPage(channelID: String) async throws -> ChannelTab<Video>
     func fetchPlaylistsNextPage(channelID: String) async throws -> ChannelTab<Playlist>
+}
+
+extension ChannelServicing {
+    /// Test fixtures and alternate providers can omit this best-effort artwork fallback.
+    func fetchChannelAvatar(id: String) async -> URL? { nil }
 }
 
 /// Wraps `YouTubeKit.ChannelInfosResponse` and its per-tab subtypes.
@@ -94,8 +100,15 @@ final class ChannelService: ChannelServicing {
         merge(into: &merged, from: playlistsTab.source)
         await cache.set(id, merged)
 
+        let avatar = channel.thumbnailURL
+            ?? videosTab.videoTab.items.lazy.compactMap(\.channelThumbnailURL).first
+            ?? shortsTab.videoTab.items.lazy.compactMap(\.channelThumbnailURL).first
+            ?? directsTab.videoTab.items.lazy.compactMap(\.channelThumbnailURL).first
+        if avatar == nil {
+            log.notice("Channel \(id, privacy: .public) has no avatar in header or video rows")
+        }
         return ChannelDetails(
-            channel: channel,
+            channel: channel.withThumbnailURL(avatar),
             videos: videosTab.videoTab,
             shorts: shortsTab.videoTab,
             directs: directsTab.videoTab,
@@ -117,6 +130,10 @@ final class ChannelService: ChannelServicing {
             log.error("Channel metadata failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
             throw YouTubeServiceError.network(error)
         }
+    }
+
+    func fetchChannelAvatar(id: String) async -> URL? {
+        await ChannelAvatarService().fetchAvatar(id: id)
     }
 
     /// Fetches only the first page of a channel's Videos tab. The local subscription feed uses

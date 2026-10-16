@@ -1280,18 +1280,13 @@ struct FullScreenPlayer: View {
     }
 
     /// Finish the same collapse used by the player control before pushing a destination behind it.
-    /// A fixed delay can expose that destination while the expanded player is still on screen.
+    /// Navigation waits for the container's interactive-style collapse to reach the mini frame.
     private func collapseForNavigation(_ navigate: @escaping () -> Void) {
-        withAnimation(
-            reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08),
-            completionCriteria: .logicallyComplete
-        ) {
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             player.chapterListPresented = false
             isPlaylistPanelPresented = false
-            player.fullScreenPresented = false
-        } completion: {
-            navigate()
         }
+        player.requestPlayerCollapse(then: navigate)
     }
 
 }

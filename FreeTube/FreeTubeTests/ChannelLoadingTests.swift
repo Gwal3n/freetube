@@ -4,6 +4,16 @@ import XCTest
 
 @MainActor
 final class ChannelLoadingTests: XCTestCase {
+    func testPublicChannelAvatarFallbackAcceptsOnlyYouTubeArtwork() {
+        let html = #"<meta property="og:image" content="https://yt3.googleusercontent.com/avatar=s900">"#
+        XCTAssertEqual(
+            ChannelAvatarService.avatarURL(in: html)?.absoluteString,
+            "https://yt3.googleusercontent.com/avatar=s900"
+        )
+        let unrelated = #"<meta property="og:image" content="https://example.com/avatar.png">"#
+        XCTAssertNil(ChannelAvatarService.avatarURL(in: unrelated))
+    }
+
     func testCancelledAppearanceAndReopeningShareTheRequest() async {
         let service = ChannelLoadingFixture()
         service.allowSuccess()

@@ -54,6 +54,10 @@ struct VideoCard: View {
                 // Menu, since SwiftUI's outer Button consumes the gesture first.
                 metadataRow(branding: branding)
             }
+            // This card is currently used only by Feed. Include its row spacing in the view
+            // that the native context menu lifts and returns to, rather than adding it outside.
+            .padding(.top, 4)
+            .padding(.bottom, 14)
             .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true)
         }
     }

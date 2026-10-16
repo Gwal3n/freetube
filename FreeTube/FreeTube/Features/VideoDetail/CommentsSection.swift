@@ -246,12 +246,7 @@ struct CommentsSection: View {
               let channelID = comment.authorChannelID,
               !channelID.isEmpty else { return nil }
         return {
-            let wasExpanded = player.fullScreenPresented
-            if wasExpanded { player.fullScreenPresented = false }
-            Task { @MainActor in
-                // Match the existing player-menu route: reveal the tab before pushing onto
-                // its NavigationStack, avoiding a destination hidden behind the player.
-                try? await Task.sleep(for: .milliseconds(wasExpanded ? 180 : 100))
+            player.requestPlayerCollapse {
                 NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
             }
         }

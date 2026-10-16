@@ -123,6 +123,7 @@ final class PlayerStateManager {
     private(set) var playerExpansionRequest = 0
     /// Allows the fixed collapse control to use the container's video-only shrinking transition.
     private(set) var playerCollapseRequest = 0
+    @ObservationIgnored private var pendingCollapseCompletion: (sessionID: Int, action: () -> Void)?
     /// Width of the in-app floating video; optionally restored between launches. The view
     /// constrains it to the current viewport.
     private(set) var floatingMiniPlayerWidth: CGFloat = 216
@@ -682,8 +683,23 @@ final class PlayerStateManager {
         launchSourceFrame = nil
     }
 
-    func requestPlayerCollapse() {
+    func requestPlayerCollapse(then completion: (() -> Void)? = nil) {
+        guard fullScreenPresented else {
+            completion?()
+            return
+        }
+        if let completion {
+            pendingCollapseCompletion = (playbackSessionID, completion)
+        }
         playerCollapseRequest &+= 1
+    }
+
+    func finishPlayerCollapse() {
+        let completion = pendingCollapseCompletion
+        pendingCollapseCompletion = nil
+        if let completion, completion.sessionID == playbackSessionID, miniPlayerVisible {
+            completion.action()
+        }
     }
 
     func resizeFloatingMiniPlayer(to width: CGFloat) {

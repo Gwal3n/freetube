@@ -16,4 +16,18 @@ struct Channel: Identifiable, Hashable, Sendable {
         guard !channelID.isEmpty else { return nil }
         return URL(string: "https://www.youtube.com/channel")?.appendingPathComponent(channelID)
     }
+
+    func withThumbnailURL(_ url: URL?) -> Channel {
+        Channel(
+            id: id,
+            name: name,
+            handle: handle,
+            thumbnailURL: url,
+            bannerURL: bannerURL,
+            subscriberCount: subscriberCount,
+            videoCount: videoCount,
+            isSubscribed: isSubscribed,
+            descriptionText: descriptionText
+        )
+    }
 }

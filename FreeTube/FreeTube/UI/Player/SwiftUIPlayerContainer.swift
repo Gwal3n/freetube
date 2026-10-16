@@ -524,6 +524,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         guard !reduceMotion else {
             player.fullScreenPresented = false
             presentationTranslation = 0
+            player.finishPlayerCollapse()
             return
         }
         withAnimation(
@@ -534,6 +535,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         } completion: {
             guard player.fullScreenPresented else {
                 presentationTranslation = 0
+                player.finishPlayerCollapse()
                 return
             }
             // At progress 1 the live video already has the floating window's exact frame.
@@ -542,6 +544,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 player.fullScreenPresented = false
                 presentationTranslation = 0
             }
+            player.finishPlayerCollapse()
         }
     }
 

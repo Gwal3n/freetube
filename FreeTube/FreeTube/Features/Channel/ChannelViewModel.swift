@@ -64,7 +64,13 @@ final class ChannelViewModel {
             initialLoadTask = nil
         }
         do {
-            let loadedDetails = try await service.fetchChannel(id: channelID)
+            var loadedDetails = try await service.fetchChannel(id: channelID)
+            if loadedDetails.channel.thumbnailURL == nil,
+               let savedAvatar = localSubscriptions.subscriptions.first(where: { $0.id == channelID })?.thumbnailURL {
+                loadedDetails = loadedDetails.replacingChannel(
+                    loadedDetails.channel.withThumbnailURL(savedAvatar)
+                )
+            }
             details = loadedDetails
             videoTabs[.newest] = loadedDetails.videos
             if let channel = details?.channel, channel.isSubscribed {
@@ -72,11 +78,24 @@ final class ChannelViewModel {
                 // time the user visits the channel, without changing subscription state.
                 localSubscriptions.add(channel)
             }
+            if loadedDetails.channel.thumbnailURL == nil {
+                Task { [weak self] in await self?.hydrateAvatarIfNeeded() }
+            }
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
             initialLoadFailed = details == nil
             errorState = ErrorState(from: error)
         }
+    }
+
+    private func hydrateAvatarIfNeeded() async {
+        guard details?.channel.thumbnailURL == nil,
+              let avatar = await service.fetchChannelAvatar(id: channelID),
+              let current = details,
+              current.channel.thumbnailURL == nil else { return }
+        let updatedChannel = current.channel.withThumbnailURL(avatar)
+        details = current.replacingChannel(updatedChannel)
+        if updatedChannel.isSubscribed { localSubscriptions.add(updatedChannel) }
     }
 
     /// Subscription is deliberately device-only. No YouTube account mutation is performed.
@@ -101,13 +120,7 @@ final class ChannelViewModel {
             isSubscribed: !wasSubscribed,
             descriptionText: c.descriptionText
         )
-        details = ChannelDetails(
-            channel: updatedChannel,
-            videos: current.videos,
-            shorts: current.shorts,
-            directs: current.directs,
-            playlists: current.playlists
-        )
+        details = current.replacingChannel(updatedChannel)
     }
 
     /// True when YouTubeKit still has a continuation token for the underlying content tab.
@@ -247,6 +260,16 @@ final class ChannelViewModel {
 }
 
 private extension ChannelDetails {
+    func replacingChannel(_ updated: Channel) -> ChannelDetails {
+        ChannelDetails(
+            channel: updated,
+            videos: videos,
+            shorts: shorts,
+            directs: directs,
+            playlists: playlists
+        )
+    }
+
     func appendingVideos(_ page: ChannelTab<Video>) -> ChannelDetails {
         ChannelDetails(
             channel: channel,
