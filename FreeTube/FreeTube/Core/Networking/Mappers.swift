@@ -204,13 +204,13 @@ enum Mappers {
 
     // MARK: - Comments
 
-    static func comment(from yt: YTComment) -> Comment {
+    static func comment(from yt: YTComment, authorAvatarURL: URL? = nil) -> Comment {
         let likeCount = Int(yt.likesCount?.filter(\.isNumber) ?? "") ?? 0
         return Comment(
             id: yt.commentIdentifier,
             authorName: yt.sender?.name ?? "",
             authorChannelID: yt.sender?.channelId,
-            authorThumbnailURL: bestThumbnailURL(yt.sender?.thumbnails ?? []),
+            authorThumbnailURL: bestThumbnailURL(yt.sender?.thumbnails ?? []) ?? authorAvatarURL,
             bodyText: yt.text,
             likeCount: likeCount,
             publishedRelative: yt.timePosted ?? "",

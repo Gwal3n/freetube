@@ -49,18 +49,20 @@ final class CommentService: CommentServicing {
         }
 
         do {
-            let response = try await VideoCommentsResponse.sendThrowingRequest(
+            let response = try await CommentAvatarResponse.sendThrowingRequest(
                 youtubeModel: client.model,
                 data: [.continuation: token]
             )
-            let comments = response.results.map { Mappers.comment(from: $0) }
+            let comments = response.page.results.map {
+                Mappers.comment(from: $0, authorAvatarURL: response.authorAvatarURLs[$0.commentIdentifier])
+            }
             let photoCount = comments.filter { $0.authorThumbnailURL != nil }.count
             log.info("Comments decoded: count=\(comments.count, privacy: .public), authorPhotos=\(photoCount, privacy: .public)")
             return CommentThread(
                 comments: comments,
-                continuationToken: response.continuationToken,
+                continuationToken: response.page.continuationToken,
                 availability: .available,
-                sortingModes: response.sortingModes.map {
+                sortingModes: response.page.sortingModes.map {
                     CommentSortingMode(
                         label: $0.label,
                         token: $0.token,
@@ -75,16 +77,18 @@ final class CommentService: CommentServicing {
 
     func fetchReplies(continuation: String) async throws -> CommentThread {
         do {
-            let response = try await VideoCommentsResponse.Continuation.sendThrowingRequest(
+            let response = try await CommentAvatarResponse.Continuation.sendThrowingRequest(
                 youtubeModel: client.model,
                 data: [.continuation: continuation]
             )
-            let comments = response.results.map { Mappers.comment(from: $0) }
+            let comments = response.response.page.results.map {
+                Mappers.comment(from: $0, authorAvatarURL: response.response.authorAvatarURLs[$0.commentIdentifier])
+            }
             let photoCount = comments.filter { $0.authorThumbnailURL != nil }.count
             log.info("Replies decoded: count=\(comments.count, privacy: .public), authorPhotos=\(photoCount, privacy: .public)")
             return CommentThread(
                 comments: comments,
-                continuationToken: response.continuationToken,
+                continuationToken: response.response.page.continuationToken,
                 availability: .available
             )
         } catch {
