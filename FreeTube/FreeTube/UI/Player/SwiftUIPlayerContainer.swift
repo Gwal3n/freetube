@@ -533,7 +533,22 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                       !floatingPinchSuppressesDrag, !floatingIsStashed else { return }
                 floatingGestureActive = true
                 floatingActionsSuppressed = true
-                floatingDragTranslation = value.translation
+                let bottom = floatingYBounds(
+                    in: size, window: window,
+                    topInset: PlayerLayoutMetrics.safeAreaInsets.top,
+                    bottomInset: PlayerLayoutMetrics.bottomTabBarClearance
+                ).upperBound
+                let requestedY = base.y + value.translation.height
+                // Resist a downward drag at the tab bar instead of letting the player run
+                // through the hard occlusion mask. Keep the gesture's unmodified translation
+                // for the deliberate downward-dismiss decision in onEnded below.
+                let visibleY = requestedY > bottom
+                    ? bottom + (requestedY - bottom) / (1 + (requestedY - bottom) / 12)
+                    : requestedY
+                floatingDragTranslation = CGSize(
+                    width: value.translation.width,
+                    height: visibleY - base.y
+                )
             }
             .onEnded { value in
                 guard !player.fullScreenPresented, !floatingIsDismissing,
@@ -565,7 +580,10 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         : projected.y > size.height + window.height * 0.3
                 )
                 if verticalIntent && (movedBeyondEdge || flickedBeyondEdge) {
-                    dismissFloatingPlayer(in: size, window: window, from: actual)
+                    dismissFloatingPlayer(in: size, window: window, from: CGPoint(
+                        x: base.x + floatingDragTranslation.width,
+                        y: base.y + floatingDragTranslation.height
+                    ))
                     return
                 }
 

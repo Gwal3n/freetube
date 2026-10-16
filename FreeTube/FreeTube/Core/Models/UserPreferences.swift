@@ -63,6 +63,8 @@ struct UserPreferences {
     /// cannot decode the current teaser shape, the first top-level comment is used as a fallback.
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("featuredCommentsNearPlaybackOnly") var featuredCommentsNearPlaybackOnly: Bool = false
+    @AppStorage("showCommentAuthorPhotos") var showCommentAuthorPhotos: Bool = false
+    @AppStorage("openCommentAuthorChannels") var openCommentAuthorChannels: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true

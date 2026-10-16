@@ -169,6 +169,7 @@ final class AppBackupService {
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
         "saveSearchHistory", "saveWatchHistory", "seekPreviewStyle", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
+        "showCommentAuthorPhotos", "openCommentAuthorChannels",
         "showContinueWatchingMenu", "showHistoryProgressBars", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
         "sponsorBlockExclusiveAccessBehavior", "sponsorBlockPreviewBehavior",

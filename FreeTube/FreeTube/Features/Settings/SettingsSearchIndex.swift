@@ -90,6 +90,10 @@ enum SettingsSearchIndex {
             case .player where displayTitle == String(localized: "Show featured comment preview")
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
+            case .player where (displayTitle == String(localized: "Show commenter photos")
+                || displayTitle == String(localized: "Open commenter channels"))
+                && !UserPreferences().showComments:
+                return String(localized: "Show comments")
             case .player where displayTitle == String(localized: "Only near playback time")
                 && (!UserPreferences().showComments || !UserPreferences().showFeaturedCommentPreview):
                 return String(localized: "Show featured comment preview")
@@ -137,7 +141,7 @@ enum SettingsSearchIndex {
             "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
             "Save button", "Share button", "Download button",
             "Remember floating player placement", "Show watch progress bars", "Show description",
-            "Show comments", "Show featured comment preview", "Only near playback time", "Show Up Next",
+            "Show comments", "Show commenter photos", "Open commenter channels", "Show featured comment preview", "Only near playback time", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments"
         ]),
         Group(destination: .captions, titles: [

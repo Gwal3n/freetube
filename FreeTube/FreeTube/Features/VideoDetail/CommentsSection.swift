@@ -12,6 +12,7 @@ struct CommentsSection: View {
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showFeaturedCommentPreview") private var showsFeaturedCommentPreview = false
     @AppStorage("featuredCommentsNearPlaybackOnly") private var featuredCommentsNearPlaybackOnly = false
+    @AppStorage("openCommentAuthorChannels") private var openCommentAuthorChannels = false
 
     init(videoID: String, countText: String? = nil) {
         self.countText = countText
@@ -180,7 +181,8 @@ struct CommentsSection: View {
             onToggleReplies: comment.replyCount > 0 && comment.replyContinuationToken != nil
                 ? { toggleReplies(for: comment) }
                 : nil,
-            onSeek: { player.seek(to: $0) }
+            onSeek: { player.seek(to: $0) },
+            onOpenAuthor: authorAction(for: comment)
         )
 
         if comment.replyCount > 0, comment.replyContinuationToken != nil {
@@ -201,7 +203,11 @@ struct CommentsSection: View {
                                             .frame(width: 2)
                                     }
                                 }
-                                CommentRow(comment: item.comment, onSeek: { player.seek(to: $0) })
+                                CommentRow(
+                                    comment: item.comment,
+                                    onSeek: { player.seek(to: $0) },
+                                    onOpenAuthor: authorAction(for: item.comment)
+                                )
                             }
                             .padding(.leading, 20)
                         }
@@ -231,6 +237,22 @@ struct CommentsSection: View {
                     reduceMotion ? nil : InterfaceMotion.content,
                     value: model.repliesByCommentID[comment.id]?.count ?? 0
                 )
+            }
+        }
+    }
+
+    private func authorAction(for comment: Comment) -> (() -> Void)? {
+        guard openCommentAuthorChannels,
+              let channelID = comment.authorChannelID,
+              !channelID.isEmpty else { return nil }
+        return {
+            let wasExpanded = player.fullScreenPresented
+            if wasExpanded { player.fullScreenPresented = false }
+            Task { @MainActor in
+                // Match the existing player-menu route: reveal the tab before pushing onto
+                // its NavigationStack, avoiding a destination hidden behind the player.
+                try? await Task.sleep(for: .milliseconds(wasExpanded ? 180 : 100))
+                NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
             }
         }
     }

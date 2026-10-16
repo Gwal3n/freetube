@@ -154,14 +154,12 @@ struct SearchContent: View {
                     Section {
                         if areChannelsExpanded {
                             ForEach(visibleChannels) { channel in
-                                Button {
+                                ChannelRow(channel: channel, onTap: {
+                                    navigationLog.info("Search channel row tapped: \(channel.id, privacy: .public)")
+                                    dismissKeyboard()
                                     onOpenDestination(.channel(channel.id))
-                                } label: {
-                                    ChannelRow(channel: channel)
-                                }
-                                .buttonStyle(ResponsiveButtonStyle())
+                                })
                                 .accessibilityAddTraits(.isLink)
-                                .mediaListRow()
                             }
                         }
                     } header: {
@@ -410,19 +408,15 @@ struct SearchContent: View {
             .disabled(!videoFilters.isActive)
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-                .frame(width: 44, height: 44)
                 .overlay(alignment: .topTrailing) {
-                    Circle()
-                        .fill(.primary)
-                        .frame(width: 5, height: 5)
-                        .padding(8)
-                        .opacity(videoFilters.isActive ? 1 : 0)
+                    if videoFilters.isActive {
+                        Circle()
+                            .fill(.primary)
+                            .frame(width: 5, height: 5)
+                            .offset(x: 4, y: -4)
+                    }
                 }
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("Filter search videos")
         .accessibilityValue(videoFilters.isActive ? "On" : "Off")
     }

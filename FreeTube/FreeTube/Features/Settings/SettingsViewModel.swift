@@ -259,6 +259,16 @@ final class SettingsViewModel {
         set { preferences.featuredCommentsNearPlaybackOnly = newValue }
     }
 
+    var showCommentAuthorPhotos: Bool {
+        get { preferences.showCommentAuthorPhotos }
+        set { preferences.showCommentAuthorPhotos = newValue }
+    }
+
+    var openCommentAuthorChannels: Bool {
+        get { preferences.openCommentAuthorChannels }
+        set { preferences.openCommentAuthorChannels = newValue }
+    }
+
     var prefetchVideoDetails: Bool {
         get { preferences.prefetchVideoDetails }
         set { preferences.prefetchVideoDetails = newValue }

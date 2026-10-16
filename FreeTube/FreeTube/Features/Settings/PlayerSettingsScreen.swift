@@ -104,6 +104,12 @@ struct PlayerSettingsScreen: View {
                     .tint(.green)
                     .settingsSearchRow("Show comments")
                 if model.showComments {
+                    Toggle("Show commenter photos", isOn: Bindable(model).showCommentAuthorPhotos)
+                        .tint(.green)
+                        .settingsSearchRow("Show commenter photos")
+                    Toggle("Open commenter channels", isOn: Bindable(model).openCommentAuthorChannels)
+                        .tint(.green)
+                        .settingsSearchRow("Open commenter channels")
                     Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
                         .tint(.green)
                         .settingsSearchRow("Show featured comment preview")

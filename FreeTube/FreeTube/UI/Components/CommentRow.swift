@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+import Kingfisher
+
 struct CommentRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let comment: Comment
@@ -8,6 +10,8 @@ struct CommentRow: View {
     var repliesExpanded = false
     var onToggleReplies: (() -> Void)? = nil
     var onSeek: ((TimeInterval) -> Void)? = nil
+    var onOpenAuthor: (() -> Void)? = nil
+    @AppStorage("showCommentAuthorPhotos") private var showAuthorPhotos = false
     @State private var isBodyExpanded = false
 
     private var isLongComment: Bool {
@@ -17,7 +21,13 @@ struct CommentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(comment.authorName).appFont(.caption, weight: .semibold)
+                if let onOpenAuthor {
+                    Button(action: onOpenAuthor) { authorIdentity }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(comment.authorName)'s channel")
+                } else {
+                    authorIdentity
+                }
                 Text(comment.publishedRelative).appFont(.caption2).foregroundStyle(.secondary)
             }
             SelectableCommentText(
@@ -57,6 +67,23 @@ struct CommentRow: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 6)
+    }
+
+    private var authorIdentity: some View {
+        HStack(spacing: 6) {
+            if showAuthorPhotos, let url = comment.authorThumbnailURL {
+                KFImage(url)
+                    .thumbnail(size: CGSize(width: 28, height: 28)) {
+                        Circle().fill(MediaStyle.placeholderFill)
+                    }
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 28, height: 28)
+                    .clipShape(Circle())
+            }
+            Text(comment.authorName).appFont(.caption, weight: .semibold)
+        }
+        .contentShape(Rectangle())
     }
 }
 
