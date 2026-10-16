@@ -16,6 +16,7 @@ struct VideoRow: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var launchAnchor = VideoLaunchAnchor()
+    @State private var branding = DeArrowVideoViewModel()
     let video: Video
     var accessory: Accessory
     var showsChannelAvatar: Bool
@@ -57,49 +58,49 @@ struct VideoRow: View {
     }
 
     var body: some View {
-        DeArrowVideoContent(video: video) { branding in
-            HStack(spacing: 0) {
-                Group {
-                    Button(action: openVideo) {
-                        content(branding: branding)
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
-                    .accessibilityHint("Plays video")
+        HStack(spacing: 0) {
+            Group {
+                Button(action: openVideo) {
+                    content(branding: branding)
                 }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
+                .accessibilityHint("Plays video")
+            }
 
-                switch accessory {
-                case .none:
-                    EmptyView()
-                case .actions(let offersPlayNext):
-                    VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext, onOpenChannel: onOpenChannel)
-                case .reserved:
-                    Color.clear
-                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                        .accessibilityHidden(true)
-                }
+            switch accessory {
+            case .none:
+                EmptyView()
+            case .actions(let offersPlayNext):
+                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext, onOpenChannel: onOpenChannel)
+            case .reserved:
+                Color.clear
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .accessibilityHidden(true)
             }
-            .overlay(alignment: .topLeading) {
-                if showsThumbnailToggle && branding.hasReplacement(for: video) {
-                    DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
-                        .frame(width: thumbnailWidth, height: thumbnailHeight, alignment: .topTrailing)
-                }
-            }
-            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                if offersPlayNext {
-                    Button {
-                        player.enqueue(video)
-                    } label: {
-                        Label("Add to queue", systemImage: "text.badge.plus")
-                    }
-                    .tint(.indigo)
-                }
-            }
-            // Keep the system context-menu lift anchored to the row's final List geometry.
-            .mediaListRow()
-            .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true,
-                              onOpenChannel: onOpenChannel)
         }
+        .overlay(alignment: .topLeading) {
+            if showsThumbnailToggle && branding.hasReplacement(for: video) {
+                DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                    .frame(width: thumbnailWidth, height: thumbnailHeight, alignment: .topTrailing)
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if offersPlayNext {
+                Button {
+                    player.enqueue(video)
+                } label: {
+                    Label("Add to queue", systemImage: "text.badge.plus")
+                }
+                .tint(.indigo)
+            }
+        }
+        .loadDeArrowBranding(video: video, model: branding)
+        // The menu must be on the outer List row, not a nested branding view that can lag behind
+        // the scrolling cell while iOS animates its lifted preview back into place.
+        .mediaListRow()
+        .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true,
+                          onOpenChannel: onOpenChannel)
     }
 
     private var offersPlayNext: Bool {

@@ -11,6 +11,7 @@ struct VideoCard: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var launchAnchor = VideoLaunchAnchor()
+    @State private var branding = DeArrowVideoViewModel()
 
     let video: Video
     var onTap: () -> Void = {}
@@ -33,34 +34,41 @@ struct VideoCard: View {
     }
 
     var body: some View {
-        DeArrowVideoContent(video: video) { branding in
-            VStack(alignment: .leading, spacing: 8) {
-                ZStack(alignment: .topTrailing) {
-                    Button(action: openVideo) {
-                        thumbnail(branding: branding)
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    // The metadata control below performs the same action and carries the complete
-                    // spoken label. Exposing both would make VoiceOver announce every card twice.
-                    .accessibilityHidden(true)
-
-                    if branding.hasReplacement(for: video) {
-                        DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
-                    }
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                Button(action: openVideo) {
+                    thumbnail(branding: branding)
                 }
+                .buttonStyle(ResponsiveButtonStyle())
+                // The metadata control below performs the same action and carries the complete
+                // spoken label. Exposing both would make VoiceOver announce every card twice.
+                .accessibilityHidden(true)
 
-                // Metadata row is split into its own HStack so the ellipsis Menu can live as a
-                // sibling of the title/avatar tap target (which still routes to `onTap`). Nesting
-                // the Menu inside the outer Button would route taps to playback instead of to the
-                // Menu, since SwiftUI's outer Button consumes the gesture first.
-                metadataRow(branding: branding)
+                if branding.hasReplacement(for: video) {
+                    DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                }
             }
-            // This card is currently used only by Feed. Include its row spacing in the view
-            // that the native context menu lifts and returns to, rather than adding it outside.
-            .padding(.top, 4)
-            .padding(.bottom, 14)
-            .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true)
+
+            // Metadata and its ellipsis remain siblings of the thumbnail's tap target.
+            metadataRow(branding: branding)
         }
+        // Include spacing in the List row that the native menu lifts and returns to.
+        .padding(.top, 4)
+        .padding(.bottom, 14)
+        .loadDeArrowBranding(video: video, model: branding)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if offersPlayNext {
+                Button {
+                    player.enqueue(video)
+                } label: {
+                    Label("Add to queue", systemImage: "text.badge.plus")
+                }
+                .tint(.indigo)
+            }
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: offersPlayNext)
     }
 
     private func thumbnail(branding: DeArrowVideoViewModel) -> some View {

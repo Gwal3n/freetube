@@ -560,16 +560,6 @@ struct SubscriptionFeedScreen: View {
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             )
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                Button {
-                    player.enqueue(video)
-                } label: {
-                    Label("Add to queue", systemImage: "text.badge.plus")
-                }
-                .tint(.indigo)
-            }
         } else {
             VideoRow(
                 video: video,
