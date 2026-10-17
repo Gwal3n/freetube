@@ -303,215 +303,20 @@ struct FullScreenPlayer: View {
                         .zIndex(2)
                     }
                     if !isFloating {
-                    PlayerTransportOverlay(
-                        isVisible: showsPlayerControls,
-                        isPreparing: isPreparingPlayback,
-                        isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
-                        isFrameStepping: isFrameStepping,
-                        previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
-                        hasPrevious: hasPrevious,
-                        hasNext: hasNext,
-                        videoTitle: player.currentVideo?.title ?? "",
-                        channelName: player.currentVideo?.channelName ?? "",
-                        usesLandscapeLayout: isLandscape,
-                        showsCollapseButton: !isLandscape && !usesPortraitFullscreen,
-                        additionalTopControls: AnyView(
-                            PlayerTopControls(
-                                controls: controlLayout.onPlayer,
-                                overflowControls: controlLayout.moreMenu,
-                                playbackRate: player.playbackRate,
-                                effectivePlaybackRate: player.effectivePlaybackRate,
-                                playbackQuality: player.playbackQuality,
-                                isMuted: player.isMuted,
-                                isLooping: player.isLoopingCurrentVideo,
-                                isAutoplayEnabled: autoplayNext,
-                                isFullscreen: isLandscape || portraitFullscreenActive,
-                                isAudioOnly: player.isAudioOnly,
-                                isSwitchingAudioMode: player.isSwitchingAudioMode || player.isPreparingFastPlayback,
-                                isPreparingFastPlayback: player.isPreparingFastPlayback,
-                                isFrameStepping: isFrameStepping,
-                                canUseFineSeeking: !player.isPlaying
-                                    && (player.canStepFrameBackward || player.canStepFrameForward),
-                                sleepTimerOption: player.sleepTimerOption,
-                                captionsModel: captionsModel,
-                                onSetPlaybackRate: { rate in
-                                    player.setPlaybackRate(rate)
-                                    showPlayerControls()
-                                },
-                                onSetPlaybackQuality: { quality in
-                                    player.setPlaybackQuality(quality)
-                                    showPlayerControls()
-                                },
-                                onToggleLoop: {
-                                    player.toggleLoopCurrentVideo()
-                                    showPlayerControls()
-                                },
-                                onToggleMute: {
-                                    player.toggleMute()
-                                    showPlayerControls()
-                                },
-                                onToggleFullscreen: toggleFullscreen,
-                                onToggleAutoplay: {
-                                    autoplayNext.toggle()
-                                    showPlayerControls()
-                                },
-                                onToggleAudioOnly: {
-                                    player.toggleAudioOnly()
-                                    showPlayerControls()
-                                },
-                                onSetSleepTimer: { option in
-                                    player.setSleepTimer(option)
-                                    showPlayerControls()
-                                },
-                                onToggleFrameStepping: {
-                                    guard !player.isPlaying,
-                                          player.canStepFrameBackward || player.canStepFrameForward else { return }
-                                    isFrameStepping.toggle()
-                                    showPlayerControls()
-                                },
-                                onShowTranscript: {
-                                    isTranscriptPresented = true
-                                }
-                            )
-                        ),
-                        topControlsSafeAreaPadding: usesPortraitFullscreen
-                            ? PlayerLayoutMetrics.safeAreaInsets.top
-                            : 0,
-                        bottomTimelinePadding: timelineBottomPadding,
-                        onTogglePlayPause: {
-                            player.togglePlayPause()
-                            showPlayerControls()
-                        },
-                        onSeek: {
-                            player.seek(to: $0)
-                            showPlayerControls()
-                        },
-                        onSeekPreviewChanged: { seconds in
-                            scrubberSeekPreview = seconds
-                        },
-                        onShowChapters: {
-                            guard !player.chapters.isEmpty else { return }
-                            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                                isPlaylistPanelPresented = false
-                                player.chapterListPresented.toggle()
-                            }
-                            showPlayerControls()
-                        },
-                        onPrevious: {
-                            player.playPrevious()
-                            showPlayerControls()
-                        },
-                        onNext: {
-                            player.playNext()
-                            showPlayerControls()
-                        },
-                        onStepFrame: { count in
-                            player.stepFrame(by: count)
-                            showPlayerControls()
-                        },
-                        onCollapse: {
-                            isPlaylistPanelPresented = false
-                            player.requestPlayerCollapse()
-                        }
+                        playerTransportOverlay(
+                            controlLayout: controlLayout,
+                            controlFrame: controlFrame,
+                            timelineBottomPadding: timelineBottomPadding,
+                            isLandscape: isLandscape,
+                            usesPortraitFullscreen: usesPortraitFullscreen
+                        )
+                    }
+                    playerFeedbackOverlays(
+                        isFloating: isFloating,
+                        controlFrame: controlFrame,
+                        timelineBottomPadding: timelineBottomPadding,
+                        surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight)
                     )
-                    .frame(width: controlFrame.width, height: controlFrame.height)
-                    .position(x: controlFrame.midX, y: controlFrame.midY)
-                    .opacity(chromePresentationReady ? max(0, 1 - collapseProgress * 3) : 0)
-                    .allowsHitTesting(chromePresentationReady && collapseProgress < 0.05 && !isPlaybackFailure)
-                    .zIndex(3)
-                    }
-                    // Long-running fallback downloads and failures retain their explanatory
-                    // overlay. Brief startup waits replace the centre transport glyph instead,
-                    // keeping the surrounding player chrome stable and avoiding a dark badge.
-                    Group {
-                        if !isFloating && showsStatusOverlay {
-                            DownloadProgressOverlay(
-                                state: player.loadState,
-                                allowsRetry: player.currentVideo?.id.hasPrefix("fetch-") == false,
-                                onRetry: { player.retryFailedPlayback() }
-                            )
-                            .opacity(max(0, 1 - collapseProgress * 2.5))
-                        }
-                    }
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsStatusOverlay)
-                    if !isFloating,
-                       let preparation = player.fastPlaybackPreparation {
-                        FastPlaybackProgressOverlay(
-                            preparation: preparation,
-                            rate: player.playbackRate,
-                            onCancel: { player.cancelPendingFastPlayback() }
-                        )
-                        .position(
-                            x: controlFrame.midX,
-                            y: controlFrame.minY + min(72, max(52, controlFrame.height * 0.24))
-                        )
-                        .opacity(max(0, 1 - collapseProgress * 3))
-                        .allowsHitTesting(collapseProgress < 0.05)
-                        .zIndex(6)
-                    }
-                    if !isFloating, seekPreviewStyle != .off,
-                       let previewTime = scrubberSeekPreview {
-                        Group {
-                            if player.isAudioOnly {
-                                AudioOnlySeekPreview(
-                                    artwork: player.currentArtwork,
-                                    thumbnailURL: player.currentVideo?.thumbnailURL,
-                                    previewTime: previewTime,
-                                    style: seekPreviewStyle
-                                )
-                            } else if let tile = player.storyboard?.tile(
-                                at: previewTime,
-                                duration: player.duration,
-                                maximumWidth: seekPreviewStyle.storyboardTileMaximumWidth,
-                                maximumHeight: seekPreviewStyle.storyboardTileMaximumHeight
-                            ) {
-                                StoryboardPreview(
-                                    tile: tile,
-                                    videoPresentationSize: player.videoPresentationSize,
-                                    previewTime: previewTime,
-                                    style: seekPreviewStyle
-                                )
-                            }
-                        }
-                        .position(
-                            x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
-                                time: previewTime,
-                                duration: player.duration,
-                                surfaceWidth: controlFrame.width,
-                                previewWidth: seekPreviewStyle.maximumWidth
-                            ),
-                            y: max(
-                                58 + (seekPreviewStyle.maximumHeight - 96) / 2,
-                                // Align the preview time with the elapsed/duration row;
-                                // the image above it stays clear of the timeline.
-                                controlFrame.maxY
-                                    - timelineBottomPadding
-                                    - 84.5
-                                    - (seekPreviewStyle.maximumHeight - 96) / 2
-                            )
-                        )
-                        .allowsHitTesting(false)
-                        .zIndex(4)
-                    }
-                    if !isFloating, let notice = player.sponsorBlockNotice {
-                        SponsorBlockSkipOverlay(
-                            notice: notice,
-                            onUndo: { player.undoSponsorBlockSkip() },
-                            onSkip: { player.confirmSponsorBlockSkip() },
-                            onDismiss: { player.dismissSponsorBlockNotice() },
-                            bottomPadding: timelineBottomPadding + 46
-                        )
-                        .frame(width: controlFrame.width, height: controlFrame.height)
-                        .position(x: controlFrame.midX, y: controlFrame.midY)
-                        .opacity(max(0, 1 - collapseProgress * 2.5))
-                    }
-                    if !isFloating {
-                        PlayerSwipeAdjustmentOverlay(
-                            model: swipeAdjustment,
-                            surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight)
-                        )
-                        .zIndex(7)
-                    }
                 }
                 .frame(width: surfaceWidth, height: surfaceHeight)
                 .simultaneousGesture(
@@ -805,6 +610,234 @@ struct FullScreenPlayer: View {
         // smaller-than-content windows (Mac shrunk) this is invisible; on larger ones
         // (Mac maximized) you'd see an unfilled gap below the panel.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    // MARK: - Player controls and feedback
+
+    private func playerTransportOverlay(
+        controlLayout: PlayerControlLayout,
+        controlFrame: CGRect,
+        timelineBottomPadding: CGFloat,
+        isLandscape: Bool,
+        usesPortraitFullscreen: Bool
+    ) -> some View {
+        PlayerTransportOverlay(
+            isVisible: showsPlayerControls,
+            isPreparing: isPreparingPlayback,
+            isSeekPreviewActive: gestureSeekPreview != nil || scrubberSeekPreview != nil,
+            isFrameStepping: isFrameStepping,
+            previewElapsed: scrubberSeekPreview ?? gestureSeekPreview,
+            hasPrevious: hasPrevious,
+            hasNext: hasNext,
+            videoTitle: player.currentVideo?.title ?? "",
+            channelName: player.currentVideo?.channelName ?? "",
+            usesLandscapeLayout: isLandscape,
+            showsCollapseButton: !isLandscape && !usesPortraitFullscreen,
+            additionalTopControls: AnyView(
+                PlayerTopControls(
+                    controls: controlLayout.onPlayer,
+                    overflowControls: controlLayout.moreMenu,
+                    playbackRate: player.playbackRate,
+                    effectivePlaybackRate: player.effectivePlaybackRate,
+                    playbackQuality: player.playbackQuality,
+                    isMuted: player.isMuted,
+                    isLooping: player.isLoopingCurrentVideo,
+                    isAutoplayEnabled: autoplayNext,
+                    isFullscreen: isLandscape || portraitFullscreenActive,
+                    isAudioOnly: player.isAudioOnly,
+                    isSwitchingAudioMode: player.isSwitchingAudioMode || player.isPreparingFastPlayback,
+                    isPreparingFastPlayback: player.isPreparingFastPlayback,
+                    isFrameStepping: isFrameStepping,
+                    canUseFineSeeking: !player.isPlaying
+                        && (player.canStepFrameBackward || player.canStepFrameForward),
+                    sleepTimerOption: player.sleepTimerOption,
+                    captionsModel: captionsModel,
+                    onSetPlaybackRate: { rate in
+                        player.setPlaybackRate(rate)
+                        showPlayerControls()
+                    },
+                    onSetPlaybackQuality: { quality in
+                        player.setPlaybackQuality(quality)
+                        showPlayerControls()
+                    },
+                    onToggleLoop: {
+                        player.toggleLoopCurrentVideo()
+                        showPlayerControls()
+                    },
+                    onToggleMute: {
+                        player.toggleMute()
+                        showPlayerControls()
+                    },
+                    onToggleFullscreen: toggleFullscreen,
+                    onToggleAutoplay: {
+                        autoplayNext.toggle()
+                        showPlayerControls()
+                    },
+                    onToggleAudioOnly: {
+                        player.toggleAudioOnly()
+                        showPlayerControls()
+                    },
+                    onSetSleepTimer: { option in
+                        player.setSleepTimer(option)
+                        showPlayerControls()
+                    },
+                    onToggleFrameStepping: {
+                        guard !player.isPlaying,
+                              player.canStepFrameBackward || player.canStepFrameForward else { return }
+                        isFrameStepping.toggle()
+                        showPlayerControls()
+                    },
+                    onShowTranscript: {
+                        isTranscriptPresented = true
+                    }
+                )
+            ),
+            topControlsSafeAreaPadding: usesPortraitFullscreen
+                ? PlayerLayoutMetrics.safeAreaInsets.top
+                : 0,
+            bottomTimelinePadding: timelineBottomPadding,
+            onTogglePlayPause: {
+                player.togglePlayPause()
+                showPlayerControls()
+            },
+            onSeek: {
+                player.seek(to: $0)
+                showPlayerControls()
+            },
+            onSeekPreviewChanged: { seconds in
+                scrubberSeekPreview = seconds
+            },
+            onShowChapters: {
+                guard !player.chapters.isEmpty else { return }
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    isPlaylistPanelPresented = false
+                    player.chapterListPresented.toggle()
+                }
+                showPlayerControls()
+            },
+            onPrevious: {
+                player.playPrevious()
+                showPlayerControls()
+            },
+            onNext: {
+                player.playNext()
+                showPlayerControls()
+            },
+            onStepFrame: { count in
+                player.stepFrame(by: count)
+                showPlayerControls()
+            },
+            onCollapse: {
+                isPlaylistPanelPresented = false
+                player.requestPlayerCollapse()
+            }
+        )
+        .frame(width: controlFrame.width, height: controlFrame.height)
+        .position(x: controlFrame.midX, y: controlFrame.midY)
+        .opacity(chromePresentationReady ? max(0, 1 - collapseProgress * 3) : 0)
+        .allowsHitTesting(chromePresentationReady && collapseProgress < 0.05 && !isPlaybackFailure)
+        .zIndex(3)
+    }
+
+    @ViewBuilder
+    private func playerFeedbackOverlays(
+        isFloating: Bool,
+        controlFrame: CGRect,
+        timelineBottomPadding: CGFloat,
+        surfaceSize: CGSize
+    ) -> some View {
+        // Long-running fallback downloads and failures retain their explanatory
+        // overlay. Brief startup waits replace the centre transport glyph instead,
+        // keeping the surrounding player chrome stable and avoiding a dark badge.
+        Group {
+            if !isFloating && showsStatusOverlay {
+                DownloadProgressOverlay(
+                    state: player.loadState,
+                    allowsRetry: player.currentVideo?.id.hasPrefix("fetch-") == false,
+                    onRetry: { player.retryFailedPlayback() }
+                )
+                .opacity(max(0, 1 - collapseProgress * 2.5))
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsStatusOverlay)
+        if !isFloating,
+           let preparation = player.fastPlaybackPreparation {
+            FastPlaybackProgressOverlay(
+                preparation: preparation,
+                rate: player.playbackRate,
+                onCancel: { player.cancelPendingFastPlayback() }
+            )
+            .position(
+                x: controlFrame.midX,
+                y: controlFrame.minY + min(72, max(52, controlFrame.height * 0.24))
+            )
+            .opacity(max(0, 1 - collapseProgress * 3))
+            .allowsHitTesting(collapseProgress < 0.05)
+            .zIndex(6)
+        }
+        if !isFloating, seekPreviewStyle != .off,
+           let previewTime = scrubberSeekPreview {
+            Group {
+                if player.isAudioOnly {
+                    AudioOnlySeekPreview(
+                        artwork: player.currentArtwork,
+                        thumbnailURL: player.currentVideo?.thumbnailURL,
+                        previewTime: previewTime,
+                        style: seekPreviewStyle
+                    )
+                } else if let tile = player.storyboard?.tile(
+                    at: previewTime,
+                    duration: player.duration,
+                    maximumWidth: seekPreviewStyle.storyboardTileMaximumWidth,
+                    maximumHeight: seekPreviewStyle.storyboardTileMaximumHeight
+                ) {
+                    StoryboardPreview(
+                        tile: tile,
+                        videoPresentationSize: player.videoPresentationSize,
+                        previewTime: previewTime,
+                        style: seekPreviewStyle
+                    )
+                }
+            }
+            .position(
+                x: controlFrame.minX + PlayerViewportLayout.storyboardPreviewX(
+                    time: previewTime,
+                    duration: player.duration,
+                    surfaceWidth: controlFrame.width,
+                    previewWidth: seekPreviewStyle.maximumWidth
+                ),
+                y: max(
+                    58 + (seekPreviewStyle.maximumHeight - 96) / 2,
+                    // Align the preview time with the elapsed/duration row;
+                    // the image above it stays clear of the timeline.
+                    controlFrame.maxY
+                        - timelineBottomPadding
+                        - 84.5
+                        - (seekPreviewStyle.maximumHeight - 96) / 2
+                )
+            )
+            .allowsHitTesting(false)
+            .zIndex(4)
+        }
+        if !isFloating, let notice = player.sponsorBlockNotice {
+            SponsorBlockSkipOverlay(
+                notice: notice,
+                onUndo: { player.undoSponsorBlockSkip() },
+                onSkip: { player.confirmSponsorBlockSkip() },
+                onDismiss: { player.dismissSponsorBlockNotice() },
+                bottomPadding: timelineBottomPadding + 46
+            )
+            .frame(width: controlFrame.width, height: controlFrame.height)
+            .position(x: controlFrame.midX, y: controlFrame.midY)
+            .opacity(max(0, 1 - collapseProgress * 2.5))
+        }
+        if !isFloating {
+            PlayerSwipeAdjustmentOverlay(
+                model: swipeAdjustment,
+                surfaceSize: surfaceSize
+            )
+            .zIndex(7)
         }
     }
 
