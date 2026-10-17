@@ -103,6 +103,9 @@ enum SettingsSearchIndex {
             case .browsing where displayTitle == String(localized: "Refresh interval")
                 && !UserPreferences().automaticFeedRefreshEnabled:
                 return String(localized: "Refresh feed automatically")
+            case .browsing where displayTitle == String(localized: "View count batch interval")
+                && !UserPreferences().automaticFeedViewCountsEnabled:
+                return String(localized: "Update feed view counts")
             case .browsing where (displayTitle == String(localized: "Same channel gap")
                 || displayTitle == String(localized: "Same group gap")
                 || displayTitle == String(localized: "Maximum date shift"))
@@ -158,7 +161,7 @@ enum SettingsSearchIndex {
             "Browsing", "Show search suggestions", "Save recent searches",
             "Large video thumbnails", "Show channel avatars", "Mark new uploads", "Space out related uploads",
             "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
-            "Refresh interval"
+            "Refresh interval", "Update feed view counts", "View count batch interval"
         ]),
         Group(destination: .subscriptionGroups, titles: ["Manage subscription groups"]),
         Group(destination: .channelTabs, titles: ["Channel tabs"]),

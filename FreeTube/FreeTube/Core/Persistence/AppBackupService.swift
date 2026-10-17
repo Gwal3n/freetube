@@ -151,7 +151,7 @@ final class AppBackupService {
 
     private static let settingKeys: Set<String> = [
         "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appAccentPreset", "appFontPreset",
-        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "cacheRecentVideoContent", "cellularPlaybackQuality",
+        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "cacheRecentVideoContent", "cellularPlaybackQuality",
         "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",

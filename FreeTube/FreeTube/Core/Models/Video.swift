@@ -87,6 +87,16 @@ extension Video {
         )
     }
 
+    func withViewCount(_ count: Int) -> Video {
+        Video(
+            id: id, title: title, channelID: channelID, channelName: channelName,
+            channelThumbnailURL: channelThumbnailURL, thumbnailURL: thumbnailURL,
+            duration: duration, viewCount: count, publishedAt: publishedAt,
+            publishedRelative: publishedRelative, descriptionSnippet: descriptionSnippet,
+            isLive: isLive, isShort: isShort
+        )
+    }
+
     func markedLive() -> Video {
         Video(
             id: id, title: title, channelID: channelID, channelName: channelName,

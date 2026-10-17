@@ -76,10 +76,26 @@ struct BrowsingSettingsScreen: View {
                     }
                     .settingsSearchRow("Refresh interval")
                 }
+                Toggle("Update feed view counts", isOn: Bindable(model).automaticFeedViewCountsEnabled)
+                    .tint(.green)
+                    .settingsSearchRow("Update feed view counts")
+                if model.automaticFeedViewCountsEnabled {
+                    Picker("View count batch interval", selection: Bindable(model).automaticFeedViewCountInterval) {
+                        ForEach(FeedRefreshInterval.allCases) { interval in
+                            switch interval {
+                            case .hourly: Text("Every hour").tag(interval)
+                            case .everySixHours: Text("Every 6 hours").tag(interval)
+                            case .everyTwelveHours: Text("Every 12 hours").tag(interval)
+                            case .daily: Text("Every day").tag(interval)
+                            }
+                        }
+                    }
+                    .settingsSearchRow("View count batch interval")
+                }
             } header: {
                 Text("Feed")
             } footer: {
-                Text("Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic refresh runs only while Feed is selected and the app is active.")
+                Text("Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic updates run only while Feed is selected and the app is active. View counts update four channels per interval without reloading the feed.")
             }
 
             Section("Channels") {

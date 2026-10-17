@@ -99,6 +99,25 @@ actor PersistenceWriter {
         try? modelContext.save()
     }
 
+    /// Refreshes only counts already present in the feed. A metadata-only pass must not change
+    /// publication estimates, row identity, pagination, or the order of the cached feed.
+    func updateSubscriptionFeedViewCounts(channelID: String, videos: [Video]) -> [String: Int] {
+        let target = channelID
+        let descriptor = FetchDescriptor<SubscriptionFeedEntry>(predicate: #Predicate { $0.channelID == target })
+        let counts = Dictionary(videos.compactMap { video -> (String, Int)? in
+            guard let count = video.viewCount, count > 0 else { return nil }
+            return (video.id, count)
+        }, uniquingKeysWith: { _, newest in newest })
+        var changed: [String: Int] = [:]
+        for entry in (try? modelContext.fetch(descriptor)) ?? [] {
+            guard let count = counts[entry.videoID], count != entry.viewCount else { continue }
+            entry.viewCount = count
+            changed[entry.videoID] = count
+        }
+        if !changed.isEmpty { try? modelContext.save() }
+        return changed
+    }
+
     func pruneSubscriptionFeed(validChannelIDs: Set<String>) {
         let descriptor = FetchDescriptor<SubscriptionFeedEntry>()
         for entry in (try? modelContext.fetch(descriptor)) ?? [] where !validChannelIDs.contains(entry.channelID) {

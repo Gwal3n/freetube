@@ -9,6 +9,7 @@ final class SubscriptionFeedViewModel {
     private(set) var playbackProgress: [String: Double] = [:]
     private(set) var watchStatuses: [String: WatchHistoryStatus] = [:]
     private(set) var isRefreshing = false
+    private(set) var showsRefreshProgress = false
     private(set) var isLoadingMore = false
     private(set) var refreshedChannels = 0
     private(set) var refreshChannelCount = 0
@@ -30,6 +31,8 @@ final class SubscriptionFeedViewModel {
     private var cachedSnapshots: [SubscriptionFeedSnapshot] = []
     @ObservationIgnored private var activeRefreshTask: Task<SubscriptionFeedRefresh, Never>?
     @ObservationIgnored private var activeRefreshID: UUID?
+    @ObservationIgnored private var activeViewCountTask: Task<[String: Int], Never>?
+    @ObservationIgnored private var activeViewCountID: UUID?
 
     private let service: any SubscriptionFeedServicing
     private let writer: PersistenceWriter
@@ -39,6 +42,8 @@ final class SubscriptionFeedViewModel {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "SubscriptionFeed")
     private static let lastCompleteRefreshKey = "com.leshko.freetube.lastCompleteSubscriptionFeedRefresh"
     private static let lastCompleteSubscriptionKey = "com.leshko.freetube.lastCompleteSubscriptionIDs"
+    private static let lastViewCountBatchKey = "com.leshko.freetube.lastFeedViewCountBatch"
+    private static let nextViewCountChannelKey = "com.leshko.freetube.nextFeedViewCountChannel"
     private var completedSubscriptionIDs: String?
 
     init(
@@ -108,12 +113,21 @@ final class SubscriptionFeedViewModel {
         watchStatuses = summary.statuses
     }
 
-    func refresh() async {
+    func reloadCachedFeed() async {
         guard !isRefreshing else { return }
+        await loadCache()
+    }
+
+    func refresh(showProgress: Bool = true) async {
+        guard !isRefreshing else { return }
+        activeViewCountTask?.cancel()
+        activeViewCountTask = nil
+        activeViewCountID = nil
         let priorVisibleIDs = Set(videos.map(\.id))
         let refreshID = UUID()
         activeRefreshID = refreshID
         isRefreshing = true
+        showsRefreshProgress = showProgress
         lastRefreshAttemptAt = .now
         failedChannels = []
         isRefreshWarningDismissed = false
@@ -140,12 +154,16 @@ final class SubscriptionFeedViewModel {
         if task.isCancelled {
             log.info("Feed refresh cancelled after \(refreshedChannels, privacy: .public)/\(snapshot.count, privacy: .public) channels")
             isRefreshing = false
+            showsRefreshProgress = false
             refreshedChannels = 0
             refreshChannelCount = 0
             await loadCache()
             return
         }
         failedChannels = result.failedChannels
+        if result.succeeded > 0 {
+            defaults.set(Date.now.timeIntervalSince1970, forKey: Self.lastViewCountBatchKey)
+        }
         if result.succeeded == snapshot.count, result.failedChannels.isEmpty {
             let completedAt = Date.now
             lastCompleteRefreshAt = completedAt
@@ -153,11 +171,49 @@ final class SubscriptionFeedViewModel {
             defaults.set(completedAt.timeIntervalSince1970, forKey: Self.lastCompleteRefreshKey)
             defaults.set(completedSubscriptionIDs, forKey: Self.lastCompleteSubscriptionKey)
         }
-        visibleLimit = pageSize
+        if showProgress { visibleLimit = pageSize }
         await loadCache()
         isRefreshing = false
+        showsRefreshProgress = false
         let newVisibleCount = Set(videos.map(\.id)).subtracting(priorVisibleIDs).count
         log.info("Feed refresh completed: channels=\(result.succeeded, privacy: .public)/\(snapshot.count, privacy: .public), failed=\(result.failedChannels.count, privacy: .public), visible=\(videos.count, privacy: .public), newly visible IDs=\(newVisibleCount, privacy: .public)")
+    }
+
+    /// Refreshes a rotating group of four subscribed channels without changing feed membership,
+    /// row order, pagination or the visible refresh indicator. The selected interval is between
+    /// batches, not a guarantee that every channel is revisited in that time.
+    func refreshViewCountBatchIfDue(interval: FeedRefreshInterval) async {
+        guard hasLoaded, !isRefreshing, activeViewCountTask == nil else { return }
+        let lastAttempt = defaults.double(forKey: Self.lastViewCountBatchKey)
+        guard lastAttempt == 0 || Date.now.timeIntervalSince1970 - lastAttempt >= interval.seconds else { return }
+        let channelIDs = subscriptions.subscriptions.map(\.id).sorted()
+        guard !channelIDs.isEmpty else { return }
+        let start = defaults.integer(forKey: Self.nextViewCountChannelKey) % channelIDs.count
+        let batch = (0..<min(4, channelIDs.count)).map { channelIDs[(start + $0) % channelIDs.count] }
+        let batchID = UUID()
+        activeViewCountID = batchID
+        defaults.set(Date.now.timeIntervalSince1970, forKey: Self.lastViewCountBatchKey)
+        defaults.set((start + batch.count) % channelIDs.count, forKey: Self.nextViewCountChannelKey)
+        let task = Task { [service] in await service.refreshViewCounts(channelIDs: batch) }
+        activeViewCountTask = task
+        let changes = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        guard activeViewCountID == batchID else { return }
+        activeViewCountID = nil
+        activeViewCountTask = nil
+        guard !Task.isCancelled, !changes.isEmpty else { return }
+        cachedSnapshots = cachedSnapshots.map { snapshot in
+            guard let count = changes[snapshot.video.id] else { return snapshot }
+            return SubscriptionFeedSnapshot(video: snapshot.video.withViewCount(count), sortDate: snapshot.sortDate)
+        }
+        videos = videos.map { video in
+            guard let count = changes[video.id] else { return video }
+            return video.withViewCount(count)
+        }
+        log.info("Updated cached view counts for \(changes.count, privacy: .public) feed videos")
     }
 
     func cancelRefresh() {
@@ -166,6 +222,7 @@ final class SubscriptionFeedViewModel {
         activeRefreshTask?.cancel()
         activeRefreshTask = nil
         isRefreshing = false
+        showsRefreshProgress = false
         refreshedChannels = 0
         refreshChannelCount = 0
         failedChannels = []

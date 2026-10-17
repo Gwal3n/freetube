@@ -114,6 +114,12 @@ final class SettingsViewModel {
     var automaticFeedRefreshInterval: FeedRefreshInterval {
         didSet { preferences.automaticFeedRefreshInterval = automaticFeedRefreshInterval }
     }
+    var automaticFeedViewCountsEnabled: Bool {
+        didSet { preferences.automaticFeedViewCountsEnabled = automaticFeedViewCountsEnabled }
+    }
+    var automaticFeedViewCountInterval: FeedRefreshInterval {
+        didSet { preferences.automaticFeedViewCountInterval = automaticFeedViewCountInterval }
+    }
     var spaceSubscriptionFeedVideos: Bool {
         didSet { preferences.spaceSubscriptionFeedVideos = spaceSubscriptionFeedVideos }
     }
@@ -165,6 +171,8 @@ final class SettingsViewModel {
         self.rememberFloatingPlayerPlacement = preferences.rememberFloatingPlayerPlacement
         self.automaticFeedRefreshEnabled = preferences.automaticFeedRefreshEnabled
         self.automaticFeedRefreshInterval = preferences.automaticFeedRefreshInterval
+        self.automaticFeedViewCountsEnabled = preferences.automaticFeedViewCountsEnabled
+        self.automaticFeedViewCountInterval = preferences.automaticFeedViewCountInterval
         self.spaceSubscriptionFeedVideos = preferences.spaceSubscriptionFeedVideos
         self.feedChannelSpacing = preferences.feedChannelSpacing
         self.feedGroupSpacing = preferences.feedGroupSpacing

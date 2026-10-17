@@ -8363,12 +8363,26 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Seulement près de la position de lecture" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Только рядом с текущим моментом видео" } }
     } },
-    "Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic refresh runs only while Feed is selected and the app is active." : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "Wenn möglich, werden zwischen ähnlichen Uploads so viele Videos wie gewählt eingefügt. Nur Uploads innerhalb des gewählten Zeitraums werden verschoben. Die automatische Aktualisierung läuft nur, wenn der Feed ausgewählt und die App aktiv ist." } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic refresh runs only while Feed is selected and the app is active." } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cuando es posible, se coloca el número seleccionado de vídeos entre publicaciones relacionadas. Solo se mueven publicaciones dentro del período elegido. La actualización automática solo funciona con Feed seleccionado y la app activa." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lorsque c’est possible, le nombre choisi de vidéos sépare les publications similaires. Seules les publications dans la période choisie sont déplacées. L’actualisation automatique ne fonctionne que si le fil est sélectionné et l’app active." } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "По возможности между похожими публикациями размещается выбранное число видео. Перемещаются только публикации в пределах выбранного периода. Автообновление работает, только когда открыта лента и приложение активно." } }
+    "Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic updates run only while Feed is selected and the app is active. View counts update four channels per interval without reloading the feed." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Wenn möglich, werden zwischen ähnlichen Uploads so viele Videos wie gewählt eingefügt. Nur Uploads innerhalb des gewählten Zeitraums werden verschoben. Automatische Aktualisierungen laufen nur, wenn der Feed ausgewählt und die App aktiv ist. Die Aufrufzahlen von vier Kanälen pro Intervall werden ohne Neuladen des Feeds aktualisiert." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic updates run only while Feed is selected and the app is active. View counts update four channels per interval without reloading the feed." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cuando es posible, se coloca el número seleccionado de vídeos entre publicaciones relacionadas. Solo se mueven publicaciones dentro del período elegido. Las actualizaciones automáticas solo funcionan con Feed seleccionado y la app activa. Las visualizaciones de cuatro canales se actualizan por intervalo sin recargar el feed." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lorsque c’est possible, le nombre choisi de vidéos sépare les publications similaires. Seules les publications dans la période choisie sont déplacées. Les mises à jour automatiques ne fonctionnent que si le fil est sélectionné et l’app active. Les vues de quatre chaînes sont actualisées par intervalle sans recharger le fil." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "По возможности между похожими публикациями размещается выбранное число видео. Перемещаются только публикации в пределах выбранного периода. Автообновление работает, только когда открыта лента и приложение активно. За один интервал обновляются просмотры видео четырёх каналов без перезагрузки ленты." } }
+    } },
+    "Update feed view counts" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Aufrufzahlen im Feed aktualisieren" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Update feed view counts" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Actualizar visualizaciones del feed" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Actualiser les vues du fil" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Обновлять просмотры в ленте" } }
+    } },
+    "View count batch interval" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Intervall für Aufrufzahlen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "View count batch interval" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Intervalo de visualizaciones" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Intervalle des vues" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Интервал обновления просмотров" } }
     } }
   },
   "version" : "1.0"

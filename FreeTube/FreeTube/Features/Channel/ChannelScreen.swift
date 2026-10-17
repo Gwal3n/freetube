@@ -323,6 +323,9 @@ struct ChannelScreen: View {
         }
         .scrollIndicators(.hidden)
         .coordinateSpace(name: Self.pageSpace(tab))
+        .refreshable {
+            await model.refresh(activeSort: tab == .videos ? videoSort : .newest)
+        }
         .onPreferenceChange(ChannelPageOffsetKey.self) { offsets in
             if #unavailable(iOS 18.0) { pageOffsets.merge(offsets) { _, new in new } }
         }

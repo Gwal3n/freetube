@@ -70,4 +70,34 @@ final class SubscriptionFeedService: SubscriptionFeedServicing {
             }
         )
     }
+
+    /// Updates existing feed rows only. Unlike a full refresh this never replaces a channel's
+    /// videos, so the visible feed keeps its identity, ordering and scroll position.
+    func refreshViewCounts(channelIDs: [String]) async -> [String: Int] {
+        var changes: [String: Int] = [:]
+        await withTaskGroup(of: (String, [Video]?).self) { group in
+            for channelID in channelIDs {
+                group.addTask { [channelService] in
+                    do {
+                        let videos = try await channelService.fetchLatestVideos(channelID: channelID)
+                        return (channelID, videos)
+                    } catch {
+                        return (channelID, nil)
+                    }
+                }
+            }
+            for await (channelID, videos) in group {
+                guard !Task.isCancelled else {
+                    group.cancelAll()
+                    break
+                }
+                guard let videos else { continue }
+                let updated = await writer.updateSubscriptionFeedViewCounts(
+                    channelID: channelID, videos: videos
+                )
+                changes.merge(updated) { _, newest in newest }
+            }
+        }
+        return changes
+    }
 }

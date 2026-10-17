@@ -1,6 +1,10 @@
 import Foundation
 import SwiftData
 
+extension Notification.Name {
+    static let subscriptionFeedChannelDidRefresh = Notification.Name("com.leshko.freetube.subscriptionFeedChannelDidRefresh")
+}
+
 /// Persisted, dependency-free snapshot of a subscription-feed row. Stream URLs are never stored.
 @available(iOS 17.0, *)
 @Model

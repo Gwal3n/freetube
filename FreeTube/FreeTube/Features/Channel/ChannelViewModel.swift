@@ -17,6 +17,7 @@ final class ChannelViewModel {
     // The screen schedules its initial load on appearance. Reserve loading geometry from the
     // first frame, rather than briefly showing the idle/retry state before `.task` starts.
     private(set) var isLoading: Bool = true
+    private(set) var isRefreshing = false
     private(set) var initialLoadFailed = false
     /// True while a per-tab continuation request is in flight. Used by the tab screen to avoid
     /// firing duplicate "load more" requests when the user is rapidly scrolling near the bottom.
@@ -28,16 +29,19 @@ final class ChannelViewModel {
 
     private let service: any ChannelServicing
     private let localSubscriptions: LocalSubscriptionStore
+    private let writer: PersistenceWriter
     @ObservationIgnored private var initialLoadTask: Task<Void, Never>?
 
     init(
         channelID: String,
         service: any ChannelServicing = ChannelService(),
-        localSubscriptions: LocalSubscriptionStore = .shared
+        localSubscriptions: LocalSubscriptionStore = .shared,
+        writer: PersistenceWriter = .shared
     ) {
         self.channelID = channelID
         self.service = service
         self.localSubscriptions = localSubscriptions
+        self.writer = writer
     }
 
     func load() async {
@@ -56,6 +60,41 @@ final class ChannelViewModel {
         }
         initialLoadTask = task
         await task.value
+    }
+
+    /// Pull-to-refresh keeps the current page visible until a complete replacement is ready.
+    /// Only this channel is fetched; a subscribed channel also updates its local feed rows.
+    func refresh(activeSort: ChannelVideoSort = .newest) async {
+        guard details != nil else {
+            await load()
+            return
+        }
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        await load()
+        guard errorState == nil, let refreshed = details else { return }
+        let previousSort = activeSort == .newest ? nil : videoTabs[activeSort]
+        videoTabs = [.newest: refreshed.videos]
+        if let previousSort { videoTabs[activeSort] = previousSort }
+        if activeSort != .newest {
+            do {
+                let remote = try await service.fetchVideos(channelID: channelID, sort: activeSort)
+                if !remote.items.isEmpty { videoTabs[activeSort] = enrichingChannelMetadata(in: remote) }
+            } catch {
+                // The existing sorted page remains usable if this optional request fails.
+                errorState = ErrorState(from: error)
+            }
+        }
+        // An unexpectedly empty Videos tab can be a parser miss. Do not erase the cached feed
+        // for that channel merely because this optional channel-page refresh returned no rows.
+        if !refreshed.videos.items.isEmpty,
+           localSubscriptions.subscriptions.contains(where: { $0.id == channelID }) {
+            await writer.replaceSubscriptionFeedChannel(
+                channelID: channelID, videos: refreshed.videos.items, refreshedAt: .now
+            )
+            NotificationCenter.default.post(name: .subscriptionFeedChannelDidRefresh, object: nil)
+        }
     }
 
     private func performInitialLoad() async {

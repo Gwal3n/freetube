@@ -276,7 +276,12 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **Automatic subscription-feed refresh is opt-in and foreground-only.** The Feed tab checks the
   last successful refresh and last in-session attempt against the selected interval (1, 6, 12,
   or 24 hours). It pauses when the tab is not selected or the scene is inactive, defers while
-  the player is expanded, and uses the same deduplicated refresh path as pull-to-refresh.
+  the player is expanded, and uses the same deduplicated refresh path as pull-to-refresh. Automatic
+  runs keep the current pagination and do not expose the manual-refresh progress row. A separate
+  opt-in view-count schedule rotates through four subscribed channels per chosen interval while
+  Feed is visible; it updates only existing cached counts in place, leaving row order and upload
+  estimates unchanged. Pull-to-refresh on a channel reloads that channel alone and refreshes its
+  local feed entries when subscribed.
 - **Loading feedback reflects real work.** Search and public-playlist pagination share a stable
   `MediaPaginationFooter`; after failure, preserve loaded rows and offer explicit retry instead
   of silently repeating lookahead requests. Search continuations and errors are generation-guarded

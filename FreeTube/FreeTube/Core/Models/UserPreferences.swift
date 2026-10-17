@@ -59,6 +59,9 @@ struct UserPreferences {
     /// Opt-in, foreground-only refresh of the local subscription feed.
     @AppStorage("automaticFeedRefreshEnabled") var automaticFeedRefreshEnabled: Bool = false
     @AppStorage("automaticFeedRefreshInterval") var automaticFeedRefreshIntervalRaw: String = FeedRefreshInterval.everySixHours.rawValue
+    /// Separate opt-in, count-only batches that never replace feed rows.
+    @AppStorage("automaticFeedViewCountsEnabled") var automaticFeedViewCountsEnabled: Bool = false
+    @AppStorage("automaticFeedViewCountInterval") var automaticFeedViewCountIntervalRaw: String = FeedRefreshInterval.hourly.rawValue
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showDescription") var showDescription: Bool = true
     /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit
@@ -303,6 +306,11 @@ struct UserPreferences {
     var automaticFeedRefreshInterval: FeedRefreshInterval {
         get { FeedRefreshInterval(rawValue: automaticFeedRefreshIntervalRaw) ?? .everySixHours }
         nonmutating set { automaticFeedRefreshIntervalRaw = newValue.rawValue }
+    }
+
+    var automaticFeedViewCountInterval: FeedRefreshInterval {
+        get { FeedRefreshInterval(rawValue: automaticFeedViewCountIntervalRaw) ?? .hourly }
+        nonmutating set { automaticFeedViewCountIntervalRaw = newValue.rawValue }
     }
 }
 

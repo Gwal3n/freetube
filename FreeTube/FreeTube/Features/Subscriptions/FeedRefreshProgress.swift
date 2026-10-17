@@ -30,10 +30,10 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
                     leadingContent
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if model.isRefreshing || model.lastRefreshAt != nil {
+                if model.showsRefreshProgress || model.lastRefreshAt != nil {
                     HStack(spacing: 0) {
                         status
-                        if model.isRefreshing {
+                        if model.showsRefreshProgress {
                             Button(action: onCancel) {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 17))
@@ -50,7 +50,7 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
             }
             .frame(maxWidth: .infinity, minHeight: 24)
 
-            if model.isRefreshing {
+            if model.showsRefreshProgress {
                 ProgressView(
                     value: Double(model.refreshedChannels),
                     total: Double(max(1, model.refreshChannelCount))
@@ -67,7 +67,7 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
 
     private var status: some View {
         Group {
-            if model.isRefreshing {
+            if model.showsRefreshProgress {
                 Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
             } else if let lastRefreshAt = model.lastRefreshAt {
                 if referenceDate.timeIntervalSince(lastRefreshAt) < 3_600 {
@@ -93,7 +93,7 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
     }
 
     private var accessibilityStatus: Text {
-        if model.isRefreshing {
+        if model.showsRefreshProgress {
             return Text("Refreshing \(model.refreshedChannels) of \(model.refreshChannelCount) channels")
         }
         guard let lastRefreshAt = model.lastRefreshAt else { return Text("Not refreshed yet") }

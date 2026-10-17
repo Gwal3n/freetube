@@ -69,6 +69,22 @@ final class ChannelLoadingTests: XCTestCase {
         XCTAssertEqual(model.details?.channel.id, "test-channel")
         XCTAssertFalse(model.isLoading)
     }
+
+    func testPullRefreshKeepsPreviouslyLoadedChannelOnFailure() async {
+        let service = ChannelLoadingFixture()
+        service.allowSuccess()
+        let model = ChannelViewModel(channelID: "test-channel", service: service)
+        await model.load()
+        XCTAssertEqual(model.details?.channel.id, "test-channel")
+
+        service.failRequests()
+        await model.refresh()
+
+        XCTAssertEqual(model.details?.channel.id, "test-channel")
+        XCTAssertNotNil(model.errorState)
+        XCTAssertFalse(model.isRefreshing)
+        XCTAssertEqual(service.requestCount, 2)
+    }
 }
 
 @MainActor
@@ -84,6 +100,7 @@ private final class ChannelLoadingFixture: ChannelServicing {
         succeeds = true
         cancels = false
     }
+    func failRequests() { succeeds = false }
     func cancelRequests() { cancels = true }
 
     func waitForRequest() async {

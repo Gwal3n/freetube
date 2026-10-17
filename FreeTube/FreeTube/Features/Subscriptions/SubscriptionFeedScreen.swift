@@ -24,6 +24,8 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("feedCustomDurationMaximumMinutes") private var customMaximumMinutes = 60
     @AppStorage("automaticFeedRefreshEnabled") private var automaticFeedRefreshEnabled = false
     @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
+    @AppStorage("automaticFeedViewCountsEnabled") private var automaticFeedViewCountsEnabled = false
+    @AppStorage("automaticFeedViewCountInterval") private var automaticFeedViewCountIntervalRaw = FeedRefreshInterval.hourly.rawValue
     @AppStorage("spaceSubscriptionFeedVideos") private var spaceSubscriptionFeedVideos = true
     @AppStorage("feedChannelSpacing") private var feedChannelSpacing = 2
     @AppStorage("feedGroupSpacing") private var feedGroupSpacing = 2
@@ -39,7 +41,7 @@ struct SubscriptionFeedScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                if !groups.groups.isEmpty || model.isRefreshing || model.lastRefreshAt != nil {
+                if !groups.groups.isEmpty || model.showsRefreshProgress || model.lastRefreshAt != nil {
                     FeedRefreshProgress(
                         model: model,
                         referenceDate: currentDate,
@@ -213,6 +215,7 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .task(id: automaticRefreshTaskKey) { await loadAndScheduleAutomaticRefresh() }
+            .task(id: viewCountRefreshTaskKey) { await loadAndScheduleViewCountRefresh() }
             .onChange(of: groups.groups) { _, _ in
                 Task { await model.groupsChanged() }
             }
@@ -233,6 +236,9 @@ struct SubscriptionFeedScreen: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await model.refreshProgress() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .subscriptionFeedChannelDidRefresh)) { _ in
+                Task { await model.reloadCachedFeed() }
             }
             .onChange(of: navigationRouter.feed?.id, initial: true) { _, _ in
                 guard let request = navigationRouter.feed,
@@ -419,6 +425,24 @@ struct SubscriptionFeedScreen: View {
         "\(selectedTab == .feed):\(scenePhase == .active):\(automaticFeedRefreshEnabled):\(automaticFeedRefreshIntervalRaw)"
     }
 
+    private var viewCountRefreshTaskKey: String {
+        "\(selectedTab == .feed):\(scenePhase == .active):\(automaticFeedViewCountsEnabled):\(automaticFeedViewCountIntervalRaw)"
+    }
+
+    /// Best-effort metadata work with no visible loading state. Each due pass changes only the
+    /// count text on existing rows; the regular full-feed refresh remains a separate operation.
+    private func loadAndScheduleViewCountRefresh() async {
+        guard selectedTab == .feed, scenePhase == .active, automaticFeedViewCountsEnabled else { return }
+        let interval = FeedRefreshInterval(rawValue: automaticFeedViewCountIntervalRaw) ?? .hourly
+        while !Task.isCancelled {
+            if model.hasLoaded, model.hasSubscriptions, !model.isRefreshing,
+               !player.fullScreenPresented, path.isEmpty {
+                await model.refreshViewCountBatchIfDue(interval: interval)
+            }
+            try? await Task.sleep(for: .seconds(60))
+        }
+    }
+
     /// Foreground, Feed-only timer. A completed run waits for the chosen interval; a partial
     /// run can retry after a bounded cooldown. Nothing is scheduled through BackgroundTasks.
     private func loadAndScheduleAutomaticRefresh() async {
@@ -440,7 +464,7 @@ struct SubscriptionFeedScreen: View {
                 interval: interval
             ) {
                 log.info("Automatic feed refresh due; starting channel refresh")
-                await model.refresh()
+                await model.refresh(showProgress: false)
             } else {
                 try? await Task.sleep(for: .seconds(60))
             }
