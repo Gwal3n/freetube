@@ -7,7 +7,7 @@ struct ContextMenuScrollDiagnosticScreen: View {
     var body: some View {
         List {
             Section {
-                Text(verbatim: "Long-press a row, dismiss the menu, then immediately scroll. Try both sections.")
+                Text(verbatim: "Long-press a row, dismiss the menu, then immediately scroll. Compare all three sections.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -27,6 +27,25 @@ struct ContextMenuScrollDiagnosticScreen: View {
                 Text(verbatim: "Plain List rows")
             } footer: {
                 Text(verbatim: "No thumbnail, nested buttons, swipe actions, or custom preview.")
+            }
+
+            Section {
+                ForEach(0..<20, id: \.self) { index in
+                    Menu {
+                        Button {} label: {
+                            Label("Test action", systemImage: "checkmark")
+                        }
+                    } label: {
+                        Text(verbatim: "Menu row \(index + 1)")
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                            .contentShape(Rectangle())
+                    } primaryAction: {}
+                }
+            } header: {
+                Text(verbatim: "Native Menu with primary tap")
+            } footer: {
+                Text(verbatim: "A tap performs a no-op; a long press opens a native Menu without a custom preview.")
             }
 
             Section {
