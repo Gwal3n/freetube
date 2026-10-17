@@ -137,7 +137,7 @@ enum SettingsSearchIndex {
     // at runtime. SwiftUI views do not expose a reliable searchable control hierarchy.
     private static let groups: [Group] = [
         Group(destination: .playback, titles: [
-            "Playback", "Default playback quality", "Cellular streaming limit", "Hold for speed", "Hold speed",
+            "Playback", "Default playback quality", "Cellular streaming limit", "Sleep timer durations", "Hold for speed", "Hold speed",
             "Autoplay next video", "Allow audio from other apps", "Resume after interruptions"
         ]),
         Group(destination: .player, titles: [

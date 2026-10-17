@@ -48,6 +48,13 @@ struct PlaybackSettingsScreen: View {
                         model.defaultPlaybackRate = 1
                     }
                 }
+                NavigationLink {
+                    CustomSleepTimersScreen()
+                } label: {
+                    Label("Sleep timer durations", systemImage: "moon.zzz")
+                }
+                .tint(.primary)
+                .settingsSearchRow("Sleep timer durations")
                 Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
                     .tint(.green)
                     .settingsSearchRow("Hold for speed")

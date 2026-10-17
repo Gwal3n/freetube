@@ -52,9 +52,19 @@ final class PlayerPolishTests: XCTestCase {
     func testSleepTimerOptionsHaveOnlyTimedDurationsWhereExpected() {
         XCTAssertNil(SleepTimerOption.off.duration)
         XCTAssertNil(SleepTimerOption.endOfVideo.duration)
-        XCTAssertEqual(SleepTimerOption.fifteenMinutes.duration, Duration.seconds(15 * 60))
-        XCTAssertEqual(SleepTimerOption.thirtyMinutes.duration, Duration.seconds(30 * 60))
-        XCTAssertEqual(SleepTimerOption.oneHour.duration, Duration.seconds(60 * 60))
+        XCTAssertEqual(SleepTimerOption.minutes(15).duration, Duration.seconds(15 * 60))
+        XCTAssertEqual(SleepTimerOption.minutes(30).duration, Duration.seconds(30 * 60))
+        XCTAssertEqual(SleepTimerOption.minutes(60).duration, Duration.seconds(60 * 60))
+        XCTAssertEqual(SleepTimerOption.minutes(95).duration, Duration.seconds(95 * 60))
+    }
+
+    func testSleepTimerPresetsRoundTripAndRejectInvalidDurations() {
+        XCTAssertEqual(SleepTimerPresets.decode(""), [15, 30, 60])
+        XCTAssertEqual(SleepTimerPresets.decode("60,15,15,999"), [15, 60])
+        XCTAssertEqual(SleepTimerPresets.encode([60, 15, 15]), "15,60")
+        XCTAssertEqual(SleepTimerPresets.parse(" 45 "), 45)
+        XCTAssertNil(SleepTimerPresets.parse("0"))
+        XCTAssertNil(SleepTimerPresets.parse("721"))
     }
 
     func testPlayerControlLayoutKeepsEachControlInExactlyOneSection() {

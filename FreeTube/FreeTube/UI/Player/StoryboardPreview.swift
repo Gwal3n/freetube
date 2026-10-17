@@ -48,7 +48,7 @@ struct StoryboardPreview: View {
             // timestamp lines up with the player's existing time labels.
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            PlayerGestureBadge(text: seekPreviewTimestamp(previewTime))
+            seekPreviewTimeLabel(previewTime)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -86,7 +86,7 @@ struct AudioOnlySeekPreview: View {
             }
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            PlayerGestureBadge(text: seekPreviewTimestamp(previewTime))
+            seekPreviewTimeLabel(previewTime)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -100,4 +100,12 @@ private func seekPreviewTimestamp(_ time: TimeInterval) -> String {
     let seconds = total % 60
     if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
     return String(format: "%d:%02d", minutes, seconds)
+}
+
+@ViewBuilder
+private func seekPreviewTimeLabel(_ time: TimeInterval) -> some View {
+    Text(verbatim: seekPreviewTimestamp(time))
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.white)
+        .frame(minHeight: 26)
 }

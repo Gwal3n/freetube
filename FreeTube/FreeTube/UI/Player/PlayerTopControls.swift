@@ -7,8 +7,11 @@ struct PlayerTopControls: View {
     @AppStorage("playerMoreMenuDividers") private var moreMenuDividersRaw = ""
     @AppStorage("playbackSpeedChoices") private var savedRatesRaw = ""
     @AppStorage("customPlaybackSpeeds") private var legacyCustomRatesRaw = ""
+    @AppStorage("sleepTimerMinuteChoices") private var savedSleepTimerMinutesRaw = ""
     @State private var isEnteringCustomSpeed = false
     @State private var customSpeedText = ""
+    @State private var isEnteringCustomSleepTimer = false
+    @State private var customSleepTimerText = ""
 
     let controls: [PlayerTopControl]
     let overflowControls: [PlayerTopControl]
@@ -60,6 +63,19 @@ struct PlayerTopControls: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Enter 0.25× to 5×, with up to two decimal places.")
+        }
+        .alert("Custom sleep timer", isPresented: $isEnteringCustomSleepTimer) {
+            TextField("Minutes", text: $customSleepTimerText)
+                .keyboardType(.numberPad)
+            Button("Start timer") {
+                if let minutes = SleepTimerPresets.parse(customSleepTimerText) {
+                    onSetSleepTimer(.minutes(minutes))
+                }
+            }
+            .disabled(SleepTimerPresets.parse(customSleepTimerText) == nil)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter a duration from 1 to 720 minutes.")
         }
     }
 
@@ -155,7 +171,7 @@ struct PlayerTopControls: View {
             Menu {
                 sleepTimerChoices
             } label: {
-                Image(systemName: "moon.zzz")
+                Image(systemName: sleepTimerOption == .off ? "moon.zzz" : "moon.fill")
                     .playerTopControl()
                     .opacity(sleepTimerOption == .off ? 0.72 : 1)
             }
@@ -190,11 +206,13 @@ struct PlayerTopControls: View {
             .disabled(isAudioOnly)
         case .loop:
             Button(action: onToggleLoop) {
-                Label(isLooping ? "Turn loop off" : "Loop current video", systemImage: control.systemImage)
+                Label(isLooping ? "Turn loop off" : "Loop current video",
+                      systemImage: isLooping ? "checkmark.circle.fill" : control.systemImage)
             }
         case .mute:
             Button(action: onToggleMute) {
-                Label(isMuted ? "Unmute" : "Mute", systemImage: control.systemImage)
+                Label(isMuted ? "Unmute" : "Mute",
+                      systemImage: isMuted ? "speaker.slash.fill" : control.systemImage)
             }
         case .fullscreen:
             Button(action: onToggleFullscreen) {
@@ -202,11 +220,13 @@ struct PlayerTopControls: View {
             }
         case .autoplay:
             Button(action: onToggleAutoplay) {
-                Label(isAutoplayEnabled ? "Turn autoplay off" : "Turn autoplay on", systemImage: control.systemImage)
+                Label(isAutoplayEnabled ? "Turn autoplay off" : "Turn autoplay on",
+                      systemImage: isAutoplayEnabled ? "play.circle.fill" : control.systemImage)
             }
         case .audioOnly:
             Button(action: onToggleAudioOnly) {
-                Label(isAudioOnly ? "Turn audio-only off" : "Turn audio-only on", systemImage: control.systemImage)
+                Label(isAudioOnly ? "Turn audio-only off" : "Turn audio-only on",
+                      systemImage: isAudioOnly ? "headphones.circle.fill" : control.systemImage)
             }
             .disabled(isSwitchingAudioMode)
         case .sleepTimer:
@@ -215,7 +235,7 @@ struct PlayerTopControls: View {
             captionsMenu(onPlayer: false)
         case .frameStepping:
             Button(action: onToggleFrameStepping) {
-                Label("Fine seeking", systemImage: isFrameStepping ? "checkmark" : "film")
+                Label("Fine seeking", systemImage: isFrameStepping ? "film.fill" : "film")
             }
             .disabled(!canUseFineSeeking)
         }
@@ -230,7 +250,8 @@ struct PlayerTopControls: View {
                     ? "captions.bubble" : "captions.bubble.fill")
                     .playerTopControl()
             } else {
-                Label("Captions", systemImage: "captions.bubble")
+                Label("Captions", systemImage: captionsModel.selectedTrackID == nil
+                    ? "captions.bubble" : "captions.bubble.fill")
             }
         }
         .accessibilityLabel("Captions")
@@ -320,27 +341,46 @@ struct PlayerTopControls: View {
         Menu {
             sleepTimerChoices
         } label: {
-            Label("Sleep timer", systemImage: "moon.zzz")
+            Label("Sleep timer", systemImage: sleepTimerOption == .off ? "moon.zzz" : "moon.fill")
         }
     }
 
     @ViewBuilder
     private var sleepTimerChoices: some View {
-        sleepTimerChoice(.off, title: "Off")
-        sleepTimerChoice(.fifteenMinutes, title: "15 minutes")
-        sleepTimerChoice(.thirtyMinutes, title: "30 minutes")
-        sleepTimerChoice(.oneHour, title: "1 hour")
-        sleepTimerChoice(.endOfVideo, title: "End of current video")
+        sleepTimerChoice(.off, title: String(localized: "Off"))
+        ForEach(availableSleepTimerMinutes, id: \.self) { minutes in
+            sleepTimerChoice(.minutes(minutes), title: SleepTimerPresets.label(minutes))
+        }
+        if case .minutes(let minutes) = sleepTimerOption,
+           !availableSleepTimerMinutes.contains(minutes) {
+            sleepTimerChoice(.minutes(minutes), title: SleepTimerPresets.label(minutes))
+        }
+        Divider()
+        Button("Custom duration…") {
+            customSleepTimerText = ""
+            isEnteringCustomSleepTimer = true
+        }
+        if isAutoplayEnabled || isLooping || sleepTimerOption == .endOfVideo {
+            sleepTimerChoice(.endOfVideo, title: String(localized: "End of current video"))
+        }
     }
 
-    private func sleepTimerChoice(_ option: SleepTimerOption, title: LocalizedStringKey) -> some View {
+    private var availableSleepTimerMinutes: [Int] {
+        SleepTimerPresets.decode(savedSleepTimerMinutesRaw)
+    }
+
+    private func sleepTimerChoice(_ option: SleepTimerOption, title: String) -> some View {
         Button {
             onSetSleepTimer(option)
         } label: {
             if sleepTimerOption == option {
-                Label(title, systemImage: "checkmark")
+                Label {
+                    Text(verbatim: title)
+                } icon: {
+                    Image(systemName: "checkmark")
+                }
             } else {
-                Text(title)
+                Text(verbatim: title)
             }
         }
     }

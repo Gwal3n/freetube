@@ -790,6 +790,69 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Таймер сна" } }
       }
     },
+    "Sleep timer durations" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Einschlaftimer-Dauern" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Sleep timer durations" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Duraciones del temporizador" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Durées du minuteur de sommeil" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Длительности таймера сна" } }
+    } },
+    "Add sleep timer duration" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Einschlaftimer-Dauer hinzufügen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Add sleep timer duration" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadir duración del temporizador" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter une durée au minuteur" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавить длительность таймера" } }
+    } },
+    "Swipe left to remove a duration. At least one remains available. You can also enter a custom duration in the player." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Zum Entfernen einer Dauer nach links wischen. Mindestens eine bleibt verfügbar. Im Player kannst du auch eine eigene Dauer eingeben." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Swipe left to remove a duration. At least one remains available. You can also enter a custom duration in the player." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Desliza a la izquierda para quitar una duración. Debe quedar al menos una. También puedes introducir una duración personalizada en el reproductor." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Balayez vers la gauche pour supprimer une durée. Au moins une doit rester disponible. Vous pouvez aussi saisir une durée personnalisée dans le lecteur." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Смахните влево, чтобы удалить длительность. Должна остаться хотя бы одна. В плеере также можно указать свою длительность." } }
+    } },
+    "Add duration" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Dauer hinzufügen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Add duration" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadir duración" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter une durée" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавить длительность" } }
+    } },
+    "Minutes" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Minuten" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Минуты" } }
+    } },
+    "Enter a duration from 1 to 720 minutes." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Gib eine Dauer von 1 bis 720 Minuten ein." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter a duration from 1 to 720 minutes." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Introduce una duración de 1 a 720 minutos." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Saisissez une durée de 1 à 720 minutes." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите длительность от 1 до 720 минут." } }
+    } },
+    "Custom sleep timer" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigener Einschlaftimer" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom sleep timer" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Temporizador personalizado" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Minuteur personnalisé" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Свой таймер сна" } }
+    } },
+    "Start timer" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Timer starten" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Start timer" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Iniciar temporizador" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Démarrer le minuteur" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Запустить таймер" } }
+    } },
+    "Custom duration…" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Dauer…" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom duration…" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Duración personalizada…" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Durée personnalisée…" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Своя длительность…" } }
+    } },
     "Off" : {
       "localizations" : {
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Aus" } },
