@@ -258,7 +258,6 @@ private struct VideoActionsContent: View {
 private struct VideoContextMenuModifier: ViewModifier {
     let video: Video
     let previewBranding: DeArrowVideoViewModel?
-    let usesCustomPreview: Bool
     let offersPlayNext: Bool
     let onPlay: (() -> Void)?
     let onRemoveFromUpNext: (() -> Void)?
@@ -274,7 +273,12 @@ private struct VideoContextMenuModifier: ViewModifier {
     @State private var downloadModel: PlayerActionsModel?
 
     func body(content: Content) -> some View {
-        menu(for: content)
+        content
+            .contextMenu {
+                menuItems
+            } preview: {
+                VideoContextPreview(video: video, branding: previewBranding)
+            }
             .sheet(isPresented: Binding(
                 get: { shareFileURL != nil },
                 set: { if !$0 { shareFileURL = nil } }
@@ -297,21 +301,6 @@ private struct VideoContextMenuModifier: ViewModifier {
                 guard let error = downloadModel?.downloadError else { return }
                 errorPresenter.present(error)
             }
-    }
-
-    @ViewBuilder
-    private func menu(for content: Content) -> some View {
-        if usesCustomPreview {
-            content.contextMenu {
-                menuItems
-            } preview: {
-                VideoContextPreview(video: video, branding: previewBranding)
-            }
-        } else {
-            content.contextMenu {
-                menuItems
-            }
-        }
     }
 
     @ViewBuilder
@@ -355,7 +344,6 @@ extension View {
     func videoContextMenu(
         video: Video,
         previewBranding: DeArrowVideoViewModel? = nil,
-        usesCustomPreview: Bool = true,
         offersPlayNext: Bool = false,
         onPlay: (() -> Void)? = nil,
         onRemoveFromUpNext: (() -> Void)? = nil,
@@ -366,7 +354,6 @@ extension View {
         modifier(VideoContextMenuModifier(
             video: video,
             previewBranding: previewBranding,
-            usesCustomPreview: usesCustomPreview,
             offersPlayNext: offersPlayNext,
             onPlay: onPlay,
             onRemoveFromUpNext: onRemoveFromUpNext,

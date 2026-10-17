@@ -17,7 +17,6 @@ struct VideoCard: View {
     var onTap: () -> Void = {}
     var showsMoreMenu: Bool = false
     var offersPlayNext = false
-    var usesCustomContextPreview = true
     var showsChannelAvatar = true
     var playbackProgress: Double? = nil
     var isNewSinceLastVisit = false
@@ -41,6 +40,8 @@ struct VideoCard: View {
                     thumbnail(branding: branding)
                 }
                 .buttonStyle(ResponsiveButtonStyle())
+                .videoContextMenu(video: video, previewBranding: branding,
+                                  offersPlayNext: offersPlayNext)
                 // The metadata control below performs the same action and carries the complete
                 // spoken label. Exposing both would make VoiceOver announce every card twice.
                 .accessibilityHidden(true)
@@ -69,8 +70,6 @@ struct VideoCard: View {
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
-        .videoContextMenu(video: video, previewBranding: branding,
-                          usesCustomPreview: usesCustomContextPreview, offersPlayNext: offersPlayNext)
     }
 
     private func thumbnail(branding: DeArrowVideoViewModel) -> some View {
@@ -133,6 +132,8 @@ struct VideoCard: View {
             .buttonStyle(ResponsiveButtonStyle())
             .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
             .accessibilityHint("Plays video")
+            .videoContextMenu(video: video, previewBranding: branding,
+                              offersPlayNext: offersPlayNext)
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)

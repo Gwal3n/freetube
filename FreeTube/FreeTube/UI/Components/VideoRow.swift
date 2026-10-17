@@ -23,7 +23,6 @@ struct VideoRow: View {
     var playbackProgress: Double?
     var isNewSinceLastVisit = false
     var relativeDateReference: Date?
-    var usesCustomContextPreview: Bool
     var onOpenChannel: (() -> Void)?
     var onTap: () -> Void
 
@@ -36,7 +35,6 @@ struct VideoRow: View {
         playbackProgress: Double? = nil,
         isNewSinceLastVisit: Bool = false,
         relativeDateReference: Date? = nil,
-        usesCustomContextPreview: Bool = true,
         onOpenChannel: (() -> Void)? = nil,
         onTap: @escaping () -> Void = {}
     ) {
@@ -46,7 +44,6 @@ struct VideoRow: View {
         self.playbackProgress = playbackProgress
         self.isNewSinceLastVisit = isNewSinceLastVisit
         self.relativeDateReference = relativeDateReference
-        self.usesCustomContextPreview = usesCustomContextPreview
         self.onOpenChannel = onOpenChannel
         self.onTap = onTap
     }
@@ -69,6 +66,8 @@ struct VideoRow: View {
                 .buttonStyle(ResponsiveButtonStyle())
                 .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
                 .accessibilityHint("Plays video")
+                .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: true,
+                                  onOpenChannel: onOpenChannel)
             }
 
             switch accessory {
@@ -99,12 +98,7 @@ struct VideoRow: View {
             }
         }
         .loadDeArrowBranding(video: video, model: branding)
-        // The menu must be on the outer List row, not a nested branding view that can lag behind
-        // the scrolling cell while iOS animates its lifted preview back into place.
         .mediaListRow()
-        .videoContextMenu(video: video, previewBranding: branding,
-                          usesCustomPreview: usesCustomContextPreview, offersPlayNext: true,
-                          onOpenChannel: onOpenChannel)
     }
 
     private var offersPlayNext: Bool {

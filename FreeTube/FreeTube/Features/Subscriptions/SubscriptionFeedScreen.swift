@@ -555,7 +555,6 @@ struct SubscriptionFeedScreen: View {
                 onTap: { player.load(video) },
                 showsMoreMenu: true,
                 offersPlayNext: true,
-                usesCustomContextPreview: false,
                 showsChannelAvatar: showChannelAvatars,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
@@ -568,8 +567,7 @@ struct SubscriptionFeedScreen: View {
                 showsChannelAvatar: showChannelAvatars,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
-                relativeDateReference: currentDate,
-                usesCustomContextPreview: false
+                relativeDateReference: currentDate
             ) {
                 player.load(video)
             }
