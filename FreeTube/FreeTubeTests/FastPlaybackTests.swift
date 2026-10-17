@@ -106,6 +106,33 @@ final class FastPlaybackTests: XCTestCase {
         XCTAssertNil(purged)
     }
 
+    func testStreamCacheEvictsLeastRecentlyUsedResolution() async {
+        let cache = StreamURLCache(capacity: 2)
+        let first = URL(string: "https://example.com/first.m3u8")!
+        let second = URL(string: "https://example.com/second.m3u8")!
+        let third = URL(string: "https://example.com/third.m3u8")!
+
+        await cache.set(videoID: "first", formatID: "native", url: first)
+        await cache.set(videoID: "second", formatID: "native", url: second)
+        let touchedFirst = await cache.get(videoID: "first", formatID: "native")
+        XCTAssertEqual(touchedFirst, first)
+        await cache.set(videoID: "third", formatID: "native", url: third)
+
+        let evictedSecond = await cache.get(videoID: "second", formatID: "native")
+        let retainedFirst = await cache.get(videoID: "first", formatID: "native")
+        let retainedThird = await cache.get(videoID: "third", formatID: "native")
+        XCTAssertNil(evictedSecond)
+        XCTAssertEqual(retainedFirst, first)
+        XCTAssertEqual(retainedThird, third)
+    }
+
+    func testStreamCacheDoesNotReturnImmediatelyExpiredURL() async {
+        let cache = StreamURLCache(ttl: 0)
+        await cache.set(videoID: "expired", formatID: "native", url: URL(string: "https://example.com/expired")!)
+        let expired = await cache.get(videoID: "expired", formatID: "native")
+        XCTAssertNil(expired)
+    }
+
     func testRejectedNativeURLDoesNotEvictPairedFallback() async {
         let cache = StreamURLCache()
         let videoID = "testvideo01"

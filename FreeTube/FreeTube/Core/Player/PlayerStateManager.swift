@@ -268,6 +268,7 @@ final class PlayerStateManager {
         self.playbackRate = PlaybackSpeedPresets.bounded(preferences.defaultPlaybackRate)
         self.effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(preferences.defaultPlaybackRate, canPlayFastForward: false)
         FastPlaybackLocalFileService.removeOrphansAtLaunch()
+        NativeHLSDownloadService.removeOrphansAtLaunch()
         self.playbackQuality = preferences.preferredQuality
         self.videoQualityBeforeAudio = preferences.preferredQuality == .audioOnly
             ? .auto : preferences.preferredQuality

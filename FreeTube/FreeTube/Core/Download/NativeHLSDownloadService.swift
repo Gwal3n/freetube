@@ -11,11 +11,36 @@ import OSLog
 nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     typealias ProgressHandler = @Sendable (Double) -> Void
 
+    private static let workDirectoryPrefix = "freetube-hls-"
+    @MainActor private static var orphanCleanupStarted = false
     private let session: URLSession
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "NativeHLSDownload")
 
     init(session: URLSession = .shared) {
         self.session = session
+    }
+
+    /// A force-quit skips `download`'s defer. Capture only work folders from earlier launches,
+    /// then remove them off-main so large abandoned segment sets cannot delay app startup.
+    @MainActor static func removeOrphansAtLaunch() {
+        guard !orphanCleanupStarted else { return }
+        orphanCleanupStarted = true
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+        guard let children = try? FileManager.default.contentsOfDirectory(
+            at: temporaryDirectory, includingPropertiesForKeys: [.isDirectoryKey]
+        ) else { return }
+        let orphans = children.filter { url in
+            let name = url.lastPathComponent
+            guard name.hasPrefix(workDirectoryPrefix),
+                  UUID(uuidString: String(name.dropFirst(workDirectoryPrefix.count))) != nil else { return false }
+            return (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        }
+        guard !orphans.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for directory in orphans {
+                try? FileManager.default.removeItem(at: directory)
+            }
+        }
     }
 
     /// Returns the preferred audio media playlist from a multivariant HLS manifest. Playback
@@ -36,7 +61,7 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         progress: @escaping ProgressHandler
     ) async throws {
         let workDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("freetube-hls-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("\(Self.workDirectoryPrefix)\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workDirectory) }
 

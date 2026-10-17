@@ -120,7 +120,13 @@ final class FastPlaybackLocalFileService {
         guard let children = try? FileManager.default.contentsOfDirectory(
             at: rootDirectory, includingPropertiesForKeys: nil
         ) else { return }
-        for child in children { try? FileManager.default.removeItem(at: child) }
+        let orphans = children.filter { UUID(uuidString: $0.lastPathComponent) != nil }
+        guard !orphans.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for directory in orphans {
+                try? FileManager.default.removeItem(at: directory)
+            }
+        }
     }
 
     static func prepare(

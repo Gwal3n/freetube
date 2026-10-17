@@ -763,6 +763,17 @@ final class DownloadManager {
             // Don't include the canonical destination itself in mux inputs.
             return candidates.filter { $0.path != destination.path }
         }.value
+        var intermediatesToClean = intermediates
+        defer {
+            // A failed mux or later validation must not leave large separate tracks on disk.
+            // Success awaits this cleanup below before publishing the completed download.
+            let leftovers = intermediatesToClean
+            if !leftovers.isEmpty {
+                Task.detached(priority: .utility) {
+                    for url in leftovers { try? FileManager.default.removeItem(at: url) }
+                }
+            }
+        }
         log.debug("yt-dlp[\(video.id, privacy: .public)] candidate files: \(intermediates.map(\.lastPathComponent).joined(separator: ", "), privacy: .public)")
 
         // The output template records both codec roles. This is reliable even when the only
@@ -793,6 +804,7 @@ final class DownloadManager {
                     try? FileManager.default.removeItem(at: url)
                 }
             }.value
+            intermediatesToClean = []
         } else if let single = intermediates.first {
             // Single combined progressive file — just rename it to the destination.
             log.info("yt-dlp[\(video.id, privacy: .public)] single-file mode (no mux needed): \(single.lastPathComponent, privacy: .public)")

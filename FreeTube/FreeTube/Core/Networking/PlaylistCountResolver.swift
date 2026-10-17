@@ -13,6 +13,8 @@ actor PlaylistCountResolver {
 
     private let service: any PlaylistServicing
     private var cached: [String: CacheEntry] = [:]
+    private let cacheTTL: TimeInterval = 900
+    private let cacheCapacity = 128
     private var inFlight: [String: Task<Int?, Never>] = [:]
     private var activeRequests = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
@@ -28,7 +30,7 @@ actor PlaylistCountResolver {
     }
 
     func count(for playlistID: String) async -> Int? {
-        if let cached = cached[playlistID], Date.now.timeIntervalSince(cached.fetchedAt) < 900 {
+        if let cached = cached[playlistID], Date.now.timeIntervalSince(cached.fetchedAt) < cacheTTL {
             return cached.count
         }
         if let pending = inFlight[playlistID] { return await pending.value }
@@ -39,7 +41,13 @@ actor PlaylistCountResolver {
         let count = await task.value
         inFlight[playlistID] = nil
         if generation == cacheGeneration {
-            cached[playlistID] = CacheEntry(count: count, fetchedAt: .now)
+            let now = Date.now
+            cached = cached.filter { now.timeIntervalSince($0.value.fetchedAt) < cacheTTL }
+            cached[playlistID] = CacheEntry(count: count, fetchedAt: now)
+            if cached.count > cacheCapacity,
+               let oldest = cached.min(by: { $0.value.fetchedAt < $1.value.fetchedAt })?.key {
+                cached[oldest] = nil
+            }
         }
         return count
     }

@@ -2,7 +2,8 @@ import Foundation
 import OSLog
 
 /// In-memory cache of resolved direct stream URLs. Per CLAUDE.md §2/§7: signed URLs are sensitive
-/// and time-limited — they never touch disk. 30-minute TTL.
+/// and time-limited — they never touch disk. Entries expire within 30 minutes and the cache
+/// retains only a bounded number of recently used resolutions, including storyboard metadata.
 actor StreamURLCache {
     static let shared = StreamURLCache()
 
@@ -21,14 +22,18 @@ actor StreamURLCache {
         let originalTitle: String?
         let mimeTypeOverride: String?
         let expiresAt: Date
+        var lastAccess: UInt64
     }
 
     private var entries: [Key: Entry] = [:]
+    private var accessCounter: UInt64 = 0
     private let ttl: TimeInterval
+    private let capacity: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "StreamURLCache")
 
-    init(ttl: TimeInterval = 30 * 60) {
-        self.ttl = ttl
+    init(ttl: TimeInterval = 30 * 60, capacity: Int = 64) {
+        self.ttl = min(max(ttl, 0), 30 * 60)
+        self.capacity = max(1, capacity)
     }
 
     func get(videoID: String, formatID: String) -> URL? {
@@ -40,11 +45,14 @@ actor StreamURLCache {
         formatID: String
     ) -> (url: URL, audioURL: URL?, mediaKind: NativeStreamResult.MediaKind, storyboard: VideoStoryboard?, captionTracks: [VideoCaptionTrack], originalAudioLanguageCode: String?, originalTitle: String?, mimeTypeOverride: String?)? {
         let key = Key(videoID: videoID, formatID: formatID)
-        guard let entry = entries[key] else { return nil }
-        if entry.expiresAt < .now {
+        guard var entry = entries[key] else { return nil }
+        if entry.expiresAt <= .now {
             entries[key] = nil
             return nil
         }
+        accessCounter &+= 1
+        entry.lastAccess = accessCounter
+        entries[key] = entry
         return (entry.url, entry.audioURL, entry.mediaKind, entry.storyboard, entry.captionTracks, entry.originalAudioLanguageCode, entry.originalTitle, entry.mimeTypeOverride)
     }
 
@@ -61,6 +69,9 @@ actor StreamURLCache {
         mimeTypeOverride: String? = nil
     ) {
         let key = Key(videoID: videoID, formatID: formatID)
+        let now = Date.now
+        entries = entries.filter { $0.value.expiresAt > now }
+        accessCounter &+= 1
         entries[key] = Entry(
             url: url,
             audioURL: audioURL,
@@ -70,8 +81,13 @@ actor StreamURLCache {
             originalAudioLanguageCode: originalAudioLanguageCode,
             originalTitle: originalTitle,
             mimeTypeOverride: mimeTypeOverride,
-            expiresAt: .now.addingTimeInterval(ttl)
+            expiresAt: now.addingTimeInterval(ttl),
+            lastAccess: accessCounter
         )
+        if entries.count > capacity,
+           let leastRecentlyUsed = entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key {
+            entries[leastRecentlyUsed] = nil
+        }
         log.debug("Cached stream URL for \(videoID, privacy: .public)/\(formatID, privacy: .public)")
     }
 
@@ -89,5 +105,6 @@ actor StreamURLCache {
 
     func purge() {
         entries.removeAll()
+        accessCounter = 0
     }
 }
