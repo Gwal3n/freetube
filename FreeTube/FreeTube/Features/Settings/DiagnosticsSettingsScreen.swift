@@ -48,6 +48,20 @@ struct DiagnosticsSettingsScreen: View {
             } footer: {
                 Text("Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries.")
             }
+
+            Section {
+                NavigationLink {
+                    ContextMenuScrollDiagnosticScreen()
+                } label: {
+                    Label {
+                        Text(verbatim: "Context menu scroll test")
+                    } icon: {
+                        Image(systemName: "hand.tap")
+                    }
+                }
+            } footer: {
+                Text(verbatim: "Temporary SwiftUI-only test on the experiment branch.")
+            }
         }
         .scrollToSearchedSetting()
         .navigationTitle("Diagnostics")
