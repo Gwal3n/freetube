@@ -132,9 +132,11 @@ struct SearchContent: View {
         let visibleChannels = results.channels.filter { !blocklist.blocks($0) }
         let visiblePlaylists = results.playlists.filter { !blocklist.blocks($0) }
         let unblockedVideos = results.videos.filter { !blocklist.blocks($0) }
-        let visibleVideos = results.videos.filter {
-            !blocklist.blocks($0) && videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
-        }
+        let visibleVideos = videoFilters.isActive
+            ? unblockedVideos.filter {
+                videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
+            }
+            : unblockedVideos
         if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
             ContentUnavailableView(
                 "No Results",

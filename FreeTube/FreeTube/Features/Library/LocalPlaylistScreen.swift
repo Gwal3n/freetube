@@ -223,28 +223,31 @@ struct LocalPlaylistScreen: View {
 
     @ViewBuilder
     private var emptyStateOverlay: some View {
-        if let details, details.videos.isEmpty {
-            ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
-                .allowsHitTesting(false)
-        } else if let details, editingMode == nil, searchText.isEmpty, videoFilters.isActive,
-                  visibleVideos(in: details).isEmpty {
-            ContentUnavailableView(
-                "No matching videos", systemImage: "line.3.horizontal.decrease",
-                description: Text("Try changing the playlist filters.")
-            )
-            .allowsHitTesting(false)
-        } else if let details, editingMode == nil, searchText.isEmpty,
-                  visibleVideos(in: details).isEmpty {
-            ContentUnavailableView(
-                "Playlist Videos Hidden",
-                systemImage: "hand.raised",
-                description: Text("Change blocked content in Settings to see them again.")
-            )
-            .allowsHitTesting(false)
-        } else if let details, !searchText.isEmpty, visibleVideos(in: details).isEmpty {
-            ContentUnavailableView.search(text: searchText)
-                .allowsHitTesting(false)
-        } else if hasLoaded && details == nil {
+        if let details {
+            if details.videos.isEmpty {
+                ContentUnavailableView("Empty Playlist", systemImage: "music.note.list")
+                    .allowsHitTesting(false)
+            } else {
+                let hasVisibleVideos = !visibleVideos(in: details).isEmpty
+                if !hasVisibleVideos && editingMode == nil && searchText.isEmpty && videoFilters.isActive {
+                    ContentUnavailableView(
+                        "No matching videos", systemImage: "line.3.horizontal.decrease",
+                        description: Text("Try changing the playlist filters.")
+                    )
+                    .allowsHitTesting(false)
+                } else if !hasVisibleVideos && editingMode == nil && searchText.isEmpty {
+                    ContentUnavailableView(
+                        "Playlist Videos Hidden",
+                        systemImage: "hand.raised",
+                        description: Text("Change blocked content in Settings to see them again.")
+                    )
+                    .allowsHitTesting(false)
+                } else if !hasVisibleVideos && !searchText.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                        .allowsHitTesting(false)
+                }
+            }
+        } else if hasLoaded {
             ContentUnavailableView("Playlist Unavailable", systemImage: "music.note.list")
                 .allowsHitTesting(false)
         }
@@ -307,9 +310,14 @@ struct LocalPlaylistScreen: View {
         // Edit mode must retain the source order so native move offsets still map to storage.
         if editingMode != nil { return details.videos }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return videoSort.ordered(details.videos).filter { video in
+        let orderedVideos = videoSort.ordered(details.videos)
+        if query.isEmpty && !videoFilters.isActive && !blocklist.rules.isActive {
+            return orderedVideos
+        }
+        let now = Date.now
+        return orderedVideos.filter { video in
             !blocklist.blocks(video)
-                && videoFilters.includes(video, status: watchStatuses[video.id], now: .now)
+                && videoFilters.includes(video, status: watchStatuses[video.id], now: now)
                 && (query.isEmpty || video.title.localizedStandardContains(query)
                     || video.channelName.localizedStandardContains(query)
                     || video.id.localizedStandardContains(query))

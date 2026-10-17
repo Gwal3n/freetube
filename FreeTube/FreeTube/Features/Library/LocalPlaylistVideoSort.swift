@@ -33,6 +33,10 @@ enum LocalPlaylistVideoSort: String, CaseIterable, Identifiable {
     func ordered(_ videos: [Video]) -> [Video] {
         guard self != .custom else { return videos }
         let referenceDate = Date.now
+        // Relative upload text is parsed once per video, not on every sort comparison.
+        let publishedDates: [Date?] = self == .newest || self == .oldest
+            ? videos.map { $0.estimatedPublishedAt(relativeTo: referenceDate) }
+            : []
         // Include each video's original index so equal titles/durations retain manual order.
         return videos.enumerated().sorted { left, right in
             switch self {
@@ -44,8 +48,8 @@ enum LocalPlaylistVideoSort: String, CaseIterable, Identifiable {
                 return self == .title ? comparison == .orderedAscending : comparison == .orderedDescending
             case .newest, .oldest:
                 return compareOptional(
-                    left.element.estimatedPublishedAt(relativeTo: referenceDate),
-                    right.element.estimatedPublishedAt(relativeTo: referenceDate),
+                    publishedDates[left.offset],
+                    publishedDates[right.offset],
                     leftIndex: left.offset, rightIndex: right.offset,
                     ascending: self == .oldest
                 )

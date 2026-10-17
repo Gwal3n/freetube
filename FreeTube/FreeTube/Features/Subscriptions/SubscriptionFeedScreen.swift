@@ -40,6 +40,11 @@ struct SubscriptionFeedScreen: View {
 
     var body: some View {
         NavigationStack(path: $path) {
+            // Share one filtered snapshot with rows, pagination, and empty-state checks.
+            let visibleVideos = filteredVideos
+            let filteredLookaheadIDs = Set(visibleVideos.suffix(5).map(\.id))
+            let filtersAreActive = watchFilter != .all || durationFilter != .all || blocklist.rules.isActive
+            let pageKey = automaticLoadKey
             List {
                 if !groups.groups.isEmpty || model.showsRefreshProgress || model.lastRefreshAt != nil {
                     FeedRefreshProgress(
@@ -69,18 +74,17 @@ struct SubscriptionFeedScreen: View {
                     }
                 }
 
-                ForEach(filteredVideos) { video in
+                ForEach(visibleVideos) { video in
                     feedRow(video)
                         .onAppear {
-                            guard watchFilter != .all || durationFilter != .all || blocklist.rules.isActive,
-                                  filteredVideos.count >= 12,
-                                  filteredVideos.suffix(5).contains(where: { $0.id == video.id }),
+                            guard filtersAreActive,
+                                  visibleVideos.count >= 12,
+                                  filteredLookaheadIDs.contains(video.id),
                                   model.canLoadMore,
                                   !model.isLoadingMore,
                                   !model.isRefreshing else { return }
-                            let key = automaticLoadKey
-                            guard lastFilteredPrefetchKey != key else { return }
-                            lastFilteredPrefetchKey = key
+                            guard lastFilteredPrefetchKey != pageKey else { return }
+                            lastFilteredPrefetchKey = pageKey
                             Task {
                                 await model.loadMore()
                                 await fillFilteredFeed()
@@ -88,7 +92,7 @@ struct SubscriptionFeedScreen: View {
                         }
                 }
 
-                if filteredVideos.isEmpty && !model.videos.isEmpty && model.canLoadMore {
+                if visibleVideos.isEmpty && !model.videos.isEmpty && model.canLoadMore {
                     Text(model.isLoadingMore
                          ? "Finding matching videos…"
                          : "No loaded videos match. Load more to check the next page.")
@@ -117,13 +121,12 @@ struct SubscriptionFeedScreen: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .disabled(model.isLoadingMore || model.isRefreshing)
-                    .id(automaticLoadKey)
+                    .id(pageKey)
                     .onAppear {
-                        guard watchFilter == .all, !blocklist.rules.isActive,
-                              durationFilter == .all,
+                        guard !filtersAreActive,
                               !model.isRefreshing,
-                              lastAutomaticLoadKey != automaticLoadKey else { return }
-                        lastAutomaticLoadKey = automaticLoadKey
+                              lastAutomaticLoadKey != pageKey else { return }
+                        lastAutomaticLoadKey = pageKey
                         Task { await model.loadMore() }
                     }
                 }
@@ -201,7 +204,7 @@ struct SubscriptionFeedScreen: View {
                         )
                     }
                 } else if model.hasLoaded && !model.videos.isEmpty
-                            && filteredVideos.isEmpty && !model.canLoadMore && !model.isRefreshing {
+                            && visibleVideos.isEmpty && !model.canLoadMore && !model.isRefreshing {
                     ContentUnavailableView {
                         Label("No matching videos", systemImage: "line.3.horizontal.decrease")
                     } description: {
@@ -272,10 +275,15 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var filteredVideos: [Video] {
-        model.videos.filter { video in
+        let selectedWatch = watchFilter
+        let selectedDuration = durationFilter
+        guard selectedWatch != .all || selectedDuration != .all || blocklist.rules.isActive else {
+            return model.videos
+        }
+        return model.videos.filter { video in
             !blocklist.blocks(video)
-                && watchFilter.includes(model.watchStatuses[video.id])
-                && durationFilter.includes(
+                && selectedWatch.includes(model.watchStatuses[video.id])
+                && selectedDuration.includes(
                     video.duration,
                     minimumMinutes: customMinimumMinutes,
                     maximumMinutes: customMaximumMinutes
