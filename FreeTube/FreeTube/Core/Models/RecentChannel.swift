@@ -2,6 +2,8 @@ import Foundation
 
 /// A bounded, device-local channel visit. No network request is needed to display it in Search.
 struct RecentChannel: Codable, Identifiable {
+    static let maximumCount = 3
+
     let id: String
     let name: String
     let handle: String?
@@ -15,7 +17,13 @@ struct RecentChannel: Codable, Identifiable {
 
     static func entries(from json: String) -> [RecentChannel] {
         guard let data = json.data(using: .utf8) else { return [] }
-        return (try? JSONDecoder().decode([RecentChannel].self, from: data)) ?? []
+        let decoded = (try? JSONDecoder().decode([RecentChannel].self, from: data)) ?? []
+        return Array(decoded.prefix(maximumCount))
+    }
+
+    static func json(from entries: [RecentChannel]) -> String? {
+        guard let data = try? JSONEncoder().encode(Array(entries.prefix(maximumCount))) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     static func record(_ channel: Channel, defaults: UserDefaults = .standard) {
@@ -29,8 +37,7 @@ struct RecentChannel: Codable, Identifiable {
         entries.removeAll { $0.id == channel.id }
         entries.insert(RecentChannel(id: channel.id, name: channel.name,
                                      handle: channel.handle, thumbnailURL: channel.thumbnailURL), at: 0)
-        if let data = try? JSONEncoder().encode(Array(entries.prefix(12))),
-           let json = String(data: data, encoding: .utf8) {
+        if let json = json(from: entries) {
             defaults.set(json, forKey: key)
         }
     }

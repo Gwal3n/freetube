@@ -528,6 +528,13 @@ struct SearchContent: View {
                         }
                         .mediaListRow()
                     }
+                    .onDelete { offsets in
+                        var entries = recentChannels
+                        entries.remove(atOffsets: offsets)
+                        if let json = RecentChannel.json(from: entries) {
+                            recentChannelsJSON = json
+                        }
+                    }
                 } header: {
                     HStack {
                         Text("Recent channels")
