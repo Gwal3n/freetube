@@ -3,6 +3,7 @@ import SwiftUI
 /// Controls the bounded in-memory recent-video cache and explicit disposable-cache removal.
 @available(iOS 17.0, *)
 struct CacheSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @State private var showingClearAllConfirmation = false
@@ -15,7 +16,7 @@ struct CacheSettingsScreen: View {
         Form {
             Section {
                 Toggle("Cache recent video details", isOn: $cacheRecentVideoContent)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Cache recent video details")
             } footer: {
                 Text("Keeps details and the first comments page for up to 12 recently opened videos in memory. Nothing is saved to disk. Turning this off also stops detail prefetching.")

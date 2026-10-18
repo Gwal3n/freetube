@@ -54,6 +54,7 @@ struct PlayerTransportOverlay: View {
             bottomTimelinePadding: bottomTimelinePadding,
             onTogglePlayPause: onTogglePlayPause,
             onSeek: onSeek,
+            onSeekRelative: { player.seekRelative(by: $0) },
             onSeekPreviewChanged: onSeekPreviewChanged,
             onShowChapters: onShowChapters,
             onPrevious: onPrevious,

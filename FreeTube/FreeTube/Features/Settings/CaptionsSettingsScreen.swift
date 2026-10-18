@@ -2,16 +2,17 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct CaptionsSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
 
     var body: some View {
         Form {
             Section {
                 Toggle("Dark caption background", isOn: Bindable(model).captionBackgroundEnabled)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Dark caption background")
                 Toggle("Use source formatting", isOn: Bindable(model).formattedCaptions)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Use source formatting")
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {

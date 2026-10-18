@@ -16,6 +16,8 @@ import SwiftData
 struct FreeTubeApp: App {
     @State private var appEnvironment = AppEnvironment()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
+    @AppStorage("useAccentTheme") private var useAccentTheme = false
+    @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
     // A new app session starts on Feed. Keep selection in memory so presentations and player
     // transitions cannot change the current tab within that session.
     @State private var selectedTab = RootView.Tab.feed
@@ -26,9 +28,13 @@ struct FreeTubeApp: App {
                 .environment(appEnvironment.playerStateManager)
                 .environment(appEnvironment.appVisitState)
                 .modelContainer(PersistenceController.sharedContainer)
-                // Keep navigation and player controls neutral. Switches set their native
-                // green tint locally so their enabled track remains distinct from the thumb.
-                .tint(.primary)
+                .tint(useAccentTheme
+                      ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color
+                      : .primary)
+                .environment(\.settingsToggleTint,
+                             useAccentTheme
+                             ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color
+                             : .green)
                 // The app and player interface follow the chosen appearance.
                 .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)
         }
@@ -39,5 +45,16 @@ struct FreeTubeApp: App {
         .commands {
             MacCommands(player: appEnvironment.playerStateManager)
         }
+    }
+}
+
+private struct SettingsToggleTintKey: EnvironmentKey {
+    static let defaultValue: Color = .green
+}
+
+extension EnvironmentValues {
+    var settingsToggleTint: Color {
+        get { self[SettingsToggleTintKey.self] }
+        set { self[SettingsToggleTintKey.self] = newValue }
     }
 }

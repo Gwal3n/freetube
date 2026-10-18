@@ -3,6 +3,7 @@ import SwiftUI
 /// Keeps the system tab bar while letting people arrange its ordinary destinations.
 @available(iOS 17.0, *)
 struct TabBarSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     @AppStorage("tabBarOrder") private var tabBarOrderRaw = TabBarOrder.defaultValue
     @AppStorage("showTabBarLabels") private var showTabBarLabels = true
     @AppStorage("showSubscriptionFeedTab") private var showFeedTab = true
@@ -20,7 +21,7 @@ struct TabBarSettingsScreen: View {
         List {
             Section {
                 Toggle("Show tab names", isOn: $showTabBarLabels)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Show tab names")
             } footer: {
                 Text("Icons remain accessible by name when labels are hidden.")
@@ -31,7 +32,7 @@ struct TabBarSettingsScreen: View {
                     Toggle(isOn: visibility(for: tab)) {
                         Label(tab.title, systemImage: tab.symbol)
                     }
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .disabled(tab == .settings && !showLibraryTab)
                 }
                 .onMove(perform: moveTabs)
@@ -39,7 +40,7 @@ struct TabBarSettingsScreen: View {
                 Toggle(isOn: $showSearchTab) {
                     Label("Search", systemImage: "magnifyingglass")
                 }
-                .tint(.green)
+                    .tint(settingsToggleTint)
                 .moveDisabled(true)
             } header: {
                 Text("Tab order")

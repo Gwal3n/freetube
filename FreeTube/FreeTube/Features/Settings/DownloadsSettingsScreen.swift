@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct DownloadsSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
 
     var body: some View {
@@ -21,7 +22,7 @@ struct DownloadsSettingsScreen: View {
                 }
                 .settingsSearchRow("Default download quality")
                 Toggle("Allow cellular data", isOn: Bindable(model).allowCellularDownloads)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Allow cellular data")
                 Picker("Parallel fragments", selection: Bindable(model).concurrentFragments) {
                     ForEach([1, 2, 4, 8, 16], id: \.self) { value in

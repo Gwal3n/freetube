@@ -38,7 +38,9 @@ struct LibraryVideoShelfCard: View {
                     video: video,
                     size: CGSize(width: 160, height: 90),
                     progress: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
-                        ? entry.resumableProgress : nil
+                        ? entry.resumableProgress : nil,
+                    watchStatus: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+                        ? entry.watchStatus : nil
                 )
                 .onGeometryChange(for: CGRect.self) { proxy in
                     proxy.frame(in: .global)

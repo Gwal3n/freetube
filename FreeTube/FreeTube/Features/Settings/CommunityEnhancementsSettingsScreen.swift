@@ -3,13 +3,14 @@ import SwiftUI
 /// Native settings for the two optional, anonymous community enhancements.
 @available(iOS 17.0, *)
 struct CommunityEnhancementsSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     @Bindable var model: SettingsViewModel
 
     var body: some View {
         Form {
             Section {
                 Toggle("Enable SponsorBlock", isOn: $model.sponsorBlockEnabled)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Enable SponsorBlock")
             } header: {
                 Text("SponsorBlock")
@@ -59,14 +60,14 @@ struct CommunityEnhancementsSettingsScreen: View {
 
             Section {
                 Toggle("Replace video titles", isOn: $model.deArrowTitles)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Replace video titles")
                 Toggle("Replace video thumbnails", isOn: $model.deArrowThumbnails)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Replace video thumbnails")
                 if model.deArrowThumbnails {
                     Toggle("Random thumbnail when no submission exists", isOn: $model.deArrowRandomThumbnails)
-                        .tint(.green)
+                    .tint(settingsToggleTint)
                         .settingsSearchRow("Random thumbnail when no submission exists")
                 }
             } header: {

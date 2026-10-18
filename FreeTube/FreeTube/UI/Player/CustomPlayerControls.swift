@@ -3,6 +3,8 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct CustomPlayerControls: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
+    @AppStorage("doubleTapSeekSeconds") private var seekSeconds = 10
     let isVisible: Bool
     let isPreparing: Bool
     let isSeekPreviewActive: Bool
@@ -23,12 +25,17 @@ struct CustomPlayerControls: View {
     let bottomTimelinePadding: CGFloat
     let onTogglePlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
+    let onSeekRelative: (TimeInterval) -> Void
     let onSeekPreviewChanged: (TimeInterval?) -> Void
     let onShowChapters: () -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onStepFrame: (Int) -> Void
     let onCollapse: () -> Void
+
+    private var seekInterval: TimeInterval {
+        TimeInterval(seekSeconds > 0 ? seekSeconds : 10)
+    }
 
     var body: some View {
         ZStack {
@@ -71,13 +78,15 @@ struct CustomPlayerControls: View {
 
                 HStack(spacing: 42) {
                     Button {
-                        if isFrameStepping { onStepFrame(-1) } else { onPrevious() }
+                        if isFrameStepping { onStepFrame(-1) }
+                        else if transportButtonMode == "seek" { onSeekRelative(-seekInterval) }
+                        else { onPrevious() }
                     } label: {
-                        Image(systemName: isFrameStepping ? "chevron.left" : "backward.end.fill")
+                        Image(systemName: isFrameStepping ? "chevron.left" : (transportButtonMode == "seek" ? "gobackward" : "backward.end.fill"))
                             .playerCenterControl()
                     }
-                    .disabled(isFrameStepping ? !canStepBackward : !hasPrevious)
-                    .accessibilityLabel(isFrameStepping ? "Fine step backward" : "Previous video")
+                    .disabled(isFrameStepping ? !canStepBackward : (transportButtonMode == "seek" ? false : !hasPrevious))
+                    .accessibilityLabel(isFrameStepping ? "Fine step backward" : (transportButtonMode == "seek" ? "Seek backward" : "Previous video"))
                     Group {
                         if isPreparing {
                             PlaybackActivityIndicator(size: 34, lineWidth: 3.5)
@@ -110,13 +119,15 @@ struct CustomPlayerControls: View {
                     }
                     .frame(width: 68, height: 68)
                     Button {
-                        if isFrameStepping { onStepFrame(1) } else { onNext() }
+                        if isFrameStepping { onStepFrame(1) }
+                        else if transportButtonMode == "seek" { onSeekRelative(seekInterval) }
+                        else { onNext() }
                     } label: {
-                        Image(systemName: isFrameStepping ? "chevron.right" : "forward.end.fill")
+                        Image(systemName: isFrameStepping ? "chevron.right" : (transportButtonMode == "seek" ? "goforward" : "forward.end.fill"))
                             .playerCenterControl()
                     }
-                    .disabled(isFrameStepping ? !canStepForward : !hasNext)
-                    .accessibilityLabel(isFrameStepping ? "Fine step forward" : "Next video")
+                    .disabled(isFrameStepping ? !canStepForward : (transportButtonMode == "seek" ? false : !hasNext))
+                    .accessibilityLabel(isFrameStepping ? "Fine step forward" : (transportButtonMode == "seek" ? "Seek forward" : "Next video"))
                 }
                 .buttonStyle(.plain)
                 .opacity(isVisible ? 1 : 0)

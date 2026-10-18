@@ -21,6 +21,7 @@ struct VideoRow: View {
     var accessory: Accessory
     var showsChannelAvatar: Bool
     var playbackProgress: Double?
+    var watchStatus: WatchHistoryStatus?
     var isNewSinceLastVisit = false
     var relativeDateReference: Date?
     var onOpenChannel: (() -> Void)?
@@ -33,6 +34,7 @@ struct VideoRow: View {
         accessory: Accessory = .none,
         showsChannelAvatar: Bool = false,
         playbackProgress: Double? = nil,
+        watchStatus: WatchHistoryStatus? = nil,
         isNewSinceLastVisit: Bool = false,
         relativeDateReference: Date? = nil,
         onOpenChannel: (() -> Void)? = nil,
@@ -42,6 +44,7 @@ struct VideoRow: View {
         self.accessory = accessory
         self.showsChannelAvatar = showsChannelAvatar
         self.playbackProgress = playbackProgress
+        self.watchStatus = watchStatus
         self.isNewSinceLastVisit = isNewSinceLastVisit
         self.relativeDateReference = relativeDateReference
         self.onOpenChannel = onOpenChannel
@@ -140,6 +143,7 @@ struct VideoRow: View {
                 size: CGSize(width: thumbnailWidth,
                              height: thumbnailHeight),
                 progress: playbackProgress,
+                watchStatus: watchStatus,
                 replacementData: branding.thumbnailData(for: video),
                 replacementCacheKey: branding.thumbnailCacheKey(for: video)
             )

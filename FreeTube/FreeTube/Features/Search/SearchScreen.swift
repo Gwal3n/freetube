@@ -37,6 +37,7 @@ struct SearchContent: View {
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
+    @AppStorage("recentChannelsJSON") private var recentChannelsJSON = "[]"
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
@@ -68,7 +69,8 @@ struct SearchContent: View {
                     }
                     .buttonStyle(.bordered)
                 }
-            } else if !history.isEmpty && !(incognitoEnabled && incognitoSkipSearchHistory) {
+            } else if (!history.isEmpty || !recentChannels.isEmpty)
+                        && !(incognitoEnabled && incognitoSkipSearchHistory) {
                 historyList
             } else {
                 ContentUnavailableView(
@@ -224,7 +226,8 @@ struct SearchContent: View {
                                 VideoRow(
                                     video: video,
                                     accessory: .actions(offersPlayNext: true),
-                                    playbackProgress: progressByVideoID[video.id]
+                                    playbackProgress: progressByVideoID[video.id],
+                                    watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil
                                 ) {
                                     // Playback overlays this screen, so preserve the native search
                                     // session and its results for the user's return. Calling
@@ -514,41 +517,63 @@ struct SearchContent: View {
     @ViewBuilder
     private var historyList: some View {
         List {
-            Section {
-                ForEach(history) { entry in
-                    Button {
-                        model.query = entry.query
-                        onRunSearch(entry.query)
-                        dismissKeyboard()
-                    } label: {
-                        HStack {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .foregroundStyle(.secondary)
-                            Text(entry.query)
-                                .foregroundStyle(.primary)
-                            Spacer()
+            if !recentChannels.isEmpty {
+                Section {
+                    ForEach(recentChannels) { entry in
+                        ChannelRow(channel: entry.channel, onTap: {
+                            dismissKeyboard()
+                            onOpenDestination(.channel(entry.id))
+                        })
+                    }
+                } header: {
+                    HStack {
+                        Text("Recent channels")
+                        Spacer()
+                        Button("Clear") { recentChannelsJSON = "[]" }
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .textCase(nil)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityLabel("Clear recent channels")
+                    }
+                }
+            }
+            if !history.isEmpty {
+                Section {
+                    ForEach(history) { entry in
+                        Button {
+                            model.query = entry.query
+                            onRunSearch(entry.query)
+                            dismissKeyboard()
+                        } label: {
+                            HStack {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .foregroundStyle(.secondary)
+                                Text(entry.query)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                            }
                         }
                     }
-                }
-                .onDelete { offsets in
-                    for index in offsets {
-                        modelContext.delete(history[index])
+                    .onDelete { offsets in
+                        for index in offsets {
+                            modelContext.delete(history[index])
+                        }
+                        try? modelContext.save()
                     }
-                    try? modelContext.save()
-                }
-
-            } header: {
-                HStack {
-                    Text("Recent searches")
-                    Spacer()
-                    Button("Clear") {
-                        showingClearSearchHistoryConfirmation = true
+                } header: {
+                    HStack {
+                        Text("Recent searches")
+                        Spacer()
+                        Button("Clear") {
+                            showingClearSearchHistoryConfirmation = true
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .textCase(nil)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel("Clear recent searches")
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .textCase(nil)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityLabel("Clear recent searches")
                 }
             }
         }
@@ -566,6 +591,14 @@ struct SearchContent: View {
         } message: {
             Text("This removes saved searches from this device.")
         }
+    }
+
+    private var recentChannels: [RecentChannel] {
+        RecentChannel.entries(from: recentChannelsJSON)
+    }
+
+    private var displaysWatchProgress: Bool {
+        showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
     }
 
     private func dismissKeyboard() {

@@ -6,6 +6,7 @@ struct VideoThumbnail: View {
     let video: Video
     let size: CGSize
     var progress: Double? = nil
+    var watchStatus: WatchHistoryStatus? = nil
     var cornerRadius: CGFloat = MediaStyle.thumbnailRadius
     var replacementData: Data? = nil
     var replacementCacheKey: String? = nil
@@ -13,6 +14,22 @@ struct VideoThumbnail: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var savedMomentStore = SavedMomentStore.shared
+    @AppStorage("watchProgressColorMode") private var progressColorMode = WatchIndicatorStyle.ColorMode.red.rawValue
+    @AppStorage("watchProgressCustomHex") private var progressCustomHex = "#FF0000"
+    @AppStorage("finishedVideoIndicator") private var finishedIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
+    @AppStorage("appAccentPreset") private var accentPreset = AppAccentPreset.classic.rawValue
+
+    private var indicatorColor: Color {
+        WatchIndicatorStyle.color(
+            mode: WatchIndicatorStyle.ColorMode(rawValue: progressColorMode) ?? .red,
+            accent: AppAccentPreset(rawValue: accentPreset) ?? .classic,
+            customHex: progressCustomHex
+        )
+    }
+
+    private var finishedMode: WatchIndicatorStyle.FinishedMode {
+        WatchIndicatorStyle.FinishedMode(rawValue: finishedIndicator) ?? .none
+    }
 
     var body: some View {
         KFImage(video.thumbnailURL)
@@ -57,14 +74,26 @@ struct VideoThumbnail: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if let progress, progress.isFinite {
+                if let displayedProgress = watchStatus == .finished
+                    ? (finishedMode == .fullBar ? 1.0 : nil) : progress,
+                   displayedProgress.isFinite {
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
                             Color.black.opacity(0.32)
-                            Color.red.frame(width: proxy.size.width * min(max(progress, 0), 1))
+                            indicatorColor.frame(width: proxy.size.width * min(max(displayedProgress, 0), 1))
                         }
                     }
                     .frame(height: 3)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if watchStatus == .finished && finishedMode == .checkmark {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: compactBadge ? 13 : 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.8), radius: 2)
+                        .padding(compactBadge ? 4 : 6)
+                        .accessibilityLabel("Watched")
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

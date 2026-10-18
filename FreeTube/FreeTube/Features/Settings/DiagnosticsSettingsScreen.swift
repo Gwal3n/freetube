@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct DiagnosticsSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
     @State private var logWriter = LogFileWriter.shared
     @State private var shareLogURL: URL?
@@ -12,7 +13,7 @@ struct DiagnosticsSettingsScreen: View {
         Form {
             Section {
                 Toggle("Save logs to file", isOn: Bindable(model).logToFile)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Save logs to file")
                 if model.logToFile, let url = logWriter.currentLogFileURL {
                     LabeledContent("Current log") {

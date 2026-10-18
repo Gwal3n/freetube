@@ -39,6 +39,10 @@ struct LocalPlaylistScreen: View {
     @State private var videoSort: LocalPlaylistVideoSort = .custom
     @State private var videoFilters = SearchVideoFilters()
     @State private var watchStatuses: [String: WatchHistoryStatus] = [:]
+    @State private var watchProgress: [String: Double] = [:]
+    @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
+    @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @State private var customRange: CustomRange?
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -282,7 +286,12 @@ struct LocalPlaylistScreen: View {
     private func playlistVideoRow(_ video: Video, in details: LocalPlaylistDetails) -> some View {
         let accessory: VideoRow.Accessory = editingMode == nil
             ? .actions(offersPlayNext: true) : .reserved
-        return VideoRow(video: video, accessory: accessory, onTap: {
+        return VideoRow(video: video, accessory: accessory,
+                        playbackProgress: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+                            ? watchProgress[video.id] : nil,
+                        watchStatus: showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
+                            ? watchStatuses[video.id] : nil,
+                        onTap: {
             if editingMode != nil {
                 if selectedVideoIDs.contains(video.id) {
                     selectedVideoIDs.remove(video.id)
@@ -346,6 +355,7 @@ struct LocalPlaylistScreen: View {
         let summary = await PersistenceWriter.shared.watchHistorySummary(videoIDs: ids)
         guard self.details?.videos.map(\.id) == ids else { return }
         watchStatuses = summary.statuses
+        watchProgress = summary.progress
     }
 
     private func playlistHeader(_ local: LocalPlaylistDetails) -> some View {

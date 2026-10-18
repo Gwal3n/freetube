@@ -2,9 +2,11 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct AppearanceSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
     @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
+    @AppStorage("useAccentTheme") private var useAccentTheme = false
 
     var body: some View {
         Form {
@@ -15,19 +17,24 @@ struct AppearanceSettingsScreen: View {
                     Text("Dark").tag(AppearanceMode.dark.rawValue)
                 }
                 .settingsSearchRow("Appearance")
-                Picker("Accent color", selection: $appAccentPresetRaw) {
-                    ForEach(AppAccentPreset.allCases) { preset in
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(preset.color)
-                                .frame(width: 18, height: 18)
-                            Text(preset.label)
-                                .foregroundStyle(.primary)
+                Toggle("Use accent colors", isOn: $useAccentTheme)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Use accent colors")
+                if useAccentTheme {
+                    Picker("Accent color", selection: $appAccentPresetRaw) {
+                        ForEach(AppAccentPreset.allCases) { preset in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(preset.color)
+                                    .frame(width: 18, height: 18)
+                                Text(preset.label)
+                                    .foregroundStyle(.primary)
+                            }
+                            .tag(preset.rawValue)
                         }
-                        .tag(preset.rawValue)
                     }
+                    .settingsSearchRow("Accent color")
                 }
-                .settingsSearchRow("Accent color")
                 Picker("Text font", selection: Bindable(model).appFontPreset) {
                     ForEach(AppFontPreset.allCases) { preset in
                         preset.label
@@ -46,7 +53,6 @@ struct AppearanceSettingsScreen: View {
                 } label: {
                     Label("Tab Bar", systemImage: "square.grid.2x2")
                 }
-                .tint(.primary)
                 .settingsSearchRow("Tab Bar")
             }
         }

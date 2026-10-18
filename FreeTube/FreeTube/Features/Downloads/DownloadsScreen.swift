@@ -246,6 +246,16 @@ struct DownloadsScreen: View {
             .navigationTitle(isSelecting
                              ? String(localized: "\(selectedIDs.count) selected")
                              : String(localized: "Downloads"))
+            .toolbar {
+                if !savedItems.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(isSelecting ? "Done" : "Select") {
+                            isSelecting.toggle()
+                            selectedIDs.removeAll()
+                        }
+                    }
+                }
+            }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
                 switch destination {
                 case .channel(let id): ChannelScreen(channelID: id)
@@ -389,11 +399,6 @@ struct DownloadsScreen: View {
                     }
                     .accessibilityLabel("Sort saved videos")
                 }
-                Button(isSelecting ? "Done" : "Select") {
-                    isSelecting.toggle()
-                    selectedIDs.removeAll()
-                }
-                .frame(minWidth: 44, minHeight: 44)
             }
         }
         .textCase(nil)

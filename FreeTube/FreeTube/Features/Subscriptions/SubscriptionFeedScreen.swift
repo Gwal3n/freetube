@@ -589,6 +589,7 @@ struct SubscriptionFeedScreen: View {
                 offersPlayNext: true,
                 showsChannelAvatar: showChannelAvatars,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
+                watchStatus: displaysWatchProgress ? model.watchStatuses[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             )
@@ -598,6 +599,7 @@ struct SubscriptionFeedScreen: View {
                 accessory: .actions(offersPlayNext: true),
                 showsChannelAvatar: showChannelAvatars,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
+                watchStatus: displaysWatchProgress ? model.watchStatuses[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate
             ) {

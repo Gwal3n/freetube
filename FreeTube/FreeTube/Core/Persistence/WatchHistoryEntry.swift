@@ -118,4 +118,11 @@ struct WatchHistorySnapshot: Identifiable, Sendable, Codable {
               lastPosition < duration * 0.95 else { return nil }
         return lastPosition / duration
     }
+
+    var watchStatus: WatchHistoryStatus {
+        guard lastPosition.isFinite, duration.isFinite, duration > 0 else { return .watched }
+        if lastPosition >= duration * 0.95 { return .finished }
+        if lastPosition >= min(duration * 0.05, 10) { return .partial }
+        return .watched
+    }
 }

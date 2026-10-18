@@ -21,9 +21,6 @@ final class SettingsViewModel {
     var addToHistoryWhenOpened: Bool {
         didSet { preferences.addToHistoryWhenOpened = addToHistoryWhenOpened }
     }
-    var saveSearchHistory: Bool {
-        didSet { preferences.saveSearchHistory = saveSearchHistory }
-    }
     var showLibraryShelf: Bool {
         didSet { preferences.showLibraryShelf = showLibraryShelf }
     }
@@ -140,7 +137,6 @@ final class SettingsViewModel {
         self.showUpNext = preferences.showUpNext
         self.saveWatchHistory = preferences.saveWatchHistory
         self.addToHistoryWhenOpened = preferences.addToHistoryWhenOpened
-        self.saveSearchHistory = preferences.saveSearchHistory
         self.showLibraryShelf = preferences.showLibraryShelf
         self.showContinueWatchingMenu = preferences.showContinueWatchingMenu
         self.recentLibraryVideoCount = preferences.recentLibraryVideoCount

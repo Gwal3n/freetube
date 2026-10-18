@@ -30,6 +30,7 @@ struct PlaylistScreen: View {
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @State private var playbackProgress: [String: Double] = [:]
+    @State private var watchStatuses: [String: WatchHistoryStatus] = [:]
 
     init(playlistID: String) {
         _model = State(wrappedValue: PlaylistViewModel(playlistID: playlistID))
@@ -114,9 +115,11 @@ struct PlaylistScreen: View {
         }
         .task(id: "\(showHistoryProgressBars):\(incognitoEnabled):\(incognitoHideWatchProgress):" + (model.details?.videos.map(\.id).joined(separator: ",") ?? "")) {
             let ids = model.details?.videos.map(\.id) ?? []
-            playbackProgress = displaysWatchProgress
-                ? await PersistenceWriter.shared.watchProgress(videoIDs: ids)
-                : [:]
+            let summary = displaysWatchProgress
+                ? await PersistenceWriter.shared.watchHistorySummary(videoIDs: ids)
+                : WatchHistorySummary()
+            playbackProgress = summary.progress
+            watchStatuses = summary.statuses
         }
         .errorToast(Bindable(model).errorState)
     }
@@ -305,7 +308,8 @@ struct PlaylistScreen: View {
                     VideoRow(
                         video: video,
                         accessory: .actions(offersPlayNext: true),
-                        playbackProgress: displaysWatchProgress ? playbackProgress[video.id] : nil
+                        playbackProgress: displaysWatchProgress ? playbackProgress[video.id] : nil,
+                        watchStatus: displaysWatchProgress ? watchStatuses[video.id] : nil
                     ) {
                         // Make sure the queue reflects the playlist's order before kicking off
                         // playback, so "next video" actually means the next playlist entry.

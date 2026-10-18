@@ -161,6 +161,7 @@ struct LocalHistoryScreen: View {
             video: video,
             accessory: .actions(offersPlayNext: true),
             playbackProgress: showsProgress ? entry.resumableProgress : nil,
+            watchStatus: showsProgress ? entry.watchStatus : nil,
             onOpenChannel: {
                 if let channelID = entry.channelID, !channelID.isEmpty {
                     channelToOpen = channelID

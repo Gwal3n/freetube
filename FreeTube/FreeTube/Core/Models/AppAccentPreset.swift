@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// A small set of adaptive system tints for app chrome. Semantic video and status colors do not
-/// derive from this preference, so changing the accent cannot recolor LIVE or playback progress.
+/// Adaptive system tints for optional accented app chrome. Semantic LIVE colors remain fixed;
+/// watch progress can follow this tint only when that separate preference is selected.
 enum AppAccentPreset: String, CaseIterable, Identifiable {
     case classic
     case blue

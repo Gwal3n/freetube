@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct PlayerSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
@@ -9,6 +10,10 @@ struct PlayerSettingsScreen: View {
     @AppStorage("showPlayerShareButton") private var showPlayerShareButton = true
     @AppStorage("showPlayerDownloadButton") private var showPlayerDownloadButton = true
     @AppStorage("customDoubleTapSeekSeconds") private var customDoubleTapSeekSeconds = 20
+    @AppStorage("watchProgressColorMode") private var watchProgressColorMode = WatchIndicatorStyle.ColorMode.red.rawValue
+    @AppStorage("watchProgressCustomHex") private var watchProgressCustomHex = "#FF0000"
+    @AppStorage("finishedVideoIndicator") private var finishedVideoIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
+    @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
 
@@ -18,7 +23,7 @@ struct PlayerSettingsScreen: View {
         Form {
             Section {
                 Toggle("Swipe horizontally to seek", isOn: $horizontalSwipeToSeekEnabled)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Swipe horizontally to seek")
                 Picker("Double-tap seek", selection: seekIntervalSelection) {
                     Text("Off").tag(0)
@@ -37,7 +42,6 @@ struct PlayerSettingsScreen: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .tint(.primary)
                     .settingsSearchRow("Custom interval")
                 }
                 Picker("Seek preview", selection: Bindable(model).seekPreviewStyle) {
@@ -76,13 +80,13 @@ struct PlayerSettingsScreen: View {
 
             Section {
                 Toggle("Save", isOn: $showPlayerSaveButton)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Save button")
                 Toggle("Share", isOn: $showPlayerShareButton)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Share button")
                 Toggle("Download", isOn: $showPlayerDownloadButton)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Download button")
             } header: {
                 Text("Buttons below video")
@@ -92,35 +96,60 @@ struct PlayerSettingsScreen: View {
 
             Section {
                 Toggle("Remember floating player placement", isOn: Bindable(model).rememberFloatingPlayerPlacement)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Remember floating player placement")
                 Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Show watch progress bars")
+                if model.showHistoryProgressBars {
+                    Picker("Watch progress color", selection: $watchProgressColorMode) {
+                        Text("Red").tag(WatchIndicatorStyle.ColorMode.red.rawValue)
+                        Text("Accent color").tag(WatchIndicatorStyle.ColorMode.accent.rawValue)
+                        Text("Custom").tag(WatchIndicatorStyle.ColorMode.custom.rawValue)
+                    }
+                    .settingsSearchRow("Watch progress color")
+                    if watchProgressColorMode == WatchIndicatorStyle.ColorMode.custom.rawValue {
+                        ColorPicker("Custom progress color", selection: Binding(
+                            get: { WatchIndicatorStyle.color(hex: watchProgressCustomHex) ?? .red },
+                            set: { watchProgressCustomHex = WatchIndicatorStyle.hex(color: $0) }
+                        ), supportsOpacity: false)
+                    }
+                    Picker("Fully watched videos", selection: $finishedVideoIndicator) {
+                        Text("Full progress bar").tag(WatchIndicatorStyle.FinishedMode.fullBar.rawValue)
+                        Text("Checkmark").tag(WatchIndicatorStyle.FinishedMode.checkmark.rawValue)
+                        Text("No indicator").tag(WatchIndicatorStyle.FinishedMode.none.rawValue)
+                    }
+                    .settingsSearchRow("Fully watched videos")
+                }
+                Picker("Transport buttons", selection: $transportButtonMode) {
+                    Text("Previous and next video").tag("videos")
+                    Text("Seek backward and forward").tag("seek")
+                }
+                .settingsSearchRow("Transport buttons")
                 Toggle("Show description", isOn: Bindable(model).showDescription)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Show description")
                 Toggle("Show comments", isOn: Bindable(model).showComments)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Show comments")
                 if model.showComments {
                     Toggle("Show commenter photos", isOn: Bindable(model).showCommentAuthorPhotos)
-                        .tint(.green)
+                        .tint(settingsToggleTint)
                         .settingsSearchRow("Show commenter photos")
                     Toggle("Open commenter channels", isOn: Bindable(model).openCommentAuthorChannels)
-                        .tint(.green)
+                        .tint(settingsToggleTint)
                         .settingsSearchRow("Open commenter channels")
                     Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
-                        .tint(.green)
+                        .tint(settingsToggleTint)
                         .settingsSearchRow("Show featured comment preview")
                     if model.showFeaturedCommentPreview {
                         Toggle("Only near playback time", isOn: Bindable(model).featuredCommentsNearPlaybackOnly)
-                            .tint(.green)
+                            .tint(settingsToggleTint)
                             .settingsSearchRow("Only near playback time")
                     }
                 }
                 Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Show Up Next")
                 if model.showUpNext {
                     Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
@@ -133,7 +162,7 @@ struct PlayerSettingsScreen: View {
                     .settingsSearchRow("Initial Up Next videos")
                 }
                 Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .disabled(!cacheRecentVideoContent)
                     .settingsSearchRow("Prefetch details and comments")
                 NavigationLink {
@@ -141,7 +170,6 @@ struct PlayerSettingsScreen: View {
                 } label: {
                     Label("Customize controls", systemImage: "slider.horizontal.3")
                 }
-                .tint(.primary)
                 .settingsSearchRow("Customize controls")
             } header: {
                 Text("Content & controls")

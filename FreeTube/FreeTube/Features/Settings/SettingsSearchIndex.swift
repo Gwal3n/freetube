@@ -57,6 +57,9 @@ enum SettingsSearchIndex {
                 || displayTitle == String(localized: "Light")
                 || displayTitle == String(localized: "Dark"):
                 return String(localized: "Appearance")
+            case .appearance where displayTitle == String(localized: "Accent color"):
+                return UserDefaults.standard.bool(forKey: "useAccentTheme")
+                    ? String(localized: "Accent color") : String(localized: "Use accent colors")
             case .tabBar where displayTitle == String(localized: "Tab Bar"):
                 return String(localized: "Show tab names")
             case .browsing where displayTitle == String(localized: "Browsing"):
@@ -143,7 +146,7 @@ enum SettingsSearchIndex {
         Group(destination: .player, titles: [
             "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
             "Save button", "Share button", "Download button",
-            "Remember floating player placement", "Show watch progress bars", "Show description",
+            "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Show description",
             "Show comments", "Show commenter photos", "Open commenter channels", "Show featured comment preview", "Only near playback time", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments"
         ]),
@@ -158,14 +161,14 @@ enum SettingsSearchIndex {
             "More menu separators", "Fine seeking", "Quality limit", "Captions"
         ]),
         Group(destination: .browsing, titles: [
-            "Browsing", "Show search suggestions", "Save recent searches",
+            "Browsing", "Show search suggestions",
             "Large video thumbnails", "Show channel avatars", "Mark new uploads", "Space out related uploads",
             "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
             "Refresh interval", "Update feed view counts", "View count batch interval"
         ]),
         Group(destination: .subscriptionGroups, titles: ["Manage subscription groups"]),
         Group(destination: .channelTabs, titles: ["Channel tabs"]),
-        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Accent color", "Text font"]),
+        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Use accent colors", "Accent color", "Text font"]),
         Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Tab order"]),
         Group(destination: .libraryData, titles: [
             "Library & Data", "Save watch history", "Add to history when opened",
@@ -182,7 +185,7 @@ enum SettingsSearchIndex {
             "Import Playlist Archive", "Import Playlist CSV Files"
         ]),
         Group(destination: .downloads, titles: ["Downloads", "Default download quality", "Allow cellular data", "Parallel fragments"]),
-        Group(destination: .privacy, titles: ["Privacy"]),
+        Group(destination: .privacy, titles: ["Privacy", "Save recent searches"]),
         Group(destination: .incognito, titles: [
             "Incognito", "Don't save searches", "Don't save watch history",
             "Don't save watch progress", "Hide watch progress", "Hide Feed tab", "Hide Library tab"

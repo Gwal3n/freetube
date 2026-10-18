@@ -19,6 +19,7 @@ struct VideoCard: View {
     var offersPlayNext = false
     var showsChannelAvatar = true
     var playbackProgress: Double? = nil
+    var watchStatus: WatchHistoryStatus? = nil
     var isNewSinceLastVisit = false
     var relativeDateReference: Date? = nil
 
@@ -77,6 +78,7 @@ struct VideoCard: View {
                 video: video,
                 size: CGSize(width: proxy.size.width, height: proxy.size.width * 9 / 16),
                 progress: playbackProgress,
+                watchStatus: watchStatus,
                 replacementData: branding.thumbnailData(for: video),
                 replacementCacheKey: branding.thumbnailCacheKey(for: video)
             )

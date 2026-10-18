@@ -3,6 +3,7 @@ import SwiftUI
 /// Configures local-only privacy behavior. Existing saved data is never deleted by this mode.
 @available(iOS 17.0, *)
 struct IncognitoSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     @AppStorage("incognitoEnabled") private var enabled = false
     @AppStorage("incognitoSkipSearchHistory") private var skipSearchHistory = true
     @AppStorage("incognitoSkipWatchHistory") private var skipWatchHistory = true
@@ -15,7 +16,7 @@ struct IncognitoSettingsScreen: View {
         Form {
             Section {
                 Toggle("Incognito", isOn: $enabled)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Incognito")
             } footer: {
                 Text("Incognito changes only future activity while it is on. It does not delete existing data or hide network activity from YouTube or your internet provider.")
@@ -23,25 +24,25 @@ struct IncognitoSettingsScreen: View {
 
             Section("While Incognito Is On") {
                 Toggle("Don't save searches", isOn: $skipSearchHistory)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Don't save searches")
                 Toggle("Don't save watch history", isOn: $skipWatchHistory)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Don't save watch history")
                 Toggle("Don't save watch progress", isOn: $skipWatchProgress)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Don't save watch progress")
                 Toggle("Hide watch progress", isOn: $hideWatchProgress)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Hide watch progress")
             }
 
             Section {
                 Toggle("Hide Feed tab", isOn: $hideFeed)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Hide Feed tab")
                 Toggle("Hide Library tab", isOn: $hideLibrary)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Hide Library tab")
             } header: {
                 Text("Tabs")

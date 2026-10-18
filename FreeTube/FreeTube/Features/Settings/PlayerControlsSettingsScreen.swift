@@ -4,6 +4,7 @@ import SwiftUI
 /// including moves into empty sections, without making the entire row compete with drag handles.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     @Bindable var model: SettingsViewModel
     @State private var editMode = EditMode.active
     @State private var showsMenuSeparators = false
@@ -108,7 +109,7 @@ struct PlayerControlsSettingsScreen: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                 }
             }
             .settingsSearchRow("More menu separators")

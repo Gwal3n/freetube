@@ -90,7 +90,6 @@ struct SettingsScreen: View {
                                         }
                                     }
                                 }
-                                .tint(.primary)
                             }
                         }
                     }
@@ -166,6 +165,5 @@ struct SettingsScreen: View {
             Label(title, systemImage: systemImage)
                 .foregroundStyle(.primary)
         }
-        .tint(.primary)
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct LibraryDataSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     private enum ClearTarget: Equatable {
         case progress, history
     }
@@ -20,10 +21,10 @@ struct LibraryDataSettingsScreen: View {
         Form {
             Section {
                 Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Save watch history")
                 Toggle("Add to history when opened", isOn: Bindable(model).addToHistoryWhenOpened)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .disabled(!model.saveWatchHistory)
                     .settingsSearchRow("Add to history when opened")
                 Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
@@ -53,10 +54,10 @@ struct LibraryDataSettingsScreen: View {
 
             Section("Library") {
                 Toggle("Continue Watching in Library", isOn: Bindable(model).showContinueWatchingMenu)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Continue Watching in Library")
                 Toggle("Library video shelf", isOn: Bindable(model).showLibraryShelf)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .disabled(!model.saveWatchHistory)
                     .settingsSearchRow("Library video shelf")
                 if model.showLibraryShelf && model.saveWatchHistory {

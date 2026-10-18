@@ -3,6 +3,7 @@ import SwiftUI
 /// Native, device-local controls for hiding unwanted public content. Saved data is untouched.
 @available(iOS 17.0, *)
 struct VideoBlockingSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     @State private var blocklist = VideoBlocklist.shared
     @State private var keywordInput = ""
     @State private var channelInput = ""
@@ -14,7 +15,7 @@ struct VideoBlockingSettingsScreen: View {
                     get: { blocklist.hideShorts },
                     set: { blocklist.hideShorts = $0 }
                 ))
-                .tint(.green)
+                    .tint(settingsToggleTint)
                 .settingsSearchRow("Hide Shorts")
             } footer: {
                 Text("Shorts are hidden where YouTube identifies a video as a Short.")

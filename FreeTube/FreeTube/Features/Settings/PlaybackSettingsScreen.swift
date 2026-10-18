@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct PlaybackSettingsScreen: View {
+    @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("playbackSpeedChoices") private var savedPlaybackSpeedsRaw = ""
@@ -38,7 +39,6 @@ struct PlaybackSettingsScreen: View {
                         Label("Playback speeds", systemImage: "speedometer")
                     }
                 }
-                .tint(.primary)
                 .settingsSearchRow("Playback speeds")
                 .onChange(of: model.defaultPlaybackRate) { _, rate in
                     player.setPlaybackRate(rate)
@@ -53,10 +53,9 @@ struct PlaybackSettingsScreen: View {
                 } label: {
                     Label("Sleep timer durations", systemImage: "moon.zzz")
                 }
-                .tint(.primary)
                 .settingsSearchRow("Sleep timer durations")
                 Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Hold for speed")
                 Button {
                     holdSpeedText = model.holdSpeedRate.formatted(.number.precision(.fractionLength(0...2)))
@@ -67,17 +66,16 @@ struct PlaybackSettingsScreen: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .tint(.primary)
                 .disabled(!model.holdForSpeedEnabled)
                 .settingsSearchRow("Hold speed")
                 Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Autoplay next video")
                 Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Allow audio from other apps")
                 Toggle("Resume after interruptions", isOn: Bindable(model).resumeAfterAudioInterruption)
-                    .tint(.green)
+                    .tint(settingsToggleTint)
                     .settingsSearchRow("Resume after interruptions")
             } header: {
                 Text("Video & audio")

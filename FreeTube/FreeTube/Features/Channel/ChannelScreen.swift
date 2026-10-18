@@ -103,6 +103,9 @@ struct ChannelScreen: View {
         .toolbarBackground(MediaStyle.pageBackground, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
+        .onChange(of: model.details?.channel.id, initial: true) { _, _ in
+            if let channel = model.details?.channel { RecentChannel.record(channel) }
+        }
         .onChange(of: currentTabs) { _, tabs in
             guard !tabs.isEmpty else { return }
             let destination = tabs.contains(selectedTab) ? selectedTab : .videos
