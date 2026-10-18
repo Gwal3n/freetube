@@ -14,6 +14,9 @@ struct NowPlayingIndicator: View {
     let videoID: String
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
+    @AppStorage("appCustomAccentHex") private var appCustomAccentHex = "#FF3B30"
+    @AppStorage("useAccentTheme") private var useAccentTheme = false
+    @AppStorage("accentNavigationOnly") private var accentNavigationOnly = false
 
     /// Local mirror that the library mutates via its `@Binding`. We sync from the player on
     /// every render so taps that play/pause externally are reflected in the bars.
@@ -23,7 +26,9 @@ struct NowPlayingIndicator: View {
         SwimplyPlayIndicator(
             state: $audioState,
             count: 3,
-            color: (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color,
+            color: useAccentTheme && !accentNavigationOnly
+                ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)
+                : .primary,
             style: .modern
         )
         .frame(width: 16, height: 16)

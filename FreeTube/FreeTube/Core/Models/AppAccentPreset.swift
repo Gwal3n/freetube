@@ -11,10 +11,11 @@ enum AppAccentPreset: String, CaseIterable, Identifiable {
     case green
     case orange
     case purple
+    case custom
 
     var id: String { rawValue }
 
-    var color: Color {
+    func color(customHex: String) -> Color {
         switch self {
         case .classic: Color(uiColor: .systemRed)
         case .blue: Color(uiColor: .systemBlue)
@@ -23,6 +24,7 @@ enum AppAccentPreset: String, CaseIterable, Identifiable {
         case .green: Color(uiColor: .systemGreen)
         case .orange: Color(uiColor: .systemOrange)
         case .purple: Color(uiColor: .systemPurple)
+        case .custom: WatchIndicatorStyle.color(hex: customHex) ?? Color(uiColor: .systemRed)
         }
     }
 
@@ -35,6 +37,7 @@ enum AppAccentPreset: String, CaseIterable, Identifiable {
         case .green: "Green"
         case .orange: "Orange"
         case .purple: "Purple"
+        case .custom: "Custom"
         }
     }
 }

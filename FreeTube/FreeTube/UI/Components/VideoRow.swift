@@ -25,6 +25,7 @@ struct VideoRow: View {
     var isNewSinceLastVisit = false
     var relativeDateReference: Date?
     var onOpenChannel: (() -> Void)?
+    var channelLinkID: String?
     var onTap: () -> Void
 
     /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
@@ -38,6 +39,7 @@ struct VideoRow: View {
         isNewSinceLastVisit: Bool = false,
         relativeDateReference: Date? = nil,
         onOpenChannel: (() -> Void)? = nil,
+        channelLinkID: String? = nil,
         onTap: @escaping () -> Void = {}
     ) {
         self.video = video
@@ -48,6 +50,7 @@ struct VideoRow: View {
         self.isNewSinceLastVisit = isNewSinceLastVisit
         self.relativeDateReference = relativeDateReference
         self.onOpenChannel = onOpenChannel
+        self.channelLinkID = channelLinkID
         self.onTap = onTap
     }
 
@@ -63,12 +66,16 @@ struct VideoRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Group {
-                Button(action: openVideo) {
-                    content(branding: branding)
+                if let channelLinkID, !channelLinkID.isEmpty {
+                    linkedContent(branding: branding, channelID: channelLinkID)
+                } else {
+                    Button(action: openVideo) {
+                        content(branding: branding)
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
+                    .accessibilityHint("Plays video")
                 }
-                .buttonStyle(ResponsiveButtonStyle())
-                .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
-                .accessibilityHint("Plays video")
             }
 
             switch accessory {
@@ -138,66 +145,124 @@ struct VideoRow: View {
 
     private func content(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: MediaStyle.spacing) {
-            VideoThumbnail(
-                video: video,
-                size: CGSize(width: thumbnailWidth,
-                             height: thumbnailHeight),
-                progress: playbackProgress,
-                watchStatus: watchStatus,
-                replacementData: branding.thumbnailData(for: video),
-                replacementCacheKey: branding.thumbnailCacheKey(for: video)
-            )
-            .onGeometryChange(for: CGRect.self) { proxy in
-                proxy.frame(in: .global)
-            } action: { frame in
-                launchAnchor.frame = frame
-            }
+            thumbnail(branding: branding)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(branding.title(for: video))
-                    .contentTransition(.opacity)
-                    .appFont(.subheadline, weight: .semibold)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
-                HStack(spacing: 5) {
-                    if showsChannelAvatar {
-                        KFImage(video.channelThumbnailURL)
-                            .thumbnail(size: CGSize(width: 18, height: 18)) {
-                                Circle().fill(MediaStyle.placeholderFill)
-                            }
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 18, height: 18)
-                            .clipShape(Circle())
-                            .accessibilityHidden(true)
-                    }
-                    Text(video.channelName)
-                        .appFont(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if !statsLine.isEmpty {
-                    HStack(spacing: 6) {
-                        if isNewSinceLastVisit {
-                            Text("New")
-                                .appFont(.caption2, weight: .semibold)
-                                .foregroundStyle(.primary)
-                                .fixedSize()
-                                .accessibilityHidden(true)
-                        }
-                        Text(statsLine)
-                            .appFont(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                } else if isNewSinceLastVisit {
-                    Text("New")
-                        .appFont(.caption2, weight: .semibold)
-                        .foregroundStyle(.primary)
-                        .accessibilityHidden(true)
-                }
+                title(branding: branding)
+                channelLine
+                secondaryLine
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    /// Search results give the uploader a separate native navigation target. The other row
+    /// contexts keep their original whole-row playback button unchanged.
+    private func linkedContent(branding: DeArrowVideoViewModel, channelID: String) -> some View {
+        HStack(alignment: .top, spacing: MediaStyle.spacing) {
+            Button(action: openVideo) { thumbnail(branding: branding) }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Button(action: openVideo) {
+                    title(branding: branding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel(branding.title(for: video))
+                .accessibilityHint("Plays video")
+
+                NavigationLink {
+                    ChannelScreen(channelID: channelID)
+                } label: {
+                    channelLine
+                        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open \(video.channelName)")
+
+                if !statsLine.isEmpty || isNewSinceLastVisit {
+                    Button(action: openVideo) {
+                        secondaryLine
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityHidden(true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func thumbnail(branding: DeArrowVideoViewModel) -> some View {
+        VideoThumbnail(
+            video: video,
+            size: CGSize(width: thumbnailWidth, height: thumbnailHeight),
+            progress: playbackProgress,
+            watchStatus: watchStatus,
+            replacementData: branding.thumbnailData(for: video),
+            replacementCacheKey: branding.thumbnailCacheKey(for: video)
+        )
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            launchAnchor.frame = frame
+        }
+    }
+
+    private func title(branding: DeArrowVideoViewModel) -> some View {
+        Text(branding.title(for: video))
+            .contentTransition(.opacity)
+            .appFont(.subheadline, weight: .semibold)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
+    }
+
+    private var channelLine: some View {
+        HStack(spacing: 5) {
+            if showsChannelAvatar {
+                KFImage(video.channelThumbnailURL)
+                    .thumbnail(size: CGSize(width: 18, height: 18)) {
+                        Circle().fill(MediaStyle.placeholderFill)
+                    }
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 18, height: 18)
+                    .clipShape(Circle())
+                    .accessibilityHidden(true)
+            }
+            Text(video.channelName)
+                .appFont(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    @ViewBuilder
+    private var secondaryLine: some View {
+        if !statsLine.isEmpty {
+            HStack(spacing: 6) {
+                if isNewSinceLastVisit {
+                    Text("New")
+                        .appFont(.caption2, weight: .semibold)
+                        .foregroundStyle(.primary)
+                        .fixedSize()
+                        .accessibilityHidden(true)
+                }
+                Text(statsLine)
+                    .appFont(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        } else if isNewSinceLastVisit {
+            Text("New")
+                .appFont(.caption2, weight: .semibold)
+                .foregroundStyle(.primary)
+                .accessibilityHidden(true)
+        }
     }
 }

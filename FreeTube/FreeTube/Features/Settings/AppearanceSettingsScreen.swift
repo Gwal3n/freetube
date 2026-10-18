@@ -7,6 +7,8 @@ struct AppearanceSettingsScreen: View {
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
     @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
     @AppStorage("useAccentTheme") private var useAccentTheme = false
+    @AppStorage("accentNavigationOnly") private var accentNavigationOnly = false
+    @AppStorage("appCustomAccentHex") private var appCustomAccentHex = "#FF3B30"
 
     var body: some View {
         Form {
@@ -21,11 +23,14 @@ struct AppearanceSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Use accent colors")
                 if useAccentTheme {
+                    Toggle("Accent navigation bar only", isOn: $accentNavigationOnly)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Accent navigation bar only")
                     Picker("Accent color", selection: $appAccentPresetRaw) {
                         ForEach(AppAccentPreset.allCases) { preset in
                             HStack(spacing: 12) {
                                 Circle()
-                                    .fill(preset.color)
+                                    .fill(preset.color(customHex: appCustomAccentHex))
                                     .frame(width: 18, height: 18)
                                 Text(preset.label)
                                     .foregroundStyle(.primary)
@@ -34,6 +39,13 @@ struct AppearanceSettingsScreen: View {
                         }
                     }
                     .settingsSearchRow("Accent color")
+                    if appAccentPresetRaw == AppAccentPreset.custom.rawValue {
+                        ColorPicker("Custom accent color", selection: Binding(
+                            get: { WatchIndicatorStyle.color(hex: appCustomAccentHex) ?? .red },
+                            set: { appCustomAccentHex = WatchIndicatorStyle.hex(color: $0) }
+                        ), supportsOpacity: false)
+                        .settingsSearchRow("Custom accent color")
+                    }
                 }
                 Picker("Text font", selection: Bindable(model).appFontPreset) {
                     ForEach(AppFontPreset.allCases) { preset in

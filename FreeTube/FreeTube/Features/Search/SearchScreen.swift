@@ -158,12 +158,12 @@ struct SearchContent: View {
                     Section {
                         if areChannelsExpanded {
                             ForEach(visibleChannels) { channel in
-                                ChannelRow(channel: channel, onTap: {
-                                    navigationLog.info("Search channel row tapped: \(channel.id, privacy: .public)")
-                                    dismissKeyboard()
-                                    onOpenDestination(.channel(channel.id))
-                                })
-                                .accessibilityAddTraits(.isLink)
+                                NavigationLink {
+                                    ChannelScreen(channelID: channel.id)
+                                } label: {
+                                    ChannelRow(channel: channel)
+                                }
+                                .mediaListRow()
                             }
                         }
                     } header: {
@@ -227,7 +227,8 @@ struct SearchContent: View {
                                     video: video,
                                     accessory: .actions(offersPlayNext: true),
                                     playbackProgress: progressByVideoID[video.id],
-                                    watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil
+                                    watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil,
+                                    channelLinkID: video.channelID.isEmpty ? nil : video.channelID
                                 ) {
                                     // Playback overlays this screen, so preserve the native search
                                     // session and its results for the user's return. Calling
@@ -520,10 +521,12 @@ struct SearchContent: View {
             if !recentChannels.isEmpty {
                 Section {
                     ForEach(recentChannels) { entry in
-                        ChannelRow(channel: entry.channel, onTap: {
-                            dismissKeyboard()
-                            onOpenDestination(.channel(entry.id))
-                        })
+                        NavigationLink {
+                            ChannelScreen(channelID: entry.id)
+                        } label: {
+                            ChannelRow(channel: entry.channel)
+                        }
+                        .mediaListRow()
                     }
                 } header: {
                     HStack {

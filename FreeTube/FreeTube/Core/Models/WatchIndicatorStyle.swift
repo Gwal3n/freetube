@@ -10,10 +10,10 @@ enum WatchIndicatorStyle {
         case fullBar, checkmark, none
     }
 
-    static func color(mode: ColorMode, accent: AppAccentPreset, customHex: String) -> Color {
+    static func color(mode: ColorMode, accent: AppAccentPreset, accentHex: String, customHex: String) -> Color {
         switch mode {
         case .red: .red
-        case .accent: accent.color
+        case .accent: accent.color(customHex: accentHex)
         case .custom: color(hex: customHex) ?? .red
         }
     }

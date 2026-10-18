@@ -18,6 +18,8 @@ struct FreeTubeApp: App {
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
     @AppStorage("useAccentTheme") private var useAccentTheme = false
     @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
+    @AppStorage("appCustomAccentHex") private var appCustomAccentHex = "#FF3B30"
+    @AppStorage("accentNavigationOnly") private var accentNavigationOnly = false
     // A new app session starts on Feed. Keep selection in memory so presentations and player
     // transitions cannot change the current tab within that session.
     @State private var selectedTab = RootView.Tab.feed
@@ -28,12 +30,12 @@ struct FreeTubeApp: App {
                 .environment(appEnvironment.playerStateManager)
                 .environment(appEnvironment.appVisitState)
                 .modelContainer(PersistenceController.sharedContainer)
-                .tint(useAccentTheme
-                      ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color
+                .tint(useAccentTheme && !accentNavigationOnly
+                      ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)
                       : .primary)
                 .environment(\.settingsToggleTint,
-                             useAccentTheme
-                             ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color
+                             useAccentTheme && !accentNavigationOnly
+                             ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)
                              : .green)
                 // The app and player interface follow the chosen appearance.
                 .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)

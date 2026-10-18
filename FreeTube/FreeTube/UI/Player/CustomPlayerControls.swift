@@ -4,7 +4,7 @@ import SwiftUI
 struct CustomPlayerControls: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
-    @AppStorage("doubleTapSeekSeconds") private var seekSeconds = 10
+    @AppStorage("transportSeekSeconds") private var seekSeconds = 10
     let isVisible: Bool
     let isPreparing: Bool
     let isSeekPreviewActive: Bool
@@ -33,9 +33,7 @@ struct CustomPlayerControls: View {
     let onStepFrame: (Int) -> Void
     let onCollapse: () -> Void
 
-    private var seekInterval: TimeInterval {
-        TimeInterval(seekSeconds > 0 ? seekSeconds : 10)
-    }
+    private var seekInterval: TimeInterval { TimeInterval(min(max(seekSeconds, 1), 120)) }
 
     var body: some View {
         ZStack {

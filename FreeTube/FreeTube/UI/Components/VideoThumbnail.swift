@@ -18,11 +18,13 @@ struct VideoThumbnail: View {
     @AppStorage("watchProgressCustomHex") private var progressCustomHex = "#FF0000"
     @AppStorage("finishedVideoIndicator") private var finishedIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
     @AppStorage("appAccentPreset") private var accentPreset = AppAccentPreset.classic.rawValue
+    @AppStorage("appCustomAccentHex") private var accentCustomHex = "#FF3B30"
 
     private var indicatorColor: Color {
         WatchIndicatorStyle.color(
             mode: WatchIndicatorStyle.ColorMode(rawValue: progressColorMode) ?? .red,
             accent: AppAccentPreset(rawValue: accentPreset) ?? .classic,
+            accentHex: accentCustomHex,
             customHex: progressCustomHex
         )
     }

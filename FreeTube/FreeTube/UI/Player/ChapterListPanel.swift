@@ -9,9 +9,14 @@ struct ChapterListPanel: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
+    @AppStorage("appCustomAccentHex") private var appCustomAccentHex = "#FF3B30"
+    @AppStorage("useAccentTheme") private var useAccentTheme = false
+    @AppStorage("accentNavigationOnly") private var accentNavigationOnly = false
 
     private var accentColor: Color {
-        (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color
+        useAccentTheme && !accentNavigationOnly
+            ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)
+            : .primary
     }
 
     let chapters: [VideoChapter]

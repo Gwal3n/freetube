@@ -14,6 +14,7 @@ struct PlayerSettingsScreen: View {
     @AppStorage("watchProgressCustomHex") private var watchProgressCustomHex = "#FF0000"
     @AppStorage("finishedVideoIndicator") private var finishedVideoIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
+    @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
 
@@ -126,6 +127,16 @@ struct PlayerSettingsScreen: View {
                     Text("Seek backward and forward").tag("seek")
                 }
                 .settingsSearchRow("Transport buttons")
+                if transportButtonMode == "seek" {
+                    Stepper(value: $transportSeekSeconds, in: 1...120) {
+                        LabeledContent("Seek button interval") {
+                            Text("\(transportSeekSeconds) seconds")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsSearchRow("Seek button interval")
+                }
                 Toggle("Show description", isOn: Bindable(model).showDescription)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show description")

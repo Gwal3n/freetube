@@ -60,6 +60,13 @@ enum SettingsSearchIndex {
             case .appearance where displayTitle == String(localized: "Accent color"):
                 return UserDefaults.standard.bool(forKey: "useAccentTheme")
                     ? String(localized: "Accent color") : String(localized: "Use accent colors")
+            case .appearance where displayTitle == String(localized: "Accent navigation bar only")
+                && !UserDefaults.standard.bool(forKey: "useAccentTheme"):
+                return String(localized: "Use accent colors")
+            case .appearance where displayTitle == String(localized: "Custom accent color"):
+                return UserDefaults.standard.string(forKey: "appAccentPreset") == AppAccentPreset.custom.rawValue
+                    && UserDefaults.standard.bool(forKey: "useAccentTheme")
+                    ? String(localized: "Custom accent color") : String(localized: "Use accent colors")
             case .tabBar where displayTitle == String(localized: "Tab Bar"):
                 return String(localized: "Show tab names")
             case .browsing where displayTitle == String(localized: "Browsing"):
@@ -84,6 +91,9 @@ enum SettingsSearchIndex {
                 return String(localized: "Default playback quality")
             case .player where displayTitle == String(localized: "Player"):
                 return String(localized: "Double-tap seek")
+            case .player where displayTitle == String(localized: "Seek button interval")
+                && UserDefaults.standard.string(forKey: "transportButtonMode") != "seek":
+                return String(localized: "Transport buttons")
             case .captions where displayTitle == String(localized: "Captions"):
                 return String(localized: "Dark caption background")
             case .player where (displayTitle == String(localized: "Left side")
@@ -146,7 +156,7 @@ enum SettingsSearchIndex {
         Group(destination: .player, titles: [
             "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
             "Save button", "Share button", "Download button",
-            "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Show description",
+            "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
             "Show comments", "Show commenter photos", "Open commenter channels", "Show featured comment preview", "Only near playback time", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments"
         ]),
@@ -168,7 +178,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .subscriptionGroups, titles: ["Manage subscription groups"]),
         Group(destination: .channelTabs, titles: ["Channel tabs"]),
-        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Use accent colors", "Accent color", "Text font"]),
+        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Use accent colors", "Accent navigation bar only", "Accent color", "Custom accent color", "Text font"]),
         Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Tab order"]),
         Group(destination: .libraryData, titles: [
             "Library & Data", "Save watch history", "Add to history when opened",

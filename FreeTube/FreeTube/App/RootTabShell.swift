@@ -11,6 +11,16 @@ struct RootTabShell: View {
     let showsSettings: Bool
     @AppStorage("tabBarOrder") private var tabBarOrderRaw = TabBarOrder.defaultValue
     @AppStorage("showTabBarLabels") private var showTabBarLabels = true
+    @AppStorage("useAccentTheme") private var useAccentTheme = false
+    @AppStorage("accentNavigationOnly") private var accentNavigationOnly = false
+    @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
+    @AppStorage("appCustomAccentHex") private var appCustomAccentHex = "#FF3B30"
+
+    private var tabTint: Color {
+        useAccentTheme
+            ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)
+            : .primary
+    }
 
     private let downloads = DownloadManager.shared
 
@@ -64,8 +74,10 @@ struct RootTabShell: View {
                     }
                 }
             }
+            .tint(tabTint)
         } else {
             legacyTabShell
+                .tint(tabTint)
         }
     }
 
@@ -117,6 +129,7 @@ struct RootTabShell: View {
                 SettingsScreen(onClose: nil)
             }
         }
+        .tint(useAccentTheme && accentNavigationOnly ? .primary : tabTint)
         .overlay {
             if tab == selection {
                 FloatingPlayerUnderlay()
