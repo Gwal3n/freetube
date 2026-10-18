@@ -195,7 +195,7 @@ enum SettingsSearchIndex {
             "Import Playlist Archive", "Import Playlist CSV Files"
         ]),
         Group(destination: .downloads, titles: ["Downloads", "Default download quality", "Allow cellular data", "Parallel fragments"]),
-        Group(destination: .privacy, titles: ["Privacy", "Save recent searches"]),
+        Group(destination: .privacy, titles: ["Privacy", "Save recent searches", "Save recent channels"]),
         Group(destination: .incognito, titles: [
             "Incognito", "Don't save searches", "Don't save watch history",
             "Don't save watch progress", "Hide watch progress", "Hide Feed tab", "Hide Library tab"

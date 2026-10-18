@@ -27,7 +27,8 @@ struct RecentChannel: Codable, Identifiable {
     }
 
     static func record(_ channel: Channel, defaults: UserDefaults = .standard) {
-        let savesHistory = defaults.object(forKey: "saveSearchHistory") as? Bool ?? true
+        let savesHistory = defaults.object(forKey: "saveRecentChannels") as? Bool
+            ?? (defaults.object(forKey: "saveSearchHistory") as? Bool ?? true)
         let skipsIncognitoHistory = defaults.object(forKey: "incognitoSkipSearchHistory") as? Bool ?? true
         guard savesHistory,
               !(defaults.bool(forKey: "incognitoEnabled") && skipsIncognitoHistory),

@@ -147,6 +147,10 @@ final class AppBackupService {
             case .text(let value): defaults.set(value, forKey: key)
             }
         }
+        if settings["saveRecentChannels"] == nil {
+            defaults.set(defaults.object(forKey: "saveSearchHistory") as? Bool ?? true,
+                         forKey: "saveRecentChannels")
+        }
     }
 
     private static let settingKeys: Set<String> = [
@@ -167,7 +171,7 @@ final class AppBackupService {
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder",
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
-        "saveSearchHistory", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
+        "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
         "showCommentAuthorPhotos", "openCommentAuthorChannels",
         "showContinueWatchingMenu", "showHistoryProgressBars", "watchProgressColorMode", "watchProgressCustomHex", "finishedVideoIndicator", "transportButtonMode", "transportSeekSeconds", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",

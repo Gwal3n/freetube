@@ -73,6 +73,7 @@ struct UserPreferences {
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true
+    @AppStorage("saveRecentChannels") var saveRecentChannels: Bool = true
     /// Incognito keeps existing local data intact while changing what this session records or shows.
     @AppStorage("incognitoEnabled") var incognitoEnabled: Bool = false
     @AppStorage("incognitoSkipSearchHistory") var incognitoSkipSearchHistory: Bool = true
@@ -146,6 +147,12 @@ struct UserPreferences {
 
     init() {
         let defaults = UserDefaults.standard
+        // Channel visits previously followed the search-history switch. Preserve an existing
+        // opt-out when introducing their independent setting.
+        if defaults.object(forKey: "saveRecentChannels") == nil {
+            defaults.set(defaults.object(forKey: "saveSearchHistory") as? Bool ?? true,
+                         forKey: "saveRecentChannels")
+        }
         guard defaults.object(forKey: "defaultDownloadQuality") == nil else { return }
         let previous = defaults.string(forKey: "preferredQuality") ?? VideoQuality.p360.rawValue
         defaults.set(
