@@ -18,6 +18,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let onOpenChannel: () -> Void
     let actions: Actions
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
 
     init(
         video: Video,
@@ -132,12 +133,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     }
 
     private func fullVideoLabelColor(_ category: SponsorBlockCategory) -> Color {
-        switch category {
-        case .sponsor: return .green
-        case .exclusiveAccess: return Color(red: 0, green: 138.0 / 255, blue: 92.0 / 255)
-        case .selfPromotion: return .yellow
-        default: return .clear
-        }
+        SponsorBlockColorPalette(json: sponsorBlockColorOverridesJSON).color(for: category)
     }
 
     private func accessibilityTitle(_ title: String) -> String {

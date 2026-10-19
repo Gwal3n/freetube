@@ -321,6 +321,10 @@ final class SettingsViewModel {
         )
     }
 
+    func sponsorBlockBehavior(for category: SponsorBlockCategory) -> SponsorBlockBehavior {
+        preferences.sponsorBlockBehavior(for: category)
+    }
+
     // MARK: - Diagnostics
 
     /// Two-way binding for the "Save logs to file" toggle. Routes through

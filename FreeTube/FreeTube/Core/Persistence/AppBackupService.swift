@@ -168,10 +168,10 @@ final class AppBackupService {
         "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
         "logToFile", "manualQueue",
-        "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder",
+        "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex",
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
-        "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
+        "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showHoldSpeedPill", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "showDescription", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
         "showCommentAuthorPhotos", "openCommentAuthorChannels",
         "showContinueWatchingMenu", "showHistoryProgressBars", "watchProgressColorMode", "watchProgressCustomHex", "finishedVideoIndicator", "transportButtonMode", "transportSeekSeconds", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
@@ -181,7 +181,7 @@ final class AppBackupService {
         "sponsorBlockMusicOfftopicBehavior", "sponsorBlockFillerBehavior",
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
-        "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
+        "sponsorBlockColorOverridesJSON", "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
         "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount"
     ]
 

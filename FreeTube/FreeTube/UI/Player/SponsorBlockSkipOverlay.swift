@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SponsorBlockSkipOverlay: View {
+    @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     let notice: SponsorBlockNotice
     let onUndo: () -> Void
     let onSkip: () -> Void
@@ -68,19 +69,6 @@ struct SponsorBlockSkipOverlay: View {
     }
 
     private var categoryColor: Color {
-        switch notice.category {
-        case .sponsor: return .green
-        case .selfPromotion: return .yellow
-        case .exclusiveAccess: return Color(red: 0, green: 138.0 / 255, blue: 92.0 / 255)
-        case .interaction: return .pink
-        case .intro: return .cyan
-        case .outro: return .blue
-        case .preview: return Color(red: 0, green: 143.0 / 255, blue: 214.0 / 255)
-        case .hook: return Color(red: 1, green: 128.0 / 255, blue: 0)
-        case .musicOfftopic: return Color(red: 1, green: 153.0 / 255, blue: 0)
-        case .filler: return Color(red: 115.0 / 255, green: 0, blue: 1)
-        case .highlight: return .purple
-        case .chapter: return .white
-        }
+        SponsorBlockColorPalette(json: sponsorBlockColorOverridesJSON).color(for: notice.category)
     }
 }

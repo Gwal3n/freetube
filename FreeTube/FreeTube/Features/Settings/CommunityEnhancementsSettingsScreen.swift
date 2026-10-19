@@ -35,6 +35,16 @@ struct CommunityEnhancementsSettingsScreen: View {
             }
             .disabled(!model.sponsorBlockEnabled)
 
+            Section {
+                NavigationLink {
+                    SponsorBlockColorsSettingsScreen(model: model)
+                } label: {
+                    Label("Segment colors", systemImage: "paintpalette")
+                }
+                .settingsSearchRow("Segment colors")
+            }
+            .disabled(!model.sponsorBlockEnabled)
+
             Section("Skipping") {
                 Stepper(value: $model.sponsorBlockMinimumSkipSeconds, in: 0...30, step: 1) {
                     LabeledContent("Minimum segment length") {

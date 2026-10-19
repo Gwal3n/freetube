@@ -7,6 +7,7 @@ struct PlaybackSettingsScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("playbackSpeedChoices") private var savedPlaybackSpeedsRaw = ""
     @AppStorage("customPlaybackSpeeds") private var legacyCustomPlaybackSpeedsRaw = ""
+    @AppStorage("showHoldSpeedPill") private var showHoldSpeedPill = true
     @State private var showingHoldSpeedEditor = false
     @State private var holdSpeedText = ""
 
@@ -68,6 +69,11 @@ struct PlaybackSettingsScreen: View {
                 }
                 .disabled(!model.holdForSpeedEnabled)
                 .settingsSearchRow("Hold speed")
+                if model.holdForSpeedEnabled {
+                    Toggle("Show hold-speed pill", isOn: $showHoldSpeedPill)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Show hold-speed pill")
+                }
                 Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Autoplay next video")

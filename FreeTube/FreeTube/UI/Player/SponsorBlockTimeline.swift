@@ -2,6 +2,10 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SponsorBlockTimeline: View {
+    @AppStorage("playerScrubberColorMode") private var scrubberColorModeRaw = PlayerScrubberColorMode.standard.rawValue
+    @AppStorage("playerScrubberCustomHex") private var scrubberCustomHex = "#FF0000"
+    @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
+
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
     let duration: TimeInterval
@@ -25,6 +29,10 @@ struct SponsorBlockTimeline: View {
     private var fullVideoLabel: SponsorBlockCategory? {
         SponsorBlockSegment.primaryFullVideoLabel(in: segments)
     }
+    private var scrubberColor: Color {
+        (PlayerScrubberColorMode(rawValue: scrubberColorModeRaw) ?? .standard)
+            .color(customHex: scrubberCustomHex)
+    }
 
     var body: some View {
         if isLive, duration <= 0 {
@@ -40,6 +48,7 @@ struct SponsorBlockTimeline: View {
             .padding(.vertical, 6)
             .accessibilityLabel("Live broadcast")
         } else {
+        let sponsorColors = SponsorBlockColorPalette(json: sponsorBlockColorOverridesJSON)
         VStack(spacing: 4) {
             HStack(spacing: 7) {
                 // The track follows the finger, but the elapsed clock remains the real
@@ -82,13 +91,13 @@ struct SponsorBlockTimeline: View {
                             .frame(width: width * max(0, end - start), height: 4)
                             .offset(x: width * start)
                     }
-                    Capsule().fill(.red).frame(width: width * progress, height: 4)
+                    Capsule().fill(scrubberColor).frame(width: width * progress, height: 4)
 
                     // Full-video labels are annotations, never a seek target. Keep their slim
-                    // stripe below the progress track so the red playback position stays clear.
+                    // stripe below the progress track so the playback position stays clear.
                     if let fullVideoLabel {
                         Capsule()
-                            .fill(color(for: fullVideoLabel))
+                            .fill(sponsorColors.color(for: fullVideoLabel))
                             .frame(width: width, height: 2)
                             .offset(y: 5)
                     }
@@ -96,7 +105,7 @@ struct SponsorBlockTimeline: View {
                     ForEach(segments.filter { $0.category != .chapter && !$0.isFullVideoLabel }, id: \.id) { segment in
                         let segmentWidth = width * fraction(for: segment.endTime - segment.startTime)
                         RoundedRectangle(cornerRadius: 1)
-                            .fill(color(for: segment.category))
+                            .fill(sponsorColors.color(for: segment.category))
                             .frame(
                                 width: segment.category == .highlight ? max(3, segmentWidth) : max(2, segmentWidth),
                                 height: 4
@@ -116,7 +125,7 @@ struct SponsorBlockTimeline: View {
                     }
 
                     Circle()
-                        .fill(.red)
+                        .fill(scrubberColor)
                         .frame(width: 14, height: 14)
                         .offset(x: min(max(width * progress - 7, 0), width - 14))
                 }
@@ -179,23 +188,6 @@ struct SponsorBlockTimeline: View {
     private func fraction(for time: TimeInterval) -> CGFloat {
         guard duration.isFinite, duration > 0, time.isFinite else { return 0 }
         return CGFloat(min(max(time / duration, 0), 1))
-    }
-
-    private func color(for category: SponsorBlockCategory) -> Color {
-        switch category {
-        case .sponsor: return .green
-        case .selfPromotion: return .yellow
-        case .exclusiveAccess: return Color(red: 0, green: 138.0 / 255, blue: 92.0 / 255)
-        case .interaction: return .pink
-        case .intro: return .cyan
-        case .outro: return .blue
-        case .preview: return Color(red: 0, green: 143.0 / 255, blue: 214.0 / 255)
-        case .hook: return Color(red: 1, green: 128.0 / 255, blue: 0)
-        case .musicOfftopic: return Color(red: 1, green: 153.0 / 255, blue: 0)
-        case .filler: return Color(red: 115.0 / 255, green: 0, blue: 1)
-        case .highlight: return .purple
-        case .chapter: return .white
-        }
     }
 
     private func format(_ value: TimeInterval) -> String {

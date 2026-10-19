@@ -12,6 +12,8 @@ struct PlayerSettingsScreen: View {
     @AppStorage("customDoubleTapSeekSeconds") private var customDoubleTapSeekSeconds = 20
     @AppStorage("watchProgressColorMode") private var watchProgressColorMode = WatchIndicatorStyle.ColorMode.red.rawValue
     @AppStorage("watchProgressCustomHex") private var watchProgressCustomHex = "#FF0000"
+    @AppStorage("playerScrubberColorMode") private var playerScrubberColorMode = PlayerScrubberColorMode.standard.rawValue
+    @AppStorage("playerScrubberCustomHex") private var playerScrubberCustomHex = "#FF0000"
     @AppStorage("finishedVideoIndicator") private var finishedVideoIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
@@ -93,6 +95,21 @@ struct PlayerSettingsScreen: View {
                 Text("Buttons below video")
             } footer: {
                 Text("These switches hide shortcuts below the video without removing saved items or downloads.")
+            }
+
+            Section("Playback timeline") {
+                Picker("Scrubber color", selection: $playerScrubberColorMode) {
+                    Text("Default red").tag(PlayerScrubberColorMode.standard.rawValue)
+                    Text("Custom").tag(PlayerScrubberColorMode.custom.rawValue)
+                }
+                .settingsSearchRow("Scrubber color")
+                if playerScrubberColorMode == PlayerScrubberColorMode.custom.rawValue {
+                    ColorPicker("Custom scrubber color", selection: Binding(
+                        get: { WatchIndicatorStyle.color(hex: playerScrubberCustomHex) ?? .red },
+                        set: { playerScrubberCustomHex = WatchIndicatorStyle.hex(color: $0) }
+                    ), supportsOpacity: false)
+                    .settingsSearchRow("Custom scrubber color")
+                }
             }
 
             Section {

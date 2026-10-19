@@ -72,6 +72,7 @@ struct FullScreenPlayer: View {
     @AppStorage("seekPreviewStyle") private var seekPreviewStyleRaw = SeekPreviewStyle.compact.rawValue
     @AppStorage("holdForSpeedEnabled") private var holdForSpeedEnabled = true
     @AppStorage("holdSpeedRate") private var holdSpeedRate = 2.0
+    @AppStorage("showHoldSpeedPill") private var showHoldSpeedPill = true
     @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
     @AppStorage("doubleTapSeekSeconds") private var doubleTapSeekSeconds = 10
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
@@ -842,7 +843,10 @@ struct FullScreenPlayer: View {
     }
 
     private var gestureBadgeText: String? {
-        isHoldingForSpeed ? PlaybackSpeedPresets.label(player.effectivePlaybackRate) : gestureSeekFeedback
+        if isHoldingForSpeed {
+            return showHoldSpeedPill ? PlaybackSpeedPresets.label(player.effectivePlaybackRate) : nil
+        }
+        return gestureSeekFeedback
     }
 
     // MARK: - Playlist presentation

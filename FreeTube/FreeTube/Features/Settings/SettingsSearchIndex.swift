@@ -94,6 +94,12 @@ enum SettingsSearchIndex {
             case .player where displayTitle == String(localized: "Seek button interval")
                 && UserDefaults.standard.string(forKey: "transportButtonMode") != "seek":
                 return String(localized: "Transport buttons")
+            case .player where displayTitle == String(localized: "Custom scrubber color")
+                && UserPreferences().playerScrubberColorModeRaw != PlayerScrubberColorMode.custom.rawValue:
+                return String(localized: "Scrubber color")
+            case .playback where displayTitle == String(localized: "Show hold-speed pill")
+                && !UserPreferences().holdForSpeedEnabled:
+                return String(localized: "Hold for speed")
             case .captions where displayTitle == String(localized: "Captions"):
                 return String(localized: "Dark caption background")
             case .player where (displayTitle == String(localized: "Left side")
@@ -131,6 +137,9 @@ enum SettingsSearchIndex {
             case .community where displayTitle == String(localized: "Random thumbnail when no submission exists")
                 && !UserPreferences().deArrowThumbnails:
                 return String(localized: "Replace video thumbnails")
+            case .community where displayTitle == String(localized: "Segment colors")
+                && !UserPreferences().sponsorBlockEnabled:
+                return String(localized: "Enable SponsorBlock")
             case .community where displayTitle == String(localized: "SponsorBlock & DeArrow"):
                 return String(localized: "Enable SponsorBlock")
             case .blockedContent where displayTitle == String(localized: "Blocked content"):
@@ -150,12 +159,12 @@ enum SettingsSearchIndex {
     // at runtime. SwiftUI views do not expose a reliable searchable control hierarchy.
     private static let groups: [Group] = [
         Group(destination: .playback, titles: [
-            "Playback", "Default playback quality", "Cellular streaming limit", "Sleep timer durations", "Hold for speed", "Hold speed",
+            "Playback", "Default playback quality", "Cellular streaming limit", "Sleep timer durations", "Hold for speed", "Hold speed", "Show hold-speed pill",
             "Autoplay next video", "Allow audio from other apps", "Resume after interruptions"
         ]),
         Group(destination: .player, titles: [
             "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
-            "Save button", "Share button", "Download button",
+            "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
             "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
             "Show comments", "Show commenter photos", "Open commenter channels", "Show featured comment preview", "Only near playback time", "Show Up Next",
             "Initial Up Next videos", "Prefetch details and comments"
@@ -202,7 +211,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .blockedContent, titles: ["Blocked content", "Hide Shorts", "Blocked keywords", "Blocked channels"]),
         Group(destination: .community, titles: [
-            "SponsorBlock & DeArrow", "Enable SponsorBlock", "Minimum segment length",
+            "SponsorBlock & DeArrow", "Enable SponsorBlock", "Segment colors", "Minimum segment length",
             "Skip notice duration", "Replace video titles", "Replace video thumbnails",
             "Random thumbnail when no submission exists", "Sponsors", "Self-promotion",
             "Exclusive access", "Interaction reminders", "Intros", "Outros", "Previews",
