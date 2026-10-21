@@ -6,11 +6,18 @@ import SwiftUI
 /// shared `PlayerStateManager`, while navigation out of the player remains with its parent.
 @available(iOS 17.0, *)
 struct PlayerQueueSections: View {
+    enum Kind: Equatable {
+        case manualQueue
+        case upNext
+    }
+
     @Environment(PlayerStateManager.self) private var player
     @State private var blocklist = VideoBlocklist.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage("upNextRowSize") private var upNextRowSizeRaw = UpNextRowSize.compact.rawValue
 
-    let showsUpNext: Bool
+    let kind: Kind
     let upNextInitialCount: Int
 
     @State private var isQueueExpanded = false
@@ -18,22 +25,40 @@ struct PlayerQueueSections: View {
     @State private var upNextVisibleLimit = 5
     @State private var queueToSave: [Video] = []
     @State private var showingSaveQueue = false
+    @State private var panelWidth: CGFloat = 320
 
     // The DeArrow switch overlays the thumbnail, so it never changes row height as branding loads.
     private let queueRowHeight: CGFloat = 56
     private var queueRowFootprint: CGFloat { queueRowHeight + 8 }
+    private var upNextSize: UpNextRowSize { UpNextRowSize(rawValue: upNextRowSizeRaw) ?? .compact }
+
+    private var upNextRowHeight: CGFloat {
+        switch upNextSize {
+        case .compact: queueRowHeight
+        case .small: dynamicTypeSize.isAccessibilitySize ? 120 : 89
+        case .large: max(0, panelWidth - 32) * 9 / 16 + (dynamicTypeSize.isAccessibilitySize ? 128 : 68)
+        }
+    }
+
+    private var rowThumbnailSize: CGSize {
+        if kind == .upNext && upNextSize == .small {
+            return dynamicTypeSize.isAccessibilitySize
+                ? CGSize(width: 104, height: 58.5)
+                : CGSize(width: 144, height: 81)
+        }
+        return CGSize(width: 80, height: 45)
+    }
 
     @ViewBuilder
     var body: some View {
         Group {
-            if !visibleManualQueue.isEmpty || showsUpNext {
-                VStack(alignment: .leading, spacing: 8) {
-                    manualQueuePanel
-                    if showsUpNext {
-                        queuePanel
-                    }
-                }
+            switch kind {
+            case .manualQueue: manualQueuePanel
+            case .upNext: queuePanel
             }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in proxy.size.width } action: { width in
+            panelWidth = width
         }
         .sheet(isPresented: $showingSaveQueue) {
             AddToPlaylistSheet(queueVideos: queueToSave)
@@ -139,8 +164,8 @@ struct PlayerQueueSections: View {
 
     private var queueListHeight: CGFloat {
         let loadMoreRows = canRevealMoreUpNext ? 1 : 0
-        let count = max(1, displayedUpNextVideos.count + loadMoreRows)
-        return CGFloat(count) * queueRowFootprint + 32
+        return CGFloat(displayedUpNextVideos.count) * (upNextRowHeight + 8)
+            + CGFloat(loadMoreRows) * queueRowFootprint + 32
     }
 
     private var allUpNextVideos: [Video] {
@@ -197,7 +222,7 @@ struct PlayerQueueSections: View {
                             }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
-                            .frame(height: queueRowHeight)
+                            .frame(height: upNextRowHeight)
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
                     if canRevealMoreUpNext {
@@ -268,71 +293,17 @@ struct PlayerQueueSections: View {
         let removalAction: () -> Void = onRemove ?? { player.removeFromUpNext(videoID: video.id) }
 
         return DeArrowVideoContent(video: video) { branding in
-            HStack(spacing: 0) {
-                Group {
-                    Button {
-                        if let onPlay {
-                            onPlay()
-                        } else {
-                            player.load(video)
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            VideoThumbnail(
-                                video: video,
-                                size: CGSize(width: 80, height: 45),
-                                cornerRadius: 4,
-                                replacementData: branding.thumbnailData(for: video),
-                                replacementCacheKey: branding.thumbnailCacheKey(for: video),
-                                compactBadge: true
-                            )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(branding.title(for: video))
-                                    .contentTransition(.opacity)
-                                    .appFont(.subheadline)
-                                    .lineLimit(2)
-                                Text(queueRowMetadata(for: video))
-                                    .appFont(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                            if video.id == player.currentVideo?.id {
-                                NowPlayingIndicator(videoID: video.id)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, minHeight: queueRowHeight, alignment: .leading)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-                }
-
-                if showsRemoveButton {
-                    Button(action: removalAction) {
-                        Image(systemName: "xmark")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel("Remove from queue")
-                }
-
-                VStack(spacing: 0) {
-                    VideoMoreActionsMenu(
-                        video: video,
-                        offersPlayNext: true,
-                        onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
+            Group {
+                if kind == .upNext && upNextSize == .large {
+                    largeUpNextRow(video, branding: branding, onRemove: removalAction)
+                } else {
+                    horizontalQueueRow(
+                        video,
+                        branding: branding,
+                        onPlay: onPlay,
+                        onRemove: removalAction,
+                        showsRemoveButton: showsRemoveButton
                     )
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                if branding.hasReplacement(for: video) {
-                    DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
-                        .frame(width: 80, height: queueRowHeight, alignment: .topTrailing)
                 }
             }
             .videoContextMenu(
@@ -342,6 +313,117 @@ struct PlayerQueueSections: View {
                 onRemoveFromUpNext: showsRemoveButton ? nil : removalAction
             )
         }
+    }
+
+    private func horizontalQueueRow(
+        _ video: Video,
+        branding: DeArrowVideoViewModel,
+        onPlay: (() -> Void)?,
+        onRemove: @escaping () -> Void,
+        showsRemoveButton: Bool
+    ) -> some View {
+        let thumbnailSize = rowThumbnailSize
+        let rowHeight = kind == .upNext ? upNextRowHeight : queueRowHeight
+        return HStack(spacing: 0) {
+            Button {
+                if let onPlay { onPlay() } else { player.load(video) }
+            } label: {
+                HStack(spacing: 12) {
+                    VideoThumbnail(
+                        video: video,
+                        size: thumbnailSize,
+                        cornerRadius: 4,
+                        replacementData: branding.thumbnailData(for: video),
+                        replacementCacheKey: branding.thumbnailCacheKey(for: video),
+                        compactBadge: thumbnailSize.width == 80
+                    )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(branding.title(for: video))
+                            .contentTransition(.opacity)
+                            .appFont(.subheadline)
+                            .lineLimit(2)
+                        Text(queueRowMetadata(for: video))
+                            .appFont(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if video.id == player.currentVideo?.id {
+                        NowPlayingIndicator(videoID: video.id)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+
+            if showsRemoveButton {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel("Remove from queue")
+            }
+
+            VideoMoreActionsMenu(
+                video: video,
+                offersPlayNext: true,
+                onRemoveFromUpNext: showsRemoveButton ? nil : onRemove
+            )
+        }
+        .overlay(alignment: .topLeading) {
+            if branding.hasReplacement(for: video) {
+                DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                    .frame(width: thumbnailSize.width, height: rowHeight, alignment: .topTrailing)
+            }
+        }
+    }
+
+    private func largeUpNextRow(
+        _ video: Video,
+        branding: DeArrowVideoViewModel,
+        onRemove: @escaping () -> Void
+    ) -> some View {
+        let width = max(0, panelWidth - 32)
+        return VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                Button { player.load(video) } label: {
+                    VideoThumbnail(
+                        video: video,
+                        size: CGSize(width: width, height: width * 9 / 16),
+                        replacementData: branding.thumbnailData(for: video),
+                        replacementCacheKey: branding.thumbnailCacheKey(for: video)
+                    )
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                if branding.hasReplacement(for: video) {
+                    DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
+                }
+            }
+            HStack(alignment: .top, spacing: 8) {
+                Button { player.load(video) } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(branding.title(for: video))
+                            .contentTransition(.opacity)
+                            .appFont(.subheadline, weight: .semibold)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+                        Text(queueRowMetadata(for: video))
+                            .appFont(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                VideoMoreActionsMenu(video: video, offersPlayNext: true, onRemoveFromUpNext: onRemove)
+            }
+        }
+        .frame(height: upNextRowHeight, alignment: .top)
     }
 
     private func queueRowMetadata(for video: Video) -> String {

@@ -119,6 +119,9 @@ enum SettingsSearchIndex {
             case .player where displayTitle == String(localized: "Initial Up Next videos")
                 && !UserPreferences().showUpNext:
                 return String(localized: "Show Up Next")
+            case .player where displayTitle == String(localized: "Up Next video size")
+                && !UserPreferences().showUpNext:
+                return String(localized: "Show Up Next")
             case .browsing where displayTitle == String(localized: "Refresh interval")
                 && !UserPreferences().automaticFeedRefreshEnabled:
                 return String(localized: "Refresh feed automatically")
@@ -167,7 +170,7 @@ enum SettingsSearchIndex {
             "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
             "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
             "Show comments", "Show commenter photos", "Open commenter channels", "Show featured comment preview", "Only near playback time", "Show Up Next",
-            "Initial Up Next videos", "Prefetch details and comments"
+            "Initial Up Next videos", "Up Next video size", "Rearrange sections", "Prefetch details and comments"
         ]),
         Group(destination: .captions, titles: [
             "Captions", "Dark caption background", "Use source formatting", "Caption text size"

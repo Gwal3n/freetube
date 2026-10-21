@@ -422,8 +422,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's
   no-comment-load performance characteristics. Both section headers are tappable across their
-  available width. The current video is hidden from the visible Up Next rows; compact autoplay and
-  repeat icons appear beside the heading only while Up Next is expanded. Queue deletion
+  available width. Users can reorder the independent Saved Moments, Queue, Up Next, and Comments
+  sections; hidden or empty sections retain their chosen position. Up Next alone supports compact,
+  small, and full-width thumbnail rows, while the manual queue remains compact. The current video
+  is hidden from the visible Up Next rows; compact autoplay and repeat icons appear beside the
+  heading only while Up Next is expanded. Queue deletion
   uses swipe actions rather than permanent edit-mode minus controls. Existing comment replies use
   YouTubeKit's reply continuation token and load only when their inline like-row control is expanded.
   YouTubeKit has no literal comments-disabled Boolean. Treat a `MoreVideoInfosResponse` with neither

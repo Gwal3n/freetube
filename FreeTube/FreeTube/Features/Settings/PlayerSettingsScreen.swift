@@ -17,6 +17,7 @@ struct PlayerSettingsScreen: View {
     @AppStorage("finishedVideoIndicator") private var finishedVideoIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
+    @AppStorage("upNextRowSize") private var upNextRowSize = UpNextRowSize.compact.rawValue
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
 
@@ -180,6 +181,12 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show Up Next")
                 if model.showUpNext {
+                    Picker("Up Next video size", selection: $upNextRowSize) {
+                        ForEach(UpNextRowSize.allCases) { size in
+                            Text(size.title).tag(size.rawValue)
+                        }
+                    }
+                    .settingsSearchRow("Up Next video size")
                     Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
                         LabeledContent("Initial Up Next videos") {
                             Text("\(model.upNextInitialCount)")
@@ -189,6 +196,12 @@ struct PlayerSettingsScreen: View {
                     }
                     .settingsSearchRow("Initial Up Next videos")
                 }
+                NavigationLink {
+                    PlayerSectionsSettingsScreen()
+                } label: {
+                    Label("Rearrange sections", systemImage: "line.3.horizontal")
+                }
+                .settingsSearchRow("Rearrange sections")
                 Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
                     .tint(settingsToggleTint)
                     .disabled(!cacheRecentVideoContent)
