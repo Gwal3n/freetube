@@ -74,11 +74,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     }
 
     var body: some View {
-        // Keep section headers in the same lazy stack as the panel's other content. A second
-        // pinned stack inside CommentsSection fought the outer scroll view's layout.
-        LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
-            // Preserve the previous gap above metadata when the scroll probe moved to the stack.
-            Color.clear.frame(height: 1)
+        VStack(alignment: .leading, spacing: 16) {
             PlayerMetadataHeader(
                 video: video,
                 fullVideoLabel: fullVideoLabel,
@@ -105,20 +101,22 @@ struct PlayerInformationPanel<Actions: View>: View {
                 )
             }
 
-            ForEach(PlayerPanelSection.ordered(from: storedSectionOrder)) { section in
-                switch section {
-                case .savedMoments:
-                    SavedMomentsSection(videoID: video.id, onSeek: onSeek)
-                case .queue:
-                    PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
-                case .upNext:
-                    if showsUpNext {
-                        PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
-                    }
-                case .comments:
-                    if showsComments {
-                        CommentsSection(videoID: video.id, countText: commentsCountText)
-                            .id(video.id)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(PlayerPanelSection.ordered(from: storedSectionOrder)) { section in
+                    switch section {
+                    case .savedMoments:
+                        SavedMomentsSection(videoID: video.id, onSeek: onSeek)
+                    case .queue:
+                        PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+                    case .upNext:
+                        if showsUpNext {
+                            PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+                        }
+                    case .comments:
+                        if showsComments {
+                            CommentsSection(videoID: video.id, countText: commentsCountText)
+                                .id(video.id)
+                        }
                     }
                 }
             }
