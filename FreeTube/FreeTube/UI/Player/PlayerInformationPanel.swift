@@ -20,6 +20,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     let showsDescription: Bool
     let showsUpNext: Bool
     let upNextInitialCount: Int
+    let contentWidth: CGFloat
     let showsComments: Bool
     let onToggleDetails: () -> Void
     let onExpandDetails: () -> Void
@@ -41,6 +42,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         showsDescription: Bool,
         showsUpNext: Bool,
         upNextInitialCount: Int,
+        contentWidth: CGFloat,
         showsComments: Bool,
         onToggleDetails: @escaping () -> Void,
         onExpandDetails: @escaping () -> Void,
@@ -61,6 +63,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.showsDescription = showsDescription
         self.showsUpNext = showsUpNext
         self.upNextInitialCount = upNextInitialCount
+        self.contentWidth = contentWidth
         self.showsComments = showsComments
         self.onToggleDetails = onToggleDetails
         self.onExpandDetails = onExpandDetails
@@ -104,10 +107,10 @@ struct PlayerInformationPanel<Actions: View>: View {
                     case .savedMoments:
                         SavedMomentsSection(videoID: video.id, onSeek: onSeek)
                     case .queue:
-                        PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount)
+                        PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
                     case .upNext:
                         if showsUpNext {
-                            PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount)
+                            PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
                         }
                     case .comments:
                         if showsComments {

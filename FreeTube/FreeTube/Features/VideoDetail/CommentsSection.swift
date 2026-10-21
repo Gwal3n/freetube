@@ -4,8 +4,8 @@ import SwiftUI
 struct CommentsSection: View {
     let countText: String?
     @State private var model: CommentsViewModel
-    /// Mounted in the user's chosen player-section order, but collapsed and unloaded by default so showing the
-    /// header never brings the comment tree (or its network work) into play until the user asks.
+    /// Mounted in the user's chosen player-section order, but collapsed and unloaded by default.
+    /// Showing the header does not load the comment tree until the user expands it.
     @State private var isExpanded = false
     @State private var expandedReplyCommentIDs: Set<String> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -21,69 +21,22 @@ struct CommentsSection: View {
     }
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 8, pinnedViews: [.sectionHeaders]) {
-            Section {
-                if showsFeaturedCommentPreview && !isExpanded {
-                    FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
-                        model.focusComment(commentID)
-                        expandComments()
-                    }
-                }
+        LazyVStack(alignment: .leading, spacing: 8) {
+            header
 
-                if isExpanded {
-                    Group {
-                        if model.isLoading && model.comments.isEmpty {
-                            CommentListPlaceholder()
-                        } else if model.commentsDisabled {
-                            ContentUnavailableView(
-                                "Comments disabled",
-                                systemImage: "text.bubble",
-                                description: Text("Comments are unavailable for this video.")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                        } else {
-                            ForEach(model.commentsForDisplay) { comment in
-                                commentThread(comment)
-                            }
-                            if model.isLoading {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .accessibilityLabel("Loading more comments")
-                            } else if model.continuationToken != nil {
-                                if autoLoadMoreComments {
-                                    // A quiet pagination sentinel keeps comments moving as the user
-                                    // reaches the end without introducing a non-native action row.
-                                    Color.clear
-                                        .frame(height: 24)
-                                        .contentShape(Rectangle())
-                                        .onAppear {
-                                            Task { await model.loadMore() }
-                                        }
-                                        .accessibilityHidden(true)
-                                } else {
-                                    Button {
-                                        Task { await model.loadMore() }
-                                    } label: {
-                                        Label("Load more comments", systemImage: "chevron.down")
-                                            .frame(maxWidth: .infinity, minHeight: 44)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(.primary)
-                                }
-                            }
-                        }
-                    }
-                    // Keep the same in-place reveal; pinning changes only the heading's scroll position.
-                    .transition(.opacity)
+            if showsFeaturedCommentPreview && !isExpanded {
+                FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
+                    model.focusComment(commentID)
+                    expandComments()
                 }
-            } header: {
-                header
-                    .background(Color(uiColor: .systemBackground))
+            }
+
+            if isExpanded {
+                expandedComments
+                    .transition(.opacity)
             }
         }
+        .clipped()
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.teaserText)
         .errorToast(Bindable(model).errorState)
@@ -94,6 +47,50 @@ struct CommentsSection: View {
                 await model.loadTeaser(onlyTimed: featuredCommentsNearPlaybackOnly)
             } else if isExpanded, model.comments.isEmpty, !model.isLoading {
                 await model.load()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var expandedComments: some View {
+        if model.isLoading && model.comments.isEmpty {
+            CommentListPlaceholder()
+        } else if model.commentsDisabled {
+            ContentUnavailableView(
+                "Comments disabled",
+                systemImage: "text.bubble",
+                description: Text("Comments are unavailable for this video.")
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        } else {
+            ForEach(model.commentsForDisplay) { comment in
+                commentThread(comment)
+            }
+            if model.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .accessibilityLabel("Loading more comments")
+            } else if model.continuationToken != nil {
+                if autoLoadMoreComments {
+                    // A quiet pagination sentinel keeps comments moving as the user reaches the end.
+                    Color.clear
+                        .frame(height: 24)
+                        .contentShape(Rectangle())
+                        .onAppear { Task { await model.loadMore() } }
+                        .accessibilityHidden(true)
+                } else {
+                    Button {
+                        Task { await model.loadMore() }
+                    } label: {
+                        Label("Load more comments", systemImage: "chevron.down")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                }
             }
         }
     }

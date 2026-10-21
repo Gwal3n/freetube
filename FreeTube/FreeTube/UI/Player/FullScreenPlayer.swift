@@ -407,6 +407,7 @@ struct FullScreenPlayer: View {
                 panel(
                     video,
                     collapseRange: collapseRange,
+                    contentWidth: surfaceWidth,
                     minimumContentHeight: max(
                         0,
                         proxy.size.height - compactSurfaceHeight + collapseRange
@@ -1112,12 +1113,14 @@ struct FullScreenPlayer: View {
     private func panel(
         _ video: Video,
         collapseRange: CGFloat,
+        contentWidth: CGFloat,
         minimumContentHeight: CGFloat
     ) -> some View {
         if #available(iOS 18.0, *) {
             panelScrollView(
                 video,
                 collapseRange: collapseRange,
+                contentWidth: contentWidth,
                 minimumContentHeight: minimumContentHeight
             )
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -1130,6 +1133,7 @@ struct FullScreenPlayer: View {
             panelScrollView(
                 video,
                 collapseRange: collapseRange,
+                contentWidth: contentWidth,
                 minimumContentHeight: minimumContentHeight
             )
                 .coordinateSpace(name: "playerPanelScroll")
@@ -1143,6 +1147,7 @@ struct FullScreenPlayer: View {
     private func panelScrollView(
         _ video: Video,
         collapseRange: CGFloat,
+        contentWidth: CGFloat,
         minimumContentHeight: CGFloat
     ) -> some View {
         ScrollView {
@@ -1168,6 +1173,7 @@ struct FullScreenPlayer: View {
                     showsDescription: showDescription,
                     showsUpNext: showUpNext,
                     upNextInitialCount: upNextInitialCount,
+                    contentWidth: contentWidth,
                     showsComments: showComments,
                     onToggleDetails: {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {

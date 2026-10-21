@@ -19,13 +19,13 @@ struct PlayerQueueSections: View {
 
     let kind: Kind
     let upNextInitialCount: Int
+    let contentWidth: CGFloat
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
     @State private var upNextVisibleLimit = 5
     @State private var queueToSave: [Video] = []
     @State private var showingSaveQueue = false
-    @State private var panelWidth: CGFloat = 320
 
     // The DeArrow switch overlays the thumbnail, so it never changes row height as branding loads.
     private let queueRowHeight: CGFloat = 56
@@ -36,7 +36,7 @@ struct PlayerQueueSections: View {
         switch upNextSize {
         case .compact: queueRowHeight
         case .small: dynamicTypeSize.isAccessibilitySize ? 120 : 89
-        case .large: max(0, panelWidth - 32) * 9 / 16 + (dynamicTypeSize.isAccessibilitySize ? 128 : 68)
+        case .large: max(0, contentWidth - 32) * 9 / 16 + (dynamicTypeSize.isAccessibilitySize ? 128 : 68)
         }
     }
 
@@ -56,9 +56,6 @@ struct PlayerQueueSections: View {
             case .manualQueue: manualQueuePanel
             case .upNext: queuePanel
             }
-        }
-        .onGeometryChange(for: CGFloat.self) { proxy in proxy.size.width } action: { width in
-            panelWidth = width
         }
         .sheet(isPresented: $showingSaveQueue) {
             AddToPlaylistSheet(queueVideos: queueToSave)
@@ -201,7 +198,7 @@ struct PlayerQueueSections: View {
             .buttonStyle(ResponsiveButtonStyle())
             .padding(.horizontal)
 
-            ZStack(alignment: .top) {
+            if isQueueExpanded {
                 List {
                     ForEach(displayedUpNextVideos) { video in
                         queueRow(video)
@@ -252,11 +249,8 @@ struct PlayerQueueSections: View {
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
                 .frame(height: queueListHeight)
+                .transition(.opacity)
             }
-            .frame(height: isQueueExpanded ? queueListHeight : 0, alignment: .top)
-            .clipped()
-            .opacity(isQueueExpanded ? 1 : 0)
-            .allowsHitTesting(isQueueExpanded)
         }
         .onChange(of: player.currentVideo?.id) {
             // Playlist switches should not close the lower panel and shift the entire details
@@ -388,7 +382,7 @@ struct PlayerQueueSections: View {
         branding: DeArrowVideoViewModel,
         onRemove: @escaping () -> Void
     ) -> some View {
-        let width = max(0, panelWidth - 32)
+        let width = max(0, contentWidth - 32)
         return VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topTrailing) {
                 Button { player.load(video) } label: {
