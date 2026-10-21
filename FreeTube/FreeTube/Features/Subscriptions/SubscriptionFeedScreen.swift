@@ -472,7 +472,7 @@ struct SubscriptionFeedScreen: View {
                 interval: interval
             ) {
                 log.info("Automatic feed refresh due; starting channel refresh")
-                await model.refresh(showProgress: false)
+                await model.refresh(resetPagination: false)
             } else {
                 try? await Task.sleep(for: .seconds(60))
             }

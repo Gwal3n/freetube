@@ -118,7 +118,7 @@ final class SubscriptionFeedViewModel {
         await loadCache()
     }
 
-    func refresh(showProgress: Bool = true) async {
+    func refresh(resetPagination: Bool = true) async {
         guard !isRefreshing else { return }
         activeViewCountTask?.cancel()
         activeViewCountTask = nil
@@ -127,7 +127,7 @@ final class SubscriptionFeedViewModel {
         let refreshID = UUID()
         activeRefreshID = refreshID
         isRefreshing = true
-        showsRefreshProgress = showProgress
+        showsRefreshProgress = true
         lastRefreshAttemptAt = .now
         failedChannels = []
         isRefreshWarningDismissed = false
@@ -171,7 +171,7 @@ final class SubscriptionFeedViewModel {
             defaults.set(completedAt.timeIntervalSince1970, forKey: Self.lastCompleteRefreshKey)
             defaults.set(completedSubscriptionIDs, forKey: Self.lastCompleteSubscriptionKey)
         }
-        if showProgress { visibleLimit = pageSize }
+        if resetPagination { visibleLimit = pageSize }
         await loadCache()
         isRefreshing = false
         showsRefreshProgress = false

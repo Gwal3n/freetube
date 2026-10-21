@@ -277,7 +277,7 @@ and a rejected strategy is excluded before requesting the next candidate.
   last successful refresh and last in-session attempt against the selected interval (1, 6, 12,
   or 24 hours). It pauses when the tab is not selected or the scene is inactive, defers while
   the player is expanded, and uses the same deduplicated refresh path as pull-to-refresh. Automatic
-  runs keep the current pagination and do not expose the manual-refresh progress row. A separate
+  runs keep the current pagination while showing the same cancellable progress row as manual refresh. A separate
   opt-in view-count schedule rotates through four subscribed channels per chosen interval while
   Feed is visible; it updates only existing cached counts in place, leaving row order and upload
   estimates unchanged. Pull-to-refresh on a channel reloads that channel alone and refreshes its
