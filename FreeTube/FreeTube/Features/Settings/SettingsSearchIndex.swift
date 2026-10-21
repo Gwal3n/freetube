@@ -170,7 +170,7 @@ enum SettingsSearchIndex {
             "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
             "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
             "Show comments", "Load more comments automatically", "Show commenter photos", "Open commenter channels", "Featured comment preview", "Show Up Next",
-            "Initial Up Next videos", "Up Next video size", "Rearrange sections", "Prefetch details and comments"
+            "Initial Up Next videos", "Up Next video size", "Prefetch details and comments"
         ]),
         Group(destination: .captions, titles: [
             "Captions", "Dark caption background", "Use source formatting", "Caption text size"

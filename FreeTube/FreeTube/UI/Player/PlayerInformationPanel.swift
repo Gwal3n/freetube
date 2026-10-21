@@ -7,7 +7,6 @@ import SwiftUI
 /// player orchestrator from also owning the lower panel's visual hierarchy.
 @available(iOS 17.0, *)
 struct PlayerInformationPanel<Actions: View>: View {
-    @AppStorage("playerPanelSectionOrder") private var storedSectionOrder = PlayerPanelSection.defaultOrder
     let video: Video
     let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
@@ -102,22 +101,14 @@ struct PlayerInformationPanel<Actions: View>: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(PlayerPanelSection.ordered(from: storedSectionOrder)) { section in
-                    switch section {
-                    case .savedMoments:
-                        SavedMomentsSection(videoID: video.id, onSeek: onSeek)
-                    case .queue:
-                        PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
-                    case .upNext:
-                        if showsUpNext {
-                            PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
-                        }
-                    case .comments:
-                        if showsComments {
-                            CommentsSection(videoID: video.id, countText: commentsCountText)
-                                .id(video.id)
-                        }
-                    }
+                SavedMomentsSection(videoID: video.id, onSeek: onSeek)
+                PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+                if showsUpNext {
+                    PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+                }
+                if showsComments {
+                    CommentsSection(videoID: video.id, countText: commentsCountText)
+                        .id(video.id)
                 }
             }
         }

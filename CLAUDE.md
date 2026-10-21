@@ -422,9 +422,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's
   no-comment-load performance characteristics. Both section headers are tappable across their
-  available width. Users can reorder the independent Saved Moments, Queue, Up Next, and Comments
-  sections; hidden or empty sections retain their chosen position. Up Next alone supports compact,
-  small, and full-width thumbnail rows, while the manual queue remains compact. The current video
+  available width. The independent sections are temporarily in a fixed order (Saved Moments,
+  Queue, Up Next, Comments) while
+  diagnosing expanded-comment scrolling. Keep the saved custom order intact for restoration later.
+  Up Next alone supports compact, small, and full-width thumbnail rows, while the manual queue
+  remains compact. The current video
   is hidden from the visible Up Next rows; compact autoplay and repeat icons appear beside the
   heading only while Up Next is expanded. Keep the player panel's scroll hierarchy stable;
   nested pinned section headers caused jumpy scrolling here. Queue deletion

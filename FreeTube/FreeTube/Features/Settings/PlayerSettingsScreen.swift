@@ -199,12 +199,6 @@ struct PlayerSettingsScreen: View {
                     }
                     .settingsSearchRow("Initial Up Next videos")
                 }
-                NavigationLink {
-                    PlayerSectionsSettingsScreen()
-                } label: {
-                    Label("Rearrange sections", systemImage: "line.3.horizontal")
-                }
-                .settingsSearchRow("Rearrange sections")
                 Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
                     .tint(settingsToggleTint)
                     .disabled(!cacheRecentVideoContent)
