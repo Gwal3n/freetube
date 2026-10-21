@@ -106,16 +106,16 @@ enum SettingsSearchIndex {
                 || displayTitle == String(localized: "Right side"))
                 && UserPreferences().playerVerticalSwipeAction != .adjustPlayback:
                 return String(localized: "Vertical swipe in fullscreen")
-            case .player where displayTitle == String(localized: "Show featured comment preview")
+            case .player where displayTitle == String(localized: "Featured comment preview")
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
             case .player where (displayTitle == String(localized: "Show commenter photos")
                 || displayTitle == String(localized: "Open commenter channels"))
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
-            case .player where displayTitle == String(localized: "Only near playback time")
-                && (!UserPreferences().showComments || !UserPreferences().showFeaturedCommentPreview):
-                return String(localized: "Show featured comment preview")
+            case .player where displayTitle == String(localized: "Load more comments automatically")
+                && !UserPreferences().showComments:
+                return String(localized: "Show comments")
             case .player where displayTitle == String(localized: "Initial Up Next videos")
                 && !UserPreferences().showUpNext:
                 return String(localized: "Show Up Next")
@@ -169,7 +169,7 @@ enum SettingsSearchIndex {
             "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
             "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
             "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
-            "Show comments", "Show commenter photos", "Open commenter channels", "Show featured comment preview", "Only near playback time", "Show Up Next",
+            "Show comments", "Load more comments automatically", "Show commenter photos", "Open commenter channels", "Featured comment preview", "Show Up Next",
             "Initial Up Next videos", "Up Next video size", "Rearrange sections", "Prefetch details and comments"
         ]),
         Group(destination: .captions, titles: [
@@ -183,8 +183,8 @@ enum SettingsSearchIndex {
             "More menu separators", "Fine seeking", "Quality limit", "Captions"
         ]),
         Group(destination: .browsing, titles: [
-            "Browsing", "Show search suggestions",
-            "Large video thumbnails", "Show channel avatars", "Mark new uploads", "Space out related uploads",
+            "Browsing", "Show search suggestions", "Load more search results automatically",
+            "Large video thumbnails", "Show channel avatars", "Load more feed videos automatically", "Mark new uploads", "Space out related uploads",
             "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
             "Refresh interval", "Update feed view counts", "View count batch interval"
         ]),

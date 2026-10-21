@@ -75,16 +75,18 @@ struct CustomPlayerControls: View {
                 Spacer()
 
                 HStack(spacing: 42) {
-                    Button {
-                        if isFrameStepping { onStepFrame(-1) }
-                        else if transportButtonMode == "seek" { onSeekRelative(-seekInterval) }
-                        else { onPrevious() }
-                    } label: {
-                        Image(systemName: isFrameStepping ? "chevron.left" : (transportButtonMode == "seek" ? "gobackward" : "backward.end.fill"))
-                            .playerCenterControl()
+                    if transportButtonMode != "off" || isFrameStepping {
+                        Button {
+                            if isFrameStepping { onStepFrame(-1) }
+                            else if transportButtonMode == "seek" { onSeekRelative(-seekInterval) }
+                            else { onPrevious() }
+                        } label: {
+                            Image(systemName: isFrameStepping ? "chevron.left" : (transportButtonMode == "seek" ? "gobackward" : "backward.end.fill"))
+                                .playerCenterControl()
+                        }
+                        .disabled(isFrameStepping ? !canStepBackward : (transportButtonMode == "seek" ? false : !hasPrevious))
+                        .accessibilityLabel(isFrameStepping ? "Fine step backward" : (transportButtonMode == "seek" ? "Seek backward" : "Previous video"))
                     }
-                    .disabled(isFrameStepping ? !canStepBackward : (transportButtonMode == "seek" ? false : !hasPrevious))
-                    .accessibilityLabel(isFrameStepping ? "Fine step backward" : (transportButtonMode == "seek" ? "Seek backward" : "Previous video"))
                     Group {
                         if isPreparing {
                             PlaybackActivityIndicator(size: 34, lineWidth: 3.5)
@@ -116,16 +118,18 @@ struct CustomPlayerControls: View {
                         }
                     }
                     .frame(width: 68, height: 68)
-                    Button {
-                        if isFrameStepping { onStepFrame(1) }
-                        else if transportButtonMode == "seek" { onSeekRelative(seekInterval) }
-                        else { onNext() }
-                    } label: {
-                        Image(systemName: isFrameStepping ? "chevron.right" : (transportButtonMode == "seek" ? "goforward" : "forward.end.fill"))
-                            .playerCenterControl()
+                    if transportButtonMode != "off" || isFrameStepping {
+                        Button {
+                            if isFrameStepping { onStepFrame(1) }
+                            else if transportButtonMode == "seek" { onSeekRelative(seekInterval) }
+                            else { onNext() }
+                        } label: {
+                            Image(systemName: isFrameStepping ? "chevron.right" : (transportButtonMode == "seek" ? "goforward" : "forward.end.fill"))
+                                .playerCenterControl()
+                        }
+                        .disabled(isFrameStepping ? !canStepForward : (transportButtonMode == "seek" ? false : !hasNext))
+                        .accessibilityLabel(isFrameStepping ? "Fine step forward" : (transportButtonMode == "seek" ? "Seek forward" : "Next video"))
                     }
-                    .disabled(isFrameStepping ? !canStepForward : (transportButtonMode == "seek" ? false : !hasNext))
-                    .accessibilityLabel(isFrameStepping ? "Fine step forward" : (transportButtonMode == "seek" ? "Seek forward" : "Next video"))
                 }
                 .buttonStyle(.plain)
                 .opacity(isVisible ? 1 : 0)

@@ -95,6 +95,7 @@ struct SettingsScreen: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(onClose == nil ? .large : .inline)
             .searchable(

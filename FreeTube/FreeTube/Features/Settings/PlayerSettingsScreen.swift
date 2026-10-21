@@ -18,6 +18,7 @@ struct PlayerSettingsScreen: View {
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
     @AppStorage("upNextRowSize") private var upNextRowSize = UpNextRowSize.compact.rawValue
+    @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
 
@@ -143,6 +144,7 @@ struct PlayerSettingsScreen: View {
                 Picker("Transport buttons", selection: $transportButtonMode) {
                     Text("Previous and next video").tag("videos")
                     Text("Seek backward and forward").tag("seek")
+                    Text("Off").tag("off")
                 }
                 .settingsSearchRow("Transport buttons")
                 if transportButtonMode == "seek" {
@@ -162,20 +164,21 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show comments")
                 if model.showComments {
+                    Toggle("Load more comments automatically", isOn: $autoLoadMoreComments)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Load more comments automatically")
                     Toggle("Show commenter photos", isOn: Bindable(model).showCommentAuthorPhotos)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Show commenter photos")
                     Toggle("Open commenter channels", isOn: Bindable(model).openCommentAuthorChannels)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Open commenter channels")
-                    Toggle("Show featured comment preview", isOn: Bindable(model).showFeaturedCommentPreview)
-                        .tint(settingsToggleTint)
-                        .settingsSearchRow("Show featured comment preview")
-                    if model.showFeaturedCommentPreview {
-                        Toggle("Only near playback time", isOn: Bindable(model).featuredCommentsNearPlaybackOnly)
-                            .tint(settingsToggleTint)
-                            .settingsSearchRow("Only near playback time")
+                    Picker("Featured comment preview", selection: featuredCommentSelection) {
+                        Text("Off").tag("off")
+                        Text("Only near playback time").tag("timed")
+                        Text("Always").tag("always")
                     }
+                    .settingsSearchRow("Featured comment preview")
                 }
                 Toggle("Show Up Next", isOn: Bindable(model).showUpNext)
                     .tint(settingsToggleTint)
@@ -241,6 +244,19 @@ struct PlayerSettingsScreen: View {
 
     private var isCustomSeekIntervalSelected: Bool {
         model.doubleTapSeekSeconds != 0 && !presetSeekIntervals.contains(model.doubleTapSeekSeconds)
+    }
+
+    private var featuredCommentSelection: Binding<String> {
+        Binding(
+            get: {
+                guard model.showFeaturedCommentPreview else { return "off" }
+                return model.featuredCommentsNearPlaybackOnly ? "timed" : "always"
+            },
+            set: { selection in
+                model.featuredCommentsNearPlaybackOnly = selection == "timed"
+                model.showFeaturedCommentPreview = selection != "off"
+            }
+        )
     }
 
     private var seekIntervalSelection: Binding<Int> {

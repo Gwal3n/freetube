@@ -38,6 +38,7 @@ struct SearchContent: View {
     @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("recentChannelsJSON") private var recentChannelsJSON = "[]"
+    @AppStorage("autoLoadMoreSearchItems") private var autoLoadMoreSearchItems = true
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
@@ -238,7 +239,7 @@ struct SearchContent: View {
                                     player.load(video)
                                 }
                                 .onAppear {
-                                    guard lookaheadIDs.contains(video.id),
+                                    guard autoLoadMoreSearchItems, lookaheadIDs.contains(video.id),
                                           results.continuationToken != nil,
                                           !model.paginationFailed,
                                           !model.isLoading else { return }
@@ -281,7 +282,7 @@ struct SearchContent: View {
                     .onAppear {
                         // The bounded filtered fill owns sparse pages. Ordinary unfiltered
                         // browsing retains its existing automatic footer pagination.
-                        guard !videoFilters.isActive, !blocklist.rules.isActive,
+                        guard autoLoadMoreSearchItems, !videoFilters.isActive, !blocklist.rules.isActive,
                               !model.paginationFailed else { return }
                         Task { await model.loadMore() }
                     }
@@ -434,6 +435,7 @@ struct SearchContent: View {
     /// Fill a sparse filtered list without turning a very narrow filter into an unlimited stream
     /// of YouTube requests. A later explicit Load more starts another bounded batch.
     private func fillFilteredResults() async {
+        guard autoLoadMoreSearchItems else { return }
         let filters = videoFilters
         let blockingRevision = blocklist.revision
         guard (filters.isActive || blocklist.rules.isActive), areVideosExpanded,

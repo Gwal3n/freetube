@@ -3,6 +3,8 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct BrowsingSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
+    @AppStorage("autoLoadMoreSearchItems") private var autoLoadMoreSearchItems = true
+    @AppStorage("autoLoadMoreFeedItems") private var autoLoadMoreFeedItems = true
     let model: SettingsViewModel
 
     var body: some View {
@@ -11,6 +13,9 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show search suggestions")
+                Toggle("Load more search results automatically", isOn: $autoLoadMoreSearchItems)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Load more search results automatically")
             } header: {
                 Text("Search")
             }
@@ -22,6 +27,9 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Show channel avatars", isOn: Bindable(model).showFeedChannelAvatars)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show channel avatars")
+                Toggle("Load more feed videos automatically", isOn: $autoLoadMoreFeedItems)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Load more feed videos automatically")
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Mark new uploads")

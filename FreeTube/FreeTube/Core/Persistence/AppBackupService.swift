@@ -155,7 +155,7 @@ final class AppBackupService {
 
     private static let settingKeys: Set<String> = [
         "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appAccentPreset", "appFontPreset",
-        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "cacheRecentVideoContent", "cellularPlaybackQuality",
+        "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "autoLoadMoreFeedItems", "autoLoadMoreSearchItems", "autoLoadMoreComments", "cacheRecentVideoContent", "cellularPlaybackQuality",
         "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "useAccentTheme", "accentNavigationOnly", "appCustomAccentHex", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
@@ -168,7 +168,7 @@ final class AppBackupService {
         "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
         "logToFile", "manualQueue",
-        "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex",
+        "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "playerPanelSectionOrder",
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
         "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showHoldSpeedPill", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
@@ -182,7 +182,7 @@ final class AppBackupService {
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
         "sponsorBlockColorOverridesJSON", "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
-        "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount"
+        "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize"
     ]
 
     enum BackupError: LocalizedError {

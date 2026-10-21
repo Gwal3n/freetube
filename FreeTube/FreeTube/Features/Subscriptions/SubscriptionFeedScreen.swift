@@ -26,6 +26,7 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
     @AppStorage("automaticFeedViewCountsEnabled") private var automaticFeedViewCountsEnabled = false
     @AppStorage("automaticFeedViewCountInterval") private var automaticFeedViewCountIntervalRaw = FeedRefreshInterval.hourly.rawValue
+    @AppStorage("autoLoadMoreFeedItems") private var autoLoadMoreFeedItems = true
     @AppStorage("spaceSubscriptionFeedVideos") private var spaceSubscriptionFeedVideos = true
     @AppStorage("feedChannelSpacing") private var feedChannelSpacing = 2
     @AppStorage("feedGroupSpacing") private var feedGroupSpacing = 2
@@ -77,7 +78,7 @@ struct SubscriptionFeedScreen: View {
                 ForEach(visibleVideos) { video in
                     feedRow(video)
                         .onAppear {
-                            guard filtersAreActive,
+                            guard autoLoadMoreFeedItems, filtersAreActive,
                                   visibleVideos.count >= 12,
                                   filteredLookaheadIDs.contains(video.id),
                                   model.canLoadMore,
@@ -123,7 +124,7 @@ struct SubscriptionFeedScreen: View {
                     .disabled(model.isLoadingMore || model.isRefreshing)
                     .id(pageKey)
                     .onAppear {
-                        guard !filtersAreActive,
+                        guard autoLoadMoreFeedItems, !filtersAreActive,
                               !model.isRefreshing,
                               lastAutomaticLoadKey != pageKey else { return }
                         lastAutomaticLoadKey = pageKey
@@ -298,6 +299,7 @@ struct SubscriptionFeedScreen: View {
     /// Feed pagination reads cached videos, but sparse filters still need several cache pages to
     /// show a useful first screen. Stop after a bounded batch; explicit Load more can continue it.
     private func fillFilteredFeed() async {
+        guard autoLoadMoreFeedItems else { return }
         let selectedWatch = watchFilter
         let selectedDuration = durationFilter
         let minimum = customMinimumMinutes
