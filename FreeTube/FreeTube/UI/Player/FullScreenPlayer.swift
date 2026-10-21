@@ -1151,55 +1151,52 @@ struct FullScreenPlayer: View {
         minimumContentHeight: CGFloat
     ) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Color.clear
-                    // Keep the geometry probe alive so it reliably emits scroll preferences.
-                    .frame(height: 1)
-                    .reportPlayerPanelScrollOffset()
-                PlayerInformationPanel(
-                    video: video,
-                    fullVideoLabel: SponsorBlockSegment.primaryFullVideoLabel(
-                        in: player.sponsorBlockSegments
-                    ),
-                    statsText: detailsModel.statsText(for: video),
-                    descriptionText: detailsModel.description(for: video),
-                    descriptionParts: detailsModel.details?.descriptionParts ?? [],
-                    commentsCountText: detailsModel.commentsCountText(
-                        fallback: player.commentsCountText
-                    ),
-                    isDetailsExpanded: detailsModel.isExpanded,
-                    isLoadingDetails: detailsModel.isLoading,
-                    detailsLoadFailed: detailsModel.loadFailed,
-                    showsDescription: showDescription,
-                    showsUpNext: showUpNext,
-                    upNextInitialCount: upNextInitialCount,
-                    contentWidth: contentWidth,
-                    showsComments: showComments,
-                    onToggleDetails: {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            detailsModel.isExpanded.toggle()
-                        }
-                        if detailsModel.isExpanded {
-                            detailsModel.loadIfNeeded(for: video, player: player)
-                        }
-                    },
-                    onExpandDetails: {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            detailsModel.isExpanded = true
-                        }
+            PlayerInformationPanel(
+                video: video,
+                fullVideoLabel: SponsorBlockSegment.primaryFullVideoLabel(
+                    in: player.sponsorBlockSegments
+                ),
+                statsText: detailsModel.statsText(for: video),
+                descriptionText: detailsModel.description(for: video),
+                descriptionParts: detailsModel.details?.descriptionParts ?? [],
+                commentsCountText: detailsModel.commentsCountText(
+                    fallback: player.commentsCountText
+                ),
+                isDetailsExpanded: detailsModel.isExpanded,
+                isLoadingDetails: detailsModel.isLoading,
+                detailsLoadFailed: detailsModel.loadFailed,
+                showsDescription: showDescription,
+                showsUpNext: showUpNext,
+                upNextInitialCount: upNextInitialCount,
+                contentWidth: contentWidth,
+                showsComments: showComments,
+                onToggleDetails: {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                        detailsModel.isExpanded.toggle()
+                    }
+                    if detailsModel.isExpanded {
                         detailsModel.loadIfNeeded(for: video, player: player)
-                    },
-                    onRetryDetails: {
-                        detailsModel.retry(for: video, player: player)
-                    },
-                    onOpenChannel: {
-                        openChannel(video.channelID)
-                    },
-                    onSeek: { player.seek(to: $0) }
-                ) {
-                    playerActions(video)
-                }
+                    }
+                },
+                onExpandDetails: {
+                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                        detailsModel.isExpanded = true
+                    }
+                    detailsModel.loadIfNeeded(for: video, player: player)
+                },
+                onRetryDetails: {
+                    detailsModel.retry(for: video, player: player)
+                },
+                onOpenChannel: {
+                    openChannel(video.channelID)
+                },
+                onSeek: { player.seek(to: $0) }
+            ) {
+                playerActions(video)
             }
+            // Keep the legacy scroll probe attached to the stack itself, rather than a lazy
+            // child that can disappear when the player details scroll far offscreen.
+            .reportPlayerPanelScrollOffset()
             .padding(.top, 6)
             .padding(.bottom, player.activePlaylist == nil
                 ? 16

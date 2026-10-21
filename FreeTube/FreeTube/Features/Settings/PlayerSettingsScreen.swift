@@ -19,6 +19,7 @@ struct PlayerSettingsScreen: View {
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
     @AppStorage("upNextRowSize") private var upNextRowSize = UpNextRowSize.compact.rawValue
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
+    @AppStorage("pinCommentsHeading") private var pinCommentsHeading = true
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
 
@@ -164,6 +165,9 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show comments")
                 if model.showComments {
+                    Toggle("Keep comments heading visible", isOn: $pinCommentsHeading)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Keep comments heading visible")
                     Toggle("Load more comments automatically", isOn: $autoLoadMoreComments)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Load more comments automatically")

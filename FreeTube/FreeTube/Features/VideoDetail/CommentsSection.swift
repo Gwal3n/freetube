@@ -13,6 +13,7 @@ struct CommentsSection: View {
     @AppStorage("showFeaturedCommentPreview") private var showsFeaturedCommentPreview = false
     @AppStorage("featuredCommentsNearPlaybackOnly") private var featuredCommentsNearPlaybackOnly = false
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
+    @AppStorage("pinCommentsHeading") private var pinCommentsHeading = true
     @AppStorage("openCommentAuthorChannels") private var openCommentAuthorChannels = false
 
     init(videoID: String, countText: String? = nil) {
@@ -21,22 +22,25 @@ struct CommentsSection: View {
     }
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 8) {
-            header
-
-            if showsFeaturedCommentPreview && !isExpanded {
-                FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
-                    model.focusComment(commentID)
-                    expandComments()
+        Group {
+            if pinCommentsHeading {
+                Section {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        commentsContent
+                    }
+                    .clipped()
+                } header: {
+                    header
+                        .background(Color(uiColor: .systemBackground))
                 }
-            }
-
-            if isExpanded {
-                expandedComments
-                    .transition(.opacity)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    header
+                    commentsContent
+                }
+                .clipped()
             }
         }
-        .clipped()
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.teaserText)
         .errorToast(Bindable(model).errorState)
@@ -48,6 +52,20 @@ struct CommentsSection: View {
             } else if isExpanded, model.comments.isEmpty, !model.isLoading {
                 await model.load()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var commentsContent: some View {
+        if showsFeaturedCommentPreview && !isExpanded {
+            FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
+                model.focusComment(commentID)
+                expandComments()
+            }
+        }
+        if isExpanded {
+            expandedComments
+                .transition(.opacity)
         }
     }
 
