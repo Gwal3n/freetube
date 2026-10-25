@@ -143,10 +143,12 @@ private struct SelectableCommentText: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.onSeek = onSeek
-        let font = preset.uiFont(style: .subheadline, size: 15)
-        if context.coordinator.lastText != text || context.coordinator.lastPreset != preset
+        let contentChanged = context.coordinator.lastText != text || context.coordinator.lastPreset != preset
             || context.coordinator.lastDynamicTypeSize != dynamicTypeSize
-            || context.coordinator.lastHasSeek != (onSeek != nil) {
+            || context.coordinator.lastHasSeek != (onSeek != nil)
+        let lineLimitChanged = context.coordinator.lastMaximumNumberOfLines != maximumNumberOfLines
+        if contentChanged {
+            let font = preset.uiFont(style: .subheadline, size: 15)
             let rendered = NSMutableAttributedString(string: text, attributes: [
                 .font: font,
                 .foregroundColor: UIColor.label
@@ -166,11 +168,16 @@ private struct SelectableCommentText: UIViewRepresentable {
             context.coordinator.lastDynamicTypeSize = dynamicTypeSize
             context.coordinator.lastHasSeek = onSeek != nil
         }
-        view.textContainer.maximumNumberOfLines = maximumNumberOfLines
-        view.textContainer.lineBreakMode = maximumNumberOfLines == 0
-            ? .byWordWrapping
-            : .byTruncatingTail
-        view.invalidateIntrinsicContentSize()
+        if contentChanged || lineLimitChanged {
+            view.textContainer.maximumNumberOfLines = maximumNumberOfLines
+            view.textContainer.lineBreakMode = maximumNumberOfLines == 0
+                ? .byWordWrapping
+                : .byTruncatingTail
+            context.coordinator.lastMaximumNumberOfLines = maximumNumberOfLines
+            // The player updates during scrolling and minimization. Invalidating unchanged
+            // comment text on every update forces avoidable UIKit layout work on each frame.
+            view.invalidateIntrinsicContentSize()
+        }
     }
 
     func sizeThatFits(
@@ -191,6 +198,7 @@ private struct SelectableCommentText: UIViewRepresentable {
         var lastPreset: AppFontPreset?
         var lastDynamicTypeSize: DynamicTypeSize?
         var lastHasSeek = false
+        var lastMaximumNumberOfLines: Int?
 
         func textView(
             _ textView: UITextView,

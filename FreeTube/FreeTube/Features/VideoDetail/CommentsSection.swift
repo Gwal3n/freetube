@@ -44,7 +44,11 @@ struct CommentsSection: View {
                         .padding(.vertical, 12)
                     } else {
                         ForEach(model.commentsForDisplay) { comment in
-                            commentThread(comment)
+                            // One stable child per comment keeps the lazy stack from expanding
+                            // every reply branch merely to count its rows.
+                            VStack(alignment: .leading, spacing: 8) {
+                                commentThread(comment)
+                            }
                         }
                         if model.isLoading {
                             ProgressView()
