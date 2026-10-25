@@ -83,6 +83,11 @@ struct CommentsSection: View {
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.teaserText)
         .errorToast(Bindable(model).errorState)
+        .onAppear { PlayerScrollDiagnostics.shared.setCommentsExpanded(isExpanded) }
+        .onChange(of: isExpanded) { _, expanded in
+            PlayerScrollDiagnostics.shared.setCommentsExpanded(expanded)
+        }
+        .onDisappear { PlayerScrollDiagnostics.shared.setCommentsExpanded(false) }
         // Covers state restoration where the section mounts expanded. Collapsed sections remain
         // unloaded unless the user explicitly enables the featured-comment preview.
         .task(id: "\(showsFeaturedCommentPreview):\(featuredCommentsNearPlaybackOnly)") {

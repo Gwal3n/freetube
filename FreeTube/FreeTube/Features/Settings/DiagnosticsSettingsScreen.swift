@@ -5,6 +5,7 @@ struct DiagnosticsSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
     @State private var logWriter = LogFileWriter.shared
+    @AppStorage("playerScrollDiagnosticsEnabled") private var playerScrollDiagnosticsEnabled = false
     @State private var shareLogURL: URL?
     @State private var showingClearLogsConfirmation = false
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
@@ -15,6 +16,9 @@ struct DiagnosticsSettingsScreen: View {
                 Toggle("Save logs to file", isOn: Bindable(model).logToFile)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Save logs to file")
+                Toggle("Measure player scrolling", isOn: $playerScrollDiagnosticsEnabled)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Measure player scrolling")
                 if model.logToFile, let url = logWriter.currentLogFileURL {
                     LabeledContent("Current log") {
                         Text(url.lastPathComponent)
@@ -47,7 +51,7 @@ struct DiagnosticsSettingsScreen: View {
                 .disabled(LogFileWriter.allLogFiles().isEmpty)
                 .settingsSearchRow("Clear all logs")
             } footer: {
-                Text("Saving logs creates a new file at launch for troubleshooting. Logs include app and device details, but omit sensitive URL queries.")
+                Text("Saving logs creates a new file at launch for troubleshooting. Scroll measurements summarize update gaps after each swipe; they are not video FPS. Enable file logs to share them. Logs omit sensitive URL queries.")
             }
         }
         .scrollToSearchedSetting()

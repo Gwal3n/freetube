@@ -222,7 +222,7 @@ enum SettingsSearchIndex {
             "Community chapters"
         ]),
         Group(destination: .diagnostics, titles: [
-            "Diagnostics", "Save logs to file", "Share latest log…", "Show log folder", "Clear all logs"
+            "Diagnostics", "Save logs to file", "Measure player scrolling", "Share latest log…", "Show log folder", "Clear all logs"
         ]),
         Group(destination: .about, titles: ["About"])
     ]

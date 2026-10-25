@@ -5,6 +5,13 @@ import UIKit
 /// surface, transport controls, metadata, and independently collapsible sections below.
 @available(iOS 17.0, *)
 struct FullScreenPlayer: View {
+    private struct PanelScrollSample: Equatable {
+        let collapseOffset: CGFloat
+        let isAtTop: Bool
+        // Keep raw scroll callbacks only while explicitly measuring scroll performance.
+        let diagnosticOffset: CGFloat?
+    }
+
     let captionPresentationReady: Bool
     let chromePresentationReady: Bool
     let collapseProgress: CGFloat
@@ -63,6 +70,7 @@ struct FullScreenPlayer: View {
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("showComments") private var showComments = true
+    @AppStorage("playerScrollDiagnosticsEnabled") private var playerScrollDiagnosticsEnabled = false
     @AppStorage("showDescription") private var showDescription = true
     @AppStorage("showUpNext") private var showUpNext = true
     @AppStorage("upNextInitialCount") private var upNextInitialCount = 5
@@ -1123,11 +1131,26 @@ struct FullScreenPlayer: View {
                 contentWidth: contentWidth,
                 minimumContentHeight: minimumContentHeight
             )
-                .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                    max(0, geometry.contentOffset.y + geometry.contentInsets.top)
-                } action: { _, offset in
-                    panelScrollOffset = offset
-                    player.playerPanelAtTop = offset <= 0.5
+                .onScrollGeometryChange(for: PanelScrollSample.self) { geometry in
+                    let offset = max(0, geometry.contentOffset.y + geometry.contentInsets.top)
+                    return PanelScrollSample(
+                        collapseOffset: min(offset, collapseRange),
+                        isAtTop: offset <= 0.5,
+                        diagnosticOffset: playerScrollDiagnosticsEnabled ? offset : nil
+                    )
+                } action: { _, sample in
+                    updatePanelScroll(collapseOffset: sample.collapseOffset, isAtTop: sample.isAtTop)
+                    if let offset = sample.diagnosticOffset, offset > collapseRange + 1 {
+                        PlayerScrollDiagnostics.shared.record()
+                    }
+                }
+                .onScrollPhaseChange { _, phase in
+                    guard playerScrollDiagnosticsEnabled else { return }
+                    if phase == .interacting {
+                        PlayerScrollDiagnostics.shared.begin()
+                    } else if phase == .idle {
+                        PlayerScrollDiagnostics.shared.finish()
+                    }
                 }
         } else {
             panelScrollView(
@@ -1138,9 +1161,22 @@ struct FullScreenPlayer: View {
             )
                 .coordinateSpace(name: "playerPanelScroll")
                 .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
-                    panelScrollOffset = offset
-                    player.playerPanelAtTop = offset <= 0.5
+                    updatePanelScroll(
+                        collapseOffset: min(max(offset, 0), collapseRange),
+                        isAtTop: offset <= 0.5
+                    )
                 }
+        }
+    }
+
+    private func updatePanelScroll(collapseOffset: CGFloat, isAtTop: Bool) {
+        // Past the tall-video collapse range, ordinary scrolling must not invalidate the
+        // entire player and expanded comment tree for every pixel of movement.
+        if panelScrollOffset != collapseOffset {
+            panelScrollOffset = collapseOffset
+        }
+        if player.playerPanelAtTop != isAtTop {
+            player.playerPanelAtTop = isAtTop
         }
     }
 
@@ -1215,6 +1251,7 @@ struct FullScreenPlayer: View {
         }
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
+        .onDisappear { PlayerScrollDiagnostics.shared.finish() }
     }
 
     // MARK: - Player actions
