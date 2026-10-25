@@ -422,14 +422,14 @@ and a rejected strategy is excluded before requesting the next candidate.
   queue/comments mode switch. Mounting `CommentsSection` must not fetch comments: it defaults
   collapsed and performs its first request only when the user expands it, preserving the player's
   no-comment-load performance characteristics. Both section headers are tappable across their
-  available width. The independent sections are temporarily in a fixed order (Saved Moments,
-  Queue, Up Next, Comments) while
-  diagnosing expanded-comment scrolling. Keep the saved custom order intact for restoration later.
+  available width. Their order is configurable under Player settings and stored locally.
   Up Next alone supports compact, small, and full-width thumbnail rows, while the manual queue
   remains compact. The current video
   is hidden from the visible Up Next rows; compact autoplay and repeat icons appear beside the
-  heading only while Up Next is expanded. Keep the player panel's scroll hierarchy stable;
-  nested pinned section headers caused jumpy scrolling here. Queue deletion
+  heading only while Up Next is expanded. The optional sticky Comments heading defaults off.
+  When enabled, its pinned Section belongs to the panel's main lazy stack. Keep the unpinned
+  scroll hierarchy stable and avoid nested pinned stacks or unbounded scroll-offset state writes.
+  Queue deletion
   uses swipe actions rather than permanent edit-mode minus controls. Existing comment replies use
   YouTubeKit's reply continuation token and load only when their inline like-row control is expanded.
   YouTubeKit has no literal comments-disabled Boolean. Treat a `MoreVideoInfosResponse` with neither

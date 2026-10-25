@@ -7,6 +7,8 @@ import SwiftUI
 /// player orchestrator from also owning the lower panel's visual hierarchy.
 @available(iOS 17.0, *)
 struct PlayerInformationPanel<Actions: View>: View {
+    @AppStorage("playerPanelSectionOrder") private var storedSectionOrder = PlayerPanelSection.defaultOrder
+    @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
     let video: Video
     let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
@@ -73,39 +75,67 @@ struct PlayerInformationPanel<Actions: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            PlayerMetadataHeader(
-                video: video,
-                fullVideoLabel: fullVideoLabel,
-                statsText: statsText,
-                isDetailsExpanded: isDetailsExpanded,
-                showsDescription: showsDescription,
-                canOpenChannel: !video.channelID.isEmpty,
-                onToggleDetails: onToggleDetails,
-                onOpenChannel: onOpenChannel
-            ) {
-                actions
+        if pinCommentsHeading {
+            // A pinned Section needs to belong to the panel's main lazy stack, not a lazy
+            // stack nested around Comments alone. Keep the original one-point top probe gap.
+            LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
+                Color.clear.frame(height: 1)
+                metadataHeader
+                if showsDescription { description }
+                orderedSections
             }
-
-            if showsDescription {
-                PlayerDescription(
-                    text: descriptionText,
-                    parts: descriptionParts,
-                    isExpanded: isDetailsExpanded,
-                    isLoading: isLoadingDetails,
-                    loadFailed: detailsLoadFailed,
-                    onSeek: onSeek,
-                    onRetry: onRetryDetails,
-                    onExpand: onExpandDetails
-                )
+        } else {
+            // Preserve the existing non-sticky layout exactly when pinning is disabled.
+            VStack(alignment: .leading, spacing: 16) {
+                metadataHeader
+                if showsDescription { description }
+                VStack(alignment: .leading, spacing: 8) {
+                    orderedSections
+                }
             }
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
+    private var metadataHeader: some View {
+        PlayerMetadataHeader(
+            video: video,
+            fullVideoLabel: fullVideoLabel,
+            statsText: statsText,
+            isDetailsExpanded: isDetailsExpanded,
+            showsDescription: showsDescription,
+            canOpenChannel: !video.channelID.isEmpty,
+            onToggleDetails: onToggleDetails,
+            onOpenChannel: onOpenChannel
+        ) {
+            actions
+        }
+    }
+
+    private var description: some View {
+        PlayerDescription(
+            text: descriptionText,
+            parts: descriptionParts,
+            isExpanded: isDetailsExpanded,
+            isLoading: isLoadingDetails,
+            loadFailed: detailsLoadFailed,
+            onSeek: onSeek,
+            onRetry: onRetryDetails,
+            onExpand: onExpandDetails
+        )
+    }
+
+    private var orderedSections: some View {
+        ForEach(PlayerPanelSection.ordered(from: storedSectionOrder)) { section in
+            switch section {
+            case .savedMoments:
                 SavedMomentsSection(videoID: video.id, onSeek: onSeek)
+            case .queue:
                 PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+            case .upNext:
                 if showsUpNext {
                     PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
                 }
+            case .comments:
                 if showsComments {
                     CommentsSection(videoID: video.id, countText: commentsCountText)
                         .id(video.id)

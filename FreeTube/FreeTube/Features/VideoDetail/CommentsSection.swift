@@ -13,6 +13,7 @@ struct CommentsSection: View {
     @AppStorage("featuredCommentsNearPlaybackOnly") private var featuredCommentsNearPlaybackOnly = false
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
     @AppStorage("openCommentAuthorChannels") private var openCommentAuthorChannels = false
+    @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
 
     init(videoID: String, countText: String? = nil) {
         self.countText = countText
@@ -20,66 +21,24 @@ struct CommentsSection: View {
     }
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 8) {
-            header
-
-            if showsFeaturedCommentPreview && !isExpanded {
-                FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
-                    model.focusComment(commentID)
-                    expandComments()
-                }
-            }
-
-            if isExpanded {
-                Group {
-                    if model.isLoading && model.comments.isEmpty {
-                        CommentListPlaceholder()
-                    } else if model.commentsDisabled {
-                        ContentUnavailableView(
-                            "Comments disabled",
-                            systemImage: "text.bubble",
-                            description: Text("Comments are unavailable for this video.")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                    } else {
-                        ForEach(model.commentsForDisplay) { comment in
-                            // One stable child per comment keeps the lazy stack from expanding
-                            // every reply branch merely to count its rows.
-                            VStack(alignment: .leading, spacing: 8) {
-                                commentThread(comment)
-                            }
-                        }
-                        if model.isLoading {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .accessibilityLabel("Loading more comments")
-                        } else if model.continuationToken != nil {
-                            if autoLoadMoreComments {
-                                Color.clear
-                                    .frame(height: 24)
-                                    .contentShape(Rectangle())
-                                    .onAppear { Task { await model.loadMore() } }
-                                    .accessibilityHidden(true)
-                            } else {
-                                Button {
-                                    Task { await model.loadMore() }
-                                } label: {
-                                    Label("Load more comments", systemImage: "chevron.down")
-                                        .frame(maxWidth: .infinity, minHeight: 44)
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.primary)
-                            }
-                        }
+        Group {
+            if pinCommentsHeading {
+                Section {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        commentsContent
                     }
+                    .clipped()
+                } header: {
+                    header.background(Color(uiColor: .systemBackground))
                 }
-                .transition(.opacity)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    header
+                    commentsContent
+                }
+                .clipped()
             }
         }
-        .clipped()
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.teaserText)
         .errorToast(Bindable(model).errorState)
@@ -96,6 +55,65 @@ struct CommentsSection: View {
             } else if isExpanded, model.comments.isEmpty, !model.isLoading {
                 await model.load()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var commentsContent: some View {
+        if showsFeaturedCommentPreview && !isExpanded {
+            FeaturedCommentPreview(model: model, onlyNearPlayback: featuredCommentsNearPlaybackOnly) { commentID in
+                model.focusComment(commentID)
+                expandComments()
+            }
+        }
+
+        if isExpanded {
+            Group {
+                if model.isLoading && model.comments.isEmpty {
+                    CommentListPlaceholder()
+                } else if model.commentsDisabled {
+                    ContentUnavailableView(
+                        "Comments disabled",
+                        systemImage: "text.bubble",
+                        description: Text("Comments are unavailable for this video.")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                } else {
+                    ForEach(model.commentsForDisplay) { comment in
+                        // One stable child per comment keeps the lazy stack from expanding
+                        // every reply branch merely to count its rows.
+                        VStack(alignment: .leading, spacing: 8) {
+                            commentThread(comment)
+                        }
+                    }
+                    if model.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .accessibilityLabel("Loading more comments")
+                    } else if model.continuationToken != nil {
+                        if autoLoadMoreComments {
+                            Color.clear
+                                .frame(height: 24)
+                                .contentShape(Rectangle())
+                                .onAppear { Task { await model.loadMore() } }
+                                .accessibilityHidden(true)
+                        } else {
+                            Button {
+                                Task { await model.loadMore() }
+                            } label: {
+                                Label("Load more comments", systemImage: "chevron.down")
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.primary)
+                        }
+                    }
+                }
+            }
+            .transition(.opacity)
         }
     }
 

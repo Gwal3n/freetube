@@ -70,6 +70,7 @@ struct FullScreenPlayer: View {
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("showComments") private var showComments = true
+    @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
     @AppStorage("playerScrollDiagnosticsEnabled") private var playerScrollDiagnosticsEnabled = false
     @AppStorage("showDescription") private var showDescription = true
     @AppStorage("showUpNext") private var showUpNext = true
@@ -1187,53 +1188,19 @@ struct FullScreenPlayer: View {
         minimumContentHeight: CGFloat
     ) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Color.clear
-                    // Keep the geometry probe alive so it reliably emits scroll preferences.
-                    .frame(height: 1)
-                    .reportPlayerPanelScrollOffset()
-                PlayerInformationPanel(
-                    video: video,
-                    fullVideoLabel: SponsorBlockSegment.primaryFullVideoLabel(
-                        in: player.sponsorBlockSegments
-                    ),
-                    statsText: detailsModel.statsText(for: video),
-                    descriptionText: detailsModel.description(for: video),
-                    descriptionParts: detailsModel.details?.descriptionParts ?? [],
-                    commentsCountText: detailsModel.commentsCountText(
-                        fallback: player.commentsCountText
-                    ),
-                    isDetailsExpanded: detailsModel.isExpanded,
-                    isLoadingDetails: detailsModel.isLoading,
-                    detailsLoadFailed: detailsModel.loadFailed,
-                    showsDescription: showDescription,
-                    showsUpNext: showUpNext,
-                    upNextInitialCount: upNextInitialCount,
-                    contentWidth: contentWidth,
-                    showsComments: showComments,
-                    onToggleDetails: {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            detailsModel.isExpanded.toggle()
-                        }
-                        if detailsModel.isExpanded {
-                            detailsModel.loadIfNeeded(for: video, player: player)
-                        }
-                    },
-                    onExpandDetails: {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            detailsModel.isExpanded = true
-                        }
-                        detailsModel.loadIfNeeded(for: video, player: player)
-                    },
-                    onRetryDetails: {
-                        detailsModel.retry(for: video, player: player)
-                    },
-                    onOpenChannel: {
-                        openChannel(video.channelID)
-                    },
-                    onSeek: { player.seek(to: $0) }
-                ) {
-                    playerActions(video)
+            Group {
+                if pinCommentsHeading {
+                    // The pinned Section belongs to the ScrollView's direct lazy content.
+                    panelInformation(video, contentWidth: contentWidth)
+                        .reportPlayerPanelScrollOffset()
+                } else {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Color.clear
+                            // Keep the geometry probe alive so it reliably emits scroll preferences.
+                            .frame(height: 1)
+                            .reportPlayerPanelScrollOffset()
+                        panelInformation(video, contentWidth: contentWidth)
+                    }
                 }
             }
             .padding(.top, 6)
@@ -1252,6 +1219,52 @@ struct FullScreenPlayer: View {
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
         .onDisappear { PlayerScrollDiagnostics.shared.finish() }
+    }
+
+    private func panelInformation(_ video: Video, contentWidth: CGFloat) -> some View {
+        PlayerInformationPanel(
+            video: video,
+            fullVideoLabel: SponsorBlockSegment.primaryFullVideoLabel(
+                in: player.sponsorBlockSegments
+            ),
+            statsText: detailsModel.statsText(for: video),
+            descriptionText: detailsModel.description(for: video),
+            descriptionParts: detailsModel.details?.descriptionParts ?? [],
+            commentsCountText: detailsModel.commentsCountText(
+                fallback: player.commentsCountText
+            ),
+            isDetailsExpanded: detailsModel.isExpanded,
+            isLoadingDetails: detailsModel.isLoading,
+            detailsLoadFailed: detailsModel.loadFailed,
+            showsDescription: showDescription,
+            showsUpNext: showUpNext,
+            upNextInitialCount: upNextInitialCount,
+            contentWidth: contentWidth,
+            showsComments: showComments,
+            onToggleDetails: {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    detailsModel.isExpanded.toggle()
+                }
+                if detailsModel.isExpanded {
+                    detailsModel.loadIfNeeded(for: video, player: player)
+                }
+            },
+            onExpandDetails: {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    detailsModel.isExpanded = true
+                }
+                detailsModel.loadIfNeeded(for: video, player: player)
+            },
+            onRetryDetails: {
+                detailsModel.retry(for: video, player: player)
+            },
+            onOpenChannel: {
+                openChannel(video.channelID)
+            },
+            onSeek: { player.seek(to: $0) }
+        ) {
+            playerActions(video)
+        }
     }
 
     // MARK: - Player actions
