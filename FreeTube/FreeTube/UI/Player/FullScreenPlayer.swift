@@ -1261,6 +1261,9 @@ struct FullScreenPlayer: View {
             onOpenChannel: {
                 openChannel(video.channelID)
             },
+            onOpenRecommendationChannel: { channelID in
+                openChannel(channelID)
+            },
             onSeek: { player.seek(to: $0) }
         ) {
             playerActions(video)

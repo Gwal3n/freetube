@@ -172,8 +172,8 @@ final class AppBackupService {
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
         "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showHoldSpeedPill", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
-        "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "pinCommentsHeading", "showDescription", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
-        "showCommentAuthorPhotos", "openCommentAuthorChannels",
+        "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "pinCommentsHeading", "showDescription", "showFeedChannelAvatars", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
+        "showCommentAuthorPhotos", "openCommentAuthorChannels", "openFeedChannelsOnTap", "openUpNextChannelsOnTap",
         "showContinueWatchingMenu", "showHistoryProgressBars", "watchProgressColorMode", "watchProgressCustomHex", "finishedVideoIndicator", "transportButtonMode", "transportSeekSeconds", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
         "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
         "sponsorBlockExclusiveAccessBehavior", "sponsorBlockPreviewBehavior",
@@ -182,7 +182,8 @@ final class AppBackupService {
         "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
         "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
         "sponsorBlockColorOverridesJSON", "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
-        "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize"
+        "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize",
+        "showUpNextChannelAvatars"
     ]
 
     enum BackupError: LocalizedError {

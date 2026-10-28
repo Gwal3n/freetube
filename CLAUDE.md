@@ -427,6 +427,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   remains compact. The current video
   is hidden from the visible Up Next rows; compact autoplay and repeat icons appear beside the
   heading only while Up Next is expanded. The optional sticky Comments heading defaults off.
+  Feed and Up Next channel-name/avatar navigation are separate opt-in preferences. Up Next
+  avatars have their own preference; channel actions use the player's existing collapse-and-route
+  path, while video titles and thumbnails keep their playback action.
   When enabled, its pinned Section belongs to the panel's main lazy stack. Keep the unpinned
   scroll hierarchy stable and avoid nested pinned stacks or unbounded scroll-offset state writes.
   Queue deletion

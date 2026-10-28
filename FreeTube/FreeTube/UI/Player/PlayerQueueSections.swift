@@ -1,5 +1,7 @@
 import SwiftUI
 
+import Kingfisher
+
 /// Manual queue and recommendations shown below the expanded player's metadata.
 ///
 /// This view owns only disclosure/windowing state. Playback and queue mutations remain in the
@@ -16,10 +18,13 @@ struct PlayerQueueSections: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("upNextRowSize") private var upNextRowSizeRaw = UpNextRowSize.compact.rawValue
+    @AppStorage("showUpNextChannelAvatars") private var showUpNextChannelAvatars = false
+    @AppStorage("openUpNextChannelsOnTap") private var openUpNextChannelsOnTap = false
 
     let kind: Kind
     let upNextInitialCount: Int
     let contentWidth: CGFloat
+    let onOpenChannel: (String) -> Void
 
     @State private var isQueueExpanded = false
     @State private var isManualQueueExpanded = true
@@ -319,37 +324,31 @@ struct PlayerQueueSections: View {
         let thumbnailSize = rowThumbnailSize
         let rowHeight = kind == .upNext ? upNextRowHeight : queueRowHeight
         return HStack(spacing: 0) {
-            Button {
-                if let onPlay { onPlay() } else { player.load(video) }
-            } label: {
-                HStack(spacing: 12) {
-                    VideoThumbnail(
-                        video: video,
-                        size: thumbnailSize,
-                        cornerRadius: 4,
-                        replacementData: branding.thumbnailData(for: video),
-                        replacementCacheKey: branding.thumbnailCacheKey(for: video),
-                        compactBadge: thumbnailSize.width == 80
-                    )
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(branding.title(for: video))
-                            .contentTransition(.opacity)
-                            .appFont(.subheadline)
-                            .lineLimit(2)
-                        Text(queueRowMetadata(for: video))
-                            .appFont(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+            if canOpenUpNextChannel(for: video) {
+                linkedHorizontalContent(
+                    video, branding: branding, thumbnailSize: thumbnailSize,
+                    rowHeight: rowHeight, onPlay: onPlay
+                )
+            } else {
+                Button {
+                    playQueueVideo(video, onPlay: onPlay)
+                } label: {
+                    HStack(spacing: 12) {
+                        compactThumbnail(video, branding: branding, size: thumbnailSize)
+                        VStack(alignment: .leading, spacing: 2) {
+                            queueTitle(video, branding: branding)
+                            passiveQueueMetadata(for: video)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if video.id == player.currentVideo?.id {
+                            NowPlayingIndicator(videoID: video.id)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    if video.id == player.currentVideo?.id {
-                        NowPlayingIndicator(videoID: video.id)
-                    }
+                    .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
-                .contentShape(Rectangle())
+                .buttonStyle(ResponsiveButtonStyle())
             }
-            .buttonStyle(ResponsiveButtonStyle())
 
             if showsRemoveButton {
                 Button(action: onRemove) {
@@ -377,6 +376,123 @@ struct PlayerQueueSections: View {
         }
     }
 
+    private func linkedHorizontalContent(
+        _ video: Video,
+        branding: DeArrowVideoViewModel,
+        thumbnailSize: CGSize,
+        rowHeight: CGFloat,
+        onPlay: (() -> Void)?
+    ) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                playQueueVideo(video, onPlay: onPlay)
+            } label: {
+                compactThumbnail(video, branding: branding, size: thumbnailSize)
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel("Play \(branding.title(for: video))")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Button {
+                    playQueueVideo(video, onPlay: onPlay)
+                } label: {
+                    queueTitle(video, branding: branding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel("Play \(branding.title(for: video))")
+                linkedChannelMetadata(for: video)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if video.id == player.currentVideo?.id {
+                NowPlayingIndicator(videoID: video.id)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+    }
+
+    private func compactThumbnail(
+        _ video: Video, branding: DeArrowVideoViewModel, size: CGSize
+    ) -> some View {
+        VideoThumbnail(
+            video: video,
+            size: size,
+            cornerRadius: 4,
+            replacementData: branding.thumbnailData(for: video),
+            replacementCacheKey: branding.thumbnailCacheKey(for: video),
+            compactBadge: size.width == 80
+        )
+    }
+
+    private func queueTitle(_ video: Video, branding: DeArrowVideoViewModel) -> some View {
+        Text(branding.title(for: video))
+            .contentTransition(.opacity)
+            .appFont(.subheadline)
+            .lineLimit(2)
+    }
+
+    private func playQueueVideo(_ video: Video, onPlay: (() -> Void)?) {
+        if let onPlay { onPlay() } else { player.load(video) }
+    }
+
+    private func canOpenUpNextChannel(for video: Video) -> Bool {
+        kind == .upNext && openUpNextChannelsOnTap && !video.channelID.isEmpty
+    }
+
+    private func channelAvatar(for video: Video) -> some View {
+        KFImage(video.channelThumbnailURL)
+            .thumbnail(size: CGSize(width: 18, height: 18)) {
+                Circle().fill(MediaStyle.placeholderFill)
+            }
+            .resizable()
+            .scaledToFill()
+            .frame(width: 18, height: 18)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+
+    private func passiveQueueMetadata(for video: Video) -> some View {
+        HStack(spacing: 5) {
+            if kind == .upNext && showUpNextChannelAvatars {
+                channelAvatar(for: video)
+            }
+            Text(queueRowMetadata(for: video))
+                .appFont(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private func linkedChannelMetadata(for video: Video) -> some View {
+        HStack(spacing: 0) {
+            Button {
+                onOpenChannel(video.channelID)
+            } label: {
+                HStack(spacing: 5) {
+                    if showUpNextChannelAvatars {
+                        channelAvatar(for: video)
+                    }
+                    Text(video.channelName)
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(minHeight: 20)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel("Open \(video.channelName)")
+
+            if !video.viewCountString.isEmpty {
+                Text(verbatim: " • \(video.viewCountString)")
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
     private func largeUpNextRow(
         _ video: Video,
         branding: DeArrowVideoViewModel,
@@ -399,25 +515,39 @@ struct PlayerQueueSections: View {
                 }
             }
             HStack(alignment: .top, spacing: 8) {
-                Button { player.load(video) } label: {
+                if canOpenUpNextChannel(for: video) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(branding.title(for: video))
-                            .contentTransition(.opacity)
-                            .appFont(.subheadline, weight: .semibold)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
-                        Text(queueRowMetadata(for: video))
-                            .appFont(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        Button { player.load(video) } label: {
+                            largeQueueTitle(video, branding: branding)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ResponsiveButtonStyle())
+                        linkedChannelMetadata(for: video)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                } else {
+                    Button { player.load(video) } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            largeQueueTitle(video, branding: branding)
+                            passiveQueueMetadata(for: video)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ResponsiveButtonStyle())
                 }
-                .buttonStyle(ResponsiveButtonStyle())
                 VideoMoreActionsMenu(video: video, offersPlayNext: true, onRemoveFromUpNext: onRemove)
             }
         }
         .frame(height: upNextRowHeight, alignment: .top)
+    }
+
+    private func largeQueueTitle(_ video: Video, branding: DeArrowVideoViewModel) -> some View {
+        Text(branding.title(for: video))
+            .contentTransition(.opacity)
+            .appFont(.subheadline, weight: .semibold)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
     }
 
     private func queueRowMetadata(for video: Video) -> String {

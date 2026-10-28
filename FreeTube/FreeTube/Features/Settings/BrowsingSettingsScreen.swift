@@ -5,6 +5,7 @@ struct BrowsingSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
     @AppStorage("autoLoadMoreSearchItems") private var autoLoadMoreSearchItems = true
     @AppStorage("autoLoadMoreFeedItems") private var autoLoadMoreFeedItems = true
+    @AppStorage("openFeedChannelsOnTap") private var openFeedChannelsOnTap = false
     let model: SettingsViewModel
 
     var body: some View {
@@ -27,6 +28,9 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Show channel avatars", isOn: Bindable(model).showFeedChannelAvatars)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show channel avatars")
+                Toggle("Open feed channels from name or avatar", isOn: $openFeedChannelsOnTap)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Open feed channels from name or avatar")
                 Toggle("Load more feed videos automatically", isOn: $autoLoadMoreFeedItems)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Load more feed videos automatically")

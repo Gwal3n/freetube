@@ -123,6 +123,10 @@ enum SettingsSearchIndex {
             case .player where displayTitle == String(localized: "Up Next video size")
                 && !UserPreferences().showUpNext:
                 return String(localized: "Show Up Next")
+            case .player where (displayTitle == String(localized: "Show channel avatars in Up Next")
+                || displayTitle == String(localized: "Open Up Next channels from name or avatar"))
+                && !UserPreferences().showUpNext:
+                return String(localized: "Show Up Next")
             case .browsing where displayTitle == String(localized: "Refresh interval")
                 && !UserPreferences().automaticFeedRefreshEnabled:
                 return String(localized: "Refresh feed automatically")
@@ -171,7 +175,7 @@ enum SettingsSearchIndex {
             "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
             "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
             "Show comments", "Keep comments heading visible", "Load more comments automatically", "Show commenter photos", "Open commenter channels", "Featured comment preview", "Show Up Next",
-            "Initial Up Next videos", "Up Next video size", "Rearrange sections", "Prefetch details and comments"
+            "Initial Up Next videos", "Up Next video size", "Show channel avatars in Up Next", "Open Up Next channels from name or avatar", "Rearrange sections", "Prefetch details and comments"
         ]),
         Group(destination: .captions, titles: [
             "Captions", "Dark caption background", "Use source formatting", "Caption text size"
@@ -185,7 +189,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .browsing, titles: [
             "Browsing", "Show search suggestions", "Load more search results automatically",
-            "Large video thumbnails", "Show channel avatars", "Load more feed videos automatically", "Mark new uploads", "Space out related uploads",
+            "Large video thumbnails", "Show channel avatars", "Open feed channels from name or avatar", "Load more feed videos automatically", "Mark new uploads", "Space out related uploads",
             "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
             "Refresh interval", "Update feed view counts", "View count batch interval"
         ]),

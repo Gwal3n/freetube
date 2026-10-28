@@ -27,6 +27,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     let onExpandDetails: () -> Void
     let onRetryDetails: () -> Void
     let onOpenChannel: () -> Void
+    let onOpenRecommendationChannel: (String) -> Void
     let onSeek: (TimeInterval) -> Void
     let actions: Actions
 
@@ -49,6 +50,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         onExpandDetails: @escaping () -> Void,
         onRetryDetails: @escaping () -> Void,
         onOpenChannel: @escaping () -> Void,
+        onOpenRecommendationChannel: @escaping (String) -> Void,
         onSeek: @escaping (TimeInterval) -> Void,
         @ViewBuilder actions: () -> Actions
     ) {
@@ -70,6 +72,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.onExpandDetails = onExpandDetails
         self.onRetryDetails = onRetryDetails
         self.onOpenChannel = onOpenChannel
+        self.onOpenRecommendationChannel = onOpenRecommendationChannel
         self.onSeek = onSeek
         self.actions = actions()
     }
@@ -130,10 +133,10 @@ struct PlayerInformationPanel<Actions: View>: View {
             case .savedMoments:
                 SavedMomentsSection(videoID: video.id, onSeek: onSeek)
             case .queue:
-                PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+                PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth, onOpenChannel: onOpenRecommendationChannel)
             case .upNext:
                 if showsUpNext {
-                    PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth)
+                    PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth, onOpenChannel: onOpenRecommendationChannel)
                 }
             case .comments:
                 if showsComments {

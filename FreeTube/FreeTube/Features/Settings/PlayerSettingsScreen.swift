@@ -18,6 +18,8 @@ struct PlayerSettingsScreen: View {
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
     @AppStorage("upNextRowSize") private var upNextRowSize = UpNextRowSize.compact.rawValue
+    @AppStorage("showUpNextChannelAvatars") private var showUpNextChannelAvatars = false
+    @AppStorage("openUpNextChannelsOnTap") private var openUpNextChannelsOnTap = false
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
     @State private var showingCustomSeekEditor = false
@@ -188,6 +190,12 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show Up Next")
                 if model.showUpNext {
+                    Toggle("Show channel avatars in Up Next", isOn: $showUpNextChannelAvatars)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Show channel avatars in Up Next")
+                    Toggle("Open Up Next channels from name or avatar", isOn: $openUpNextChannelsOnTap)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Open Up Next channels from name or avatar")
                     Picker("Up Next video size", selection: $upNextRowSize) {
                         ForEach(UpNextRowSize.allCases) { size in
                             Text(size.title).tag(size.rawValue)

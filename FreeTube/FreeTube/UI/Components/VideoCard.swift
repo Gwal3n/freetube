@@ -18,6 +18,7 @@ struct VideoCard: View {
     var showsMoreMenu: Bool = false
     var offersPlayNext = false
     var showsChannelAvatar = true
+    var channelLinkID: String? = nil
     var playbackProgress: Double? = nil
     var watchStatus: WatchHistoryStatus? = nil
     var isNewSinceLastVisit = false
@@ -32,6 +33,14 @@ struct VideoCard: View {
         let parts = [video.channelName, video.viewCountString, publishedText]
             .filter { !$0.isEmpty }
         return parts.joined(separator: " • ")
+    }
+
+    private var metadataDetails: String {
+        let publishedText = relativeDateReference.flatMap { video.publishedText(relativeTo: $0) }
+            ?? video.publishedRelative ?? ""
+        return [video.viewCountString, publishedText]
+            .filter { !$0.isEmpty }
+            .joined(separator: " • ")
     }
 
     var body: some View {
@@ -93,52 +102,119 @@ struct VideoCard: View {
 
     private func metadataRow(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Button(action: openVideo) {
-                HStack(alignment: .top, spacing: 12) {
-                    if showsChannelAvatar {
-                        KFImage(video.channelThumbnailURL)
-                            .thumbnail(size: CGSize(width: 36, height: 36)) {
-                                Circle().fill(MediaStyle.placeholderFill)
-                            }
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 36, height: 36)
-                            .clipShape(Circle())
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(branding.title(for: video))
-                            .contentTransition(.opacity)
-                            .appFont(.subheadline, weight: .semibold)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
-                        HStack(spacing: 6) {
-                            if isNewSinceLastVisit {
-                                Text("New")
-                                    .appFont(.caption, weight: .semibold)
-                                    .foregroundStyle(.primary)
-                                    .fixedSize()
-                                    .accessibilityHidden(true)
-                            }
-                            Text(metadataLine)
-                                .appFont(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                        }
-                    }
-
-                    Spacer(minLength: 0)
+            if let channelLinkID, !channelLinkID.isEmpty {
+                linkedMetadataContent(branding: branding, channelID: channelLinkID)
+            } else {
+                Button(action: openVideo) {
+                    playbackMetadataContent(branding: branding)
                 }
-                .contentShape(Rectangle())
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
+                .accessibilityHint("Plays video")
             }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
-            .accessibilityHint("Plays video")
 
             if showsMoreMenu {
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)
+    }
+
+    private func channelAvatar() -> some View {
+        KFImage(video.channelThumbnailURL)
+            .thumbnail(size: CGSize(width: 36, height: 36)) {
+                Circle().fill(MediaStyle.placeholderFill)
+            }
+            .resizable()
+            .scaledToFill()
+            .frame(width: 36, height: 36)
+            .clipShape(Circle())
+    }
+
+    private func playbackMetadataContent(branding: DeArrowVideoViewModel) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            if showsChannelAvatar {
+                channelAvatar()
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                title(branding: branding)
+                HStack(spacing: 6) {
+                    newUploadLabel
+                    Text(metadataLine)
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func linkedMetadataContent(branding: DeArrowVideoViewModel, channelID: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            if showsChannelAvatar {
+                NavigationLink {
+                    ChannelScreen(channelID: channelID)
+                } label: {
+                    channelAvatar()
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open \(video.channelName)")
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Button(action: openVideo) {
+                    title(branding: branding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityHint("Plays video")
+                HStack(spacing: 6) {
+                    newUploadLabel
+                    NavigationLink {
+                        ChannelScreen(channelID: channelID)
+                    } label: {
+                        Text(video.channelName)
+                            .appFont(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open \(video.channelName)")
+                    if !metadataDetails.isEmpty {
+                        Button(action: openVideo) {
+                            Text(verbatim: " • \(metadataDetails)")
+                                .appFont(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .accessibilityHidden(true)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func title(branding: DeArrowVideoViewModel) -> some View {
+        Text(branding.title(for: video))
+            .contentTransition(.opacity)
+            .appFont(.subheadline, weight: .semibold)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
+    }
+
+    @ViewBuilder
+    private var newUploadLabel: some View {
+        if isNewSinceLastVisit {
+            Text("New")
+                .appFont(.caption, weight: .semibold)
+                .foregroundStyle(.primary)
+                .fixedSize()
+                .accessibilityHidden(true)
+        }
     }
 
     private func cardAccessibilityLabel(title: String) -> String {

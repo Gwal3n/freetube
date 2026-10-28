@@ -48,6 +48,7 @@ struct UserPreferences {
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
     /// Keep channel identity visible beside feed metadata in both feed layouts.
     @AppStorage("showFeedChannelAvatars") var showFeedChannelAvatars: Bool = true
+    @AppStorage("openFeedChannelsOnTap") var openFeedChannelsOnTap: Bool = false
     /// Shows a quiet New label for subscription uploads estimated after the previous app visit.
     @AppStorage("showNewSubscriptionUploads") var showNewSubscriptionUploads: Bool = true
     /// Reorder only nearby feed uploads; the independent gap controls can be zero to disable
@@ -71,6 +72,8 @@ struct UserPreferences {
     @AppStorage("showCommentAuthorPhotos") var showCommentAuthorPhotos: Bool = true
     @AppStorage("openCommentAuthorChannels") var openCommentAuthorChannels: Bool = false
     @AppStorage("showUpNext") var showUpNext: Bool = true
+    @AppStorage("showUpNextChannelAvatars") var showUpNextChannelAvatars: Bool = false
+    @AppStorage("openUpNextChannelsOnTap") var openUpNextChannelsOnTap: Bool = false
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true
     @AppStorage("saveRecentChannels") var saveRecentChannels: Bool = true
