@@ -18,7 +18,7 @@ struct VideoCard: View {
     var showsMoreMenu: Bool = false
     var offersPlayNext = false
     var showsChannelAvatar = true
-    var channelLinkID: String? = nil
+    var onTapChannel: (() -> Void)? = nil
     var playbackProgress: Double? = nil
     var watchStatus: WatchHistoryStatus? = nil
     var isNewSinceLastVisit = false
@@ -102,8 +102,8 @@ struct VideoCard: View {
 
     private func metadataRow(branding: DeArrowVideoViewModel) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            if let channelLinkID, !channelLinkID.isEmpty {
-                linkedMetadataContent(branding: branding, channelID: channelLinkID)
+            if let onTapChannel {
+                linkedMetadataContent(branding: branding, onTapChannel: onTapChannel)
             } else {
                 Button(action: openVideo) {
                     playbackMetadataContent(branding: branding)
@@ -151,12 +151,12 @@ struct VideoCard: View {
         .contentShape(Rectangle())
     }
 
-    private func linkedMetadataContent(branding: DeArrowVideoViewModel, channelID: String) -> some View {
+    private func linkedMetadataContent(
+        branding: DeArrowVideoViewModel, onTapChannel: @escaping () -> Void
+    ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             if showsChannelAvatar {
-                NavigationLink {
-                    ChannelScreen(channelID: channelID)
-                } label: {
+                Button(action: onTapChannel) {
                     channelAvatar()
                         .contentShape(Circle())
                 }
@@ -173,9 +173,7 @@ struct VideoCard: View {
                 .accessibilityHint("Plays video")
                 HStack(spacing: 6) {
                     newUploadLabel
-                    NavigationLink {
-                        ChannelScreen(channelID: channelID)
-                    } label: {
+                    Button(action: onTapChannel) {
                         Text(video.channelName)
                             .appFont(.caption)
                             .foregroundStyle(.secondary)

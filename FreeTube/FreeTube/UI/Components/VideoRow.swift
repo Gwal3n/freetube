@@ -26,6 +26,7 @@ struct VideoRow: View {
     var relativeDateReference: Date?
     var onOpenChannel: (() -> Void)?
     var channelLinkID: String?
+    var onTapChannel: (() -> Void)?
     var onTap: () -> Void
 
     /// Keep the action closure last so existing SwiftUI call sites can continue to use trailing-
@@ -40,6 +41,7 @@ struct VideoRow: View {
         relativeDateReference: Date? = nil,
         onOpenChannel: (() -> Void)? = nil,
         channelLinkID: String? = nil,
+        onTapChannel: (() -> Void)? = nil,
         onTap: @escaping () -> Void = {}
     ) {
         self.video = video
@@ -51,6 +53,7 @@ struct VideoRow: View {
         self.relativeDateReference = relativeDateReference
         self.onOpenChannel = onOpenChannel
         self.channelLinkID = channelLinkID
+        self.onTapChannel = onTapChannel
         self.onTap = onTap
     }
 
@@ -66,8 +69,10 @@ struct VideoRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Group {
-                if let channelLinkID, !channelLinkID.isEmpty {
-                    linkedContent(branding: branding, channelID: channelLinkID)
+                if let onTapChannel {
+                    linkedContent(branding: branding, channelID: nil, onTapChannel: onTapChannel)
+                } else if let channelLinkID, !channelLinkID.isEmpty {
+                    linkedContent(branding: branding, channelID: channelLinkID, onTapChannel: nil)
                 } else {
                     Button(action: openVideo) {
                         content(branding: branding)
@@ -157,9 +162,10 @@ struct VideoRow: View {
         .contentShape(Rectangle())
     }
 
-    /// Search results give the uploader a separate native navigation target. The other row
-    /// contexts keep their original whole-row playback button unchanged.
-    private func linkedContent(branding: DeArrowVideoViewModel, channelID: String) -> some View {
+    /// Give channel identity its own tap target without nesting it inside the playback button.
+    private func linkedContent(
+        branding: DeArrowVideoViewModel, channelID: String?, onTapChannel: (() -> Void)?
+    ) -> some View {
         HStack(alignment: .top, spacing: MediaStyle.spacing) {
             Button(action: openVideo) { thumbnail(branding: branding) }
                 .buttonStyle(ResponsiveButtonStyle())
@@ -175,15 +181,25 @@ struct VideoRow: View {
                 .accessibilityLabel(branding.title(for: video))
                 .accessibilityHint("Plays video")
 
-                NavigationLink {
-                    ChannelScreen(channelID: channelID)
-                } label: {
-                    channelLine
-                        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-                        .contentShape(Rectangle())
+                if let onTapChannel {
+                    Button(action: onTapChannel) {
+                        channelLine
+                            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open \(video.channelName)")
+                } else if let channelID {
+                    NavigationLink {
+                        ChannelScreen(channelID: channelID)
+                    } label: {
+                        channelLine
+                            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open \(video.channelName)")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open \(video.channelName)")
 
                 if !statsLine.isEmpty || isNewSinceLastVisit {
                     Button(action: openVideo) {

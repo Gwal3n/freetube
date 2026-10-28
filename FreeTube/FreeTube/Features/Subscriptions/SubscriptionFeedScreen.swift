@@ -591,7 +591,8 @@ struct SubscriptionFeedScreen: View {
                 showsMoreMenu: true,
                 offersPlayNext: true,
                 showsChannelAvatar: showChannelAvatars,
-                channelLinkID: openFeedChannelsOnTap ? video.channelID : nil,
+                onTapChannel: openFeedChannelsOnTap && !video.channelID.isEmpty
+                    ? { path.append(.channel(video.channelID)) } : nil,
                 playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
                 watchStatus: displaysWatchProgress ? model.watchStatuses[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
@@ -606,7 +607,8 @@ struct SubscriptionFeedScreen: View {
                 watchStatus: displaysWatchProgress ? model.watchStatuses[video.id] : nil,
                 isNewSinceLastVisit: isNewSinceLastVisit(video),
                 relativeDateReference: currentDate,
-                channelLinkID: openFeedChannelsOnTap ? video.channelID : nil
+                onTapChannel: openFeedChannelsOnTap && !video.channelID.isEmpty
+                    ? { path.append(.channel(video.channelID)) } : nil
             ) {
                 player.load(video)
             }
