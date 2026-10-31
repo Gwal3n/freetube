@@ -1,11 +1,8 @@
-import AVFoundation
-import CoreMedia
 import Foundation
 import Network
 import OSLog
 import PythonKit
 import SwiftData
-import UIKit
 import YoutubeDL
 
 /// Owns the on-disk video cache, coordinates native HLS downloads, and surfaces progress so UI can
@@ -62,6 +59,8 @@ final class DownloadManager {
     /// Coalesces concurrent `ensureDownloaded` calls for the same video so we don't start two
     /// downloads in parallel for the same id (which would race on the destination path).
     private var inflight: [String: Task<URL, Error>] = [:]
+    @ObservationIgnored private let mediaFinalizer = DownloadMediaFinalizer()
+    @ObservationIgnored private let sourceSelector = DownloadSourceSelector()
     private let preferences = UserPreferences()
     @ObservationIgnored private let log = AppLog(subsystem: "com.leshko.freetube", category: "DownloadManager")
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -84,7 +83,7 @@ final class DownloadManager {
         guard FileManager.default.fileExists(atPath: url.path),
               let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attributes[.size] as? NSNumber,
-              size.int64Value >= Self.minimumDownloadSize else {
+              size.int64Value >= DownloadMediaFinalizer.minimumFileSize else {
             return nil
         }
         return url
@@ -115,7 +114,7 @@ final class DownloadManager {
                 // A process can die after writing enough bytes to pass localFile's size check
                 // but before validation. Only an interrupted request needs this extra probe.
                 do {
-                    try await validateDownloadedFile(at: existing, quality: quality, videoID: video.id)
+                    try await mediaFinalizer.validateFile(at: existing, quality: quality, videoID: video.id)
                     try Task.checkCancellation()
                     if DownloadsStore.shared.metadata(at: existing) == nil {
                         await persistDownloaded(video: video, fileURL: existing)
@@ -464,7 +463,7 @@ final class DownloadManager {
             // because that client profile is exempt from PoT enforcement on the video-info side.
             do {
                 try await runYouTubeKitFallback(video: video, quality: quality, destination: destination, snapshotID: snapshotID)
-                try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+                try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
                 let dur = Date().timeIntervalSince(startedAt)
                 log.info("yt-dlp[\(video.id, privacy: .public)] FALLBACK SUCCESS in \(String(format: "%.1f", dur), privacy: .public)s")
                 await persistDownloaded(video: video, fileURL: destination)
@@ -525,7 +524,7 @@ final class DownloadManager {
         if let videoFile, let audioFile {
             log.info("yt-dlp[\(video.id, privacy: .public)] muxing video=\(videoFile.lastPathComponent, privacy: .public) audio=\(audioFile.lastPathComponent, privacy: .public)")
             do {
-                try await muxToDestination(video: videoFile, audio: audioFile, destination: destination)
+                try await mediaFinalizer.mux(video: videoFile, audio: audioFile, destination: destination)
             } catch {
                 log.error("yt-dlp[\(video.id, privacy: .public)] Swift-side mux failed: \(String(describing: error), privacy: .public)")
                 publish(snapshot: DownloadTaskSnapshot(
@@ -579,7 +578,7 @@ final class DownloadManager {
         }
 
         do {
-            try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+            try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
         } catch {
             log.error("yt-dlp[\(video.id, privacy: .public)] final validation failed: \(String(describing: error), privacy: .public)")
             try? FileManager.default.removeItem(at: destination)
@@ -637,7 +636,7 @@ final class DownloadManager {
                 id: snapshotID, videoID: video.id, title: video.title,
                 state: .downloading(progress: 0), createdAt: .now
             ))
-            let resolved = try await resolveNativeDownloadSource(video: video, quality: quality)
+            let resolved = try await sourceSelector.nativeSource(video: video, quality: quality)
             try Task.checkCancellation()
             try await downloadResolvedSource(
                 resolved,
@@ -648,7 +647,7 @@ final class DownloadManager {
                 snapshotID: snapshotID
             )
             try Task.checkCancellation()
-            try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+            try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
             await persistDownloaded(video: video, fileURL: destination)
             publish(snapshot: DownloadTaskSnapshot(
                 id: snapshotID, videoID: video.id, title: video.title,
@@ -672,7 +671,7 @@ final class DownloadManager {
                 await StreamURLCache.shared.remove(videoID: video.id, formatID: "native-\(quality.rawValue)")
                 await StreamURLCache.shared.remove(videoID: video.id, formatID: "native-paired-\(quality.rawValue)")
                 do {
-                    let refreshed = try await resolveNativeDownloadSource(video: video, quality: quality)
+                    let refreshed = try await sourceSelector.nativeSource(video: video, quality: quality)
                     try await downloadResolvedSource(
                         refreshed,
                         to: destination,
@@ -681,7 +680,7 @@ final class DownloadManager {
                         video: video,
                         snapshotID: snapshotID
                     )
-                    try await validateDownloadedFile(at: destination, quality: quality, videoID: video.id)
+                    try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
                     await persistDownloaded(video: video, fileURL: destination)
                     publish(snapshot: DownloadTaskSnapshot(
                         id: snapshotID, videoID: video.id, title: video.title,
@@ -814,7 +813,7 @@ final class DownloadManager {
         ))
         phaseByVideoID[video.id] = "stream"
 
-        let formats = await fetchFallbackFormats(videoID: video.id)
+        let formats = await sourceSelector.fallbackFormats(videoID: video.id)
         log.info("yt-dlp[\(video.id, privacy: .public)] fallback: \(formats.count, privacy: .public) usable formats")
         guard !formats.isEmpty else {
             throw YouTubeServiceError.streamExtractionFailed
@@ -860,47 +859,7 @@ final class DownloadManager {
         try await downloadStream(from: audioURL, to: audioFile, videoID: video.id, snapshotID: snapshotID, title: video.title)
         phaseByVideoID[video.id] = "muxing"
 
-        try await muxToDestination(video: videoFile, audio: audioFile, destination: destination)
-    }
-
-    /// Two-tier format fetch for the fallback path.
-    ///
-    /// 1. **`fetchInfoViaTVHTML5`** — uses `YouTubeKitClient.tvHtmlModel` (TVHTML5_SIMPLY_
-    ///    EMBEDDED_PLAYER context). PoT-exempt on the video-info side. Cheap: one HTTP call, no
-    ///    player-JS scrape. Caveat: the response carries `signatureCipher`-protected URLs for
-    ///    some videos and YouTubeKit drops those (no JS runtime to decode them on iOS), so on
-    ///    cipher-heavy content we get back zero formats.
-    ///
-    /// 2. **`fetchInfoWithFormats`** — uses `VideoInfosWithDownloadFormatsResponse`, which
-    ///    additionally scrapes the YouTube player.js and decodes signature ciphers natively
-    ///    in YouTubeKit. Slower (two HTTP calls + JS parsing) but produces direct URLs even
-    ///    for cipher-protected formats. Falls through to this tier when TVHTML5 returned
-    ///    nothing usable — exactly the case the Baby-Shark video hit.
-    ///
-    /// Either tier failing silently returns an empty array; the caller treats that as "no
-    /// fallback path available" and surfaces `streamExtractionFailed`.
-    private func fetchFallbackFormats(videoID: String) async -> [VideoFormat] {
-        let service = VideoService()
-        do {
-            let info = try await service.fetchInfoViaTVHTML5(id: videoID)
-            let usable = info.formats.filter { $0.url != nil }
-            if !usable.isEmpty {
-                log.info("[fallback] TVHTML5 returned \(info.formats.count, privacy: .public) formats, \(usable.count, privacy: .public) with URLs")
-                return usable
-            }
-            log.notice("[fallback] TVHTML5 returned \(info.formats.count, privacy: .public) formats but 0 with direct URLs (cipher-protected); trying player.js scrape")
-        } catch {
-            log.notice("[fallback] TVHTML5 fetch failed: \(String(describing: error), privacy: .public); trying player.js scrape")
-        }
-        do {
-            let result = try await service.fetchInfoWithFormats(id: videoID)
-            let usable = result.formats.filter { $0.url != nil }
-            log.info("[fallback] fetchInfoWithFormats returned \(result.formats.count, privacy: .public) formats, \(usable.count, privacy: .public) with URLs")
-            return usable
-        } catch {
-            log.error("[fallback] fetchInfoWithFormats failed: \(String(describing: error), privacy: .public)")
-            return []
-        }
+        try await mediaFinalizer.mux(video: videoFile, audio: audioFile, destination: destination)
     }
 
     /// Downloads a single direct stream with a file-backed URLSession task. The previous
@@ -986,7 +945,7 @@ final class DownloadManager {
         let written = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
         log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes in \(Date().timeIntervalSince(startedAt), privacy: .public)s mode=\(usedRanges ? "ranges" : "single", privacy: .public) to \(destination.lastPathComponent, privacy: .public)")
 
-        guard written >= Self.minimumDownloadSize else {
+        guard written >= DownloadMediaFinalizer.minimumFileSize else {
             log.error("[\(sourceLabel, privacy: .public)] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
             try? FileManager.default.removeItem(at: destination)
             throw YouTubeServiceError.streamExtractionFailed
@@ -996,27 +955,6 @@ final class DownloadManager {
             try? FileManager.default.removeItem(at: destination)
             throw YouTubeServiceError.streamExtractionFailed
         }
-    }
-
-    /// An explicit 1440p/2160p request gets first chance at separate native MP4/M4A streams.
-    /// A playable HLS master can have a lower ceiling, so accepting it first would silently
-    /// prevent a higher-resolution download even when a paired stream is available. Ordinary
-    /// downloads retain the faster HLS-first path; failure here falls back to that same path.
-    private func resolveNativeDownloadSource(video: Video, quality: VideoQuality) async throws -> NativeStreamResult {
-        let service = NativeStreamService()
-        if !video.isLive, (quality.heightCap ?? 0) > 1080 {
-            do {
-                let source = try await service.resolvePaired(video: video, quality: quality)
-                log.info("native-download[\(video.id, privacy: .public)] selected high-resolution paired source")
-                return source
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                let nsError = error as NSError
-                log.notice("native-download[\(video.id, privacy: .public)] high-resolution pair unavailable; trying HLS: \(nsError.domain, privacy: .public)/\(nsError.code, privacy: .public)")
-            }
-        }
-        return try await service.resolve(video: video, quality: quality)
     }
 
     /// Materializes the native source used by playback. HLS, direct MP4, and separate MP4/M4A
@@ -1133,107 +1071,6 @@ final class DownloadManager {
         }
     }
 
-    /// A filesystem path alone is not proof that a download succeeded. yt-dlp and URLSession can
-    /// both leave a zero-byte or truncated file behind after a CDN rejection, and historically that
-    /// made the UI announce “Download finished” before the Downloads screen failed to open it.
-    /// Validate the finished asset before writing metadata or publishing `.completed`.
-    private func validateDownloadedFile(at url: URL, quality: VideoQuality, videoID: String) async throws {
-        guard FileManager.default.fileExists(atPath: url.path),
-              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attributes[.size] as? NSNumber,
-              size.int64Value >= Self.minimumDownloadSize else {
-            log.error("yt-dlp[\(videoID, privacy: .public)] validation: output missing or smaller than \(Self.minimumDownloadSize, privacy: .public) bytes")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-
-        let asset = AVURLAsset(url: url)
-        do {
-            async let playableTask = asset.load(.isPlayable)
-            async let durationTask = asset.load(.duration)
-            async let videoTracksTask = asset.loadTracks(withMediaType: .video)
-            async let audioTracksTask = asset.loadTracks(withMediaType: .audio)
-            let (playable, duration, videoTracks, audioTracks) = try await (
-                playableTask, durationTask, videoTracksTask, audioTracksTask
-            )
-            let seconds = duration.seconds
-            let hasExpectedTracks = quality == .audioOnly
-                ? !audioTracks.isEmpty
-                : !videoTracks.isEmpty && !audioTracks.isEmpty
-            guard playable, seconds.isFinite, seconds > 0, hasExpectedTracks else {
-                log.error("yt-dlp[\(videoID, privacy: .public)] validation: playable=\(playable, privacy: .public) duration=\(seconds, privacy: .public) videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-            if let videoTrack = videoTracks.first,
-               let size = try? await videoTrack.load(.naturalSize),
-               size.width.isFinite, size.height.isFinite,
-               abs(size.width) < 100_000, abs(size.height) < 100_000 {
-                log.info("yt-dlp[\(videoID, privacy: .public)] output video dimensions=\(Int(size.width), privacy: .public)x\(Int(size.height), privacy: .public)")
-            }
-            log.info("yt-dlp[\(videoID, privacy: .public)] validation passed: size=\(size.int64Value, privacy: .public) duration=\(seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
-        } catch {
-            log.error("yt-dlp[\(videoID, privacy: .public)] validation could not read asset: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-    }
-
-    // MARK: - Muxing (direct ffmpeg call, no Python)
-
-    /// Combines a video-only mp4 with an audio-only m4a into a single mp4 using `ffmpeg -c copy`.
-    ///
-    /// **Why ffmpeg:** yt-dlp delivers YouTube's DASH-fragmented mp4. AVFoundation parses these
-    /// containers with halved frame rate (per-frame PTS values in the fragmented mp4 read as 2× the
-    /// real values), so any AVAssetExportSession/AVAssetReader-based mux produces a doubled-duration
-    /// output. `ffmpeg -c copy` is the canonical fixup — it rewrites the moov atom into a regular
-    /// (non-fragmented) mp4 with correct timestamps without re-encoding.
-    ///
-    /// **Why not via yt-dlp's Popen:** the previous hang we hit was Python's `Popen.communicate`
-    /// never returning after ffmpeg's `longjmp` tore through the Python interpreter's stack. Calling
-    /// `FFmpegSupport.ffmpeg(_:)` *directly* from Swift sidesteps Python entirely — the longjmp
-    /// lands at the C `setjmp` inside the library and control returns to Swift cleanly.
-    private func muxToDestination(video: URL, audio: URL, destination: URL) async throws {
-        log.info("mux via ffmpeg: video=\(video.lastPathComponent, privacy: .public) audio=\(audio.lastPathComponent, privacy: .public)")
-        try? FileManager.default.removeItem(at: destination)
-
-        let args: [String] = [
-            "ffmpeg",
-            "-y",
-            "-hide_banner",
-            "-loglevel", "warning",
-            "-i", video.path,
-            "-i", audio.path,
-            "-c", "copy",
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-movflags", "+faststart",
-            destination.path
-        ]
-        log.info("ffmpeg argv: \(args.joined(separator: " "), privacy: .public)")
-
-        let startedAt = Date()
-        // Route every ffmpeg invocation through the shared `FFmpegRunner` actor. ffmpeg's C
-        // library is **not** thread-safe — the `+faststart` post-pass crashes on concurrent
-        // calls (see FFmpegRunner doc comment). Plain `Task.detached` here was the bug: each
-        // parallel playlist download finishing its yt-dlp step fired its own ffmpeg detach,
-        // and two of them stomping global buffers blew up inside `ff_format_shift_data`.
-        let exitCode = await FFmpegRunner.shared.run(args)
-        let elapsed = Date().timeIntervalSince(startedAt)
-        log.info("ffmpeg returned exit=\(exitCode, privacy: .public) in \(String(format: "%.1f", elapsed), privacy: .public)s")
-
-        guard exitCode == 0 else {
-            log.error("ffmpeg failed exit=\(exitCode, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        guard FileManager.default.fileExists(atPath: destination.path) else {
-            log.error("ffmpeg returned 0 but output missing at \(destination.path, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-
-        // Sanity-log the final duration so any future regression is obvious in os_log.
-        let asset = AVURLAsset(url: destination)
-        if let dur = try? await asset.load(.duration) {
-            log.info("ffmpeg-muxed file duration=\(dur.seconds, privacy: .public)s path=\(destination.lastPathComponent, privacy: .public)")
-        }
-    }
     // MARK: - File locations + format selection
 
     /// Canonical on-disk location for a downloaded video. Files land at the **Documents
@@ -1249,9 +1086,6 @@ final class DownloadManager {
     /// Re-evaluating `.documentDirectory` after Python initialization produced a path with an
     /// obsolete app-container Documents directory appended inside the current container.
     private static let downloadsDirectory = AppDirectories.documents
-
-    /// Reject placeholder/error-response files while still allowing very short clips.
-    private static let minimumDownloadSize: Int64 = 64 * 1_024
 
     // MARK: - Networking gate + snapshots
 
