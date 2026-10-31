@@ -12,8 +12,8 @@ import YoutubeDL
 /// returns immediately; otherwise the playback resolver supplies a working HLS manifest and
 /// `NativeHLSDownloadService` materializes it. Successful files receive `DownloadMetadata` xattrs.
 ///
-/// **Progress:** the manager publishes a single `AsyncStream<[DownloadTaskSnapshot]>` that any
-/// observer can subscribe to. Both the Downloads screen and the per-tab badge read from it.
+/// **Progress:** the manager exposes observable snapshots read by the Downloads screen and tab
+/// badge. The registry keeps retry and progress internals out of SwiftUI's observation graph.
 @available(iOS 17.0, *)
 @Observable
 @MainActor
@@ -34,26 +34,8 @@ final class DownloadManager {
     /// avoid the confusing "Downloading 100%" → "Downloading 0%" → "Downloading 100%" sequence.
     private(set) var phaseByVideoID: [String: String] = [:]
 
-    private var tasks: [String: DownloadTaskSnapshot] = [:]
-    private struct RetryRequest {
-        let video: Video
-        let quality: VideoQuality
-    }
-    /// Failed rows keep their original selection, so Retry never silently changes quality.
-    private var retryRequests: [String: RetryRequest] = [:]
-    @ObservationIgnored private var overallProgress: [String: DownloadOverallProgress] = [:]
-    @ObservationIgnored private var cancelledSnapshotIDs: [String] = []
-
-    /// Throttles the progress publish stream. yt-dlp emits progress events 5–10× per second per
-    /// active download, and each `publish(snapshot:)` writes to 3 `@Observable` dictionaries plus
-    /// rebuilds `activeTasks`. With several parallel downloads (Download All) the main actor was
-    /// processing 30+ Observable mutations per second, and SwiftUI's per-mutation diff pass was
-    /// what users felt as "scrolling stutters while downloading". We coalesce: if a video's most
-    /// recent publish was less than `progressPublishMinInterval` ago, the new event is dropped.
-    /// The next event arriving after the window catches up automatically, and terminal events
-    /// (`finished` / `error`) bypass throttling entirely so we never miss a completion.
-    private var lastProgressPublishedAt: [String: ContinuousClock.Instant] = [:]
-    private let progressPublishMinInterval: Duration = .milliseconds(200)
+    /// Retains retry and progress internals without making every byte callback observable.
+    @ObservationIgnored private let taskRegistry = DownloadTaskRegistry()
 
     /// Coalesces concurrent `ensureDownloaded` calls for the same video so we don't start two
     /// downloads in parallel for the same id (which would race on the destination path).
@@ -133,15 +115,7 @@ final class DownloadManager {
         }
 
         BackgroundDownloadCoordinator.shared.record(video: video, quality: quality)
-        let supersededFailures = tasks.values.compactMap { snapshot -> String? in
-            guard snapshot.videoID == video.id, case .failed = snapshot.state else { return nil }
-            return snapshot.id
-        }
-        for id in supersededFailures {
-            tasks[id] = nil
-            retryRequests[id] = nil
-        }
-        if !supersededFailures.isEmpty { publishSnapshots() }
+        if taskRegistry.discardFailures(for: video.id) { publishSnapshots() }
 
         log.info("ensureDownloaded(\(video.id, privacy: .public)): checking network gate (allowCellular=\(self.preferences.allowCellularDownloads, privacy: .public))")
         do {
@@ -151,7 +125,7 @@ final class DownloadManager {
         } catch {
             BackgroundDownloadCoordinator.shared.complete(videoID: video.id)
             let snapshotID = UUID().uuidString
-            retryRequests[snapshotID] = RetryRequest(video: video, quality: quality)
+            taskRegistry.rememberRetry(id: snapshotID, video: video, quality: quality)
             publish(snapshot: DownloadTaskSnapshot(
                 id: snapshotID,
                 videoID: video.id,
@@ -204,15 +178,10 @@ final class DownloadManager {
     }
 
     func cancel(taskID: String) {
-        guard let snapshot = tasks[taskID] else { return }
+        guard let snapshot = taskRegistry.cancel(taskID) else { return }
         BackgroundDownloadCoordinator.shared.complete(videoID: snapshot.videoID)
-        cancelledSnapshotIDs.append(taskID)
-        if cancelledSnapshotIDs.count > 256 { cancelledSnapshotIDs.removeFirst() }
-        overallProgress[taskID] = nil
         progressByVideoID[snapshot.videoID] = nil
         phaseByVideoID[snapshot.videoID] = nil
-        tasks[taskID] = nil
-        retryRequests[taskID] = nil
         publishSnapshots()
         if let task = inflight[snapshot.videoID] {
             task.cancel()
@@ -223,13 +192,7 @@ final class DownloadManager {
     /// network gate is running). A user cancellation must also clear the persisted request.
     func cancel(videoID: String) {
         BackgroundDownloadCoordinator.shared.complete(videoID: videoID)
-        let runningIDs = tasks.values.compactMap { snapshot -> String? in
-            guard snapshot.videoID == videoID else { return nil }
-            switch snapshot.state {
-            case .queued, .downloading, .paused: return snapshot.id
-            case .completed, .failed: return nil
-            }
-        }
+        let runningIDs = taskRegistry.activeTaskIDs(for: videoID)
         for id in runningIDs { cancel(taskID: id) }
         inflight[videoID]?.cancel()
     }
@@ -238,16 +201,7 @@ final class DownloadManager {
     /// available for a fresh attempt with newly resolved stream URLs.
     func interruptForBackgroundExpiration(videoID: String) {
         inflight[videoID]?.cancel()
-        let ids = tasks.values.filter { $0.videoID == videoID }.map(\.id)
-        for id in ids {
-            cancelledSnapshotIDs.append(id)
-            tasks[id] = nil
-            retryRequests[id] = nil
-            overallProgress[id] = nil
-        }
-        if cancelledSnapshotIDs.count > 256 {
-            cancelledSnapshotIDs.removeFirst(cancelledSnapshotIDs.count - 256)
-        }
+        taskRegistry.interrupt(videoID: videoID)
         progressByVideoID[videoID] = nil
         phaseByVideoID[videoID] = nil
         publishSnapshots()
@@ -256,22 +210,22 @@ final class DownloadManager {
     /// Starts a fresh attempt for a failed transfer using its original video and quality.
     /// This is a retry from the beginning, not a claim that HLS/yt-dlp can resume partial bytes.
     func retry(taskID: String) async throws {
-        guard let snapshot = tasks[taskID], case .failed = snapshot.state,
-              let request = retryRequests[taskID] else {
+        guard let retry = taskRegistry.retryableRequest(for: taskID) else {
             throw NSError(
                 domain: "com.leshko.freetube.download",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "This download can no longer be retried. Start it again from the video."]
             )
         }
+        let snapshot = retry.snapshot
+        let request = retry.request
 
         // A failure snapshot can be published just before the previous task's defer clears
         // `inflight`. Await it so ensureDownloaded does not join that failed attempt.
         if let previous = inflight[snapshot.videoID] {
             _ = try? await previous.value
         }
-        tasks[taskID] = nil
-        retryRequests[taskID] = nil
+        taskRegistry.remove(taskID)
         publishSnapshots()
         do {
             _ = try await ensureDownloaded(
@@ -282,9 +236,8 @@ final class DownloadManager {
         } catch {
             // A network gate can fail before the new attempt creates a snapshot. Restore
             // the retryable row in that case; actual transfer failures publish their own row.
-            if !tasks.values.contains(where: { $0.videoID == snapshot.videoID }) {
-                tasks[taskID] = snapshot
-                retryRequests[taskID] = request
+            if !taskRegistry.hasSnapshot(for: snapshot.videoID) {
+                taskRegistry.restoreRetry(snapshot: snapshot, request: request)
                 publishSnapshots()
             }
             throw error
@@ -297,7 +250,7 @@ final class DownloadManager {
         let startedAt = Date()
         log.info("yt-dlp[\(video.id, privacy: .public)] runYoutubeDLDownload start quality=\(quality.rawValue, privacy: .public)")
         let snapshotID = UUID().uuidString
-        retryRequests[snapshotID] = RetryRequest(video: video, quality: quality)
+        taskRegistry.rememberRetry(id: snapshotID, video: video, quality: quality)
         log.debug("yt-dlp[\(video.id, privacy: .public)] snapshotID=\(snapshotID, privacy: .public) → state=queued")
         publish(snapshot: DownloadTaskSnapshot(
             id: snapshotID,
@@ -443,8 +396,8 @@ final class DownloadManager {
                 if message.contains("[Merger]") || message.contains("[ExtractAudio]") || message.contains("Fixup") {
                     let id = video.id
                     Task { @MainActor in
-                        guard let self, let snapshot = self.tasks[snapshotID],
-                              !self.cancelledSnapshotIDs.contains(snapshotID) else { return }
+                        guard let self, let snapshot = self.taskRegistry.snapshot(for: snapshotID),
+                              !self.taskRegistry.isCancelled(snapshotID) else { return }
                         self.phaseByVideoID[id] = "muxing"
                         self.publish(snapshot: DownloadTaskSnapshot(
                             id: snapshot.id, videoID: id, title: snapshot.title,
@@ -473,7 +426,7 @@ final class DownloadManager {
                 ))
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    self.tasks[snapshotID] = nil
+                    self.taskRegistry.remove(snapshotID)
                     self.publishSnapshots()
                 }
                 return destination
@@ -603,10 +556,10 @@ final class DownloadManager {
             state: .completed(destination),
             createdAt: .now
         ))
-        // Drop the completed entry from `tasks` after a moment so the in-progress section clears.
+        // Drop the completed snapshot after a moment so the in-progress section clears.
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            self.tasks[snapshotID] = nil
+            self.taskRegistry.remove(snapshotID)
             self.publishSnapshots()
         }
 
@@ -655,7 +608,7 @@ final class DownloadManager {
             ))
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
-                self.tasks[snapshotID] = nil
+                self.taskRegistry.remove(snapshotID)
                 self.publishSnapshots()
             }
             log.info("native-download[\(video.id, privacy: .public)] SUCCESS in \(String(format: "%.1f", Date().timeIntervalSince(startedAt)), privacy: .public)s")
@@ -688,7 +641,7 @@ final class DownloadManager {
                     ))
                     Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
-                        self.tasks[snapshotID] = nil
+                        self.taskRegistry.remove(snapshotID)
                         self.publishSnapshots()
                     }
                     log.info("native-download[\(video.id, privacy: .public)] SUCCESS after fresh resolution")
@@ -720,18 +673,14 @@ final class DownloadManager {
         videoID: String,
         videoTitle: String
     ) {
-        guard !cancelledSnapshotIDs.contains(snapshotID) else { return }
+        guard !taskRegistry.isCancelled(snapshotID) else { return }
         let progress = total > 0 ? max(0, min(1, Double(downloaded) / Double(total))) : 0
 
         if status == "downloading" {
             // Throttle: skip if this video's last publish was within the min-interval window. The
             // next callback that arrives outside the window will pick up the latest progress
             // value, so the UI stays accurate, just less twitchy.
-            let now = ContinuousClock.now
-            if let last = lastProgressPublishedAt[videoID], (now - last) < progressPublishMinInterval {
-                return
-            }
-            lastProgressPublishedAt[videoID] = now
+            guard taskRegistry.shouldPublishProgress(for: videoID) else { return }
 
             log.debug("yt-dlp[\(videoID, privacy: .public)] \(phase, privacy: .public) progress: \(String(format: "%.1f", progress * 100), privacy: .public)% (\(downloaded, privacy: .public)/\(total, privacy: .public) B) speed=\(speed, privacy: .public) B/s eta=\(eta, privacy: .public)s")
             // Avoid an Observable write when the phase didn't actually change. SwiftUI's
@@ -751,12 +700,12 @@ final class DownloadManager {
             // Keep overall progress visible while the next track or finalization starts.
             // Reset throttle so the next phase (audio after video, or mux) gets its first event
             // through immediately rather than waiting out the window from the previous phase.
-            lastProgressPublishedAt.removeValue(forKey: videoID)
+            taskRegistry.resetProgressThrottle(for: videoID)
             // Note: don't clear phase here — keep showing the last label until the next downloading
             // event sets it.
         } else if status == "error" {
             log.error("yt-dlp[\(videoID, privacy: .public)] progress hook reports error")
-            lastProgressPublishedAt.removeValue(forKey: videoID)
+            taskRegistry.resetProgressThrottle(for: videoID)
         } else {
             log.debug("yt-dlp[\(videoID, privacy: .public)] progress hook status=\(status, privacy: .public)")
         }
@@ -846,7 +795,7 @@ final class DownloadManager {
         let reportProgress: @Sendable (Int64, Int64) -> Void = { [weak self] written, total in
             Task { @MainActor [weak self] in
                 guard let self,
-                      let snapshot = self.tasks[snapshotID],
+                      let snapshot = self.taskRegistry.snapshot(for: snapshotID),
                       case .downloading = snapshot.state else { return }
                 self.handleProgress(
                     status: "downloading",
@@ -1004,33 +953,22 @@ final class DownloadManager {
 
     private func publish(snapshot: DownloadTaskSnapshot) {
         // Progress callbacks already queued on the main actor can outlive cancellation.
-        guard !cancelledSnapshotIDs.contains(snapshot.id) else { return }
-        var snapshot = snapshot
-        if !snapshot.id.hasPrefix("fetch-"), case .downloading(let raw) = snapshot.state {
-            var tracker = overallProgress[snapshot.id] ?? DownloadOverallProgress()
-            let value = tracker.update(raw, phase: phaseByVideoID[snapshot.videoID] ?? "stream")
-            overallProgress[snapshot.id] = tracker
-            snapshot = DownloadTaskSnapshot(
-                id: snapshot.id, videoID: snapshot.videoID, title: snapshot.title,
-                state: .downloading(progress: value), createdAt: snapshot.createdAt
-            )
-        }
-        tasks[snapshot.id] = snapshot
+        guard let snapshot = taskRegistry.publish(
+            snapshot,
+            phase: phaseByVideoID[snapshot.videoID] ?? "stream"
+        ) else { return }
         if case .downloading(let value) = snapshot.state {
             progressByVideoID[snapshot.videoID] = value
         } else if case .completed = snapshot.state {
-            overallProgress[snapshot.id] = nil
             progressByVideoID.removeValue(forKey: snapshot.videoID)
-            retryRequests[snapshot.id] = nil
         } else if case .failed = snapshot.state {
-            overallProgress[snapshot.id] = nil
             progressByVideoID.removeValue(forKey: snapshot.videoID)
         }
         publishSnapshots()
     }
 
     private func publishSnapshots() {
-        activeTasks = Array(tasks.values).sorted { $0.createdAt > $1.createdAt }
+        activeTasks = taskRegistry.snapshots
         log.debug("publishSnapshots: \(self.activeTasks.count, privacy: .public) entries")
     }
 }

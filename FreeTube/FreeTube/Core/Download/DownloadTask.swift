@@ -14,7 +14,7 @@ enum DownloadPriority: Sendable {
     case background
 }
 
-/// Public-facing snapshot of a download. The download manager surfaces these to UI via `AsyncStream`.
+/// Public-facing snapshot of a download. DownloadManager exposes these through observable state.
 struct DownloadTaskSnapshot: Identifiable, Sendable {
     enum State: Sendable, Equatable {
         case queued
