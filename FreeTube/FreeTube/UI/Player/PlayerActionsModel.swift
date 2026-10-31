@@ -87,12 +87,7 @@ final class PlayerActionsModel {
         // mistake that partial file for a completed download eligible for deletion.
         if downloadState(for: video.id, downloadedFileURL: nil) == .downloading {
             downloadRequests[video.id]?.cancel()
-            for snapshot in downloads.activeTasks where snapshot.videoID == video.id {
-                switch snapshot.state {
-                case .queued, .downloading, .paused: downloads.cancel(taskID: snapshot.id)
-                case .completed, .failed: break
-                }
-            }
+            downloads.cancel(videoID: video.id)
             return
         }
         if downloadedFile(for: video.id) != nil { pendingDownloadDeletion = video }

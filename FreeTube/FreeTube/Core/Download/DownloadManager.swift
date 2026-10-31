@@ -100,17 +100,40 @@ final class DownloadManager {
     func ensureDownloaded(video: Video, quality: VideoQuality, priority: DownloadPriority = .background) async throws -> URL {
         try Task.checkCancellation()
         log.info("ensureDownloaded(\(video.id, privacy: .public)) — title=\"\(video.title, privacy: .public)\" quality=\(quality.rawValue, privacy: .public) priority=\(String(describing: priority), privacy: .public)")
-        if let existing = localFile(for: video.id) {
-            log.info("ensureDownloaded(\(video.id, privacy: .public)): cache hit, skipping yt-dlp")
-            Task { await OfflineCaptionStore.shared.downloadAvailableTracks(for: video.id) }
-            return existing
-        }
-
+        // A direct stream may already be writing the destination. Join that transfer before
+        // checking the file size, otherwise a partial MP4 can look like a completed cache hit.
         if let inflightTask = inflight[video.id] {
-            log.info("ensureDownloaded(\(video.id, privacy: .public)): joining inflight task")
-            return try await inflightTask.value
+            if inflightTask.isCancelled {
+                _ = try? await inflightTask.value
+            } else {
+                log.info("ensureDownloaded(\(video.id, privacy: .public)): joining inflight task")
+                return try await inflightTask.value
+            }
+        }
+        if let existing = localFile(for: video.id) {
+            if BackgroundDownloadCoordinator.shared.hasPendingRequest(for: video.id) {
+                // A process can die after writing enough bytes to pass localFile's size check
+                // but before validation. Only an interrupted request needs this extra probe.
+                do {
+                    try await validateDownloadedFile(at: existing, quality: quality, videoID: video.id)
+                    try Task.checkCancellation()
+                    if DownloadsStore.shared.metadata(at: existing) == nil {
+                        await persistDownloaded(video: video, fileURL: existing)
+                    }
+                    BackgroundDownloadCoordinator.shared.complete(videoID: video.id)
+                    return existing
+                } catch {
+                    if Task.isCancelled { throw CancellationError() }
+                    try? FileManager.default.removeItem(at: existing)
+                }
+            } else {
+                log.info("ensureDownloaded(\(video.id, privacy: .public)): cache hit, skipping yt-dlp")
+                Task { await OfflineCaptionStore.shared.downloadAvailableTracks(for: video.id) }
+                return existing
+            }
         }
 
+        BackgroundDownloadCoordinator.shared.record(video: video, quality: quality)
         let supersededFailures = tasks.values.compactMap { snapshot -> String? in
             guard snapshot.videoID == video.id, case .failed = snapshot.state else { return nil }
             return snapshot.id
@@ -127,6 +150,7 @@ final class DownloadManager {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
+            BackgroundDownloadCoordinator.shared.complete(videoID: video.id)
             let snapshotID = UUID().uuidString
             retryRequests[snapshotID] = RetryRequest(video: video, quality: quality)
             publish(snapshot: DownloadTaskSnapshot(
@@ -141,10 +165,28 @@ final class DownloadManager {
         try Task.checkCancellation()
         log.info("ensureDownloaded(\(video.id, privacy: .public)): network gate passed, spawning download task")
 
+        let lease = DownloadExecutionLease {
+            BackgroundDownloadCoordinator.shared.pauseForExpiration(videoID: video.id)
+        }
         let task = Task<URL, Error> { @MainActor [weak self] in
-            guard let self else { throw YouTubeServiceError.unknown(NSError(domain: "DownloadManager", code: -1)) }
-            defer { self.inflight[video.id] = nil }
-            return try await self.runYoutubeDLDownload(video: video, quality: quality, priority: priority)
+            guard let self else {
+                lease.end()
+                throw YouTubeServiceError.unknown(NSError(domain: "DownloadManager", code: -1))
+            }
+            defer {
+                lease.end()
+                self.inflight[video.id] = nil
+            }
+            do {
+                let url = try await self.runYoutubeDLDownload(video: video, quality: quality, priority: priority)
+                BackgroundDownloadCoordinator.shared.complete(videoID: video.id)
+                return url
+            } catch {
+                if !Task.isCancelled {
+                    BackgroundDownloadCoordinator.shared.complete(videoID: video.id)
+                }
+                throw error
+            }
         }
         inflight[video.id] = task
         return try await task.value
@@ -164,6 +206,7 @@ final class DownloadManager {
 
     func cancel(taskID: String) {
         guard let snapshot = tasks[taskID] else { return }
+        BackgroundDownloadCoordinator.shared.complete(videoID: snapshot.videoID)
         cancelledSnapshotIDs.append(taskID)
         if cancelledSnapshotIDs.count > 256 { cancelledSnapshotIDs.removeFirst() }
         overallProgress[taskID] = nil
@@ -174,8 +217,41 @@ final class DownloadManager {
         publishSnapshots()
         if let task = inflight[snapshot.videoID] {
             task.cancel()
-            inflight[snapshot.videoID] = nil
         }
+    }
+
+    /// Cancel by video even before the first transfer snapshot appears (for example while the
+    /// network gate is running). A user cancellation must also clear the persisted request.
+    func cancel(videoID: String) {
+        BackgroundDownloadCoordinator.shared.complete(videoID: videoID)
+        let runningIDs = tasks.values.compactMap { snapshot -> String? in
+            guard snapshot.videoID == videoID else { return nil }
+            switch snapshot.state {
+            case .queued, .downloading, .paused: return snapshot.id
+            case .completed, .failed: return nil
+            }
+        }
+        for id in runningIDs { cancel(taskID: id) }
+        inflight[videoID]?.cancel()
+    }
+
+    /// Stop active work when iOS expires its background runtime. The persisted request remains
+    /// available for a fresh attempt with newly resolved stream URLs.
+    func interruptForBackgroundExpiration(videoID: String) {
+        inflight[videoID]?.cancel()
+        let ids = tasks.values.filter { $0.videoID == videoID }.map(\.id)
+        for id in ids {
+            cancelledSnapshotIDs.append(id)
+            tasks[id] = nil
+            retryRequests[id] = nil
+            overallProgress[id] = nil
+        }
+        if cancelledSnapshotIDs.count > 256 {
+            cancelledSnapshotIDs.removeFirst(cancelledSnapshotIDs.count - 256)
+        }
+        progressByVideoID[videoID] = nil
+        phaseByVideoID[videoID] = nil
+        publishSnapshots()
     }
 
     /// Starts a fresh attempt for a failed transfer using its original video and quality.
@@ -692,11 +768,12 @@ final class DownloadManager {
     private func persistDownloaded(video: Video, fileURL: URL) async {
         let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.int64Value ?? 0
         let thumb = await downloadThumbnailData(url: video.thumbnailURL)
-        log.debug("persistDownloaded(\(video.id, privacy: .public)) thumb=\(thumb == nil ? "nil" : "\(thumb!.count)B", privacy: .public) size=\(size, privacy: .public)")
+        let thumbnailSize = thumb.map { "\($0.count)B" } ?? "nil"
+        log.debug("persistDownloaded(\(video.id, privacy: .public)) thumb=\(thumbnailSize, privacy: .public) size=\(size, privacy: .public)")
         // File-system + xattr backed (no SwiftData): the metadata travels with the file.
         // `DownloadsStore.write` compresses the thumbnail to ~10 KB JPEG and posts the
         // change notification so the Downloads tab re-renders.
-        DownloadsStore.shared.write(
+        await DownloadsStore.shared.write(
             videoID: video.id,
             title: video.title,
             channelName: video.channelName,

@@ -160,8 +160,8 @@ final class DownloadsStore {
     ///     is documented thread-safe since iOS 10)
     ///   - `AVURLAsset` duration probe (file header read; ~few KB)
     ///   - PropertyList encode + `setxattr(2)` syscall
-    /// Returns immediately; the `didChange` notification posts once the xattr is on disk,
-    /// triggering the DownloadsStore refresh.
+    /// Suspends the caller without blocking the main actor; the `didChange` notification posts
+    /// once the xattr has been attempted, triggering the DownloadsStore refresh.
     func write(
         videoID: String,
         title: String,
@@ -170,10 +170,10 @@ final class DownloadsStore {
         originalURL: String?,
         rawThumbnail: Data?,
         at fileURL: URL
-    ) {
+    ) async {
         // Capture all inputs by value (they're all Sendable types) so the detached task
         // doesn't pin any actor-isolated reference.
-        Task.detached(priority: .utility) {
+        await Task.detached(priority: .utility) {
             let thumb = rawThumbnail.flatMap(Self.compressedThumbnail(_:))
             let duration = Self.readDuration(at: fileURL)
             let metadata = DownloadMetadata(
@@ -195,7 +195,7 @@ final class DownloadsStore {
             await MainActor.run {
                 NotificationCenter.default.post(name: Self.didChange, object: nil)
             }
-        }
+        }.value
     }
 
     /// Delete the underlying mp4 (the xattr goes with it). Posts a change notification so

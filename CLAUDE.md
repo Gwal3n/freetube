@@ -51,7 +51,7 @@ These come first. Violating them breaks the project.
 | Legacy credential cleanup | `Security` (deletes credentials left by older builds) |
 | Embedded-Python HTTPS trust | Bundled certifi Mozilla CA roots (`Resources/cacert.pem`) via `SSL_CERT_FILE` |
 | Persistence | `SwiftData` (`@Model`); `UserDefaults` for simple flags via `UserPreferences` |
-| Background work | `BackgroundTasks` framework + `URLSession` background config (`BackgroundDownloadCoordinator`) |
+| Background work | `BackgroundTasks` processing jobs + finite UIKit background runtime (`BackgroundDownloadCoordinator`) |
 | Logging | `os.Logger` with subsystem `com.leshko.freetube` |
 | JavaScript runtime | `JavaScriptCore` (`JSContext`) — solves YouTube's N/SIG cipher challenges in-process by faking the `deno` runtime to yt-dlp; see §15.11 |
 
@@ -556,10 +556,11 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 - `wifiOnlyDownloads` setting checked via `NWPathMonitor` before every `ensureDownloaded` returns from queued state.
 
-### Background URL session
+### Background downloads
 
-- `BackgroundDownloadCoordinator` configures `URLSession(.background(withIdentifier:))` so user-initiated direct-URL downloads (tier 2 strategy 1/2) survive backgrounding.
-- `BGProcessingTaskRequest` is registered for resuming downloads at next launch.
+- `BackgroundDownloadCoordinator` persists only the requested video and quality. It never stores a signed stream URL. On a normal launch or an iOS-granted `BGProcessingTask`, it re-resolves and retries interrupted requests through `DownloadManager`.
+- `DownloadExecutionLease` gives an already-running transfer finite time to finish after the app backgrounds. An expired attempt is cancelled and stays queued for a fresh attempt. Neither API guarantees uninterrupted downloading or an immediate background launch.
+- Do not use silent audio to keep the process alive. The `audio` background mode is for actual playback.
 
 ### Download storage
 

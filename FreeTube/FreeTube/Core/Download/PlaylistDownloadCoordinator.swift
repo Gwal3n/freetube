@@ -100,11 +100,8 @@ final class PlaylistDownloadCoordinator {
         persist()
         guard activePlaylistID == id else { return }
         workTask?.cancel()
-        if ownsCurrentTransfer, let currentVideoID,
-           let snapshot = manager.activeTasks.first(where: {
-               $0.videoID == currentVideoID && Self.isRunning($0.state)
-           }) {
-            manager.cancel(taskID: snapshot.id)
+        if ownsCurrentTransfer, let currentVideoID {
+            manager.cancel(videoID: currentVideoID)
         }
     }
 

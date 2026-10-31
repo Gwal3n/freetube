@@ -1,106 +1,171 @@
-import Foundation
 import BackgroundTasks
+import Foundation
 import OSLog
 
-/// Bridges `URLSessionDownloadDelegate` callbacks and `BGProcessingTaskRequest` so user-initiated
-/// downloads survive backgrounding.
-///
-/// Per CLAUDE.md §10:
-/// - Use `URLSession.background(withIdentifier:)`.
-/// - Register a `BGProcessingTaskRequest` for resumed downloads on next launch.
-///
-/// Integration glue (call sites the project must wire up):
-/// 1. In `FreeTubeApp.init`, call `BackgroundDownloadCoordinator.shared.registerBackgroundTasks()`.
-/// 2. Add the background-task identifier to `Info.plist` under `BGTaskSchedulerPermittedIdentifiers`.
-/// 3. In the app delegate's `handleEventsForBackgroundURLSession`, forward the completion handler to
-///    `BackgroundDownloadCoordinator.shared.setBackgroundEventsCompletionHandler(_:identifier:)`.
+/// Retains explicit download requests across suspension or a system termination. The system may
+/// launch a processing task later; each attempt resolves fresh URLs through DownloadManager.
+/// No signed YouTube URL is written into the queue or a background URL session.
 @available(iOS 17.0, *)
-final class BackgroundDownloadCoordinator: NSObject {
+@MainActor
+final class BackgroundDownloadCoordinator {
     static let shared = BackgroundDownloadCoordinator()
-
-    static let sessionIdentifier = "com.leshko.freetube.downloads"
     static let bgTaskIdentifier = "com.leshko.freetube.resume-downloads"
 
+    private static let queueURL = AppDirectories.documents.deletingLastPathComponent()
+        .appendingPathComponent("Library/Application Support/BackgroundDownloads.json")
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "BGDownloads")
-    private var backgroundCompletionHandler: (() -> Void)?
+    private var pending: [BackgroundDownloadRequest]
+    private var resumeTask: Task<Void, Never>?
+    private var activeVideoID: String?
+    private var isRegistered = false
+    private var hasScheduledRequest = false
 
-    lazy var session: URLSession = {
-        let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
-        config.isDiscretionary = false
-        config.sessionSendsLaunchEvents = true
-        config.allowsCellularAccess = true
-        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
-    }()
-
-    private override init() {
-        super.init()
+    private init() {
+        let data = try? Data(contentsOf: Self.queueURL)
+        pending = data.flatMap { try? JSONDecoder().decode([BackgroundDownloadRequest].self, from: $0) } ?? []
     }
 
-    // MARK: - BG task lifecycle
-
+    /// Register during app launch, before any pending request is submitted.
     func registerBackgroundTasks() {
-        BGTaskScheduler.shared.register(
+        guard !isRegistered else { return }
+        isRegistered = BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.bgTaskIdentifier,
-            using: nil
+            using: .main
         ) { [weak self] task in
-            self?.handle(task: task as? BGProcessingTask)
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    processingTask.setTaskCompleted(success: false)
+                    return
+                }
+                self.handle(processingTask)
+            }
         }
+        if !isRegistered {
+            log.error("Background processing task registration failed")
+        } else if !pending.isEmpty {
+            scheduleNextBackgroundTask()
+        }
+    }
+
+    func record(video: Video, quality: VideoQuality) {
+        guard !pending.contains(where: { $0.video.id == video.id }) else { return }
+        pending.append(BackgroundDownloadRequest(video: video, quality: quality))
+        save()
         scheduleNextBackgroundTask()
     }
 
-    func scheduleNextBackgroundTask() {
+    func complete(videoID: String) {
+        guard pending.contains(where: { $0.video.id == videoID }) else { return }
+        pending.removeAll { $0.video.id == videoID }
+        save()
+        if pending.isEmpty, hasScheduledRequest {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.bgTaskIdentifier)
+            hasScheduledRequest = false
+        }
+    }
+
+    func hasPendingRequest(for videoID: String) -> Bool {
+        pending.contains { $0.video.id == videoID }
+    }
+
+    /// Continue interrupted requests on a normal launch too. A running download is coalesced by
+    /// DownloadManager, so this does not start a duplicate transfer.
+    func resumePending() {
+        guard resumeTask == nil, !pending.isEmpty else { return }
+        resumeTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.activeVideoID = nil
+                self.resumeTask = nil
+            }
+            while !Task.isCancelled, let request = self.pending.first {
+                self.activeVideoID = request.video.id
+                do {
+                    _ = try await DownloadManager.shared.ensureDownloaded(
+                        video: request.video,
+                        quality: request.quality
+                    )
+                } catch is CancellationError {
+                    // A user cancellation removes the request; continue with the next one.
+                    // An expired background attempt remains queued for a later launch.
+                    if Task.isCancelled || self.pending.contains(where: { $0.video.id == request.video.id }) {
+                        break
+                    }
+                } catch {
+                    // DownloadManager retains the failed row for manual retry. Do not loop a
+                    // permanently refused video in every background task.
+                    self.complete(videoID: request.video.id)
+                    self.log.notice("Pending download failed for \(request.video.id, privacy: .public): \(String(describing: error), privacy: .public)")
+                }
+            }
+        }
+    }
+
+    private func save() {
+        if pending.isEmpty {
+            try? FileManager.default.removeItem(at: Self.queueURL)
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(
+                at: Self.queueURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try JSONEncoder().encode(pending)
+            try data.write(to: Self.queueURL, options: .atomic)
+        } catch {
+            log.error("Could not save pending download requests: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    func pauseForExpiration(videoID: String) {
+        resumeTask?.cancel()
+        DownloadManager.shared.interruptForBackgroundExpiration(videoID: videoID)
+    }
+
+    private func scheduleNextBackgroundTask() {
+        guard isRegistered, !pending.isEmpty, !hasScheduledRequest else { return }
         let request = BGProcessingTaskRequest(identifier: Self.bgTaskIdentifier)
         request.requiresNetworkConnectivity = true
         request.requiresExternalPower = false
         do {
             try BGTaskScheduler.shared.submit(request)
-            log.info("Scheduled BG processing task")
+            hasScheduledRequest = true
         } catch {
-            log.error("Failed to schedule BG task: \(String(describing: error), privacy: .public)")
+            log.notice("Could not schedule pending downloads: \(String(describing: error), privacy: .public)")
         }
     }
 
-    private func handle(task: BGProcessingTask?) {
-        guard let task else { return }
-        log.info("Handling BG processing task")
-        task.expirationHandler = {
-            // No-op: URLSession background downloads continue independently of the BG task lifecycle.
+    private func handle(_ task: BGProcessingTask) {
+        hasScheduledRequest = false
+        log.info("Background download processing started with \(self.pending.count, privacy: .public) pending requests")
+        resumePending()
+        let currentRun = resumeTask
+        task.expirationHandler = { [weak self] in
+            currentRun?.cancel()
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let videoID = self.activeVideoID {
+                    self.pauseForExpiration(videoID: videoID)
+                } else {
+                    self.resumeTask?.cancel()
+                }
+            }
         }
-        scheduleNextBackgroundTask()
-        task.setTaskCompleted(success: true)
-    }
-
-    func setBackgroundEventsCompletionHandler(_ handler: @escaping () -> Void, identifier: String) {
-        guard identifier == Self.sessionIdentifier else { return }
-        backgroundCompletionHandler = handler
-    }
-}
-
-@available(iOS 17.0, *)
-extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) {
-        log.info("Download finished to temp \(location.path, privacy: .public)")
-        // TODO: hand off to DownloadManager for final placement + SwiftData insertion.
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        didCompleteWithError error: Error?
-    ) {
-        if let error {
-            log.error("Download error: \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        DispatchQueue.main.async { [weak self] in
-            self?.backgroundCompletionHandler?()
-            self?.backgroundCompletionHandler = nil
+        Task { @MainActor [weak self] in
+            await currentRun?.value
+            guard let self else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            let finished = self.pending.isEmpty
+            self.log.info("Background download processing ended; complete=\(finished, privacy: .public) pending=\(self.pending.count, privacy: .public)")
+            task.setTaskCompleted(success: finished)
+            if !finished { self.scheduleNextBackgroundTask() }
         }
     }
 }
