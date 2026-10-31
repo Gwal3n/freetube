@@ -1,8 +1,8 @@
 import AVFoundation
 import Foundation
 
-/// Bounds remote paired-track preparation before the resolver moves to another strategy.
-/// AVFoundation may finish a cancelled asset load later; its result is ignored by token.
+/// Prepares playback candidates and bounds remote paired-track preparation.
+/// AVFoundation may finish a cancelled paired load later; its result is ignored by token.
 @MainActor
 final class PlayerItemPreparationGate {
     enum Outcome {
@@ -25,7 +25,17 @@ final class PlayerItemPreparationGate {
     ) async -> Outcome {
         finish(.cancelled, token: token)
         if Task.isCancelled { return .cancelled }
-
+        // Ordinary candidates do not need the paired-track timeout, but share the same
+        // cancellation and error contract as paired candidates at the resolver boundary.
+        if candidate.strategy != .nativePaired {
+            do {
+                return .ready(try await factory.makeItem(for: candidate))
+            } catch is CancellationError {
+                return .cancelled
+            } catch {
+                return .failed(PlayerItemReadinessGate.describe(itemError: error))
+            }
+        }
         token &+= 1
         let currentToken = token
         return await withTaskCancellationHandler {

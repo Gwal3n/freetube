@@ -6,15 +6,12 @@ import UIKit
 
 /// CLAUDE.md §8: single source of truth for playback. Injected via SwiftUI environment.
 /// Mini player and full-screen player both observe this object — neither owns its own `AVPlayer`.
+/// Domain extensions keep transport operations separate; queue, playlist, recommendation, and
+/// SponsorBlock collaborators own their own state and lifetimes.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
 final class PlayerStateManager {
-    struct QueueNotice: Identifiable, Equatable {
-        let id = UUID()
-        let message: String
-        let offersUndo: Bool
-    }
     enum LoadState: Equatable {
         case idle
         case resolving
@@ -43,19 +40,19 @@ final class PlayerStateManager {
     /// Control Center) and `PlayerArtworkBackdrop`, which paints it into the video area for as long
     /// as AVPlayer has no frame to show. Refreshed when the current video changes.
     private(set) var currentArtwork: UIImage?
-    private(set) var loadState: LoadState = .idle
-    private(set) var isPlaying: Bool = false
+    var loadState: LoadState = .idle
+    var isPlaying: Bool = false
     /// True only when the current item reached its natural end and no automatic transition has
     /// replaced it. Drives replay chrome and lets a backward seek resume from the chosen point.
-    private(set) var hasEnded: Bool = false
-    private(set) var elapsed: TimeInterval = 0
-    private(set) var duration: TimeInterval = 0
+    var hasEnded: Bool = false
+    var elapsed: TimeInterval = 0
+    var duration: TimeInterval = 0
     /// Actual loaded ranges can be discontinuous, especially for HLS. Keep each range separate
     /// so the timeline never suggests that an unbuffered gap is ready to play.
-    private(set) var bufferedRanges: [ClosedRange<TimeInterval>] = []
+    var bufferedRanges: [ClosedRange<TimeInterval>] = []
     /// The newest contiguous DVR window offered by the current live AVPlayerItem. Unlike a
     /// video's duration, this range moves forward as the broadcast advances.
-    private(set) var liveSeekableRange: ClosedRange<TimeInterval>?
+    var liveSeekableRange: ClosedRange<TimeInterval>?
     /// Native frame stepping is not available for every item, notably some HLS streams. Ready
     /// on-demand video still offers a fine-seek fallback rather than hiding the control.
     var canStepFrameBackward: Bool {
@@ -77,56 +74,55 @@ final class PlayerStateManager {
               duration > 0 else { return false }
         return (pendingSeekTarget ?? elapsed) < duration
     }
-    private(set) var playbackRate: Double
+    var playbackRate: Double
     /// Actual requested transport rate, capped at 2x until a ready item supports fast-forward.
-    private(set) var effectivePlaybackRate: Double
-    private(set) var isPreparingFastPlayback = false
-    private(set) var fastPlaybackPreparation: FastPlaybackLocalFileService.ProgressUpdate?
-    private(set) var playbackQuality: VideoQuality
+    var effectivePlaybackRate: Double
+    var isPreparingFastPlayback = false
+    var fastPlaybackPreparation: FastPlaybackLocalFileService.ProgressUpdate?
+    var playbackQuality: VideoQuality
     private(set) var sleepTimerOption: SleepTimerOption = .off
     var isAudioOnly: Bool { playbackQuality == .audioOnly }
-    private(set) var isSwitchingAudioMode = false
-    private var videoQualityBeforeAudio: VideoQuality
+    var isSwitchingAudioMode = false
+    var videoQualityBeforeAudio: VideoQuality
     private(set) var isMuted = false
-    private(set) var sponsorBlockNotice: SponsorBlockNotice?
-    private(set) var sponsorBlockSegments: [SponsorBlockSegment] = []
-    private(set) var chapters: [VideoChapter] = []
-    private var youtubeChapters: [VideoChapter] = []
-    private var communityChapters: [VideoChapter] = []
-    private(set) var storyboard: VideoStoryboard?
+    var sponsorBlockNotice: SponsorBlockNotice? { sponsorBlockCoordinator.notice }
+    var sponsorBlockSegments: [SponsorBlockSegment] { sponsorBlockCoordinator.segments }
+    var chapters: [VideoChapter] = []
+    var youtubeChapters: [VideoChapter] = []
+    var storyboard: VideoStoryboard?
     /// Source tracks from the accepted playback response; signed URLs remain memory-only.
-    private(set) var captionTracks: [VideoCaptionTrack] = []
+    var captionTracks: [VideoCaptionTrack] = []
     private(set) var commentsCountText: String?
-    private(set) var isLoadingMoreRecommendations = false
-    private(set) var activePlaylist: Playlist?
-    private(set) var activePlaylistOrigin: PlaylistPlaybackOrigin?
+    var isLoadingMoreRecommendations: Bool { recommendations.isLoadingMore }
+    var activePlaylist: Playlist? { playlistContext.playlist }
+    var activePlaylistOrigin: PlaylistPlaybackOrigin? { playlistContext.origin }
     /// Increments for each actual video load so late History playlist lookups cannot attach to a
     /// different playback, even if the user opens the same video again from another surface.
     private(set) var playbackSessionID = 0
-    private(set) var isLoadingMorePlaylistVideos = false
-    private(set) var playlistRecommendations: [Video] = []
+    var isLoadingMorePlaylistVideos: Bool { playlistContext.isLoadingMore }
+    var playlistRecommendations: [Video] { recommendations.playlistItems }
     /// Explicit user choices are independent from disposable recommendations and playlists.
-    private(set) var manualQueue: [Video]
-    private(set) var queueNotice: QueueNotice?
+    var manualQueue: [Video] { manualQueueController.items }
+    var queueNotice: PlayerManualQueueController.Notice? { manualQueueController.notice }
     /// Display-correct dimensions reported by AVPlayerItem after its tracks become ready.
-    private(set) var videoPresentationSize: CGSize = .zero
+    var videoPresentationSize: CGSize = .zero
     /// Monotonic request consumed by PlayerSurface to end an existing automatic PiP session when
     /// the user explicitly reopens the expanded player.
     private(set) var pipDismissalRequest = 0
     /// Monotonic request consumed by `SwiftUIPlayerContainer`. Playback commands request an
     /// expansion instead of setting presentation state directly, giving the container a chance to
     /// stage its SwiftUI artwork before the UIKit video surface begins moving.
-    private(set) var playerExpansionRequest = 0
+    var playerExpansionRequest = 0
     /// Allows the fixed collapse control to use the container's video-only shrinking transition.
-    private(set) var playerCollapseRequest = 0
-    @ObservationIgnored private var pendingCollapseCompletion: (sessionID: Int, action: () -> Void)?
+    var playerCollapseRequest = 0
+    @ObservationIgnored var pendingCollapseCompletion: (sessionID: Int, action: () -> Void)?
     /// Width of the in-app floating video; optionally restored between launches. The view
     /// constrains it to the current viewport.
-    private(set) var floatingMiniPlayerWidth: CGFloat = 216
+    var floatingMiniPlayerWidth: CGFloat = 216
     /// The visible thumbnail that initiated the next explicit expansion, in screen coordinates.
     /// This is presentation-only state; it never changes playback or persists with a video.
-    private(set) var launchSourceFrame: CGRect?
-    @ObservationIgnored private var pendingLaunchSource: (videoID: String, frame: CGRect)?
+    var launchSourceFrame: CGRect?
+    @ObservationIgnored var pendingLaunchSource: (videoID: String, frame: CGRect)?
     var miniPlayerVisible: Bool = false
     var fullScreenPresented: Bool = false
     /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
@@ -150,7 +146,7 @@ final class PlayerStateManager {
 
     func removeFromUpNext(videoID: String) {
         if activePlaylist != nil {
-            playlistRecommendations.removeAll { $0.id == videoID }
+            recommendations.removeFromPlaylistItems(videoID: videoID)
         } else if let index = queue.items.firstIndex(where: { $0.id == videoID }),
                   index != queue.currentIndex {
             queue.remove(at: index)
@@ -168,16 +164,17 @@ final class PlayerStateManager {
     // MARK: - Collaborators
 
     let queue: QueueManager
-    private let resolver: any PlaybackResolving
-    private let itemFactory = PlaybackItemFactory()
-    @ObservationIgnored private let fastPlaybackCandidatePreparer = PlayerFastPlaybackCandidatePreparer()
-    private let preparationGate = PlayerItemPreparationGate()
-    private let readinessGate = PlayerItemReadinessGate()
-    private let sponsorBlockCoordinator: PlayerSponsorBlockCoordinator
-    private let videoService: any VideoServicing
-    private let playlistService: any PlaylistServicing
-    private let preferences: UserPreferences
-    private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
+    let resolver: any PlaybackResolving
+    let itemFactory = PlaybackItemFactory()
+    @ObservationIgnored let fastPlaybackCandidatePreparer = PlayerFastPlaybackCandidatePreparer()
+    let preparationGate = PlayerItemPreparationGate()
+    let readinessGate = PlayerItemReadinessGate()
+    let sponsorBlockCoordinator: PlayerSponsorBlockCoordinator
+    private let manualQueueController = PlayerManualQueueController()
+    let recommendations: PlayerRecommendationController
+    let playlistContext: PlayerPlaylistContext
+    let preferences: UserPreferences
+    let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
     /// Sticky "this queue accepts recommendations" intent. Set to `true` whenever the user loads
     /// a standalone video and `false` for curated Play all / Shuffle all batches. Drives:
@@ -186,10 +183,10 @@ final class PlayerStateManager {
     ///      repeat is off, we fire a fresh recs fetch using the queue's last item as a seed,
     ///      then advance once new items land. Each standalone load replaces the old queue, so
     ///      these refills never retain previously played videos.
-    private var queueAcceptsRecommendations = true
+    var queueAcceptsRecommendations = true
 
     /// Separate from recommendations so Previous/Next can revisit explicit selections.
-    private var playbackHistory = PlayerPlaybackHistory()
+    var playbackHistory = PlayerPlaybackHistory()
     private let watchHistory = PlayerWatchHistoryTracker()
 
     var canPlayPrevious: Bool { playbackHistory.canMoveBackward }
@@ -199,31 +196,29 @@ final class PlayerStateManager {
             || queue.availableUpcomingCount(limit: 1) > 0
     }
 
-    @ObservationIgnored private let observations = PlayerObservationStore()
-    private weak var acceptedStreamItem: AVPlayerItem?
-    private var acceptedStreamStrategy: PlaybackStrategy?
+    @ObservationIgnored let observations = PlayerObservationStore()
+    weak var acceptedStreamItem: AVPlayerItem?
+    var acceptedStreamStrategy: PlaybackStrategy?
     /// One post-start resolver pass per video. A second terminal failure is shown to the user
     /// instead of repeatedly rebuilding the player on an unusable network/source.
-    private var didAttemptPlaybackRecovery = false
+    var didAttemptPlaybackRecovery = false
     /// Explicit transport intent survives AVPlayer autonomously pausing a failed item. `isPlaying`
     /// is an observation/prediction for chrome and may already be false when failure KVO arrives.
-    private var wantsPlayback = false
+    var wantsPlayback = false
 
-    private var itemLoadStartedAt: Date?
-    private let itemDiagnostics = PlayerItemDiagnostics()
-    @ObservationIgnored private var fastPlayback = PlayerFastPlaybackState()
-    private var pendingSeekTarget: TimeInterval?
+    var itemLoadStartedAt: Date?
+    let itemDiagnostics = PlayerItemDiagnostics()
+    @ObservationIgnored var fastPlayback = PlayerFastPlaybackState()
+    var pendingSeekTarget: TimeInterval?
     /// The active video track's observed cadence, retained across pause. HLS does not always
     /// expose a track, so fine seeking falls back to a conservative 30 fps estimate.
-    @ObservationIgnored private var observedFrameRate: (item: AVPlayerItem, fps: Double)?
-    private var seekRequestID = 0
-    private var audioModeSwitchGeneration = 0
-    private var resumeAfterAudioSwitch: Bool?
+    @ObservationIgnored var observedFrameRate: (item: AVPlayerItem, fps: Double)?
+    var seekRequestID = 0
+    var audioModeSwitchGeneration = 0
+    var resumeAfterAudioSwitch: Bool?
     private var sleepTimerTask: Task<Void, Never>?
-    private var recommendationPager = PlayerRecommendationPager()
-    private var playlistContinuationToken: String?
-    private var audioInterruptionObserver: NSObjectProtocol?
-    private var interruptedPlaybackSessionID: Int?
+    var audioInterruptionObserver: NSObjectProtocol?
+    var interruptedPlaybackSessionID: Int?
     init(
         queue: QueueManager = QueueManager(),
         resolver: any PlaybackResolving = PlaybackResolver(),
@@ -235,10 +230,11 @@ final class PlayerStateManager {
         self.queue = queue
         self.resolver = resolver
         self.sponsorBlockCoordinator = PlayerSponsorBlockCoordinator(service: sponsorBlockService)
-        self.videoService = videoService
-        self.playlistService = playlistService
+        self.recommendations = PlayerRecommendationController(
+            queue: queue, videoService: videoService, preferences: preferences
+        )
+        self.playlistContext = PlayerPlaylistContext(queue: queue, service: playlistService)
         self.preferences = preferences
-        self.manualQueue = PlayerManualQueueStore.restore()
         self.playbackRate = PlaybackSpeedPresets.bounded(preferences.defaultPlaybackRate)
         self.effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(preferences.defaultPlaybackRate, canPlayFastForward: false)
         FastPlaybackLocalFileService.removeOrphansAtLaunch()
@@ -310,13 +306,9 @@ final class PlayerStateManager {
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
-        recommendationPager.reset()
-        isLoadingMoreRecommendations = false
-        activePlaylist = nil
-        activePlaylistOrigin = nil
-        playlistRecommendations = []
-        playlistContinuationToken = nil
-        isLoadingMorePlaylistVideos = false
+        recommendations.resetPager()
+        playlistContext.clear()
+        recommendations.clearPlaylistItems()
         videoPresentationSize = .zero
     }
 
@@ -358,20 +350,16 @@ final class PlayerStateManager {
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
-        recommendationTask?.cancel()
+        recommendations.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         clearChapterState()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
-        recommendationPager.reset()
-        isLoadingMoreRecommendations = false
-        activePlaylist = nil
-        activePlaylistOrigin = nil
-        playlistRecommendations = []
-        playlistContinuationToken = nil
-        isLoadingMorePlaylistVideos = false
+        recommendations.resetPager()
+        playlistContext.clear()
+        recommendations.clearPlaylistItems()
         videoPresentationSize = .zero
         if isPlaying { pause() }
         if !player.items().isEmpty { player.removeAllItems() }
@@ -462,25 +450,21 @@ final class PlayerStateManager {
             playbackQuality = preferredQuality
             if preferredQuality != .audioOnly { videoQualityBeforeAudio = preferredQuality }
         }
-        if manualQueue.contains(where: { $0.id == video.id }) {
-            manualQueue = PlayerManualQueueStore.removing(video.id, from: manualQueue)
-            persistManualQueue()
-        }
+        manualQueueController.remove(video.id)
         persistCurrentPlaybackProgress(force: true)
         resolutionTask?.cancel()
         audioModeSwitchTask?.cancel()
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
-        recommendationTask?.cancel()
+        recommendations.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         clearChapterState()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
-        recommendationPager.reset()
-        isLoadingMoreRecommendations = false
+        recommendations.resetPager()
         videoPresentationSize = .zero
         let isPlaylistInterlude = preservePlaylistPosition && skipRecommendations && activePlaylist != nil
         if recordInPlaybackHistory {
@@ -492,14 +476,11 @@ final class PlayerStateManager {
         }
         queueAcceptsRecommendations = !skipRecommendations
         if skipRecommendations, activePlaylist != nil {
-            playlistRecommendations = []
+            recommendations.clearPlaylistItems()
         }
         if !skipRecommendations {
-            activePlaylist = nil
-            activePlaylistOrigin = nil
-            playlistRecommendations = []
-            playlistContinuationToken = nil
-            isLoadingMorePlaylistVideos = false
+            playlistContext.clear()
+            recommendations.clearPlaylistItems()
         }
         // Pause and tear down anything currently playing. Otherwise we'd keep streaming audio from
         // the previous video while the new one's file is downloading — which is what the user kept
@@ -614,94 +595,10 @@ final class PlayerStateManager {
         }
     }
 
-    private var resolutionTask: Task<Void, Never>?
-    private var audioModeSwitchTask: Task<Void, Never>?
-    private var recommendationTask: Task<Void, Never>?
-    private var contentPrefetchTask: Task<Void, Never>?
-    private var queueNoticeDismissTask: Task<Void, Never>?
-    private var queueNoticeUndoAction: (() -> Void)?
-    private var playerPresentationTask: Task<Void, Never>?
-
-    /// Called by a tapped video row before `load` so the player can grow from that thumbnail.
-    /// A video ID guards against a stale row gesture launching a different queued item.
-    func prepareLaunch(for videoID: String, from frame: CGRect) {
-        guard frame.width > 20, frame.height > 20,
-              frame.width.isFinite, frame.height.isFinite,
-              frame.origin.x.isFinite, frame.origin.y.isFinite else {
-            pendingLaunchSource = nil
-            return
-        }
-        pendingLaunchSource = (videoID, frame)
-    }
-
-    func finishLaunchPresentation() {
-        launchSourceFrame = nil
-    }
-
-    func requestPlayerCollapse(then completion: (() -> Void)? = nil) {
-        guard fullScreenPresented else {
-            completion?()
-            return
-        }
-        if let completion {
-            pendingCollapseCompletion = (playbackSessionID, completion)
-        }
-        playerCollapseRequest &+= 1
-    }
-
-    func finishPlayerCollapse() {
-        let completion = pendingCollapseCompletion
-        pendingCollapseCompletion = nil
-        if let completion, completion.sessionID == playbackSessionID, miniPlayerVisible {
-            completion.action()
-        }
-    }
-
-    func resizeFloatingMiniPlayer(to width: CGFloat) {
-        guard width.isFinite else { return }
-        floatingMiniPlayerWidth = width
-        if preferences.rememberFloatingPlayerPlacement {
-            preferences.savedFloatingPlayerWidth = Double(width)
-        }
-    }
-
-    /// Stages one frame at the tapped thumbnail before expansion. `AVPlayerViewController` does
-    /// not reliably participate in a SwiftUI insertion transition; the mounted surface must have
-    /// a real starting frame. Actions without a thumbnail retain the floating-window fallback.
-    private func presentPlayer(for videoID: String, expanded: Bool) {
-        playerPresentationTask?.cancel()
-        let source = pendingLaunchSource?.videoID == videoID ? pendingLaunchSource?.frame : nil
-        pendingLaunchSource = nil
-        let wasVisible = miniPlayerVisible
-        miniPlayerVisible = true
-        guard expanded else {
-            launchSourceFrame = nil
-            return
-        }
-
-        // Already expanded: changing the current item must not replay the presentation animation.
-        guard !fullScreenPresented else {
-            launchSourceFrame = nil
-            return
-        }
-
-        launchSourceFrame = source
-
-        if wasVisible && source == nil {
-            playerExpansionRequest &+= 1
-            return
-        }
-
-        fullScreenPresented = false
-        playerPresentationTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(16))
-            guard !Task.isCancelled,
-                  let self,
-                  self.miniPlayerVisible,
-                  self.currentVideo?.id == videoID else { return }
-            self.playerExpansionRequest &+= 1
-        }
-    }
+    var resolutionTask: Task<Void, Never>?
+    var audioModeSwitchTask: Task<Void, Never>?
+    var contentPrefetchTask: Task<Void, Never>?
+    var playerPresentationTask: Task<Void, Never>?
 
     func play() {
         if hasEnded {
@@ -798,21 +695,13 @@ final class PlayerStateManager {
     /// Inserts a user-selected search result immediately after the current queue item without
     /// interrupting playback. The queue remains local and recommendation loading stays unchanged.
     func enqueueNext(_ video: Video) {
-        guard let currentVideo, video.id != currentVideo.id,
-              !VideoBlocklist.shared.blocks(video) else { return }
-        manualQueue = PlayerManualQueueStore.insertingNext(video, into: manualQueue)
-        persistManualQueue()
-        showQueueNotice(message: "Playing next")
+        guard let currentVideo,
+              manualQueueController.enqueueNext(video, currentVideoID: currentVideo.id) else { return }
         log.info("Queued \(video.id, privacy: .public) to play next")
     }
 
     func enqueue(_ video: Video) {
-        guard video.id != currentVideo?.id,
-              !VideoBlocklist.shared.blocks(video),
-              !manualQueue.contains(where: { $0.id == video.id }) else { return }
-        manualQueue = PlayerManualQueueStore.appending(video, to: manualQueue)
-        persistManualQueue()
-        showQueueNotice(message: "Added to queue")
+        guard manualQueueController.enqueue(video, currentVideoID: currentVideo?.id) else { return }
         log.info("Added \(video.id, privacy: .public) to manual queue")
     }
 
@@ -820,8 +709,7 @@ final class PlayerStateManager {
     /// recommendation session. Both the Next button and a tapped queue row use this path.
     func playManualQueueItem(_ video: Video, expandPlayer: Bool = true) {
         guard manualQueue.contains(where: { $0.id == video.id }) else { return }
-        manualQueue = PlayerManualQueueStore.removing(video.id, from: manualQueue)
-        persistManualQueue()
+        manualQueueController.remove(video.id)
         let interruptsPlaylist = activePlaylist != nil
         if interruptsPlaylist {
             log.info("Playing manual queue interlude; preserving playlist index=\(self.queue.currentIndex, privacy: .public)")
@@ -835,319 +723,31 @@ final class PlayerStateManager {
     }
 
     func removeFromManualQueue(videoID: String) {
-        manualQueue = PlayerManualQueueStore.removing(videoID, from: manualQueue)
-        persistManualQueue()
+        manualQueueController.remove(videoID)
     }
 
     func removeFromManualQueueWithUndo(videoID: String) {
-        guard let index = manualQueue.firstIndex(where: { $0.id == videoID }) else { return }
-        let removedVideo = manualQueue.remove(at: index)
-        persistManualQueue()
-        showQueueNotice(message: "Removed") { [weak self] in
-            guard let self, !self.manualQueue.contains(where: { $0.id == removedVideo.id }) else { return }
-            self.manualQueue = PlayerManualQueueStore.restoring(removedVideo, at: index, to: self.manualQueue)
-            self.persistManualQueue()
-        }
+        manualQueueController.removeWithUndo(videoID)
     }
 
     func clearManualQueue() {
-        guard !manualQueue.isEmpty else { return }
-        manualQueue.removeAll()
-        persistManualQueue()
+        manualQueueController.clear()
     }
 
     func clearManualQueueWithUndo() {
-        guard !manualQueue.isEmpty else { return }
-        let removedVideos = manualQueue
-        manualQueue.removeAll()
-        persistManualQueue()
-        showQueueNotice(message: "Queue cleared") { [weak self] in
-            guard let self else { return }
-            self.manualQueue = PlayerManualQueueStore.restoring(removedVideos, to: self.manualQueue)
-            self.persistManualQueue()
-        }
+        manualQueueController.clearWithUndo()
     }
 
     func moveManualQueue(fromOffsets offsets: IndexSet, toOffset destination: Int) {
-        guard let reordered = PlayerManualQueueStore.reordered(
-            manualQueue,
-            fromOffsets: offsets,
-            toOffset: destination,
-            isBlocked: { VideoBlocklist.shared.blocks($0) }
-        ) else { return }
-        manualQueue = reordered
-        persistManualQueue()
+        manualQueueController.move(fromOffsets: offsets, toOffset: destination)
     }
 
-    private func showQueueNotice(message: String, undoAction: (() -> Void)? = nil, haptic: Bool = true) {
-        let notice = QueueNotice(message: message, offersUndo: undoAction != nil)
-        queueNotice = notice
-        queueNoticeUndoAction = undoAction
-        if haptic { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-        queueNoticeDismissTask?.cancel()
-        let displayDuration: Duration = undoAction == nil ? .seconds(1.4) : .seconds(2)
-        queueNoticeDismissTask = Task { [weak self] in
-            try? await Task.sleep(for: displayDuration)
-            guard !Task.isCancelled, self?.queueNotice?.id == notice.id else { return }
-            self?.queueNotice = nil
-            self?.queueNoticeUndoAction = nil
-        }
+    func showQueueNotice(message: String, undoAction: (() -> Void)? = nil, haptic: Bool = true) {
+        manualQueueController.showNotice(message: message, undoAction: undoAction, haptic: haptic)
     }
 
     func undoQueueNotice() {
-        guard let action = queueNoticeUndoAction else { return }
-        queueNoticeDismissTask?.cancel()
-        queueNoticeUndoAction = nil
-        queueNotice = nil
-        action()
-    }
-
-    func setPlaybackRate(_ rate: Double) {
-        let boundedRate = fastPlayback.select(rate, isPreparing: isPreparingFastPlayback)
-        log.info("Playback speed selected: \(boundedRate, privacy: .public)x")
-        playbackRate = boundedRate
-        // The player menu changes this video only. Settings owns the saved default; writing
-        // menu choices there made subsequent HLS videos start at a capped 2x after a 3x choice.
-        reconcilePlaybackRate()
-        if let item = player.currentItem, item.status == .readyToPlay {
-            log.info("Playback speed applied: selected=\(self.playbackRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x actual=\(self.player.rate, privacy: .public)x canPlayFastForward=\(item.canPlayFastForward, privacy: .public) pitch=\(item.audioTimePitchAlgorithm, privacy: .public)")
-        }
-    }
-
-    /// Hold and menu speeds share the same capability checks and progressive-source experiment.
-    /// Releasing a hold cancels unresolved work without changing the user's saved base speed.
-    func beginTemporaryPlaybackRate(_ rate: Double) {
-        guard !hasEnded,
-              loadState == .readyToPlay,
-              player.currentItem?.status == .readyToPlay,
-              fastPlayback.beginTemporary(rate, wasPlaying: isPlaying) else { return }
-        reconcilePlaybackRate()
-        if !isPlaying { play() }
-    }
-
-    func endTemporaryPlaybackRate() {
-        guard let restorePaused = fastPlayback.endTemporary() else { return }
-        reconcilePlaybackRate()
-        if restorePaused { pause() }
-    }
-
-    private var requestedTransportRate: Double { fastPlayback.requestedRate(baseRate: playbackRate) }
-
-    /// Never send an unsupported HLS rate to AVPlayer. A paused, invisible probe prepares the
-    /// alternative first, leaving the current video audible and seekable at up to 2x meanwhile.
-    private func reconcilePlaybackRate() {
-        applyEffectivePlaybackRate()
-        guard requestedTransportRate > 2 else {
-            if !fastPlayback.isInstalling { cancelFastPlaybackPreparation() }
-            return
-        }
-        // A hold must not start a potentially large temporary download. A saved high-speed
-        // preference also waits for an explicit tap on each new online video.
-        guard fastPlayback.temporaryRate == nil, fastPlayback.userRequested else { return }
-        guard let item = player.currentItem, item.status == .readyToPlay,
-              !item.canPlayFastForward, loadState == .readyToPlay,
-              !hasEnded, !isSwitchingAudioMode, !isPreparingFastPlayback, !fastPlayback.failed,
-              let video = currentVideo else { return }
-        guard !video.isLive, !video.id.hasPrefix("fetch-") else {
-            failFastPlayback(message: "Higher speeds are unavailable for this video")
-            return
-        }
-        isPreparingFastPlayback = true
-        fastPlaybackPreparation = .init(phase: .resolving, completedBytes: 0, totalBytes: nil)
-        fastPlayback.generation &+= 1
-        let generation = fastPlayback.generation
-        let session = playbackSessionID
-        let quality = playbackQuality
-        log.info("Fast playback experiment started for \(video.id, privacy: .public) requested=\(self.requestedTransportRate, privacy: .public)x")
-        fastPlayback.task = Task { [weak self] in
-            await self?.prepareFastPlayback(for: video, quality: quality, originalItem: item, session: session, generation: generation)
-        }
-        scheduleFastPlaybackTimeout(after: .seconds(30), generation: generation)
-    }
-
-    private func scheduleFastPlaybackTimeout(after duration: Duration, generation: Int) {
-        fastPlayback.timeoutTask?.cancel()
-        fastPlayback.timeoutTask = Task { [weak self] in
-            do { try await Task.sleep(for: duration) } catch { return }
-            guard let self, self.fastPlayback.generation == generation,
-                  !self.fastPlayback.isInstalling else { return }
-            self.log.notice("Fast playback extraction/preparation timed out")
-            self.cancelFastPlaybackPreparation()
-            self.failFastPlayback(message: "Higher speeds are unavailable for this video")
-        }
-    }
-
-    private func applyEffectivePlaybackRate() {
-        effectivePlaybackRate = fastPlayback.applyRate(
-            to: player,
-            baseRate: playbackRate,
-            isPlaying: isPlaying
-        )
-    }
-
-    private func cancelFastPlaybackPreparation() {
-        fastPlayback.cancelPreparation()
-        isPreparingFastPlayback = false
-        fastPlaybackPreparation = nil
-    }
-
-    func cancelPendingFastPlayback() {
-        guard isPreparingFastPlayback else { return }
-        cancelFastPlaybackPreparation()
-        fastPlayback.markCancelled()
-        if playbackRate > 2 {
-            playbackRate = 2
-        }
-        applyEffectivePlaybackRate()
-        log.info("Fast playback preparation cancelled by user")
-    }
-
-    private func resetFastPlaybackState() {
-        fastPlayback.reset()
-        isPreparingFastPlayback = false
-        fastPlaybackPreparation = nil
-        playbackRate = PlaybackSpeedPresets.bounded(preferences.defaultPlaybackRate)
-        effectivePlaybackRate = PlaybackSpeedPresets.supportedRate(playbackRate, canPlayFastForward: false)
-    }
-
-    private func failFastPlayback(message: String) {
-        fastPlayback.markFailed()
-        fastPlaybackPreparation = nil
-        if playbackRate > 2 {
-            playbackRate = 2
-        }
-        applyEffectivePlaybackRate()
-        showQueueNotice(message: message, haptic: false)
-    }
-
-    private func prepareFastPlayback(
-        for video: Video, quality: VideoQuality, originalItem: AVPlayerItem,
-        session: Int, generation: Int
-    ) async {
-        var preparedLocalFile: URL?
-        var installedReplacement: AVPlayerItem?
-        var replacementAccepted = false
-        var switchPosition: TimeInterval?
-        defer {
-            // A cancellation during the final item handoff must not strand the visible player
-            // on a half-loaded temporary source. Restore the still-valid original item first.
-            if let installedReplacement, !replacementAccepted,
-               player.currentItem === installedReplacement,
-               currentVideo?.id == video.id, playbackSessionID == session {
-                let resume = fastPlayback.resumeAfterSwitch == true
-                player.pause()
-                fastPlayback.isInstalling = false
-                loadItem(originalItem)
-                let position = switchPosition ?? elapsed
-                player.seek(to: CMTime(seconds: max(0, position), preferredTimescale: 600))
-                pendingSeekTarget = nil
-                loadState = .readyToPlay
-                if resume { play() }
-            }
-            if let preparedLocalFile, fastPlayback.localFileURL != preparedLocalFile {
-                FastPlaybackLocalFileService.remove(preparedLocalFile)
-            }
-            if fastPlayback.generation == generation {
-                fastPlayback.task = nil
-                fastPlayback.timeoutTask?.cancel()
-                fastPlayback.timeoutTask = nil
-                isPreparingFastPlayback = false
-                fastPlaybackPreparation = nil
-                fastPlayback.isInstalling = false
-                fastPlayback.resumeAfterSwitch = nil
-            }
-        }
-        let replacement: AVPlayerItem
-        do {
-            let prepared = try await fastPlaybackCandidatePreparer.prepare(
-                video: video,
-                quality: quality,
-                referenceDuration: originalItem.duration.seconds,
-                resolver: resolver,
-                itemFactory: itemFactory,
-                onCompositePreparation: { [weak self] in
-                    self?.scheduleFastPlaybackTimeout(after: .seconds(1_200), generation: generation)
-                },
-                onProgress: { [weak self] update in
-                    guard let self, self.fastPlayback.generation == generation,
-                          self.playbackSessionID == session else { return }
-                    self.fastPlaybackPreparation = update
-                }
-            )
-            preparedLocalFile = prepared.temporaryFile
-            replacement = prepared.item
-        } catch {
-            guard !Task.isCancelled, fastPlayback.generation == generation,
-                  playbackSessionID == session else { return }
-            // Keep signed stream URLs out of diagnostics. Error type + code distinguish
-            // transfer, export and probe failures without logging NSError userInfo.
-            log.notice("Fast playback candidate rejected before swap: \(PlayerItemReadinessGate.describe(itemError: error), privacy: .public) type=\(String(reflecting: type(of: error)), privacy: .public)")
-            failFastPlayback(message: "Higher speeds are unavailable for this video")
-            return
-        }
-        guard !Task.isCancelled, fastPlayback.generation == generation,
-              playbackSessionID == session, currentVideo?.id == video.id,
-              playbackQuality == quality, requestedTransportRate > 2,
-              !hasEnded, player.currentItem === originalItem, loadState == .readyToPlay else { return }
-
-        // Capture the position at the handoff, not when extraction started. Any playback and
-        // seeks performed while the progressive URL was resolving must carry into the new item.
-        let time = player.currentTime().seconds
-        let position = time.isFinite && time >= 0 ? time : elapsed
-        switchPosition = position
-        let originalSeekableEnd = originalItem.seekableTimeRanges
-            .map { CMTimeRangeGetEnd($0.timeRangeValue).seconds }
-            .filter { $0.isFinite && $0 >= 0 }
-            .max()
-        let previousSize = videoPresentationSize
-        fastPlayback.resumeAfterSwitch = isPlaying
-        fastPlayback.isInstalling = true
-        fastPlayback.timeoutTask?.cancel()
-        player.pause()
-        pendingSeekTarget = position
-        seekRequestID += 1
-        loadState = .buffering
-        itemLoadStartedAt = Date()
-        loadItem(replacement)
-        installedReplacement = replacement
-        let readiness = await readinessGate.wait(for: replacement, timeout: .seconds(12))
-        guard !Task.isCancelled, fastPlayback.generation == generation,
-              playbackSessionID == session, player.currentItem === replacement else { return }
-
-        if case .ready = readiness, replacement.canPlayFastForward {
-            let originalDuration = originalItem.duration.seconds
-            let replacementDuration = replacement.duration.seconds
-            if originalDuration.isFinite, replacementDuration.isFinite,
-               abs(originalDuration - replacementDuration) > 2 {
-                // A shorter HLS timeline may be a truncated stream, a partial seekable window,
-                // or a different timebase. Do not scale the handoff seek without independent
-                // evidence: doing so could jump to the wrong scene. Keep enough URL-free facts
-                // here to distinguish those cases from the next device log.
-                log.notice("Fast playback timeline discrepancy: hls=\(originalDuration, privacy: .public)s seekableEnd=\(originalSeekableEnd ?? -1, privacy: .public)s metadata=\(video.duration ?? -1, privacy: .public)s prepared=\(replacementDuration, privacy: .public)s handoff=\(position, privacy: .public)s")
-            }
-            await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: replacement)
-            guard !Task.isCancelled, fastPlayback.generation == generation, playbackSessionID == session,
-                  player.currentItem === replacement else { return }
-            pendingSeekTarget = nil
-            loadState = .readyToPlay
-            applyEffectivePlaybackRate()
-            if fastPlayback.resumeAfterSwitch == true { play() } else { isPlaying = false }
-            fastPlayback.localFileURL = preparedLocalFile
-            replacementAccepted = true
-            log.info("Fast progressive playback accepted: source=\(preparedLocalFile == nil ? "direct" : "temporary-local", privacy: .public) requested=\(self.requestedTransportRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x actual=\(self.player.rate, privacy: .public)x canPlayFastForward=\(replacement.canPlayFastForward, privacy: .public) pitch=\(replacement.audioTimePitchAlgorithm, privacy: .public)")
-        } else {
-            log.notice("Fast playback swap rejected; restoring original stream")
-            loadItem(originalItem)
-            videoPresentationSize = previousSize
-            await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: originalItem)
-            guard !Task.isCancelled, fastPlayback.generation == generation, playbackSessionID == session,
-                  player.currentItem === originalItem else { return }
-            pendingSeekTarget = nil
-            loadState = .readyToPlay
-            failFastPlayback(message: "Higher speeds are unavailable for this video")
-            if fastPlayback.resumeAfterSwitch == true { play() } else { isPlaying = false }
-        }
-        updateNowPlaying()
+        manualQueueController.undoNotice()
     }
 
     func toggleMute() {
@@ -1192,503 +792,6 @@ final class PlayerStateManager {
         }
     }
 
-    /// Updates the HLS adaptive-quality ceiling in place and persists it for future resolutions.
-    /// Fixed progressive/local assets cannot switch representation after loading, but retain the
-    /// new preference for the next video without disrupting current playback.
-    func setPlaybackQuality(_ quality: VideoQuality) {
-        guard quality != playbackQuality, !fastPlayback.isInstalling else { return }
-        cancelFastPlaybackPreparation()
-        fastPlayback.failed = false
-        log.info("setPlaybackQuality(\(quality.rawValue, privacy: .public))")
-        playbackQuality = quality
-        if quality != .audioOnly { videoQualityBeforeAudio = quality }
-        preferences.preferredQuality = quality
-        if let item = player.currentItem {
-            applyQualityCap(to: item)
-        }
-        reconcilePlaybackRate()
-    }
-
-    /// Re-resolve only the media source. The queue, active playlist, recommendations, chapters,
-    /// and current presentation all stay in place. Resolution runs while the old item keeps
-    /// playing; we replace it only once a candidate URL is available.
-    func toggleAudioOnly() {
-        guard !isSwitchingAudioMode, !isPreparingFastPlayback,
-              loadState == .readyToPlay,
-              let video = currentVideo,
-              !video.id.hasPrefix("fetch-"),
-              !video.isLive,
-              !hasEnded,
-              player.currentItem != nil else { return }
-
-        let target: VideoQuality = isAudioOnly ? videoQualityBeforeAudio : .audioOnly
-        isSwitchingAudioMode = true
-        audioModeSwitchGeneration &+= 1
-        let generation = audioModeSwitchGeneration
-        audioModeSwitchTask = Task { [weak self] in
-            await self?.switchPlaybackSource(for: video, to: target, generation: generation)
-        }
-    }
-
-    private func switchPlaybackSource(for video: Video, to quality: VideoQuality, generation: Int) async {
-        defer {
-            if audioModeSwitchGeneration == generation {
-                isSwitchingAudioMode = false
-                resumeAfterAudioSwitch = nil
-                audioModeSwitchTask = nil
-                if !Task.isCancelled, currentVideo?.id == video.id, loadState == .readyToPlay {
-                    reconcilePlaybackRate()
-                }
-            }
-        }
-        let candidate: PlaybackCandidate
-        do {
-            candidate = try await resolver.resolve(video: video, quality: quality, excluding: [])
-        } catch {
-            if !Task.isCancelled {
-                log.notice("Audio mode switch resolution failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
-            }
-            return
-        }
-        guard !Task.isCancelled,
-              currentVideo?.id == video.id,
-              let previousItem = player.currentItem else { return }
-
-        let previousSize = videoPresentationSize
-        let wasPlaying = isPlaying
-        let currentTime = player.currentTime().seconds
-        let position = currentTime.isFinite && currentTime >= 0 ? currentTime : elapsed
-        let replacement: AVPlayerItem
-        do {
-            replacement = try await itemFactory.makeItem(for: candidate)
-        } catch {
-            log.notice("Audio mode switch candidate could not be prepared: \(PlayerItemReadinessGate.describe(itemError: error), privacy: .public)")
-            return
-        }
-        guard !Task.isCancelled, audioModeSwitchGeneration == generation,
-              currentVideo?.id == video.id, player.currentItem === previousItem else { return }
-        applyQualityCap(to: replacement, quality: quality)
-        pause()
-        resumeAfterAudioSwitch = wasPlaying
-        pendingSeekTarget = position
-        seekRequestID += 1
-        loadState = .buffering
-        itemLoadStartedAt = Date()
-        loadItem(replacement, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
-        let readiness = await readinessGate.wait(
-            for: replacement,
-            timeout: readinessTimeout(for: candidate.strategy)
-        )
-        guard !Task.isCancelled,
-              currentVideo?.id == video.id,
-              player.currentItem === replacement else { return }
-
-        switch readiness {
-        case .ready:
-            let previousQuality = playbackQuality
-            playbackQuality = quality
-            if quality == .audioOnly { videoQualityBeforeAudio = previousQuality }
-            preferences.preferredQuality = quality
-            if quality == .audioOnly { videoPresentationSize = .zero }
-            await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: replacement)
-            guard !Task.isCancelled, currentVideo?.id == video.id,
-                  player.currentItem === replacement else { return }
-            guard replacement.status == .readyToPlay else {
-                await restoreSourceAfterFailedSwitch(
-                    previousItem, videoID: video.id, position: position, size: previousSize
-                )
-                return
-            }
-            pendingSeekTarget = nil
-            acceptedStreamItem = replacement
-            acceptedStreamStrategy = candidate.strategy
-            loadState = .readyToPlay
-            if resumeAfterAudioSwitch == true { play() }
-            updateNowPlaying()
-            fastPlayback.failed = false
-            log.info("Audio mode switch succeeded for \(video.id, privacy: .public) audioOnly=\(quality == .audioOnly, privacy: .public)")
-        case .failed(let reason):
-            log.notice("Audio mode switch rejected for \(video.id, privacy: .public): \(reason, privacy: .public)")
-            await restoreSourceAfterFailedSwitch(
-                previousItem, videoID: video.id, position: position, size: previousSize
-            )
-        case .timedOut:
-            log.notice("Audio mode switch timed out for \(video.id, privacy: .public) itemStatus=\(replacement.status.rawValue, privacy: .public) playerTimeControl=\(self.player.timeControlStatus.rawValue, privacy: .public)")
-            await restoreSourceAfterFailedSwitch(
-                previousItem, videoID: video.id, position: position, size: previousSize
-            )
-        }
-    }
-
-    private func restoreSourceAfterFailedSwitch(
-        _ item: AVPlayerItem,
-        videoID: String,
-        position: TimeInterval,
-        size: CGSize
-    ) async {
-        loadItem(item)
-        videoPresentationSize = size
-        await seekForSourceSwitch(to: pendingSeekTarget ?? position, item: item)
-        guard !Task.isCancelled, currentVideo?.id == videoID,
-              player.currentItem === item else { return }
-        pendingSeekTarget = nil
-        loadState = .readyToPlay
-        if resumeAfterAudioSwitch == true { play() }
-        updateNowPlaying()
-    }
-
-    private func seekForSourceSwitch(to seconds: TimeInterval, item: AVPlayerItem) async {
-        let itemDuration = item.duration.seconds
-        let position = itemDuration.isFinite && itemDuration > 0
-            ? min(seconds, max(0, itemDuration - 0.25)) : seconds
-        let time = CMTime(seconds: max(0, position), preferredTimescale: 600)
-        await withCheckedContinuation { continuation in
-            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
-                continuation.resume()
-            }
-        }
-        guard player.currentItem === item else { return }
-        elapsed = position
-    }
-
-    func seek(
-        to seconds: TimeInterval,
-        rearmSponsorBlock: Bool = true,
-        resumeAfterEnded: Bool = true,
-        evaluateSponsorBlockAfterSeek: Bool = true
-    ) {
-        log.info("seek(to: \(seconds, privacy: .public)s)")
-        guard seconds.isFinite else { return }
-        let boundedSeconds: TimeInterval
-        if currentVideo?.isLive == true {
-            guard let range = liveSeekableRange else { return }
-            boundedSeconds = min(max(seconds, range.lowerBound), range.upperBound)
-        } else {
-            boundedSeconds = max(0, duration > 0 ? min(seconds, duration) : seconds)
-        }
-        let shouldResume = resumeAfterEnded && hasEnded && boundedSeconds < max(0, duration - 0.25)
-        if shouldResume {
-            hasEnded = false
-        }
-        // Any segment whose end is still ahead of the new position becomes eligible again. This
-        // makes rewinding before a previously skipped segment behave like a fresh encounter.
-        if rearmSponsorBlock {
-            sponsorBlockCoordinator.rearm(afterSeekingTo: boundedSeconds, segments: sponsorBlockSegments)
-        }
-        // Update optimistically so rapid continuation taps accumulate from the last requested
-        // target instead of the periodic observer's up-to-0.5-second-old playback position.
-        elapsed = boundedSeconds
-        pendingSeekTarget = boundedSeconds
-        seekRequestID += 1
-        let requestID = seekRequestID
-        let time = CMTime(seconds: boundedSeconds, preferredTimescale: 600)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
-            guard finished else { return }
-            Task { @MainActor in
-                // Let any periodic callback queued just before seek completion drain while the
-                // optimistic target is still pinned. Otherwise that stale tick briefly paints the
-                // scrubber at its pre-seek position before the next AVPlayer tick corrects it.
-                try? await Task.sleep(for: .milliseconds(120))
-                guard let self, self.seekRequestID == requestID else { return }
-                self.pendingSeekTarget = nil
-                let settledTime = self.player.currentTime().seconds
-                if settledTime.isFinite {
-                    self.elapsed = settledTime
-                    if evaluateSponsorBlockAfterSeek {
-                        self.handleSponsorBlockSegment(at: settledTime)
-                    } else {
-                        self.log.info("Fine seek settled target=\(boundedSeconds, privacy: .public)s actual=\(settledTime, privacy: .public)s")
-                    }
-                    if self.currentVideo?.isLive == true {
-                        self.log.info("Live DVR seek settled target=\(boundedSeconds, privacy: .public)s actual=\(settledTime, privacy: .public)s")
-                    }
-                }
-                if shouldResume {
-                    self.play()
-                }
-            }
-        }
-    }
-
-    func seekRelative(by delta: TimeInterval) {
-        log.info("seekRelative(by: \(delta, privacy: .public)s)")
-        if currentVideo?.isLive == true {
-            guard let range = liveSeekableRange else { return }
-            seek(to: min(max(elapsed, range.lowerBound), range.upperBound) + delta)
-        } else {
-            seek(to: max(0, min(elapsed + delta, duration)))
-        }
-    }
-
-    /// Use AVFoundation's decoded-frame step when supported. HLS commonly lacks that capability;
-    /// for those items, seek by the observed frame interval (or approximately 1/30 second).
-    func stepFrame(by count: Int) {
-        log.info("Fine step requested direction=\(count, privacy: .public)")
-        guard count == -1 || count == 1,
-              !isPlaying,
-              player.timeControlStatus == .paused,
-              (count < 0 ? canStepFrameBackward : canStepFrameForward),
-              let item = player.currentItem else { return }
-        if hasEnded && count < 0 { hasEnded = false }
-        if pendingSeekTarget == nil,
-           (count < 0 ? item.canStepBackward : item.canStepForward) {
-            log.info("Native frame step direction=\(count, privacy: .public)")
-            item.step(byCount: count)
-            let steppedTime = item.currentTime().seconds
-            if steppedTime.isFinite {
-                elapsed = steppedTime
-                updateNowPlaying()
-            }
-        } else {
-            let frameRate: Double
-            if let observedFrameRate, observedFrameRate.item === item {
-                frameRate = observedFrameRate.fps
-            } else {
-                frameRate = 30
-            }
-            let playerTime = item.currentTime().seconds
-            let position = pendingSeekTarget
-                ?? (playerTime.isFinite ? playerTime : elapsed)
-            let target = position + Double(count) / frameRate
-            log.info("Timed fine step direction=\(count, privacy: .public) fps=\(frameRate, privacy: .public) target=\(target, privacy: .public)s")
-            seek(
-                to: target,
-                rearmSponsorBlock: false,
-                resumeAfterEnded: false,
-                evaluateSponsorBlockAfterSeek: false
-            )
-        }
-    }
-
-    /// Ask AVPlayer to return to its live edge. A rolling HLS window can move between drawing
-    /// the timeline and tapping LIVE, so a finite seek to a cached end time is less reliable.
-    func seekToLive() {
-        guard currentVideo?.isLive == true, let range = liveSeekableRange else { return }
-        log.info("seekToLive()")
-        seekRequestID += 1
-        let requestID = seekRequestID
-        pendingSeekTarget = range.upperBound
-        elapsed = range.upperBound
-        player.seek(to: .positiveInfinity) { [weak self] finished in
-            Task { @MainActor in
-                guard let self, self.seekRequestID == requestID else { return }
-                self.pendingSeekTarget = nil
-                if finished {
-                    let settledTime = self.player.currentTime().seconds
-                    if settledTime.isFinite { self.elapsed = settledTime }
-                    self.log.info("Live DVR returned to live edge at \(settledTime, privacy: .public)s")
-                } else {
-                    self.log.notice("Live DVR return-to-live seek did not complete")
-                }
-            }
-        }
-    }
-
-    func playNext() {
-        log.info("playNext() — queue size=\(self.queue.items.count, privacy: .public) currentIndex=\(self.queue.currentIndex, privacy: .public)")
-        if let item = playbackHistory.moveForward(where: { !VideoBlocklist.shared.blocks($0) }) {
-            load(
-                item.video,
-                skipRecommendations: item.skipRecommendations,
-                expandPlayer: false,
-                recordInPlaybackHistory: false,
-                preservePlaylistPosition: item.preservesPlaylistPosition
-            )
-            return
-        }
-        if let next = manualQueue.first(where: { !VideoBlocklist.shared.blocks($0) }) {
-            playManualQueueItem(next, expandPlayer: false)
-            return
-        }
-        if let next = nextUnblockedQueueVideo() {
-            load(next, skipRecommendations: !queueAcceptsRecommendations, expandPlayer: false)
-            return
-        }
-        // Queue at end. If this queue accepts recommendations and the user hasn't asked for
-        // repeat-all/repeat-one, refill from the last item's recommendations and try advancing
-        // again — that's the "endless queue" behavior: every time we hit the bottom, more recs
-        // refill behind us.
-        guard queueAcceptsRecommendations,
-              queue.repeatMode == .off,
-              let seed = currentVideo ?? queue.items.last else {
-            log.notice("playNext: queue at end, no recs refill (acceptsRecs=\(self.queueAcceptsRecommendations, privacy: .public), repeat=\(String(describing: self.queue.repeatMode), privacy: .public))")
-            return
-        }
-        log.info("playNext: queue at end, refilling recs from seed=\(seed.id, privacy: .public)")
-        Task { [weak self] in
-            guard let self else { return }
-            let countBefore = self.queue.items.count
-            await self.fillQueueWithRecommendations(for: seed)
-            guard self.queue.items.count > countBefore else {
-                self.log.notice("playNext: refill produced no new items, giving up")
-                return
-            }
-            if let next = self.nextUnblockedQueueVideo() {
-                self.load(next, skipRecommendations: !self.queueAcceptsRecommendations, expandPlayer: false)
-            }
-        }
-    }
-
-    /// Previously queued videos can become blocked while Settings is open. Skip them without
-    /// changing the currently playing item or looping forever under repeat-all/one.
-    private func nextUnblockedQueueVideo() -> Video? {
-        for _ in 0..<queue.items.count {
-            guard let next = queue.advance() else { return nil }
-            if !VideoBlocklist.shared.blocks(next) { return next }
-        }
-        return nil
-    }
-
-    func playPrevious() {
-        log.info("playPrevious() — history size=\(self.playbackHistory.count, privacy: .public) index=\(self.playbackHistory.currentIndex, privacy: .public)")
-        guard playbackHistory.canMoveBackward else {
-            log.notice("playPrevious: at start of playback history")
-            return
-        }
-        guard let item = playbackHistory.moveBackward(where: { !VideoBlocklist.shared.blocks($0) })
-        else { return }
-        load(
-            item.video,
-            skipRecommendations: item.skipRecommendations,
-            expandPlayer: false,
-            recordInPlaybackHistory: false,
-            preservePlaylistPosition: item.preservesPlaylistPosition
-        )
-    }
-
-    /// Starts playback with an explicit playlist context. Unlike a generic recommendation queue,
-    /// this retains the playlist title and continuation so the player can identify and extend it.
-    func loadPlaylist(
-        _ details: PlaylistDetails,
-        startAt video: Video,
-        shuffled: Bool = false,
-        origin: PlaylistPlaybackOrigin = .youtube
-    ) {
-        let allowed = details.videos.filter { !VideoBlocklist.shared.blocks($0) }
-        let videos = shuffled ? allowed.shuffled() : allowed
-        guard videos.contains(where: { $0.id == video.id }) else { return }
-        queue.isShuffleOn = false
-        queue.replace(with: videos)
-        if shuffled { queue.isShuffleOn = true }
-        load(video, skipRecommendations: true)
-        activePlaylist = details.playlist
-        activePlaylistOrigin = origin
-        playlistRecommendations = []
-        playlistContinuationToken = details.continuationToken
-    }
-
-    /// Restores History's playlist around a video that is already resolving or playing. The
-    /// AVPlayerItem is untouched; only the upcoming queue and playlist panel gain context.
-    func attachPlaylistFromHistory(
-        _ details: PlaylistDetails,
-        origin: PlaylistPlaybackOrigin,
-        videoID: String,
-        playbackSessionID expectedSessionID: Int
-    ) {
-        guard playbackSessionID == expectedSessionID,
-              currentVideo?.id == videoID,
-              activePlaylist == nil,
-              let index = details.videos.filter({ !VideoBlocklist.shared.blocks($0) })
-                .firstIndex(where: { $0.id == videoID }) else { return }
-        let visibleVideos = details.videos.filter { !VideoBlocklist.shared.blocks($0) }
-        recommendationTask?.cancel()
-        recommendationTask = nil
-        recommendationPager.reset()
-        playlistRecommendations = []
-        queue.isShuffleOn = false
-        queue.replace(with: visibleVideos, startAt: index)
-        if let currentVideo { queue.updateVideo(currentVideo) }
-        queueAcceptsRecommendations = false
-        activePlaylist = details.playlist
-        activePlaylistOrigin = origin
-        playlistContinuationToken = details.continuationToken
-        playbackHistory.replaceCurrent(.init(
-            video: currentVideo ?? visibleVideos[index],
-            skipRecommendations: true,
-            preservesPlaylistPosition: false
-        ))
-        if preferences.recordsWatchHistory {
-            Task {
-                await PersistenceWriter.shared.updateWatchHistoryPlaylistContext(
-                    videoID: videoID,
-                    playlistID: details.playlist.id,
-                    playlistTitle: details.playlist.title,
-                    playlistOrigin: origin
-                )
-            }
-        }
-    }
-
-    /// Detaches playlist navigation without touching the installed AVPlayerItem or playhead.
-    /// The current video becomes a standalone recommendation seed; previously fetched suggestions
-    /// remain available while the normal refill path tops them up in the background.
-    func leavePlaylist() {
-        guard let currentVideo, let playlist = activePlaylist else { return }
-        let departedPlaylistID = playlist.id
-        log.info("Leaving playlist while continuing (currentVideo.id, privacy: .public)")
-        recommendationTask?.cancel()
-        recommendationTask = nil
-
-        let suggestions = playlistRecommendations.filter {
-            $0.id != currentVideo.id && !VideoBlocklist.shared.blocks($0)
-        }
-        activePlaylist = nil
-        activePlaylistOrigin = nil
-        playlistRecommendations = []
-        playlistContinuationToken = nil
-        isLoadingMorePlaylistVideos = false
-        queueAcceptsRecommendations = true
-        recommendationPager.reset()
-        queue.replace(with: [currentVideo] + suggestions)
-        queue.isShuffleOn = false
-
-        playbackHistory.replaceCurrent(.init(
-            video: currentVideo,
-            skipRecommendations: false,
-            preservesPlaylistPosition: false
-        ))
-        if preferences.recordsWatchHistory {
-            Task {
-                await PersistenceWriter.shared.updateWatchHistoryPlaylistContext(
-                    videoID: currentVideo.id,
-                    playlistID: nil,
-                    playlistTitle: nil,
-                    playlistOrigin: nil,
-                    onlyIfCurrentPlaylistID: departedPlaylistID
-                )
-            }
-        }
-        recommendationTask = Task { [weak self] in
-            await self?.fillQueueWithRecommendations(for: currentVideo)
-        }
-    }
-
-    var canLoadMorePlaylistItems: Bool {
-        activePlaylist != nil && playlistContinuationToken != nil
-    }
-
-    func loadMorePlaylistItems() async {
-        guard let token = playlistContinuationToken, !isLoadingMorePlaylistVideos else { return }
-        let playlistID = activePlaylist?.id
-        isLoadingMorePlaylistVideos = true
-        defer { isLoadingMorePlaylistVideos = false }
-        do {
-            let page = try await playlistService.fetchMore(continuation: token)
-            guard activePlaylist?.id == playlistID else { return }
-            let existing = Set(queue.items.map(\.id))
-            queue.append(contentsOf: page.videos.filter {
-                !existing.contains($0.id) && !VideoBlocklist.shared.blocks($0)
-            })
-            playlistContinuationToken = page.continuationToken
-        } catch {
-            log.notice("Playlist continuation failed: \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    var isLoadingMoreQueueItems: Bool {
-        isLoadingMorePlaylistVideos || isLoadingMoreRecommendations
-    }
-
     func dismiss() {
         log.info("dismiss()")
         interruptedPlaybackSessionID = nil
@@ -1710,22 +813,17 @@ final class PlayerStateManager {
         playerPresentationTask = nil
         pendingLaunchSource = nil
         launchSourceFrame = nil
-        recommendationTask?.cancel()
-        recommendationTask = nil
+        recommendations.cancel()
         contentPrefetchTask?.cancel()
         contentPrefetchTask = nil
         clearSponsorBlockState()
         clearChapterState()
         storyboard = nil
         captionTracks = []
-        recommendationPager.reset()
-        isLoadingMoreRecommendations = false
-        activePlaylist = nil
-        activePlaylistOrigin = nil
+        recommendations.resetPager()
+        playlistContext.clear()
         playbackSessionID &+= 1
-        playlistRecommendations = []
-        playlistContinuationToken = nil
-        isLoadingMorePlaylistVideos = false
+        recommendations.clearPlaylistItems()
         pause()
         miniPlayerVisible = false
         fullScreenPresented = false
@@ -1751,620 +849,7 @@ final class PlayerStateManager {
         NowPlayingCenter.clear()
     }
 
-    func undoSponsorBlockSkip() {
-        guard let notice = sponsorBlockNotice else { return }
-        sponsorBlockCoordinator.cancelNoticeDismissal()
-        sponsorBlockNotice = nil
-        // Undo is the one rewind that should not immediately trigger the same skip again.
-        seek(to: notice.originalStartTime, rearmSponsorBlock: false)
-    }
-
-    func confirmSponsorBlockSkip() {
-        guard let notice = sponsorBlockNotice,
-              case .prompt(let endTime) = notice.kind else { return }
-        sponsorBlockCoordinator.cancelNoticeDismissal()
-        sponsorBlockNotice = nil
-        seek(to: endTime)
-    }
-
-    func dismissSponsorBlockNotice() {
-        sponsorBlockCoordinator.cancelNoticeDismissal()
-        sponsorBlockNotice = nil
-    }
-
-    // MARK: - Internals
-
-    private func loadSponsorBlockSegments(for videoID: String) {
-        guard preferences.sponsorBlockEnabled else { return }
-        let categories = preferences.sponsorBlockCategories
-        guard !categories.isEmpty else { return }
-        sponsorBlockCoordinator.loadSegments(
-            for: videoID,
-            categories: categories,
-            isCurrent: { [weak self] in self?.currentVideo?.id == videoID },
-            onLoaded: { [weak self] segments in
-                self?.installSponsorBlockObservers(for: segments)
-            }
-        )
-    }
-
-    private func installSponsorBlockObservers(for segments: [SponsorBlockSegment]) {
-        sponsorBlockSegments = segments
-        let installation = sponsorBlockCoordinator.installSegments(
-            segments,
-            on: player,
-            elapsed: elapsed,
-            preferences: preferences,
-            onEntry: { [weak self] in self?.handleSponsorBlockSegment($0) }
-        )
-        communityChapters = installation.communityChapters
-        updateDisplayedChapters()
-
-        // A highlight is a point to jump *to*, not a duration to skip once playback reaches it.
-        // Offer it as soon as the lookup finishes while leaving Show only as a marker-only mode.
-        if let highlight = installation.highlight {
-            sponsorBlockNotice = SponsorBlockNotice(
-                category: .highlight,
-                originalStartTime: elapsed,
-                kind: .prompt(endTime: highlight.startTime)
-            )
-            scheduleSponsorBlockNoticeDismissal()
-        }
-
-        // The lookup may finish after playback has already entered a segment. Boundary observers
-        // cannot fire retroactively, so evaluate the current position once immediately.
-        if let current = installation.current {
-            handleSponsorBlockSegment(current, enteredAt: elapsed)
-        }
-    }
-
-    private func shouldObserveSponsorBlockSegment(_ segment: SponsorBlockSegment) -> Bool {
-        sponsorBlockCoordinator.shouldObserve(
-            segment,
-            behavior: preferences.sponsorBlockBehavior(for: segment.category),
-            minimumSkipSeconds: preferences.sponsorBlockMinimumSkipSeconds
-        )
-    }
-
-    private func handleSponsorBlockSegment(at time: TimeInterval) {
-        guard let segment = sponsorBlockSegments.first(where: {
-            shouldObserveSponsorBlockSegment($0)
-                && time >= $0.startTime - 0.5
-                && time < $0.endTime - 0.1
-        }) else { return }
-        handleSponsorBlockSegment(segment, enteredAt: time)
-    }
-
-    private func handleSponsorBlockSegment(
-        _ segment: SponsorBlockSegment,
-        enteredAt explicitEntryTime: TimeInterval? = nil
-    ) {
-        let currentTime = explicitEntryTime ?? player.currentTime().seconds
-        // Preserve where the viewer actually entered the segment. A boundary observer can fire a
-        // fraction late during ordinary playback, so positions near the beginning normalize to
-        // the true segment start. A manual scrub into the middle retains its settled seek target.
-        guard let undoPosition = sponsorBlockCoordinator.claimSkip(
-            for: segment,
-            enteredAt: currentTime,
-            isEnabled: preferences.sponsorBlockEnabled,
-            hasVideo: currentVideo != nil,
-            behavior: preferences.sponsorBlockBehavior(for: segment.category),
-            minimumSkipSeconds: preferences.sponsorBlockMinimumSkipSeconds
-        ) else { return }
-        sponsorBlockCoordinator.cancelNoticeDismissal()
-
-        log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
-        seek(to: segment.endTime)
-        sponsorBlockNotice = SponsorBlockNotice(
-            category: segment.category,
-            originalStartTime: undoPosition,
-            kind: .skipped
-        )
-        scheduleSponsorBlockNoticeDismissal()
-    }
-
-    private func scheduleSponsorBlockNoticeDismissal() {
-        let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
-        sponsorBlockCoordinator.scheduleNoticeDismissal(after: seconds) { [weak self] in
-            self?.sponsorBlockNotice = nil
-        }
-    }
-
-    /// Clears cached segment responses without changing the currently playing video's markers.
-    func clearSponsorBlockCache() {
-        sponsorBlockCoordinator.clearCache()
-    }
-
-    private func clearSponsorBlockState() {
-        sponsorBlockNotice = nil
-        sponsorBlockSegments = []
-        sponsorBlockCoordinator.clear(on: player)
-    }
-
-    private func clearChapterState() {
-        youtubeChapters = []
-        communityChapters = []
-        chapters = []
-    }
-
-    private func updateDisplayedChapters() {
-        // Community chapters are a separate optional source. If none were submitted, retain
-        // YouTube chapters; neither source is mixed with the other or used for automatic seeks.
-        chapters = communityChapters.isEmpty ? youtubeChapters : communityChapters
-    }
-
-    /// Swap the player to a new item using the `AVQueuePlayer`-correct pattern. `replaceCurrentItem`
-    /// is documented to be a no-op when the player's internal queue is empty (which is our usual
-    /// state since the playable URL is short-lived and we never preload), so we always tear the
-    /// queue down to nothing first and then insert. Also wires KVO so we hear about decode/auth
-    /// failures the moment they happen (CoreMedia's `CFByteFlume err=-12939` style messages don't
-    /// surface a structured `NSError` otherwise).
-    private func loadItem(_ item: AVPlayerItem, originalAudioLanguageCode: String? = nil) {
-        // Do not log the asset URL or path. Direct YouTube assets contain signed credentials in
-        // both components; the candidate strategy is logged immediately before this method.
-        let assetKind = item.asset is AVURLAsset ? "URL" : "composition"
-        log.info("loadItem: removeAllItems + insert (assetKind=\(assetKind, privacy: .public))")
-        player.removeAllItems()
-        if let localFileURL = fastPlayback.localFileURL,
-           (item.asset as? AVURLAsset)?.url != localFileURL {
-            fastPlayback.localFileURL = nil
-            FastPlaybackLocalFileService.remove(localFileURL)
-        }
-        player.insert(item, after: nil)
-        applyEffectivePlaybackRate()
-        PlayerMediaSelection.configure(
-            item: item,
-            on: player,
-            originalAudioLanguageCode: originalAudioLanguageCode,
-            log: log
-        )
-        log.debug("loadItem: queue size after insert=\(self.player.items().count, privacy: .public)")
-        observe(item: item)
-    }
-
-    private func observe(item: AVPlayerItem) {
-        observations.clearItem()
-        bufferedRanges = []
-        liveSeekableRange = nil
-        observedFrameRate = nil
-        itemDiagnostics.reset()
-
-        observations.itemStatus = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
-            guard let self else { return }
-            Task { @MainActor in
-                switch item.status {
-                case .unknown:
-                    self.log.info("AVPlayerItem status: unknown")
-                case .readyToPlay:
-                    let preparationTime = self.itemLoadStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-                    self.log.info("AVPlayerItem status: readyToPlay after \(preparationTime, privacy: .public)s (duration=\(item.duration.seconds, privacy: .public)s)")
-                    self.log.info("AVPlayerItem fast playback: canPlayFastForward=\(item.canPlayFastForward, privacy: .public) defaultRate=\(self.player.defaultRate, privacy: .public) audioPitchAlgorithm=\(item.audioTimePitchAlgorithm, privacy: .public)")
-                    self.log.info("AVPlayerItem frame stepping: backward=\(item.canStepBackward, privacy: .public) forward=\(item.canStepForward, privacy: .public) tracks=\(item.tracks.count, privacy: .public)")
-                    self.itemDiagnostics.logAudio(
-                        for: item,
-                        allowsMixing: self.preferences.allowAudioMixing
-                    )
-                    self.itemLoadStartedAt = nil
-                    self.readinessGate.finish(.ready, for: item)
-                    // Local-file playback has no resolveAndPlay readiness branch. Normal stream
-                    // and audio-mode switches reconcile after their own acceptance/seek instead.
-                    if self.player.currentItem === item, self.loadState == .readyToPlay,
-                       !self.fastPlayback.isInstalling {
-                        self.reconcilePlaybackRate()
-                    }
-                case .failed:
-                    let err = item.error as NSError?
-                    self.log.error("AVPlayerItem status: FAILED domain=\(err?.domain ?? "?", privacy: .public) code=\(err?.code ?? 0, privacy: .public)")
-                    self.readinessGate.finish(.failed(PlayerItemReadinessGate.describe(itemError: item.error)), for: item)
-                    self.recoverAcceptedStreamIfNeeded(item, reason: "item-failed")
-                @unknown default:
-                    break
-                }
-            }
-        }
-
-        observations.itemPresentationSize = item.observe(\.presentationSize, options: [.new, .initial]) { [weak self] item, _ in
-            guard let self else { return }
-            Task { @MainActor in
-                let size = item.presentationSize
-                guard self.player.currentItem === item,
-                      size.width.isFinite, size.height.isFinite,
-                      size.width > 0, size.height > 0 else { return }
-                self.videoPresentationSize = size
-            }
-        }
-
-        observations.itemLoadedTimeRanges = item.observe(\.loadedTimeRanges, options: [.new, .initial]) { [weak self] item, _ in
-            guard let self else { return }
-            Task { @MainActor in
-                guard self.player.currentItem === item else { return }
-                let ranges: [ClosedRange<TimeInterval>] = item.loadedTimeRanges.compactMap { value in
-                    let timeRange = value.timeRangeValue
-                    let start = timeRange.start.seconds
-                    let end = timeRange.end.seconds
-                    guard start.isFinite, end.isFinite, end > max(0, start) else { return nil }
-                    return max(0, start)...end
-                }
-                if self.bufferedRanges != ranges { self.bufferedRanges = ranges }
-            }
-        }
-
-        observations.itemErrorLog = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.newErrorLogEntryNotification,
-            object: item,
-            queue: .main
-        ) { [weak self, weak item] _ in
-            guard let entry = item?.errorLog()?.events.last else { return }
-            // Never include `entry.uri`: YouTube playback URLs are signed, sensitive, and
-            // short-lived. Resolver identity is enough to correlate this with candidate logs.
-            self?.log.error("AVPlayerItem error-log: domain=\(entry.errorDomain, privacy: .public) code=\(entry.errorStatusCode, privacy: .public) comment=\(entry.errorComment ?? "", privacy: .public)")
-        }
-
-        observations.itemFailedToEnd = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.failedToPlayToEndTimeNotification,
-            object: item,
-            queue: .main
-        ) { [weak self, weak item] _ in
-            Task { @MainActor in
-                guard let self, let item else { return }
-                self.recoverAcceptedStreamIfNeeded(item, reason: "failed-to-play-to-end")
-            }
-        }
-
-        observations.itemAccessLog = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.newAccessLogEntryNotification,
-            object: item,
-            queue: .main
-        ) { [weak self, weak item] _ in
-            Task { @MainActor in
-                guard let self, let item, self.player.currentItem === item else { return }
-                self.itemDiagnostics.logAccessIfNeeded(for: item)
-            }
-        }
-    }
-
-    /// Only a terminal failure of the accepted, visible stream starts recovery. A stall alone
-    /// remains AVPlayer's job; pre-acceptance failures stay in the startup candidate loop.
-    private func recoverAcceptedStreamIfNeeded(_ item: AVPlayerItem, reason: String) {
-        guard player.currentItem === item, acceptedStreamItem === item,
-              let strategy = acceptedStreamStrategy, let video = currentVideo,
-              loadState == .readyToPlay, !hasEnded, !isSwitchingAudioMode,
-              !fastPlayback.isInstalling else { return }
-        acceptedStreamItem = nil
-        acceptedStreamStrategy = nil
-        player.pause()
-        isPlaying = false
-        if didAttemptPlaybackRecovery {
-            log.error("Playback recovery exhausted video=\(video.id, privacy: .public) reason=\(reason, privacy: .public)")
-            loadState = .failed("The video stream stopped. Please try again.")
-            updateNowPlaying()
-            return
-        }
-
-        didAttemptPlaybackRecovery = true
-        cancelFastPlaybackPreparation()
-        let recovery = playbackRecovery(for: video, excluding: strategy)
-        log.notice("Playback stream failed after start video=\(video.id, privacy: .public) strategy=\(strategy.rawValue, privacy: .public) reason=\(reason, privacy: .public); trying another source")
-        resolutionTask?.cancel()
-        player.removeAllItems()
-        loadState = .resolving
-        updateNowPlaying()
-        resolutionTask = Task { [weak self] in
-            await self?.resolveAndPlay(video: video, autoplay: false, recovery: recovery)
-        }
-    }
-
-    private func playbackRecovery(
-        for video: Video,
-        excluding failedStrategy: PlaybackStrategy?,
-        resumeFromHistoryIfUnstarted: Bool = false
-    ) -> PlayerPlaybackRecovery {
-        PlayerPlaybackRecovery(
-            sessionID: playbackSessionID,
-            failedStrategy: failedStrategy,
-            currentTime: player.currentTime().seconds,
-            elapsed: elapsed,
-            liveSeekableRange: liveSeekableRange,
-            isLive: video.isLive,
-            resumeFromHistoryIfUnstarted: resumeFromHistoryIfUnstarted
-        )
-    }
-
-    private func restoreRecoveredPosition(_ recovery: PlayerPlaybackRecovery, in item: AVPlayerItem) async {
-        if !recovery.isLive {
-            await seekForSourceSwitch(to: recovery.position, item: item)
-            return
-        }
-        let ranges = item.seekableTimeRanges.compactMap { value -> ClosedRange<TimeInterval>? in
-            let timeRange = value.timeRangeValue
-            let start = timeRange.start.seconds
-            let end = timeRange.end.seconds
-            guard start.isFinite, end.isFinite, end > start else { return nil }
-            return start...end
-        }
-        let target = recovery.liveSeekTarget(in: ranges).map {
-            CMTime(seconds: $0, preferredTimescale: 600)
-        } ?? .positiveInfinity
-        await withCheckedContinuation { continuation in
-            player.seek(to: target) { _ in continuation.resume() }
-        }
-        guard player.currentItem === item else { return }
-        let settled = player.currentTime().seconds
-        if settled.isFinite { elapsed = settled }
-    }
-
-    private func resolveAndPlay(
-        video: Video,
-        autoplay: Bool,
-        skipRecommendations: Bool = false,
-        localFileURL: URL? = nil,
-        recovery: PlayerPlaybackRecovery? = nil
-    ) async {
-        let sessionID = recovery?.sessionID ?? playbackSessionID
-        log.info("resolveAndPlay: start for \(video.id, privacy: .public) recovery=\(recovery != nil, privacy: .public)")
-        let resolutionStartedAt = Date()
-        // The model-actor read runs alongside network resolution and is consumed only after the
-        // winning AVPlayerItem is ready, so resume support adds no work to the critical path.
-        let shouldLoadSavedProgress = recovery == nil || recovery?.resumeFromHistoryIfUnstarted == true
-        let resumeLookup: Task<(position: TimeInterval, duration: TimeInterval)?, Never>? =
-            shouldLoadSavedProgress ? Task {
-                guard preferences.recordsWatchProgress else { return nil }
-                return await PersistenceWriter.shared.watchProgress(videoID: video.id)
-            } : nil
-        loadState = .resolving
-        var excludedStrategies = Set<PlaybackStrategy>()
-        if let failedStrategy = recovery?.failedStrategy { excludedStrategies.insert(failedStrategy) }
-
-        while !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id {
-            let candidate: PlaybackCandidate
-            let candidateQuality = playbackQuality
-            do {
-                if let localFileURL {
-                    guard !excludedStrategies.contains(.localFile) else {
-                        loadState = .failed("The saved video couldn’t be played from this device.")
-                        return
-                    }
-                    candidate = PlaybackCandidate(source: .localFile(localFileURL), strategy: .localFile)
-                } else {
-                    candidate = try await resolver.resolve(
-                        video: video,
-                        quality: candidateQuality,
-                        excluding: excludedStrategies
-                    )
-                }
-            } catch is CancellationError {
-                log.debug("resolveAndPlay: cancelled for \(video.id, privacy: .public)")
-                return
-            } catch {
-                guard playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
-                log.error("resolveAndPlay: all resolvers failed for \(video.id, privacy: .public): \(String(describing: error), privacy: .public)")
-                loadState = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
-                return
-            }
-
-            guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else {
-                log.debug("resolveAndPlay: discarded stale result for \(video.id, privacy: .public)")
-                return
-            }
-
-            log.info("resolveAndPlay: testing candidate=\(candidate.strategy.rawValue, privacy: .public) after \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-            let item: AVPlayerItem
-            if candidate.strategy == .nativePaired {
-                let preparationStartedAt = Date()
-                log.info("resolveAndPlay: preparing paired candidate for \(video.id, privacy: .public) (limit=30s)")
-                let outcome = await preparationGate.prepare(
-                    candidate: candidate,
-                    factory: itemFactory,
-                    videoID: video.id,
-                    timeout: .seconds(30)
-                )
-                guard !Task.isCancelled, playbackSessionID == sessionID,
-                      currentVideo?.id == video.id else { return }
-                switch outcome {
-                case .ready(let preparedItem):
-                    item = preparedItem
-                    log.info("resolveAndPlay: paired candidate prepared for \(video.id, privacy: .public) in \(Date().timeIntervalSince(preparationStartedAt), privacy: .public)s")
-                case .failed(let detail):
-                    log.notice("resolveAndPlay: paired candidate preparation failed for \(video.id, privacy: .public) after \(Date().timeIntervalSince(preparationStartedAt), privacy: .public)s \(detail, privacy: .public)")
-                    excludedStrategies.insert(candidate.strategy)
-                    continue
-                case .timedOut:
-                    log.notice("resolveAndPlay: paired candidate preparation timed out for \(video.id, privacy: .public) after \(Date().timeIntervalSince(preparationStartedAt), privacy: .public)s")
-                    excludedStrategies.insert(candidate.strategy)
-                    continue
-                case .cancelled:
-                    return
-                }
-            } else {
-                do {
-                    item = try await itemFactory.makeItem(for: candidate)
-                } catch is CancellationError {
-                    return
-                } catch {
-                    guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
-                    log.notice("resolveAndPlay: candidate preparation failed strategy=\(candidate.strategy.rawValue, privacy: .public) error=\(PlayerItemReadinessGate.describe(itemError: error), privacy: .public)")
-                    excludedStrategies.insert(candidate.strategy)
-                    continue
-                }
-            }
-            guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else { return }
-            applyQualityCap(to: item)
-            itemLoadStartedAt = Date()
-            loadItem(item, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
-            // Optimistic start. AVPlayer has no "first frame rendered" signal — only
-            // `.readyToPlay`, which on a warm resolve accounted for ~80% of the tap-to-video
-            // wait. So we stop gating the transport on it: the candidate is still validated
-            // below and still rejected on failure/timeout, but the player is already holding a
-            // play request when readiness lands, so it starts without waiting for us to notice.
-            // This only works because `automaticallyWaitsToMinimizeStalling` is `true` — see the
-            // note in `init`, where turning it off silently discards this call.
-            // Recovery waits to seek before playing, so it stays `.resolving` until ready;
-            // only a normal optimistic start uses `.buffering` here.
-            loadState = recovery == nil ? .buffering : .resolving
-            updateNowPlaying()
-            if recovery == nil, autoplay, wantsPlayback {
-                log.info("resolveAndPlay: optimistic play issued for candidate=\(candidate.strategy.rawValue, privacy: .public) at \(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-                play()
-            }
-
-            let readiness = await readinessGate.wait(
-                for: item,
-                timeout: readinessTimeout(for: candidate.strategy)
-            )
-            guard !Task.isCancelled, playbackSessionID == sessionID, currentVideo?.id == video.id else {
-                log.debug("resolveAndPlay: discarded candidate result for stale video \(video.id, privacy: .public)")
-                return
-            }
-
-            switch readiness {
-            case .ready:
-                // A ready KVO event and a terminal failure can arrive before this task resumes.
-                // Never bless an item that has already failed or been replaced.
-                guard player.currentItem === item, item.status == .readyToPlay else {
-                    log.notice("resolveAndPlay: candidate changed before acceptance strategy=\(candidate.strategy.rawValue, privacy: .public)")
-                    break
-                }
-                if let recovery {
-                    if recovery.resumeFromHistoryIfUnstarted {
-                        let savedProgress = await resumeLookup?.value
-                        guard !Task.isCancelled, playbackSessionID == sessionID,
-                              currentVideo?.id == video.id, player.currentItem === item else { return }
-                        if let position = storedResumePosition(savedProgress, for: video) {
-                            log.info("Resuming \(video.id, privacy: .public) at \(position, privacy: .public)s")
-                            await seekForSourceSwitch(to: position, item: item)
-                        }
-                    } else {
-                        await restoreRecoveredPosition(recovery, in: item)
-                    }
-                    guard !Task.isCancelled, playbackSessionID == sessionID,
-                          currentVideo?.id == video.id, player.currentItem === item else { return }
-                    guard item.status == .readyToPlay else { break }
-                    if !candidate.captionTracks.isEmpty { captionTracks = candidate.captionTracks }
-                    if let replacementStoryboard = candidate.storyboard { storyboard = replacementStoryboard }
-                    if let title = candidate.originalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-                       !title.isEmpty, let current = currentVideo, current.title != title {
-                        enrichCurrentVideo(with: current.replacingTitle(with: title))
-                    }
-                    acceptedStreamItem = item
-                    acceptedStreamStrategy = candidate.strategy
-                    loadState = .readyToPlay
-                    if wantsPlayback { play() } else { updateNowPlaying() }
-                    reconcilePlaybackRate()
-                    log.info("resolveAndPlay: recovered with candidate=\(candidate.strategy.rawValue, privacy: .public)")
-                    return
-                }
-                // `total` still measures resolve → `.readyToPlay`, unchanged, so the number stays
-                // comparable with builds that played only after this point.
-                log.info("resolveAndPlay: accepted candidate=\(candidate.strategy.rawValue, privacy: .public) total=\(Date().timeIntervalSince(resolutionStartedAt), privacy: .public)s")
-                captionTracks = candidate.captionTracks
-                acceptedStreamItem = item
-                acceptedStreamStrategy = candidate.strategy
-                loadState = .readyToPlay
-                if let title = candidate.originalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !title.isEmpty, let current = currentVideo, current.title != title {
-                    // The winning resolver already fetched this title alongside the stream.
-                    // Updating presentation/history here costs no additional network request.
-                    enrichCurrentVideo(with: current.replacingTitle(with: title))
-                }
-                if let nativeStoryboard = candidate.storyboard {
-                    storyboard = nativeStoryboard
-                }
-                let savedProgress = await resumeLookup?.value
-                guard !Task.isCancelled, playbackSessionID == sessionID,
-                      currentVideo?.id == video.id, player.currentItem === item else { return }
-                guard item.status == .readyToPlay else { return }
-                applyStoredResumePosition(savedProgress, for: video)
-                updateNowPlaying()
-                contentPrefetchTask?.cancel()
-                contentPrefetchTask = Task {
-                    if preferences.prefetchVideoDetails && preferences.cacheRecentVideoContent {
-                        if let info = try? await VideoContentPrefetchStore.shared.fetchDetails(videoID: video.id) {
-                            self.installVideoDetails(info, for: video.id)
-                        }
-                        guard !Task.isCancelled else { return }
-                        if preferences.showComments {
-                            await VideoContentPrefetchStore.shared.prefetch(videoID: video.id)
-                        }
-                    }
-                }
-                // Usually redundant — the optimistic `play()` above has either started the item or
-                // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
-                // where a rejected candidate left the transport paused.
-                //
-                // Ask the player, not `isPlaying`. That flag is a prediction written by `play()`
-                // for immediate UI feedback, so after an optimistic start it reads `true` whether
-                // or not AVPlayer honoured the request. Gating this on it means the one situation
-                // that needs a retry is the one situation where the retry is skipped.
-                if wantsPlayback, player.timeControlStatus == .paused { play() }
-                finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
-                reconcilePlaybackRate()
-                return
-            case .failed(let description):
-                log.notice("resolveAndPlay: rejected candidate=\(candidate.strategy.rawValue, privacy: .public) reason=failed detail=\(description, privacy: .public)")
-            case .timedOut:
-                log.notice("resolveAndPlay: rejected candidate=\(candidate.strategy.rawValue, privacy: .public) reason=readiness-timeout")
-            }
-
-            await resolver.invalidateRejectedCandidate(
-                candidate,
-                videoID: video.id,
-                quality: candidateQuality
-            )
-            guard !Task.isCancelled, playbackSessionID == sessionID,
-                  currentVideo?.id == video.id else { return }
-            excludedStrategies.insert(candidate.strategy)
-            // The optimistic `play()` left the transport running (rate 1, possibly stalled) on a
-            // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`
-            // and the Now Playing rate don't advertise playback for a rejected candidate while the
-            // next one resolves.
-            player.pause()
-            isPlaying = false
-            player.removeAllItems()
-            itemLoadStartedAt = nil
-            loadState = .resolving
-            updateNowPlaying()
-        }
-
-        log.debug("resolveAndPlay: ended after cancellation or video change for \(video.id, privacy: .public)")
-    }
-
-    /// Caps HLS variant selection to the user's preferred quality.
-    ///
-    /// The resolver now hands back a master playlist for most videos rather than a single
-    /// progressive stream, and a master playlist advertises YouTube's whole variant ladder. Without
-    /// a ceiling AVPlayer's ABR logic is free to climb past the user's setting — previously the
-    /// height cap was applied when picking a progressive format, so this keeps that preference
-    /// meaningful. It also shortens time-to-first-frame, since AVPlayer no longer pulls a large
-    /// segment before reporting `.readyToPlay`. `.auto` stays uncapped so ABR can use the full
-    /// ladder, and this is a no-op for progressive and local-file candidates.
-    private func applyQualityCap(to item: AVPlayerItem) {
-        applyQualityCap(to: item, quality: playbackQuality)
-    }
-
-    /// Reapply the adaptive cap when Settings changes without replacing the current item.
-    func refreshPlaybackQualityLimits() {
-        guard let item = player.currentItem else { return }
-        applyQualityCap(to: item)
-    }
-
-    private func applyQualityCap(to item: AVPlayerItem, quality: VideoQuality) {
-        PlayerQualityPolicy.apply(
-            to: item,
-            quality: quality,
-            cellularQuality: preferences.cellularPlaybackQuality
-        )
-    }
-
-    private func readinessTimeout(for strategy: PlaybackStrategy) -> Duration {
-        switch strategy {
-        case .b5iIOS, .b5iTVHTML5:
-            return .seconds(4)
-        case .localFile, .native, .nativePaired, .nativeProgressive:
-            return .seconds(12)
-        }
-    }
-
-    private func finishPlaybackSetup(video: Video, skipRecommendations: Bool) {
+    func finishPlaybackSetup(video: Video, skipRecommendations: Bool) {
         log.info("resolveAndPlay: finished happy-path for \(video.id, privacy: .public)")
         // Fire-and-forget queue fill — uses YouTube's `/next` (WEB) endpoint, independent of the
         // resolver's `/player` (IOS) endpoint, so it can't interfere with playback that's already
@@ -2375,225 +860,36 @@ final class PlayerStateManager {
         // taps, Next/Previous, and even tapping an individual playlist video — gets the
         // autoplay-style recommendation fill, so the player keeps advancing past the seed.
         if !skipRecommendations || activePlaylist != nil {
-            recommendationTask = Task { [weak self] in
-                await self?.fillQueueWithRecommendations(for: video)
-            }
+            scheduleRecommendationFill(for: video)
         }
     }
 
-    /// Fetches `MoreVideoInfosResponse` for the current video and appends the recommended videos to
-    /// the queue. This is what makes the player behave like the YouTube app: tap any video and a
-    /// fresh "up next" queue is ready to advance when the current track ends.
-    private func fillQueueWithRecommendations(for seed: Video) async {
-        let targetUpcomingCount = min(max(preferences.upNextInitialCount, 3), 15)
-        let upcomingCount = activePlaylist != nil
-            ? min(targetUpcomingCount, playlistRecommendations.filter { !VideoBlocklist.shared.blocks($0) }.count)
-            : min(targetUpcomingCount, queue.items.dropFirst(queue.currentIndex + 1)
-                .filter { !VideoBlocklist.shared.blocks($0) }.count)
-        guard upcomingCount < targetUpcomingCount else {
-            log.debug("Recommendation refill skipped for \(seed.id, privacy: .public): \(upcomingCount, privacy: .public) upcoming items remain")
-            return
-        }
-
-        do {
-            let info = try await VideoContentPrefetchStore.shared.fetchDetails(videoID: seed.id)
-            try Task.checkCancellation()
-            guard currentVideo?.id == seed.id else {
-                log.debug("Discarding stale recommendations for \(seed.id, privacy: .public)")
-                return
-            }
-            installVideoDetails(info, for: seed.id)
-            let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
-            let needed = targetUpcomingCount - upcomingCount
-            let toAppend = recommendationPager.start(
-                recommended: info.recommended,
-                continuationToken: info.recommendedContinuationToken,
-                excluding: existingIDs,
-                limit: needed
-            )
-            if activePlaylist != nil {
-                playlistRecommendations = toAppend
-            } else {
-                queue.append(contentsOf: toAppend)
-            }
-            log.info("Queued \(toAppend.count, privacy: .public) recommendations for \(seed.id, privacy: .public)")
-        } catch is CancellationError {
-            log.debug("Recommendation fetch cancelled for \(seed.id, privacy: .public)")
-        } catch {
-            log.notice("Recommendation fetch failed for \(seed.id, privacy: .public): \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    var canLoadMoreRecommendations: Bool {
-        recommendationPager.canLoadMore
-    }
-
-    /// Adds the next small recommendation page to Up Next. The remainder of YouTube's initial
-    /// response is consumed before its network continuation, so no recommendations are skipped.
-    func loadMoreRecommendations() async {
-        guard !isLoadingMoreRecommendations, canLoadMoreRecommendations else { return }
-        isLoadingMoreRecommendations = true
-        defer { isLoadingMoreRecommendations = false }
-
-        if let page = recommendationPager.takeBacklogPage(limit: 5) {
-            if activePlaylist != nil {
-                playlistRecommendations.append(contentsOf: page)
-            } else {
-                queue.append(contentsOf: page)
-            }
-            return
-        }
-
-        guard let token = recommendationPager.continuationToken else { return }
-        let videoID = currentVideo?.id
-        do {
-            let page = try await videoService.fetchRecommendedVideos(continuation: token)
-            guard !Task.isCancelled, currentVideo?.id == videoID else { return }
-            let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
-            let visible = recommendationPager.accept(page, excluding: existingIDs, limit: 5)
-            if activePlaylist != nil {
-                playlistRecommendations.append(contentsOf: visible)
-            } else {
-                queue.append(contentsOf: visible)
-            }
-        } catch {
-            log.notice("Recommendation continuation failed: \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    /// Read the window AVPlayer actually offers, rather than inferring DVR support from the
-    /// manifest URL. Live ranges can appear after readiness and move as the broadcast advances.
-    private func updateLiveSeekableRange(for item: AVPlayerItem) {
-        guard currentVideo?.isLive == true,
-              loadState == .readyToPlay,
-              item.status == .readyToPlay else { return }
-        // A seek bar cannot safely cross a gap. Use the most recent contiguous range if the
-        // manifest ever reports several, and let AVPlayer keep advancing its moving bounds.
-        let newest = item.seekableTimeRanges.compactMap { value -> ClosedRange<TimeInterval>? in
-            let range = value.timeRangeValue
-            let start = range.start.seconds
-            let end = range.end.seconds
-            guard start.isFinite, end.isFinite, start >= 0, end > start else { return nil }
-            return start...end
-        }.max { $0.upperBound < $1.upperBound }
-        if liveSeekableRange != newest { liveSeekableRange = newest }
-    }
-
-    private func installObservers() {
-        // AVPlayer pauses for calls/Siri on its own. Preserve the user's play intent separately
-        // from `isPlaying`, which KVO may already have changed by the time this arrives.
-        audioInterruptionObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] notification in
-            let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-            let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            guard let rawType,
-                  let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                switch type {
-                case .began:
-                    self.interruptedPlaybackSessionID = self.wantsPlayback && self.player.currentItem != nil
-                        ? self.playbackSessionID : nil
-                case .ended:
-                    let interruptedSessionID = self.interruptedPlaybackSessionID
-                    self.interruptedPlaybackSessionID = nil
-                    guard self.preferences.resumeAfterAudioInterruption,
-                          AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume),
-                          interruptedSessionID == self.playbackSessionID,
-                          self.wantsPlayback,
-                          self.player.currentItem != nil,
-                          self.player.timeControlStatus == .paused else { return }
-                    self.play()
-                @unknown default:
-                    break
-                }
-            }
-        }
-        observations.installPlayerObservers(
-            on: player,
-            onTime: { [weak self] in self?.handleTimeTick($0) },
-            onEnd: { [weak self] in self?.handleItemEnd($0) },
-            onTransportChange: { [weak self] in self?.handleTransportChange() }
+    func scheduleRecommendationFill(for seed: Video) {
+        recommendations.scheduleFill(
+            for: seed,
+            isCurrent: { [weak self] in self?.currentVideo?.id == seed.id },
+            isPlaylistActive: { [weak self] in self?.activePlaylist != nil },
+            onDetails: { [weak self] info in self?.installVideoDetails(info, for: seed.id) }
         )
     }
 
-    private func handleTimeTick(_ time: CMTime) {
-        elapsed = pendingSeekTarget ?? (time.seconds.isFinite ? time.seconds : 0)
-        if let item = player.currentItem {
-            if isPlaying,
-               let fps = item.tracks.map(\.currentVideoFrameRate).first(where: {
-                   $0.isFinite && $0 >= 10 && $0 <= 240
-               }) {
-                observedFrameRate = (item, Double(fps))
-            }
-            let total = item.duration.seconds
-            if total.isFinite { duration = total }
-            updateLiveSeekableRange(for: item)
-            if currentVideo?.isLive == true,
-               loadState == .readyToPlay,
-               item.status == .readyToPlay {
-                itemDiagnostics.logLiveDVRIfNeeded(
-                    for: item,
-                    videoID: currentVideo?.id ?? "unknown"
-                )
-            }
-        }
-        accumulateHistoryPlaybackTime()
-        persistCurrentPlaybackProgress(force: false)
-        updateNowPlaying()
+    func fillQueueWithRecommendations(for seed: Video) async {
+        await recommendations.fill(
+            for: seed,
+            isCurrent: { [weak self] in self?.currentVideo?.id == seed.id },
+            isPlaylistActive: { [weak self] in self?.activePlaylist != nil },
+            onDetails: { [weak self] info in self?.installVideoDetails(info, for: seed.id) }
+        )
     }
 
-    /// The queue retains an ended item so replay and backward seeking can reuse it.
-    private func handleItemEnd(_ endedItem: AVPlayerItem) {
-        guard endedItem === player.currentItem else { return }
-        log.info("Playback reached item end: sourceDuration=\(endedItem.duration.seconds, privacy: .public)s metadataDuration=\(currentVideo?.duration ?? -1, privacy: .public)s")
-        isPlaying = false
-        wantsPlayback = false
-        hasEnded = true
-        elapsed = duration
-        persistCurrentPlaybackProgress(force: true)
-        updateNowPlaying()
-        if sleepTimerOption == .endOfVideo {
-            setSleepTimer(.off)
-            return
-        }
-        if queue.repeatMode == .one || preferences.autoplayNext {
-            playNext()
-        }
+    var canLoadMoreRecommendations: Bool {
+        recommendations.canLoadMore
     }
 
-    /// Read the current transport status after the KVO hop; a captured status may be stale.
-    private func handleTransportChange() {
-        switch player.timeControlStatus {
-        case .playing:
-            if !isPlaying {
-                log.info("KVO timeControlStatus → playing (sync isPlaying=true)")
-                isPlaying = true
-            }
-        case .paused:
-            if isPlaying {
-                log.info("KVO timeControlStatus → paused (sync isPlaying=false)")
-                isPlaying = false
-            }
-        case .waitingToPlayAtSpecifiedRate:
-            if !isPlaying { isPlaying = true }
-        @unknown default:
-            break
-        }
-    }
-
-    private func updateNowPlaying() {
-        guard let video = currentVideo else { return }
-        NowPlayingCenter.update(
-            title: video.title,
-            artist: video.channelName,
-            duration: duration,
-            elapsed: elapsed,
-            rate: isPlaying ? Float(effectivePlaybackRate) : 0.0,
-            artwork: currentArtwork
+    func loadMoreRecommendations() async {
+        await recommendations.loadMore(
+            currentVideoID: { [weak self] in self?.currentVideo?.id },
+            isPlaylistActive: { [weak self] in self?.activePlaylist != nil }
         )
     }
 
@@ -2601,7 +897,7 @@ final class PlayerStateManager {
 
     /// Resumes only meaningful, unfinished progress. A short opening is treated as unwatched, and
     /// the final 30 seconds are treated as completed so finished videos restart normally.
-    private func applyStoredResumePosition(
+    func applyStoredResumePosition(
         _ progress: (position: TimeInterval, duration: TimeInterval)?,
         for video: Video
     ) {
@@ -2610,7 +906,7 @@ final class PlayerStateManager {
         seek(to: position)
     }
 
-    private func storedResumePosition(
+    func storedResumePosition(
         _ progress: (position: TimeInterval, duration: TimeInterval)?,
         for video: Video
     ) -> TimeInterval? {
@@ -2625,7 +921,7 @@ final class PlayerStateManager {
 
     /// Writes at most every ten seconds during playback, plus forced lifecycle saves. Duplicate
     /// pause/dismiss/video-switch calls are suppressed when the position has not advanced.
-    private func persistCurrentPlaybackProgress(force: Bool) {
+    func persistCurrentPlaybackProgress(force: Bool) {
         let video = currentVideo
         watchHistory.persist(
             video: video,
@@ -2639,7 +935,7 @@ final class PlayerStateManager {
         )
     }
 
-    private func accumulateHistoryPlaybackTime() {
+    func accumulateHistoryPlaybackTime() {
         watchHistory.accumulatePlaybackTime(
             isPlaying: player.timeControlStatus == .playing,
             recordsHistory: preferences.recordsWatchHistory
@@ -2655,10 +951,6 @@ final class PlayerStateManager {
         AudioSessionConfigurator.configure(allowMixing: true, activate: true)
         log.info("Publishing Now Playing for FreeTube as the only active audio source")
         updateNowPlaying()
-    }
-
-    private func persistManualQueue() {
-        PlayerManualQueueStore.persist(manualQueue)
     }
 
     /// Resolves an artwork image for the given video and stores it in `currentArtwork`. Tries three

@@ -2,19 +2,23 @@ import AVFoundation
 import Foundation
 import OSLog
 
-/// Tracks SponsorBlock skip eligibility and AVPlayer boundary callbacks for one playback session.
-/// It also owns lookup and notice timers; visible state and actual seeking remain with the player.
+/// Owns SponsorBlock lookup, skip eligibility, boundary observers, and visible notices.
+/// PlayerStateManager performs the actual seek when a segment is claimed.
 @available(iOS 17.0, *)
 @MainActor
+@Observable
 final class PlayerSponsorBlockCoordinator {
     private let service: any SponsorBlockServicing
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
-    private var boundaryObservers: [Any] = []
-    private var handledSegmentIDs = Set<String>()
-    private var lookupTask: Task<Void, Never>?
-    private var noticeTask: Task<Void, Never>?
+    @ObservationIgnored private var boundaryObservers: [Any] = []
+    @ObservationIgnored private var handledSegmentIDs = Set<String>()
+    @ObservationIgnored private var lookupTask: Task<Void, Never>?
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    private(set) var segments: [SponsorBlockSegment] = []
+    private(set) var notice: SponsorBlockNotice?
+    private(set) var communityChapters: [VideoChapter] = []
 
-    init(service: any SponsorBlockServicing) {
+    init(service: any SponsorBlockServicing = SponsorBlockService()) {
         self.service = service
     }
 
@@ -52,9 +56,10 @@ final class PlayerSponsorBlockCoordinator {
         elapsed: TimeInterval,
         preferences: UserPreferences,
         onEntry: @escaping @MainActor (SponsorBlockSegment) -> Void
-    ) -> (communityChapters: [VideoChapter], highlight: SponsorBlockSegment?, current: SponsorBlockSegment?) {
+    ) -> (highlight: SponsorBlockSegment?, current: SponsorBlockSegment?) {
+        self.segments = segments
         var chapterStarts = Set<TimeInterval>()
-        let chapters = segments.compactMap { segment -> VideoChapter? in
+        communityChapters = segments.compactMap { segment -> VideoChapter? in
             guard segment.category == .chapter,
                   let title = segment.title,
                   chapterStarts.insert(segment.startTime).inserted else { return nil }
@@ -80,14 +85,16 @@ final class PlayerSponsorBlockCoordinator {
         let current = segments.first {
             isSkippable($0) && elapsed >= $0.startTime && elapsed < $0.endTime
         }
-        return (chapters, highlight, current)
+        return (highlight, current)
     }
 
-    func scheduleNoticeDismissal(after seconds: TimeInterval, onDismiss: @escaping @MainActor () -> Void) {
+    func showNotice(_ notice: SponsorBlockNotice, for seconds: TimeInterval) {
         noticeTask?.cancel()
-        noticeTask = Task {
+        self.notice = notice
+        noticeTask = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
-            onDismiss()
+            guard self?.notice?.id == notice.id else { return }
+            self?.notice = nil
         }
     }
 
@@ -95,6 +102,13 @@ final class PlayerSponsorBlockCoordinator {
         noticeTask?.cancel()
         noticeTask = nil
     }
+
+    func dismissNotice() {
+        cancelNoticeDismissal()
+        notice = nil
+    }
+
+    func clearCommunityChapters() { communityChapters = [] }
 
     func clearCache() { service.clearCache() }
 
@@ -167,7 +181,9 @@ final class PlayerSponsorBlockCoordinator {
     func clear(on player: AVQueuePlayer) {
         lookupTask?.cancel()
         lookupTask = nil
-        cancelNoticeDismissal()
+        dismissNotice()
+        segments = []
+        communityChapters = []
         handledSegmentIDs.removeAll()
         removeBoundaryObservers(from: player)
     }
