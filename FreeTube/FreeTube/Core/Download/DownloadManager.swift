@@ -1,5 +1,4 @@
 import Foundation
-import Network
 import OSLog
 import PythonKit
 import SwiftData
@@ -60,18 +59,18 @@ final class DownloadManager {
     /// downloads in parallel for the same id (which would race on the destination path).
     private var inflight: [String: Task<URL, Error>] = [:]
     @ObservationIgnored private let mediaFinalizer = DownloadMediaFinalizer()
+    @ObservationIgnored private let metadataWriter = DownloadMetadataWriter()
     @ObservationIgnored private let sourceSelector = DownloadSourceSelector()
     @ObservationIgnored private let streamTransfer = DownloadStreamTransfer()
     private let preferences = UserPreferences()
     @ObservationIgnored private let log = AppLog(subsystem: "com.leshko.freetube", category: "DownloadManager")
-    @ObservationIgnored private let pathMonitor = NWPathMonitor()
-    private var currentPath: NWPath?
+    @ObservationIgnored private let networkGate: DownloadNetworkGate
 
     private init() {
         // Force the lazy static while the app still owns its original container environment;
         // embedded Python initialization can otherwise affect later directory resolution.
         _ = Self.downloadsDirectory
-        startMonitoringPath()
+        networkGate = DownloadNetworkGate()
     }
 
     // MARK: - Public surface
@@ -118,7 +117,7 @@ final class DownloadManager {
                     try await mediaFinalizer.validateFile(at: existing, quality: quality, videoID: video.id)
                     try Task.checkCancellation()
                     if DownloadsStore.shared.metadata(at: existing) == nil {
-                        await persistDownloaded(video: video, fileURL: existing)
+                        await metadataWriter.persist(video: video, fileURL: existing)
                     }
                     BackgroundDownloadCoordinator.shared.complete(videoID: video.id)
                     return existing
@@ -146,7 +145,7 @@ final class DownloadManager {
 
         log.info("ensureDownloaded(\(video.id, privacy: .public)): checking network gate (allowCellular=\(self.preferences.allowCellularDownloads, privacy: .public))")
         do {
-            try await waitForAllowedNetwork()
+            try networkGate.requireAllowedNetwork(allowCellularDownloads: preferences.allowCellularDownloads)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -467,7 +466,7 @@ final class DownloadManager {
                 try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
                 let dur = Date().timeIntervalSince(startedAt)
                 log.info("yt-dlp[\(video.id, privacy: .public)] FALLBACK SUCCESS in \(String(format: "%.1f", dur), privacy: .public)s")
-                await persistDownloaded(video: video, fileURL: destination)
+                await metadataWriter.persist(video: video, fileURL: destination)
                 publish(snapshot: DownloadTaskSnapshot(
                     id: snapshotID, videoID: video.id, title: video.title,
                     state: .completed(destination), createdAt: .now
@@ -594,7 +593,7 @@ final class DownloadManager {
         }
 
         log.debug("yt-dlp[\(video.id, privacy: .public)] writing download metadata xattr")
-        await persistDownloaded(video: video, fileURL: destination)
+        await metadataWriter.persist(video: video, fileURL: destination)
 
         log.debug("yt-dlp[\(video.id, privacy: .public)] → state=completed")
         publish(snapshot: DownloadTaskSnapshot(
@@ -649,7 +648,7 @@ final class DownloadManager {
             )
             try Task.checkCancellation()
             try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
-            await persistDownloaded(video: video, fileURL: destination)
+            await metadataWriter.persist(video: video, fileURL: destination)
             publish(snapshot: DownloadTaskSnapshot(
                 id: snapshotID, videoID: video.id, title: video.title,
                 state: .completed(destination), createdAt: .now
@@ -682,7 +681,7 @@ final class DownloadManager {
                         snapshotID: snapshotID
                     )
                     try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
-                    await persistDownloaded(video: video, fileURL: destination)
+                    await metadataWriter.persist(video: video, fileURL: destination)
                     publish(snapshot: DownloadTaskSnapshot(
                         id: snapshotID, videoID: video.id, title: video.title,
                         state: .completed(destination), createdAt: .now
@@ -761,35 +760,6 @@ final class DownloadManager {
         } else {
             log.debug("yt-dlp[\(videoID, privacy: .public)] progress hook status=\(status, privacy: .public)")
         }
-    }
-
-    // MARK: - SwiftData
-
-    private func persistDownloaded(video: Video, fileURL: URL) async {
-        let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.int64Value ?? 0
-        let thumb = await downloadThumbnailData(url: video.thumbnailURL)
-        let thumbnailSize = thumb.map { "\($0.count)B" } ?? "nil"
-        log.debug("persistDownloaded(\(video.id, privacy: .public)) thumb=\(thumbnailSize, privacy: .public) size=\(size, privacy: .public)")
-        // File-system + xattr backed (no SwiftData): the metadata travels with the file.
-        // `DownloadsStore.write` compresses the thumbnail to ~10 KB JPEG and posts the
-        // change notification so the Downloads tab re-renders.
-        await DownloadsStore.shared.write(
-            videoID: video.id,
-            title: video.title,
-            channelName: video.channelName,
-            formatID: "ytdl",
-            originalURL: nil,
-            rawThumbnail: thumb,
-            at: fileURL
-        )
-        log.info("persistDownloaded(\(video.id, privacy: .public)) wrote xattr size=\(size, privacy: .public) bytes")
-        // Caption sidecars are optional and never hold up a completed media download.
-        Task { await OfflineCaptionStore.shared.downloadAvailableTracks(for: video.id) }
-    }
-
-    private func downloadThumbnailData(url: URL?) async -> Data? {
-        guard let url else { return nil }
-        return try? await URLSession.shared.data(from: url).0
     }
 
     // MARK: - YouTubeKit / TVHTML5 fallback
@@ -1030,27 +1000,7 @@ final class DownloadManager {
     /// obsolete app-container Documents directory appended inside the current container.
     private static let downloadsDirectory = AppDirectories.documents
 
-    // MARK: - Networking gate + snapshots
-
-    private func startMonitoringPath() {
-        pathMonitor.pathUpdateHandler = { [weak self] path in
-            guard let self else { return }
-            Task { @MainActor in self.currentPath = path }
-        }
-        pathMonitor.start(queue: DispatchQueue(label: "DownloadManager.path"))
-    }
-
-    private func waitForAllowedNetwork() async throws {
-        // Permissive default: if the user allows cellular, never block.
-        if preferences.allowCellularDownloads { return }
-        let path = currentPath ?? pathMonitor.currentPath
-        if path.usesInterfaceType(.wifi) { return }
-        throw YouTubeServiceError.network(NSError(
-            domain: "FreeTube.DownloadManager",
-            code: -1,
-            userInfo: [NSLocalizedDescriptionKey: "Cellular downloads are disabled in Settings, but Wi-Fi isn't currently available."]
-        ))
-    }
+    // MARK: - Snapshots
 
     private func publish(snapshot: DownloadTaskSnapshot) {
         // Progress callbacks already queued on the main actor can outlive cancellation.
