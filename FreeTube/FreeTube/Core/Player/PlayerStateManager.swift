@@ -1,6 +1,5 @@
 import Foundation
 import AVFoundation
-import Kingfisher
 import OSLog
 import SwiftData
 import UIKit
@@ -174,8 +173,7 @@ final class PlayerStateManager {
     @ObservationIgnored private let fastPlaybackCandidatePreparer = PlayerFastPlaybackCandidatePreparer()
     private let preparationGate = PlayerItemPreparationGate()
     private let readinessGate = PlayerItemReadinessGate()
-    private let sponsorBlockService: any SponsorBlockServicing
-    private let sponsorBlockCoordinator = PlayerSponsorBlockCoordinator()
+    private let sponsorBlockCoordinator: PlayerSponsorBlockCoordinator
     private let videoService: any VideoServicing
     private let playlistService: any PlaylistServicing
     private let preferences: UserPreferences
@@ -214,8 +212,6 @@ final class PlayerStateManager {
     private var itemLoadStartedAt: Date?
     private let itemDiagnostics = PlayerItemDiagnostics()
     @ObservationIgnored private var fastPlayback = PlayerFastPlaybackState()
-    private var sponsorBlockTask: Task<Void, Never>?
-    private var sponsorBlockNoticeTask: Task<Void, Never>?
     private var pendingSeekTarget: TimeInterval?
     /// The active video track's observed cadence, retained across pause. HLS does not always
     /// expose a track, so fine seeking falls back to a conservative 30 fps estimate.
@@ -238,7 +234,7 @@ final class PlayerStateManager {
     ) {
         self.queue = queue
         self.resolver = resolver
-        self.sponsorBlockService = sponsorBlockService
+        self.sponsorBlockCoordinator = PlayerSponsorBlockCoordinator(service: sponsorBlockService)
         self.videoService = videoService
         self.playlistService = playlistService
         self.preferences = preferences
@@ -1757,7 +1753,7 @@ final class PlayerStateManager {
 
     func undoSponsorBlockSkip() {
         guard let notice = sponsorBlockNotice else { return }
-        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockCoordinator.cancelNoticeDismissal()
         sponsorBlockNotice = nil
         // Undo is the one rewind that should not immediately trigger the same skip again.
         seek(to: notice.originalStartTime, rearmSponsorBlock: false)
@@ -1766,13 +1762,13 @@ final class PlayerStateManager {
     func confirmSponsorBlockSkip() {
         guard let notice = sponsorBlockNotice,
               case .prompt(let endTime) = notice.kind else { return }
-        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockCoordinator.cancelNoticeDismissal()
         sponsorBlockNotice = nil
         seek(to: endTime)
     }
 
     func dismissSponsorBlockNotice() {
-        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockCoordinator.cancelNoticeDismissal()
         sponsorBlockNotice = nil
     }
 
@@ -1782,57 +1778,31 @@ final class PlayerStateManager {
         guard preferences.sponsorBlockEnabled else { return }
         let categories = preferences.sponsorBlockCategories
         guard !categories.isEmpty else { return }
-        sponsorBlockTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                let segments = try await sponsorBlockService.fetchSegments(
-                    videoID: videoID,
-                    categories: categories
-                )
-                try Task.checkCancellation()
-                guard currentVideo?.id == videoID else { return }
-                installSponsorBlockObservers(for: segments)
-                let fullLabels = segments.filter(\.isFullVideoLabel).count
-                log.info("SponsorBlock loaded \(segments.count, privacy: .public) segments (full labels=\(fullLabels, privacy: .public)) for \(videoID, privacy: .public)")
-            } catch is CancellationError {
-                log.debug("SponsorBlock lookup cancelled for \(videoID, privacy: .public)")
-            } catch {
-                // SponsorBlock is an optional enhancement. Network or decoding failures must never
-                // interrupt playback or surface as a player failure.
-                log.notice("SponsorBlock lookup failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
+        sponsorBlockCoordinator.loadSegments(
+            for: videoID,
+            categories: categories,
+            isCurrent: { [weak self] in self?.currentVideo?.id == videoID },
+            onLoaded: { [weak self] segments in
+                self?.installSponsorBlockObservers(for: segments)
             }
-        }
+        )
     }
 
     private func installSponsorBlockObservers(for segments: [SponsorBlockSegment]) {
         sponsorBlockSegments = segments
-        var chapterStarts = Set<TimeInterval>()
-        communityChapters = segments.compactMap { segment in
-            guard segment.category == .chapter,
-                  let title = segment.title,
-                  chapterStarts.insert(segment.startTime).inserted else { return nil }
-            return VideoChapter(
-                title: title, startTime: segment.startTime,
-                timeDescription: nil, thumbnailURL: nil
-            )
-        }
-        updateDisplayedChapters()
-
-        sponsorBlockCoordinator.installBoundaryObservers(
+        let installation = sponsorBlockCoordinator.installSegments(
+            segments,
             on: player,
-            for: segments,
-            shouldObserve: { [weak self] in self?.shouldObserveSponsorBlockSegment($0) ?? false },
+            elapsed: elapsed,
+            preferences: preferences,
             onEntry: { [weak self] in self?.handleSponsorBlockSegment($0) }
         )
+        communityChapters = installation.communityChapters
+        updateDisplayedChapters()
 
         // A highlight is a point to jump *to*, not a duration to skip once playback reaches it.
         // Offer it as soon as the lookup finishes while leaving Show only as a marker-only mode.
-        if let highlight = segments.first(where: {
-            $0.category == .highlight
-                && preferences.sponsorBlockBehavior(for: $0.category) == .ask
-                && elapsed < $0.startTime - 0.5
-        }) {
-            sponsorBlockCoordinator.markHandled(highlight.id)
+        if let highlight = installation.highlight {
             sponsorBlockNotice = SponsorBlockNotice(
                 category: .highlight,
                 originalStartTime: elapsed,
@@ -1843,10 +1813,7 @@ final class PlayerStateManager {
 
         // The lookup may finish after playback has already entered a segment. Boundary observers
         // cannot fire retroactively, so evaluate the current position once immediately.
-        if let current = segments.first(where: {
-            shouldObserveSponsorBlockSegment($0)
-                && elapsed >= $0.startTime && elapsed < $0.endTime
-        }) {
+        if let current = installation.current {
             handleSponsorBlockSegment(current, enteredAt: elapsed)
         }
     }
@@ -1884,7 +1851,7 @@ final class PlayerStateManager {
             behavior: preferences.sponsorBlockBehavior(for: segment.category),
             minimumSkipSeconds: preferences.sponsorBlockMinimumSkipSeconds
         ) else { return }
-        sponsorBlockNoticeTask?.cancel()
+        sponsorBlockCoordinator.cancelNoticeDismissal()
 
         log.info("SponsorBlock skipping category=\(segment.category.rawValue, privacy: .public) duration=\(segment.endTime - segment.startTime, privacy: .public)s")
         seek(to: segment.endTime)
@@ -1898,22 +1865,17 @@ final class PlayerStateManager {
 
     private func scheduleSponsorBlockNoticeDismissal() {
         let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
-        sponsorBlockNoticeTask = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
+        sponsorBlockCoordinator.scheduleNoticeDismissal(after: seconds) { [weak self] in
             self?.sponsorBlockNotice = nil
         }
     }
 
     /// Clears cached segment responses without changing the currently playing video's markers.
     func clearSponsorBlockCache() {
-        sponsorBlockService.clearCache()
+        sponsorBlockCoordinator.clearCache()
     }
 
     private func clearSponsorBlockState() {
-        sponsorBlockTask?.cancel()
-        sponsorBlockTask = nil
-        sponsorBlockNoticeTask?.cancel()
-        sponsorBlockNoticeTask = nil
         sponsorBlockNotice = nil
         sponsorBlockSegments = []
         sponsorBlockCoordinator.clear(on: player)
@@ -2386,28 +2348,11 @@ final class PlayerStateManager {
     }
 
     private func applyQualityCap(to item: AVPlayerItem, quality: VideoQuality) {
-        // `.zero` means unrestricted. Reset first so moving from a capped choice back to Auto
-        // takes effect on the already-playing HLS asset.
-        item.preferredMaximumResolution = .zero
-        item.preferredMaximumResolutionForExpensiveNetworks = .zero
-        guard quality != .audioOnly else { return }
-
-        // AVPlayer applies these preferences only to HLS. Local and progressive files retain
-        // their encoded quality; neither setting causes a source swap or playback interruption.
-        let globalHeightCap = quality == .auto ? nil : quality.heightCap
-        if let globalHeightCap, globalHeightCap > 0 {
-            item.preferredMaximumResolution = CGSize(
-                width: globalHeightCap * 16 / 9, height: globalHeightCap
-            )
-        }
-        let cellularQuality = preferences.cellularPlaybackQuality
-        if cellularQuality != .auto, let cellularHeightCap = cellularQuality.heightCap,
-           cellularHeightCap > 0 {
-            let heightCap = min(globalHeightCap ?? cellularHeightCap, cellularHeightCap)
-            item.preferredMaximumResolutionForExpensiveNetworks = CGSize(
-                width: heightCap * 16 / 9, height: heightCap
-            )
-        }
+        PlayerQualityPolicy.apply(
+            to: item,
+            quality: quality,
+            cellularQuality: preferences.cellularPlaybackQuality
+        )
     }
 
     private func readinessTimeout(for strategy: PlaybackStrategy) -> Duration {
@@ -2567,111 +2512,76 @@ final class PlayerStateManager {
                 }
             }
         }
-        // Periodic AVPlayer time observation.
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        observations.time = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self else { return }
-            Task { @MainActor in
-                if let pendingSeekTarget = self.pendingSeekTarget {
-                    self.elapsed = pendingSeekTarget
-                } else {
-                    self.elapsed = time.seconds.isFinite ? time.seconds : 0
-                }
-                if let item = self.player.currentItem {
-                    if self.isPlaying,
-                       let fps = item.tracks.map(\.currentVideoFrameRate).first(where: {
-                           $0.isFinite && $0 >= 10 && $0 <= 240
-                       }) {
-                        self.observedFrameRate = (item, Double(fps))
-                    }
-                    let total = item.duration.seconds
-                    if total.isFinite { self.duration = total }
-                    self.updateLiveSeekableRange(for: item)
-                    if self.currentVideo?.isLive == true,
-                       self.loadState == .readyToPlay,
-                       item.status == .readyToPlay {
-                        self.itemDiagnostics.logLiveDVRIfNeeded(
-                            for: item,
-                            videoID: self.currentVideo?.id ?? "unknown"
-                        )
-                    }
-                }
-                self.accumulateHistoryPlaybackTime()
-                self.persistCurrentPlaybackProgress(force: false)
-                self.updateNowPlaying()
+        observations.installPlayerObservers(
+            on: player,
+            onTime: { [weak self] in self?.handleTimeTick($0) },
+            onEnd: { [weak self] in self?.handleItemEnd($0) },
+            onTransportChange: { [weak self] in self?.handleTransportChange() }
+        )
+    }
+
+    private func handleTimeTick(_ time: CMTime) {
+        elapsed = pendingSeekTarget ?? (time.seconds.isFinite ? time.seconds : 0)
+        if let item = player.currentItem {
+            if isPlaying,
+               let fps = item.tracks.map(\.currentVideoFrameRate).first(where: {
+                   $0.isFinite && $0 >= 10 && $0 <= 240
+               }) {
+                observedFrameRate = (item, Double(fps))
+            }
+            let total = item.duration.seconds
+            if total.isFinite { duration = total }
+            updateLiveSeekableRange(for: item)
+            if currentVideo?.isLive == true,
+               loadState == .readyToPlay,
+               item.status == .readyToPlay {
+                itemDiagnostics.logLiveDVRIfNeeded(
+                    for: item,
+                    videoID: currentVideo?.id ?? "unknown"
+                )
             }
         }
+        accumulateHistoryPlaybackTime()
+        persistCurrentPlaybackProgress(force: false)
+        updateNowPlaying()
+    }
 
-        // Handle the retained item at natural end. `actionAtItemEnd = .pause` prevents
-        // AVQueuePlayer from removing it before replay/backward-seek can reuse it.
-        observations.end = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let self else { return }
-            Task { @MainActor in
-                guard let endedItem = notification.object as? AVPlayerItem,
-                      endedItem === self.player.currentItem else { return }
-                self.log.info("Playback reached item end: sourceDuration=\(endedItem.duration.seconds, privacy: .public)s metadataDuration=\(self.currentVideo?.duration ?? -1, privacy: .public)s")
-                self.isPlaying = false
-                self.wantsPlayback = false
-                self.hasEnded = true
-                self.elapsed = self.duration
-                self.persistCurrentPlaybackProgress(force: true)
-                self.updateNowPlaying()
-
-                // Stop-before-autoplay is essential: pausing alone would still let the ordinary
-                // end observer advance to the next recommendation or repeat the current item.
-                if self.sleepTimerOption == .endOfVideo {
-                    self.setSleepTimer(.off)
-                    return
-                }
-
-                // Loop-one is an explicit playback instruction and therefore remains active even
-                // when general autoplay is disabled. Any successful transition resets `hasEnded`
-                // in `load`; if there is no next item, the replay state stays visible.
-                if self.queue.repeatMode == .one || self.preferences.autoplayNext {
-                    self.playNext()
-                }
-            }
+    /// The queue retains an ended item so replay and backward seeking can reuse it.
+    private func handleItemEnd(_ endedItem: AVPlayerItem) {
+        guard endedItem === player.currentItem else { return }
+        log.info("Playback reached item end: sourceDuration=\(endedItem.duration.seconds, privacy: .public)s metadataDuration=\(currentVideo?.duration ?? -1, privacy: .public)s")
+        isPlaying = false
+        wantsPlayback = false
+        hasEnded = true
+        elapsed = duration
+        persistCurrentPlaybackProgress(force: true)
+        updateNowPlaying()
+        if sleepTimerOption == .endOfVideo {
+            setSleepTimer(.off)
+            return
         }
+        if queue.repeatMode == .one || preferences.autoplayNext {
+            playNext()
+        }
+    }
 
-        // Mirror AVPlayer's transport state into our `isPlaying` flag so the custom transport row
-        // under the video title (and the popup-bar play/pause glyph) reflects taps on the native
-        // AVPlayerViewController controls. Without this, hitting the native pause button on the
-        // video surface left our SwiftUI button showing "Pause" forever.
-        // The current video's menu rate is separate from the saved default. The
-        // capability-limited AVPlayer rate and temporary holds must not change either choice.
-
-        observations.timeControlStatus = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] _, _ in
-            guard let self else { return }
-            Task { @MainActor in
-                // Read the status inside the hop rather than capturing it at KVO time. Optimistic
-                // play installs and tears down items in quick succession, so a captured value can
-                // land after a later transition and leave `isPlaying` (and therefore the Now
-                // Playing rate) describing a candidate we already rejected.
-                switch self.player.timeControlStatus {
-                case .playing:
-                    if !self.isPlaying {
-                        self.log.info("KVO timeControlStatus → playing (sync isPlaying=true)")
-                        self.isPlaying = true
-                    }
-                case .paused:
-                    if self.isPlaying {
-                        self.log.info("KVO timeControlStatus → paused (sync isPlaying=false)")
-                        self.isPlaying = false
-                    }
-                case .waitingToPlayAtSpecifiedRate:
-                    // Buffering / stalled. Treat as "playing" so the UI still shows pause icon,
-                    // matching what the native AVPlayerViewController shows.
-                    if !self.isPlaying {
-                        self.isPlaying = true
-                    }
-                @unknown default:
-                    break
-                }
+    /// Read the current transport status after the KVO hop; a captured status may be stale.
+    private func handleTransportChange() {
+        switch player.timeControlStatus {
+        case .playing:
+            if !isPlaying {
+                log.info("KVO timeControlStatus → playing (sync isPlaying=true)")
+                isPlaying = true
             }
+        case .paused:
+            if isPlaying {
+                log.info("KVO timeControlStatus → paused (sync isPlaying=false)")
+                isPlaying = false
+            }
+        case .waitingToPlayAtSpecifiedRate:
+            if !isPlaying { isPlaying = true }
+        @unknown default:
+            break
         }
     }
 
@@ -2760,33 +2670,18 @@ final class PlayerStateManager {
     /// Clears artwork immediately so the previous video's preview doesn't linger on the lock screen.
     private func refreshArtwork(for video: Video) {
         currentArtwork = nil
-
-        if let url = video.thumbnailURL,
-           let cached = ImageCache.default.retrieveImageInMemoryCache(forKey: url.cacheKey) {
-            currentArtwork = cached
-            updateNowPlaying()
-            return
-        }
-
-        // Xattr fallback for downloaded-only videos. `DownloadsStore.thumbnail(forVideoID:)`
-        // is synchronous (the entries snapshot lives in memory) so we can decode + assign
-        // inline rather than through a Task / background actor.
-        let videoID = video.id
-        if let data = DownloadsStore.shared.thumbnail(forVideoID: videoID),
-           let image = UIImage(data: data) {
-            currentArtwork = image
+        let immediate = PlayerArtworkResolver.immediateArtwork(for: video)
+        if let artwork = immediate.image {
+            currentArtwork = artwork
             updateNowPlaying()
         }
-
-        // Async network/disk fetch as last resort.
-        guard let url = video.thumbnailURL else { return }
-        KingfisherManager.shared.retrieveImage(with: url) { [weak self, videoID = video.id] result in
-            guard case .success(let value) = result else { return }
+        guard immediate.needsNetworkLookup else { return }
+        PlayerArtworkResolver.retrieveArtwork(for: video) { [weak self, videoID = video.id] image in
             Task { @MainActor in
                 guard let self else { return }
                 // Drop the result if the user switched videos while the fetch was inflight.
                 guard self.currentVideo?.id == videoID else { return }
-                self.currentArtwork = value.image
+                self.currentArtwork = image
                 self.updateNowPlaying()
             }
         }

@@ -1,12 +1,104 @@
 import AVFoundation
 import Foundation
+import OSLog
 
 /// Tracks SponsorBlock skip eligibility and AVPlayer boundary callbacks for one playback session.
-/// Fetching, visible notices, chapters, and actual seeking remain with PlayerStateManager.
+/// It also owns lookup and notice timers; visible state and actual seeking remain with the player.
+@available(iOS 17.0, *)
 @MainActor
 final class PlayerSponsorBlockCoordinator {
+    private let service: any SponsorBlockServicing
+    private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
     private var boundaryObservers: [Any] = []
     private var handledSegmentIDs = Set<String>()
+    private var lookupTask: Task<Void, Never>?
+    private var noticeTask: Task<Void, Never>?
+
+    init(service: any SponsorBlockServicing) {
+        self.service = service
+    }
+
+    // MARK: - Lookup and presentation timing
+
+    func loadSegments(
+        for videoID: String,
+        categories: Set<SponsorBlockCategory>,
+        isCurrent: @escaping @MainActor () -> Bool,
+        onLoaded: @escaping @MainActor ([SponsorBlockSegment]) -> Void
+    ) {
+        lookupTask?.cancel()
+        lookupTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let segments = try await service.fetchSegments(videoID: videoID, categories: categories)
+                try Task.checkCancellation()
+                guard isCurrent() else { return }
+                onLoaded(segments)
+                let fullLabels = segments.filter(\.isFullVideoLabel).count
+                log.info("SponsorBlock loaded \(segments.count, privacy: .public) segments (full labels=\(fullLabels, privacy: .public)) for \(videoID, privacy: .public)")
+            } catch is CancellationError {
+                log.debug("SponsorBlock lookup cancelled for \(videoID, privacy: .public)")
+            } catch {
+                // Lookup failures are optional metadata failures, never playback failures.
+                log.notice("SponsorBlock lookup failed for \(videoID, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// Install skip boundaries and return the chapter/notice candidates for the current playhead.
+    func installSegments(
+        _ segments: [SponsorBlockSegment],
+        on player: AVQueuePlayer,
+        elapsed: TimeInterval,
+        preferences: UserPreferences,
+        onEntry: @escaping @MainActor (SponsorBlockSegment) -> Void
+    ) -> (communityChapters: [VideoChapter], highlight: SponsorBlockSegment?, current: SponsorBlockSegment?) {
+        var chapterStarts = Set<TimeInterval>()
+        let chapters = segments.compactMap { segment -> VideoChapter? in
+            guard segment.category == .chapter,
+                  let title = segment.title,
+                  chapterStarts.insert(segment.startTime).inserted else { return nil }
+            return VideoChapter(
+                title: title, startTime: segment.startTime,
+                timeDescription: nil, thumbnailURL: nil
+            )
+        }
+        let isSkippable: (SponsorBlockSegment) -> Bool = { segment in
+            self.shouldObserve(
+                segment,
+                behavior: preferences.sponsorBlockBehavior(for: segment.category),
+                minimumSkipSeconds: preferences.sponsorBlockMinimumSkipSeconds
+            )
+        }
+        installBoundaryObservers(on: player, for: segments, shouldObserve: isSkippable, onEntry: onEntry)
+        let highlight = segments.first {
+            $0.category == .highlight
+                && preferences.sponsorBlockBehavior(for: $0.category) == .ask
+                && elapsed < $0.startTime - 0.5
+        }
+        if let highlight { markHandled(highlight.id) }
+        let current = segments.first {
+            isSkippable($0) && elapsed >= $0.startTime && elapsed < $0.endTime
+        }
+        return (chapters, highlight, current)
+    }
+
+    func scheduleNoticeDismissal(after seconds: TimeInterval, onDismiss: @escaping @MainActor () -> Void) {
+        noticeTask?.cancel()
+        noticeTask = Task {
+            do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
+            onDismiss()
+        }
+    }
+
+    func cancelNoticeDismissal() {
+        noticeTask?.cancel()
+        noticeTask = nil
+    }
+
+    func clearCache() { service.clearCache() }
+
+    // MARK: - Skip boundaries
 
     func shouldObserve(
         _ segment: SponsorBlockSegment,
@@ -73,6 +165,9 @@ final class PlayerSponsorBlockCoordinator {
     }
 
     func clear(on player: AVQueuePlayer) {
+        lookupTask?.cancel()
+        lookupTask = nil
+        cancelNoticeDismissal()
         handledSegmentIDs.removeAll()
         removeBoundaryObservers(from: player)
     }

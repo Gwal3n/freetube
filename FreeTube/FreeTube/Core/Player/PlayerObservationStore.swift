@@ -1,20 +1,43 @@
 import AVFoundation
 import Foundation
 
-/// Owns AVPlayer observation tokens and removes them when an item is replaced or playback ends.
-/// Callback behavior remains in PlayerStateManager; this type only manages observer lifetimes.
+/// Owns AVPlayer observation registration and token lifetimes.
+/// Playback decisions remain in PlayerStateManager's event handlers.
 @available(iOS 17.0, *)
 @MainActor
 final class PlayerObservationStore {
-    var time: Any?
-    var timeControlStatus: NSKeyValueObservation?
-    var end: NSObjectProtocol?
+    private var time: Any?
+    private var timeControlStatus: NSKeyValueObservation?
+    private var end: NSObjectProtocol?
     var itemStatus: NSKeyValueObservation?
     var itemPresentationSize: NSKeyValueObservation?
     var itemLoadedTimeRanges: NSKeyValueObservation?
     var itemFailedToEnd: NSObjectProtocol?
     var itemErrorLog: NSObjectProtocol?
     var itemAccessLog: NSObjectProtocol?
+
+    func installPlayerObservers(
+        on player: AVQueuePlayer,
+        onTime: @escaping @MainActor (CMTime) -> Void,
+        onEnd: @escaping @MainActor (AVPlayerItem) -> Void,
+        onTransportChange: @escaping @MainActor () -> Void
+    ) {
+        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+        time = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { value in
+            Task { @MainActor in onTime(value) }
+        }
+        end = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let item = notification.object as? AVPlayerItem else { return }
+            Task { @MainActor in onEnd(item) }
+        }
+        timeControlStatus = player.observe(\.timeControlStatus, options: [.new, .initial]) { _, _ in
+            Task { @MainActor in onTransportChange() }
+        }
+    }
 
     func clearLoadedTimeRanges() {
         itemLoadedTimeRanges?.invalidate()
