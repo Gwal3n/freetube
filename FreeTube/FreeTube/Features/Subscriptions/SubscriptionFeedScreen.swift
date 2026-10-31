@@ -142,7 +142,12 @@ struct SubscriptionFeedScreen: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    filterMenu
+                    FeedFilterMenu(
+                        watchFilterRaw: $watchFilterRaw,
+                        durationFilterRaw: $durationFilterRaw,
+                        isWatchFilterPresented: $isWatchFilterPresented,
+                        isCustomDurationPresented: $isCustomDurationPresented
+                    )
                 }
             }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
@@ -341,97 +346,6 @@ struct SubscriptionFeedScreen: View {
         }
     }
 
-    private var filterMenu: some View {
-        Menu {
-            Button {
-                isWatchFilterPresented = true
-            } label: {
-                if watchFilter == .all {
-                    Text("Watch status")
-                } else {
-                    Label("Watch status", systemImage: "checkmark")
-                }
-            }
-            Menu {
-                ForEach(FeedDurationFilter.allCases) { option in
-                    Button {
-                        if option == .custom {
-                            isCustomDurationPresented = true
-                        } else {
-                            durationFilterRaw = option.rawValue
-                        }
-                    } label: {
-                        if durationFilter == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            } label: {
-                if durationFilter == .all {
-                    Text("Duration")
-                } else {
-                    Label("Duration", systemImage: "checkmark")
-                }
-            }
-            if watchFilter != .all || durationFilter != .all {
-                Divider()
-                Button("Reset Filters") {
-                    watchFilterRaw = FeedWatchFilter.all.rawValue
-                    durationFilterRaw = FeedDurationFilter.all.rawValue
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease")
-                .overlay(alignment: .topTrailing) {
-                    if watchFilter != .all || durationFilter != .all {
-                        Circle()
-                            .fill(.primary)
-                            .frame(width: 5, height: 5)
-                            .offset(x: 4, y: -4)
-                    }
-                }
-        }
-        .accessibilityLabel("Feed filters")
-        .accessibilityValue(watchFilter == .all && durationFilter == .all ? "Off" : "On")
-        .popover(isPresented: $isWatchFilterPresented, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Watch status")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                ForEach(FeedWatchFilter.allCases) { option in
-                    Button {
-                        watchFilterRaw = option.rawValue
-                        isWatchFilterPresented = false
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text(option.title)
-                            Spacer(minLength: 8)
-                            if watchFilter == option {
-                                Image(systemName: "checkmark")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                        }
-                        .foregroundStyle(.primary)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    if option != FeedWatchFilter.allCases.last {
-                        Divider().padding(.leading, 16)
-                    }
-                }
-            }
-            .frame(width: 270)
-            .padding(.bottom, 6)
-            .presentationCompactAdaptation(.popover)
-        }
-    }
-
     private var automaticRefreshTaskKey: String {
         "\(selectedTab == .feed):\(scenePhase == .active):\(automaticFeedRefreshEnabled):\(automaticFeedRefreshIntervalRaw)"
     }
@@ -617,65 +531,5 @@ struct SubscriptionFeedScreen: View {
 
     private var displaysWatchProgress: Bool {
         showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
-    }
-}
-
-private enum FeedWatchFilter: String, CaseIterable, Identifiable {
-    case all, hideWatched, hidePartial, onlyPartial, onlyFinished
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: "All videos"
-        case .hideWatched: "Hide watched"
-        case .hidePartial: "Hide partially watched"
-        case .onlyPartial: "Only partially watched"
-        case .onlyFinished: "Only finished"
-        }
-    }
-
-    func includes(_ status: WatchHistoryStatus?) -> Bool {
-        switch self {
-        case .all: true
-        case .hideWatched: status == nil
-        case .hidePartial: status != .partial
-        case .onlyPartial: status == .partial
-        case .onlyFinished: status == .finished
-        }
-    }
-}
-
-private enum FeedDurationFilter: String, CaseIterable, Identifiable {
-    case all, underFourMinutes, fourToTwentyMinutes, overTwentyMinutes, custom
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: "Any length"
-        case .underFourMinutes: "Under 4 minutes"
-        case .fourToTwentyMinutes: "4–20 minutes"
-        case .overTwentyMinutes: "Over 20 minutes"
-        case .custom: "Custom range…"
-        }
-    }
-
-    func includes(
-        _ duration: TimeInterval?,
-        minimumMinutes: Int,
-        maximumMinutes: Int
-    ) -> Bool {
-        guard self != .all else { return true }
-        guard let duration, duration.isFinite, duration > 0 else { return false }
-        return switch self {
-        case .all: true
-        case .underFourMinutes: duration < 240
-        case .fourToTwentyMinutes: duration >= 240 && duration <= 1200
-        case .overTwentyMinutes: duration > 1200
-        case .custom:
-            duration >= TimeInterval(max(0, minimumMinutes)) * 60
-                && (maximumMinutes == 0 || duration <= TimeInterval(maximumMinutes) * 60)
-        }
     }
 }
