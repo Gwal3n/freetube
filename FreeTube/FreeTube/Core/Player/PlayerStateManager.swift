@@ -1,6 +1,5 @@
 import Foundation
 import AVFoundation
-import Combine
 import Kingfisher
 import OSLog
 import SwiftData
@@ -8,8 +7,6 @@ import UIKit
 
 /// CLAUDE.md §8: single source of truth for playback. Injected via SwiftUI environment.
 /// Mini player and full-screen player both observe this object — neither owns its own `AVPlayer`.
-///
-/// Combine is used **only** here for `AVPlayer` time-observer bridging, per CLAUDE.md §2.9.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
@@ -203,14 +200,7 @@ final class PlayerStateManager {
             || queue.availableUpcomingCount(limit: 1) > 0
     }
 
-    private var timeObserver: Any?
-    private var timeControlStatusObservation: NSKeyValueObservation?
-    private var statusCancellable: AnyCancellable?
-    private var endObserver: NSObjectProtocol?
-    private var itemStatusObservation: NSKeyValueObservation?
-    private var itemPresentationSizeObservation: NSKeyValueObservation?
-    private var itemLoadedTimeRangesObservation: NSKeyValueObservation?
-    private var itemFailedToEndObservation: NSObjectProtocol?
+    @ObservationIgnored private let observations = PlayerObservationStore()
     private weak var acceptedStreamItem: AVPlayerItem?
     private var acceptedStreamStrategy: PlaybackStrategy?
     /// One post-start resolver pass per video. A second terminal failure is shown to the user
@@ -221,10 +211,7 @@ final class PlayerStateManager {
     private var wantsPlayback = false
 
     private var itemLoadStartedAt: Date?
-    private var itemErrorLogObservation: NSObjectProtocol?
-    private var itemAccessLogObservation: NSObjectProtocol?
     private let itemDiagnostics = PlayerItemDiagnostics()
-    private var playerErrorObservation: NSKeyValueObservation?
     private var fastPlaybackTask: Task<Void, Never>?
     private var fastPlaybackTimeoutTask: Task<Void, Never>?
     private var fastPlaybackGeneration = 0
@@ -245,8 +232,7 @@ final class PlayerStateManager {
     private var audioModeSwitchGeneration = 0
     private var resumeAfterAudioSwitch: Bool?
     private var sleepTimerTask: Task<Void, Never>?
-    private var recommendationBacklog: [Video] = []
-    private var recommendationContinuationToken: String?
+    private var recommendationPager = PlayerRecommendationPager()
     private var playlistContinuationToken: String?
     private var audioInterruptionObserver: NSObjectProtocol?
     private var interruptedPlaybackSessionID: Int?
@@ -321,29 +307,14 @@ final class PlayerStateManager {
         audioModeSwitchGeneration &+= 1
         isSwitchingAudioMode = false
         resumeAfterAudioSwitch = nil
-        if let timeObserver { player.removeTimeObserver(timeObserver) }
-        itemStatusObservation?.invalidate()
-        itemPresentationSizeObservation?.invalidate()
-        itemLoadedTimeRangesObservation?.invalidate()
-        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        observations.clearAll(on: player)
         if let audioInterruptionObserver { NotificationCenter.default.removeObserver(audioInterruptionObserver) }
         audioInterruptionObserver = nil
         interruptedPlaybackSessionID = nil
-        if let itemFailedToEndObservation { NotificationCenter.default.removeObserver(itemFailedToEndObservation) }
-        if let itemErrorLogObservation { NotificationCenter.default.removeObserver(itemErrorLogObservation) }
-        if let itemAccessLogObservation { NotificationCenter.default.removeObserver(itemAccessLogObservation) }
-        timeObserver = nil
-        endObserver = nil
-        itemFailedToEndObservation = nil
         acceptedStreamItem = nil
         acceptedStreamStrategy = nil
         didAttemptPlaybackRecovery = false
         wantsPlayback = false
-        itemErrorLogObservation = nil
-        itemAccessLogObservation = nil
-        itemStatusObservation = nil
-        itemPresentationSizeObservation = nil
-        itemLoadedTimeRangesObservation = nil
         bufferedRanges = []
         liveSeekableRange = nil
         clearSponsorBlockState()
@@ -351,8 +322,7 @@ final class PlayerStateManager {
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
-        recommendationBacklog = []
-        recommendationContinuationToken = nil
+        recommendationPager.reset()
         isLoadingMoreRecommendations = false
         activePlaylist = nil
         activePlaylistOrigin = nil
@@ -407,8 +377,7 @@ final class PlayerStateManager {
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
-        recommendationBacklog = []
-        recommendationContinuationToken = nil
+        recommendationPager.reset()
         isLoadingMoreRecommendations = false
         activePlaylist = nil
         activePlaylistOrigin = nil
@@ -444,8 +413,7 @@ final class PlayerStateManager {
         presentPlayer(for: synthetic.id, expanded: true)
         elapsed = 0
         duration = 0
-        itemLoadedTimeRangesObservation?.invalidate()
-        itemLoadedTimeRangesObservation = nil
+        observations.clearLoadedTimeRanges()
         bufferedRanges = []
         liveSeekableRange = nil
         hasEnded = false
@@ -523,8 +491,7 @@ final class PlayerStateManager {
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
-        recommendationBacklog = []
-        recommendationContinuationToken = nil
+        recommendationPager.reset()
         isLoadingMoreRecommendations = false
         videoPresentationSize = .zero
         let isPlaylistInterlude = preservePlaylistPosition && skipRecommendations && activePlaylist != nil
@@ -584,8 +551,7 @@ final class PlayerStateManager {
         // that's what showed phantom progress bars on cells the user never played.
         elapsed = 0
         duration = 0
-        itemLoadedTimeRangesObservation?.invalidate()
-        itemLoadedTimeRangesObservation = nil
+        observations.clearLoadedTimeRanges()
         bufferedRanges = []
         liveSeekableRange = nil
         hasEnded = false
@@ -1681,8 +1647,7 @@ final class PlayerStateManager {
         let visibleVideos = details.videos.filter { !VideoBlocklist.shared.blocks($0) }
         recommendationTask?.cancel()
         recommendationTask = nil
-        recommendationBacklog = []
-        recommendationContinuationToken = nil
+        recommendationPager.reset()
         playlistRecommendations = []
         queue.isShuffleOn = false
         queue.replace(with: visibleVideos, startAt: index)
@@ -1727,8 +1692,7 @@ final class PlayerStateManager {
         playlistContinuationToken = nil
         isLoadingMorePlaylistVideos = false
         queueAcceptsRecommendations = true
-        recommendationBacklog = []
-        recommendationContinuationToken = nil
+        recommendationPager.reset()
         queue.replace(with: [currentVideo] + suggestions)
         queue.isShuffleOn = false
 
@@ -1808,8 +1772,7 @@ final class PlayerStateManager {
         clearChapterState()
         storyboard = nil
         captionTracks = []
-        recommendationBacklog = []
-        recommendationContinuationToken = nil
+        recommendationPager.reset()
         isLoadingMoreRecommendations = false
         activePlaylist = nil
         activePlaylistOrigin = nil
@@ -1835,8 +1798,7 @@ final class PlayerStateManager {
             self.fastPlaybackLocalFileURL = nil
             FastPlaybackLocalFileService.remove(fastPlaybackLocalFileURL)
         }
-        itemLoadedTimeRangesObservation?.invalidate()
-        itemLoadedTimeRangesObservation = nil
+        observations.clearLoadedTimeRanges()
         bufferedRanges = []
         liveSeekableRange = nil
         playbackHistory.reset()
@@ -2049,19 +2011,13 @@ final class PlayerStateManager {
     }
 
     private func observe(item: AVPlayerItem) {
-        itemStatusObservation?.invalidate()
-        itemPresentationSizeObservation?.invalidate()
-        itemLoadedTimeRangesObservation?.invalidate()
+        observations.clearItem()
         bufferedRanges = []
         liveSeekableRange = nil
         observedFrameRate = nil
         itemDiagnostics.reset()
-        if let token = itemErrorLogObservation { NotificationCenter.default.removeObserver(token) }
-        if let token = itemAccessLogObservation { NotificationCenter.default.removeObserver(token) }
-        if let token = itemFailedToEndObservation { NotificationCenter.default.removeObserver(token) }
-        itemFailedToEndObservation = nil
 
-        itemStatusObservation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
+        observations.itemStatus = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
             guard let self else { return }
             Task { @MainActor in
                 switch item.status {
@@ -2095,7 +2051,7 @@ final class PlayerStateManager {
             }
         }
 
-        itemPresentationSizeObservation = item.observe(\.presentationSize, options: [.new, .initial]) { [weak self] item, _ in
+        observations.itemPresentationSize = item.observe(\.presentationSize, options: [.new, .initial]) { [weak self] item, _ in
             guard let self else { return }
             Task { @MainActor in
                 let size = item.presentationSize
@@ -2106,7 +2062,7 @@ final class PlayerStateManager {
             }
         }
 
-        itemLoadedTimeRangesObservation = item.observe(\.loadedTimeRanges, options: [.new, .initial]) { [weak self] item, _ in
+        observations.itemLoadedTimeRanges = item.observe(\.loadedTimeRanges, options: [.new, .initial]) { [weak self] item, _ in
             guard let self else { return }
             Task { @MainActor in
                 guard self.player.currentItem === item else { return }
@@ -2121,7 +2077,7 @@ final class PlayerStateManager {
             }
         }
 
-        itemErrorLogObservation = NotificationCenter.default.addObserver(
+        observations.itemErrorLog = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.newErrorLogEntryNotification,
             object: item,
             queue: .main
@@ -2132,7 +2088,7 @@ final class PlayerStateManager {
             self?.log.error("AVPlayerItem error-log: domain=\(entry.errorDomain, privacy: .public) code=\(entry.errorStatusCode, privacy: .public) comment=\(entry.errorComment ?? "", privacy: .public)")
         }
 
-        itemFailedToEndObservation = NotificationCenter.default.addObserver(
+        observations.itemFailedToEnd = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.failedToPlayToEndTimeNotification,
             object: item,
             queue: .main
@@ -2143,7 +2099,7 @@ final class PlayerStateManager {
             }
         }
 
-        itemAccessLogObservation = NotificationCenter.default.addObserver(
+        observations.itemAccessLog = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.newAccessLogEntryNotification,
             object: item,
             queue: .main
@@ -2554,12 +2510,12 @@ final class PlayerStateManager {
             installVideoDetails(info, for: seed.id)
             let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
             let needed = targetUpcomingCount - upcomingCount
-            let fresh = info.recommended.filter {
-                !existingIDs.contains($0.id) && !VideoBlocklist.shared.blocks($0)
-            }
-            let toAppend = Array(fresh.prefix(needed))
-            recommendationBacklog = Array(fresh.dropFirst(toAppend.count))
-            recommendationContinuationToken = info.recommendedContinuationToken
+            let toAppend = recommendationPager.start(
+                recommended: info.recommended,
+                continuationToken: info.recommendedContinuationToken,
+                excluding: existingIDs,
+                limit: needed
+            )
             if activePlaylist != nil {
                 playlistRecommendations = toAppend
             } else {
@@ -2574,7 +2530,7 @@ final class PlayerStateManager {
     }
 
     var canLoadMoreRecommendations: Bool {
-        !recommendationBacklog.isEmpty || recommendationContinuationToken != nil
+        recommendationPager.canLoadMore
     }
 
     /// Adds the next small recommendation page to Up Next. The remainder of YouTube's initial
@@ -2584,11 +2540,7 @@ final class PlayerStateManager {
         isLoadingMoreRecommendations = true
         defer { isLoadingMoreRecommendations = false }
 
-        recommendationBacklog.removeAll { VideoBlocklist.shared.blocks($0) }
-
-        if !recommendationBacklog.isEmpty {
-            let page = Array(recommendationBacklog.prefix(5))
-            recommendationBacklog.removeFirst(page.count)
+        if let page = recommendationPager.takeBacklogPage(limit: 5) {
             if activePlaylist != nil {
                 playlistRecommendations.append(contentsOf: page)
             } else {
@@ -2597,18 +2549,13 @@ final class PlayerStateManager {
             return
         }
 
-        guard let token = recommendationContinuationToken else { return }
+        guard let token = recommendationPager.continuationToken else { return }
         let videoID = currentVideo?.id
         do {
             let page = try await videoService.fetchRecommendedVideos(continuation: token)
             guard !Task.isCancelled, currentVideo?.id == videoID else { return }
             let existingIDs = Set(queue.items.map(\.id)).union(playlistRecommendations.map(\.id))
-            let fresh = page.videos.filter {
-                !existingIDs.contains($0.id) && !VideoBlocklist.shared.blocks($0)
-            }
-            let visible = Array(fresh.prefix(5))
-            recommendationBacklog = Array(fresh.dropFirst(visible.count))
-            recommendationContinuationToken = page.continuationToken
+            let visible = recommendationPager.accept(page, excluding: existingIDs, limit: 5)
             if activePlaylist != nil {
                 playlistRecommendations.append(contentsOf: visible)
             } else {
@@ -2670,9 +2617,9 @@ final class PlayerStateManager {
                 }
             }
         }
-        // Periodic time observation via Combine-friendly bridging.
+        // Periodic AVPlayer time observation.
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+        observations.time = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
             Task { @MainActor in
                 if let pendingSeekTarget = self.pendingSeekTarget {
@@ -2707,7 +2654,7 @@ final class PlayerStateManager {
 
         // Handle the retained item at natural end. `actionAtItemEnd = .pause` prevents
         // AVQueuePlayer from removing it before replay/backward-seek can reuse it.
-        endObserver = NotificationCenter.default.addObserver(
+        observations.end = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: nil,
             queue: .main
@@ -2747,7 +2694,7 @@ final class PlayerStateManager {
         // The current video's menu rate is separate from the saved default. The
         // capability-limited AVPlayer rate and temporary holds must not change either choice.
 
-        timeControlStatusObservation = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] _, _ in
+        observations.timeControlStatus = player.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] _, _ in
             guard let self else { return }
             Task { @MainActor in
                 // Read the status inside the hop rather than capturing it at KVO time. Optimistic
