@@ -61,6 +61,7 @@ final class DownloadManager {
     private var inflight: [String: Task<URL, Error>] = [:]
     @ObservationIgnored private let mediaFinalizer = DownloadMediaFinalizer()
     @ObservationIgnored private let sourceSelector = DownloadSourceSelector()
+    @ObservationIgnored private let streamTransfer = DownloadStreamTransfer()
     private let preferences = UserPreferences()
     @ObservationIgnored private let log = AppLog(subsystem: "com.leshko.freetube", category: "DownloadManager")
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
@@ -862,10 +863,7 @@ final class DownloadManager {
         try await mediaFinalizer.mux(video: videoFile, audio: audioFile, destination: destination)
     }
 
-    /// Downloads a single direct stream with a file-backed URLSession task. The previous
-    /// `AsyncBytes` loop suspended once per byte and capped an 18 MB audio file near 32 KB/s.
-    /// Progress still feeds the existing snapshot pipeline; final size and media validation stay
-    /// unchanged.
+    /// Bridges byte progress from the shared direct transfer into this download's UI snapshot.
     private func downloadStream(
         from url: URL,
         to destination: URL,
@@ -875,20 +873,6 @@ final class DownloadManager {
         sendTVClientUserAgent: Bool = true,
         sourceLabel: String = "fallback"
     ) async throws {
-        try? FileManager.default.removeItem(at: destination)
-        var request = URLRequest(url: url)
-        if sendTVClientUserAgent {
-            // Match the TVHTML5_SIMPLY_EMBEDDED_PLAYER user-agent we set on `tvHtmlModel`.
-            // The CDN occasionally rejects requests whose UA doesn't match the client that
-            // minted the URL. Native progressive audio uses URLSession's normal agent instead.
-            request.setValue("Mozilla/5.0 (PlayStation; PlayStation 4/12.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-        }
-
-        // Googlevideo sometimes omits Content-Length while retaining its `clen` parameter.
-        // Use it for progress only; never persist or log the signed URL itself.
-        let declaredLength = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "clen" })?.value.flatMap(Int64.init)
-        let startedAt = Date()
         let reportProgress: @Sendable (Int64, Int64) -> Void = { [weak self] written, total in
             Task { @MainActor [weak self] in
                 guard let self,
@@ -907,54 +891,13 @@ final class DownloadManager {
                 )
             }
         }
-
-        // The same signed audio URL took ~32 KB/s as one long response in device logs. Use a
-        // small Range probe and at most four concurrent chunks for native audio; if the server
-        // ignores ranges or any chunk fails, the existing single-request path remains intact.
-        var usedRanges = false
-        if sourceLabel == "native-audio", let declaredLength, declaredLength > 64 * 1024 {
-            do {
-                usedRanges = try await RangedMediaDownloadService.download(
-                    request: request, to: destination, totalBytes: declaredLength,
-                    onProgress: reportProgress
-                )
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                log.notice("[native-audio] range transfer failed; retrying as one request: \(String(describing: error), privacy: .public)")
-                try? FileManager.default.removeItem(at: destination)
-            }
-        }
-
-        let http: HTTPURLResponse?
-        if usedRanges {
-            http = nil
-        } else {
-            http = try await DirectFileDownloadService.download(
-                request: request,
-                to: destination,
-                expectedSizeHint: declaredLength,
-                onProgress: reportProgress
-            )
-        }
-        if let http, !(200..<300).contains(http.statusCode) {
-            log.error("[\(sourceLabel, privacy: .public)] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        let expected = usedRanges ? (declaredLength ?? -1) : (http?.expectedContentLength ?? -1)
-        let written = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
-        log.info("[\(sourceLabel, privacy: .public)] wrote \(written, privacy: .public) bytes in \(Date().timeIntervalSince(startedAt), privacy: .public)s mode=\(usedRanges ? "ranges" : "single", privacy: .public) to \(destination.lastPathComponent, privacy: .public)")
-
-        guard written >= DownloadMediaFinalizer.minimumFileSize else {
-            log.error("[\(sourceLabel, privacy: .public)] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
-            try? FileManager.default.removeItem(at: destination)
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-        if expected > 0, written != expected {
-            log.error("[\(sourceLabel, privacy: .public)] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
-            try? FileManager.default.removeItem(at: destination)
-            throw YouTubeServiceError.streamExtractionFailed
-        }
+        try await streamTransfer.download(
+            from: url,
+            to: destination,
+            sendTVClientUserAgent: sendTVClientUserAgent,
+            sourceLabel: sourceLabel,
+            onProgress: reportProgress
+        )
     }
 
     /// Materializes the native source used by playback. HLS, direct MP4, and separate MP4/M4A

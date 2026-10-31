@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Selects usable download sources without owning transfer state or progress reporting.
 @available(iOS 17.0, *)

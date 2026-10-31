@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import OSLog
 
 /// Validates completed downloads and combines separate video and audio tracks. All download
 /// sources use the same checks before the manager publishes a file as completed.
