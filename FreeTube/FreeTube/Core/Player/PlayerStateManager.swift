@@ -171,6 +171,7 @@ final class PlayerStateManager {
     let queue: QueueManager
     private let resolver: any PlaybackResolving
     private let itemFactory = PlaybackItemFactory()
+    @ObservationIgnored private let fastPlaybackCandidatePreparer = PlayerFastPlaybackCandidatePreparer()
     private let preparationGate = PlayerItemPreparationGate()
     private let readinessGate = PlayerItemReadinessGate()
     private let sponsorBlockService: any SponsorBlockServicing
@@ -1099,37 +1100,23 @@ final class PlayerStateManager {
         }
         let replacement: AVPlayerItem
         do {
-            let candidate = try await resolver.resolveForFastPlayback(video: video, quality: quality)
-            try Task.checkCancellation()
-            let itemToProbe: AVPlayerItem
-            switch candidate.source {
-            case .direct, .localFile:
-                itemToProbe = try await itemFactory.makeItem(for: candidate)
-            case .composite(let videoURL, let audioURL):
-                // Remote AVCompositions stalled on device. Materialize their tracks in a
-                // cancellable temporary file while the existing HLS item keeps playing.
-                scheduleFastPlaybackTimeout(after: .seconds(1_200), generation: generation)
-                log.info("Preparing temporary local file for fast playback of \(video.id, privacy: .public): workingDuration=\(originalItem.duration.seconds, privacy: .public)s videoMetadataDuration=\(video.duration ?? -1, privacy: .public)s")
-                let localFile = try await FastPlaybackLocalFileService.prepare(
-                    videoURL: videoURL, audioURL: audioURL,
-                    referenceDuration: originalItem.duration.seconds
-                ) { [weak self] update in
+            let prepared = try await fastPlaybackCandidatePreparer.prepare(
+                video: video,
+                quality: quality,
+                referenceDuration: originalItem.duration.seconds,
+                resolver: resolver,
+                itemFactory: itemFactory,
+                onCompositePreparation: { [weak self] in
+                    self?.scheduleFastPlaybackTimeout(after: .seconds(1_200), generation: generation)
+                },
+                onProgress: { [weak self] update in
                     guard let self, self.fastPlaybackGeneration == generation,
                           self.playbackSessionID == session else { return }
                     self.fastPlaybackPreparation = update
                 }
-                preparedLocalFile = localFile
-                itemToProbe = AVPlayerItem(url: localFile)
-            }
-            try Task.checkCancellation()
-            let preparation = FastPlaybackPreparation(item: itemToProbe)
-            let preparedAsset = try await preparation.prepare(audioOnly: quality == .audioOnly)
-            try Task.checkCancellation()
-            // Never insert the probe's AVPlayerItem into the visible AVQueuePlayer. The two
-            // players may still overlap internally after detachment and AVFoundation throws an
-            // uncaught Objective-C exception if they are given the same item.
-            replacement = AVPlayerItem(asset: preparedAsset)
-            replacement.audioTimePitchAlgorithm = .timeDomain
+            )
+            preparedLocalFile = prepared.temporaryFile
+            replacement = prepared.item
         } catch {
             guard !Task.isCancelled, fastPlaybackGeneration == generation,
                   playbackSessionID == session else { return }
