@@ -3,6 +3,7 @@ import SwiftUI
 /// Shared label for native value-based navigation rows in the Library root.
 @available(iOS 17.0, *)
 struct LibraryDestinationRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let title: String
     let subtitle: String
     let systemImage: String
@@ -19,6 +20,8 @@ struct LibraryDestinationRow: View {
                 Text(subtitle)
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
+                    .contentTransition(.opacity)
+                    .animation(reduceMotion ? nil : InterfaceMotion.content, value: subtitle)
             }
             Spacer(minLength: 8)
         }

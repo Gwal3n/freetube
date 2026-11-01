@@ -322,7 +322,10 @@ struct SearchContent: View {
                 Text(title)
                 Spacer()
                 if let count {
-                    Text(verbatim: count.formatted()).foregroundStyle(.secondary)
+                    Text(verbatim: count.formatted())
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                        .animation(reduceMotion ? nil : InterfaceMotion.content, value: count)
                 }
                 Image(systemName: "chevron.right")
                     .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))

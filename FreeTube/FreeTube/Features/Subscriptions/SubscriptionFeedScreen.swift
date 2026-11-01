@@ -12,6 +12,7 @@ struct SubscriptionFeedScreen: View {
     @State private var handledNavigationRequestID: UUID?
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
@@ -463,6 +464,9 @@ struct SubscriptionFeedScreen: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .contentTransition(.opacity)
+                .animation(reduceMotion ? nil : InterfaceMotion.content,
+                           value: model.selectedGroupName)
                 Image(systemName: "chevron.down")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)

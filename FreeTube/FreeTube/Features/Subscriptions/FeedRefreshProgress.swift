@@ -3,6 +3,7 @@ import SwiftUI
 /// The feed header keeps its status inside the row and gives the refresh bar the full row width.
 @available(iOS 17.0, *)
 struct FeedRefreshProgress<LeadingContent: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let model: SubscriptionFeedViewModel
     let referenceDate: Date
     let hasLeadingContent: Bool
@@ -33,6 +34,9 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
                 if model.showsRefreshProgress || model.lastRefreshAt != nil {
                     HStack(spacing: 0) {
                         status
+                            .contentTransition(.opacity)
+                            .animation(reduceMotion ? nil : InterfaceMotion.content,
+                                       value: model.showsRefreshProgress)
                         if model.showsRefreshProgress {
                             Button(action: onCancel) {
                                 Image(systemName: "xmark.circle.fill")
@@ -69,6 +73,11 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
         Group {
             if model.showsRefreshProgress {
                 Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
+                    .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : InterfaceMotion.content,
+                               value: model.refreshedChannels)
+                    .animation(reduceMotion ? nil : InterfaceMotion.content,
+                               value: model.refreshChannelCount)
             } else if let lastRefreshAt = model.lastRefreshAt {
                 if referenceDate.timeIntervalSince(lastRefreshAt) < 3_600 {
                     ViewThatFits(in: .horizontal) {
