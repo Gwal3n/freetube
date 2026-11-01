@@ -11,9 +11,8 @@ import FFmpegSupport
 /// uses `setjmp`/`longjmp`, which has undefined behavior across concurrent calls.
 ///
 /// Parallel playlist downloads (Download All firing N `ensureDownloaded` tasks at once) was the
-/// trigger that exposed this — each yt-dlp completion fed into its own `Task.detached` ffmpeg
-/// call. With this actor, every ffmpeg invocation chains strictly behind the previous one
-/// through `pending`, same FIFO pattern `PythonRunner` uses for yt-dlp.
+/// trigger that exposed this — each completion fed into its own `Task.detached` ffmpeg call.
+/// With this actor, every invocation chains strictly behind the previous one through `pending`.
 @available(iOS 17.0, *)
 actor FFmpegRunner {
     static let shared = FFmpegRunner()

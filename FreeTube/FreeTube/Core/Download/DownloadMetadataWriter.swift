@@ -18,7 +18,7 @@ final class DownloadMetadataWriter {
             videoID: video.id,
             title: video.title,
             channelName: video.channelName,
-            formatID: "ytdl",
+            formatID: "youtube",
             originalURL: nil,
             rawThumbnail: thumbnail,
             at: fileURL

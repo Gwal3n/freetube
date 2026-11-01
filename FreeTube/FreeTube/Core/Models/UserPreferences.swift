@@ -112,7 +112,7 @@ struct UserPreferences {
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.dark.rawValue
     @AppStorage("appAccentPreset") var appAccentPresetRaw: String = AppAccentPreset.classic.rawValue
     @AppStorage("appFontPreset") var appFontPresetRaw: String = AppFontPreset.system.rawValue
-    /// `--concurrent-fragments` value passed to yt-dlp. Higher values fetch more DASH/HLS chunks
+    /// Maximum native HLS fragment concurrency. Higher values fetch more chunks
     /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
     /// balance for cellular and consumer Wi-Fi. Values above 8 risk YouTube rate-limiting.
     @AppStorage("concurrentFragments") var concurrentFragments: Int = 4

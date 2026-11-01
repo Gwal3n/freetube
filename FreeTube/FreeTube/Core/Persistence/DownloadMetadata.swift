@@ -19,8 +19,8 @@ struct DownloadMetadata: Codable, Sendable {
     /// "YouTube channel name" for YouTube, or the extractor name ("Instagram", "Vimeo")
     /// for legacy Link items. Shown as the row subtitle in the Downloads list.
     let channelName: String
-    /// `"ytdl"` for YouTube, `"url-fetch"` for legacy Link downloads. Lets the Downloads UI branch
-    /// playback behavior without re-checking `originalURL`.
+    /// `"youtube"` for new YouTube files; older files may still carry `"ytdl"`.
+    /// Legacy Link downloads use `"url-fetch"`.
     let formatID: String
     let downloadedAt: Date
     /// Original pasted URL for legacy Link items; `nil` for YouTube (the canonical URL is

@@ -1,5 +1,4 @@
 import Foundation
-import OSLog
 import Security
 
 /// Process-wide privacy defaults that must be established before logging or networking starts.
@@ -11,27 +10,20 @@ nonisolated enum SecurityHardening {
     private static let configured: Bool = {
         lockDownSharedCookieJar()
         removeLegacyAccountCredentials()
-        configurePythonCertificateBundle()
+        removeLegacyYtDlpModule()
         migrateLegacyDiagnostics()
         return true
     }()
 
-    /// Embedded Python's OpenSSL does not know the iOS trust store. Supply a bundled Mozilla
-    /// CA bundle before yt-dlp initializes, so its HTTPS requests can verify certificates.
-    /// Never fall back to disabling verification when the resource is missing.
-    private static func configurePythonCertificateBundle() {
-        let log = Logger(subsystem: "com.leshko.freetube", category: "Security")
-        guard let url = Bundle.main.url(forResource: "cacert", withExtension: "pem"),
-              FileManager.default.isReadableFile(atPath: url.path) else {
-            log.error("Python CA bundle is missing; yt-dlp fallback will fail closed")
-            return
-        }
-        guard setenv("SSL_CERT_FILE", url.path, 1) == 0,
-              setenv("REQUESTS_CA_BUNDLE", url.path, 1) == 0 else {
-            log.error("Could not configure Python CA bundle; yt-dlp fallback will fail closed")
-            return
-        }
-        log.info("Python certificate verification configured")
+    /// Older builds downloaded an executable Python module into Application Support.
+    /// Remove that known file after upgrading to the native-only download pipeline.
+    private static func removeLegacyYtDlpModule() {
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let directory = support.appendingPathComponent("io.github.kewlbear.youtubedl-ios", isDirectory: true)
+        let module = directory.appendingPathComponent("yt_dlp")
+        try? FileManager.default.removeItem(at: module)
+        // This only succeeds when the dependency's directory is empty.
+        try? FileManager.default.removeItem(at: directory)
     }
 
     /// FreeTube is account-free. Reject and erase any response cookies that Foundation might

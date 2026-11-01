@@ -25,6 +25,16 @@ struct FloatingMiniPlayerChrome: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Expand player")
 
+            if player.isAudioOnly {
+                Image(systemName: "music.note")
+                    .font(.system(size: 27, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 54)
+                    .background(.white.opacity(0.12), in: Circle())
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+
             VStack(spacing: 0) {
                 HStack {
                     cornerButton(

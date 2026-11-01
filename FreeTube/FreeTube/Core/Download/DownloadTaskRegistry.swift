@@ -18,7 +18,9 @@ final class DownloadTaskRegistry {
     private let progressPublishMinInterval: Duration = .milliseconds(200)
 
     var snapshots: [DownloadTaskSnapshot] {
-        Array(tasks.values).sorted { $0.createdAt > $1.createdAt }
+        Array(tasks.values).sorted {
+            $0.createdAt == $1.createdAt ? $0.id < $1.id : $0.createdAt > $1.createdAt
+        }
     }
 
     func snapshot(for id: String) -> DownloadTaskSnapshot? { tasks[id] }
@@ -101,7 +103,13 @@ final class DownloadTaskRegistry {
     /// Returns the normalized snapshot, or nil for a cancelled task whose callback arrived late.
     func publish(_ incoming: DownloadTaskSnapshot, phase: String) -> DownloadTaskSnapshot? {
         guard !isCancelled(incoming.id) else { return nil }
-        var snapshot = incoming
+        // Every transfer update keeps its first enqueue time. Replacing it with `.now` makes
+        // concurrent rows exchange positions whenever one reports progress or changes phase.
+        let originalDate = tasks[incoming.id]?.createdAt ?? incoming.createdAt
+        var snapshot = DownloadTaskSnapshot(
+            id: incoming.id, videoID: incoming.videoID, title: incoming.title,
+            state: incoming.state, createdAt: originalDate
+        )
         if !snapshot.id.hasPrefix("fetch-"), case .downloading(let raw) = snapshot.state {
             var tracker = overallProgress[snapshot.id] ?? DownloadOverallProgress()
             let value = tracker.update(raw, phase: phase)

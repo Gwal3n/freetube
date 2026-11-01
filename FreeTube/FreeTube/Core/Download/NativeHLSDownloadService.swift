@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-/// Downloads a resolved HLS source without asking yt-dlp to re-extract YouTube.
+/// Downloads a resolved HLS source without a second extraction request.
 ///
 /// The service deliberately owns only transport concerns: it parses the master/media playlists,
 /// selects a bounded video rendition and the manifest's default audio rendition, downloads media

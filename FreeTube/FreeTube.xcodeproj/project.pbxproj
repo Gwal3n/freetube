@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = AC591D772FB9E26E009EE538 /* YouTubeKit */; };
-		AC591D892FB9E2BE009EE538 /* YoutubeDL in Frameworks */ = {isa = PBXBuildFile; productRef = AC591D882FB9E2BE009EE538 /* YoutubeDL */; };
 		AC591DA82FB9E35C009EE538 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = AC591DA72FB9E35C009EE538 /* Kingfisher */; };
 		AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */ = {isa = PBXBuildFile; productRef = AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */; };
 		AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */ = {isa = PBXBuildFile; productRef = AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */; };
@@ -65,7 +64,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				AC591DA82FB9E35C009EE538 /* Kingfisher in Frameworks */,
-				AC591D892FB9E2BE009EE538 /* YoutubeDL in Frameworks */,
 				AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */,
 				AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */,
 				AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */,
@@ -146,7 +144,6 @@
 			name = FreeTube;
 			packageProductDependencies = (
 				AC591D772FB9E26E009EE538 /* YouTubeKit */,
-				AC591D882FB9E2BE009EE538 /* YoutubeDL */,
 				AC591DA72FB9E35C009EE538 /* Kingfisher */,
 				AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */,
 				AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */,
@@ -188,7 +185,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AC591D762FB9E26E009EE538 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
-				AC591D872FB9E2BE009EE538 /* XCRemoteSwiftPackageReference "YoutubeDL-iOS" */,
 				AC591DA62FB9E35C009EE538 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */,
 				AC5924CC2FBB5F2B009EE538 /* XCRemoteSwiftPackageReference "SwimplyPlayIndicator" */,
@@ -564,14 +560,6 @@
 				kind = branch;
 			};
 		};
-		AC591D872FB9E2BE009EE538 /* XCRemoteSwiftPackageReference "YoutubeDL-iOS" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/kewlbear/YoutubeDL-iOS.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.9;
-			};
-		};
 		AC591DA62FB9E35C009EE538 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
@@ -603,11 +591,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AC591D762FB9E26E009EE538 /* XCRemoteSwiftPackageReference "YouTubeKit" */;
 			productName = YouTubeKit;
-		};
-		AC591D882FB9E2BE009EE538 /* YoutubeDL */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AC591D872FB9E2BE009EE538 /* XCRemoteSwiftPackageReference "YoutubeDL-iOS" */;
-			productName = YoutubeDL;
 		};
 		AC591DA72FB9E35C009EE538 /* Kingfisher */ = {
 			isa = XCSwiftPackageProductDependency;

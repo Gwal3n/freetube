@@ -25,7 +25,7 @@ final class PlayerStateManager {
         /// `.downloading(progress:phase:)` also means the download chrome (percentage label +
         /// determinate bar) stays reserved for actual file transfers.
         case buffering
-        /// File is being fetched. `progress` is 0…1 when known, nil during yt-dlp's mux/merge phase.
+        /// File is being fetched. `progress` is 0…1 when known, nil during a mux phase.
         /// `phase` labels which stream is in flight ("video", "audio", "stream") so the UI can show
         /// "Downloading video 42%" instead of two confusing identical bars in a row.
         case downloading(progress: Double?, phase: String?)
@@ -320,7 +320,7 @@ final class PlayerStateManager {
     /// `resolveAndPlay` calls `DownloadManager.ensureDownloaded` which keys off `videoID` and
     /// looks for `Documents/<id>.mp4`. URL-fetched files live under `Documents/<title>.mp4`
     /// and don't have a YouTube `videoID`, so threading them
-    /// through the normal path would either crash or silently re-trigger a yt-dlp download.
+    /// through the normal path could start an unrelated YouTube download.
     /// This method skips resolution entirely — the file is already there, just play it.
     ///
     /// **What we skip vs the normal load path:** watch-history upsert (URL files aren't in

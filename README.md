@@ -10,6 +10,6 @@ The app targets iOS 17 or later. YouTube can change the interfaces this app reli
 
 ## Origins
 
-This is a fork of [leshkodev/freetube](https://github.com/leshkodev/freetube). It uses [b5i/YouTubeKit](https://github.com/b5i/YouTubeKit) for YouTube data and a [modified copy of alexeichhorn/YouTubeKit](Vendor/FreeTubeStreamKit/UPSTREAM.md) for stream extraction. Download support also uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) through [YoutubeDL-iOS](https://github.com/kewlbear/YoutubeDL-iOS).
+This is a fork of [leshkodev/freetube](https://github.com/leshkodev/freetube). It uses [b5i/YouTubeKit](https://github.com/b5i/YouTubeKit) for YouTube data and a [modified copy of alexeichhorn/YouTubeKit](Vendor/FreeTubeStreamKit/UPSTREAM.md) for stream extraction. Downloads use resolved streams and FFmpeg to assemble media locally.
 
 The app is independent of YouTube, Google, and NewPipe. Its source is available under the [MIT license](LICENSE), which retains the original author's copyright notice. See [third-party software](THIRD_PARTY.md) for the components used by the app.

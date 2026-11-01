@@ -61,7 +61,7 @@ struct DownloadProgressOverlay: View {
 
     /// Phrasing rules:
     /// - "Downloading video 42%" / "Downloading audio 75%" when we know which stream is in flight
-    /// - "Processing video…" between phases (yt-dlp switching from video → audio, or post-download mux)
+    /// - "Processing video…" between transfers or during the final mux
     /// - "Downloading…" as a generic fallback
     private func label(for progress: Double?, phase: String?) -> String {
         guard let progress else { return "Processing video…" }

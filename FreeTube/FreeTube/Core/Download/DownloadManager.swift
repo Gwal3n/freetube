@@ -1,11 +1,9 @@
 import Foundation
 import OSLog
-import PythonKit
 import SwiftData
-import YoutubeDL
 
 /// Owns the on-disk video cache, coordinates native stream downloads, and surfaces progress so UI can
-/// render a live transfer queue. This experiment leaves the embedded yt-dlp path unused.
+/// render a live transfer queue.
 ///
 /// **Playback contract (CLAUDE.md §7 amended):**
 /// Explicit downloads call `ensureDownloaded(video:quality:)`. An existing `Documents/<id>.mp4`
@@ -29,8 +27,8 @@ final class DownloadManager {
     /// Per-video downloaded progress (0…1). The player observes this so the mini-player and the
     /// full-screen player can render a progress overlay while a file is being fetched.
     private(set) var progressByVideoID: [String: Double] = [:]
-    /// Per-video human-readable phase label ("video", "audio", "muxing"). yt-dlp downloads multiple
-    /// streams sequentially under the same id, so we surface which one is currently in-flight to
+    /// Per-video human-readable phase label ("video", "audio", "muxing"). Some sources download
+    /// separate streams sequentially under the same id, so we surface which one is currently in-flight to
     /// avoid the confusing "Downloading 100%" → "Downloading 0%" → "Downloading 100%" sequence.
     private(set) var phaseByVideoID: [String: String] = [:]
 
@@ -49,9 +47,6 @@ final class DownloadManager {
     @ObservationIgnored private let networkGate: DownloadNetworkGate
 
     private init() {
-        // Force the lazy static while the app still owns its original container environment;
-        // embedded Python initialization can otherwise affect later directory resolution.
-        _ = Self.downloadsDirectory
         networkGate = DownloadNetworkGate()
     }
 
@@ -74,10 +69,9 @@ final class DownloadManager {
     /// Either returns the existing local file URL, or downloads the video and returns
     /// the freshly-written path. Coalesces parallel callers for the same `videoID`.
     ///
-    /// `priority` remains part of the public API while the compatibility downloader is disabled.
-    func ensureDownloaded(video: Video, quality: VideoQuality, priority: DownloadPriority = .background) async throws -> URL {
+    func ensureDownloaded(video: Video, quality: VideoQuality) async throws -> URL {
         try Task.checkCancellation()
-        log.info("ensureDownloaded(\(video.id, privacy: .public)) — title=\"\(video.title, privacy: .public)\" quality=\(quality.rawValue, privacy: .public) priority=\(String(describing: priority), privacy: .public)")
+        log.info("ensureDownloaded(\(video.id, privacy: .public)) — title=\"\(video.title, privacy: .public)\" quality=\(quality.rawValue, privacy: .public)")
         // A direct stream may already be writing the destination. Join that transfer before
         // checking the file size, otherwise a partial MP4 can look like a completed cache hit.
         if let inflightTask = inflight[video.id] {
@@ -205,7 +199,7 @@ final class DownloadManager {
     }
 
     /// Starts a fresh attempt for a failed transfer using its original video and quality.
-    /// This is a retry from the beginning, not a claim that HLS/yt-dlp can resume partial bytes.
+    /// This is a retry from the beginning, not a claim that HLS can resume partial bytes.
     func retry(taskID: String) async throws {
         guard let retry = taskRegistry.retryableRequest(for: taskID) else {
             throw NSError(
@@ -227,8 +221,7 @@ final class DownloadManager {
         do {
             _ = try await ensureDownloaded(
                 video: request.video,
-                quality: request.quality,
-                priority: .userInitiated
+                quality: request.quality
             )
         } catch {
             // A network gate can fail before the new attempt creates a snapshot. Restore
@@ -288,7 +281,6 @@ final class DownloadManager {
             return destination
         }
 
-        // This branch tests downloads without invoking Python or fetching yt-dlp at runtime.
         // Keep the native stream path first, then use the existing YouTubeKit direct formats.
         do {
             log.info("download[\(video.id, privacy: .public)] source=youtubekit")
@@ -329,274 +321,8 @@ final class DownloadManager {
         }
     }
 
-    /// Runs the serialized yt-dlp compatibility path after native stream download has failed.
-    private func runCompatibilityDownload(
-        video: Video,
-        quality: VideoQuality,
-        priority: DownloadPriority,
-        destination: URL,
-        snapshotID: String,
-        startedAt: Date
-    ) async throws -> URL {
-        let downloadsDir = destination.deletingLastPathComponent()
-        let stem = destination.deletingPathExtension().lastPathComponent
-
-        // Use `,` (download multiple formats as separate files) instead of `+` (download + merge
-        // via ffmpeg). yt-dlp's ffmpeg merger reliably hangs on iOS — once `Popen.communicate`
-        // dispatches the merger ffmpeg subprocess we never see Python return. We mux the tracks
-        // through the serialized in-process FFmpeg runner. We still keep a single-file fallback
-        // (`best[ext=mp4]/best`) for the rare case where YouTube serves a combined progressive file.
-        let formatString = DownloadFormatPolicy.formatString(for: quality)
-        log.debug("yt-dlp[\(video.id, privacy: .public)] format selector=\(formatString, privacy: .public)")
-        // Output template includes `%(format_id)s` so individual streams land at predictable paths
-        // we can find afterwards. Final destination is set by us after the Swift-side mux.
-        let outputTemplate = destination.deletingPathExtension().path + ".%(format_id)s-%(vcodec)s-%(acodec)s.%(ext)s"
-
-        let argv = DownloadFormatPolicy.youtubeDLArguments(
-            video: video,
-            formatString: formatString,
-            outputTemplate: outputTemplate,
-            concurrentFragments: preferences.concurrentFragments
-        )
-
-        log.info("yt-dlp[\(video.id, privacy: .public)] argv=\(argv.joined(separator: " "), privacy: .public)")
-        log.debug("yt-dlp[\(video.id, privacy: .public)] → state=downloading(0)")
-        publish(snapshot: DownloadTaskSnapshot(
-            id: snapshotID,
-            videoID: video.id,
-            title: video.title,
-            state: .downloading(progress: 0),
-            createdAt: .now
-        ))
-
-        do {
-            log.info("yt-dlp[\(video.id, privacy: .public)] invoking yt_dlp() — first launch triggers Python module download (serialized on dedicated thread via PythonRunner)")
-            try await PythonRunner.shared.run(argv: argv, progress: { [weak self] dict in
-                guard let self else { return }
-                // CRITICAL: PythonKit's `PythonObject` is reference-counted on Python's GIL thread.
-                // If we capture the `[String: PythonObject]` dict into a `Task { @MainActor in ... }`
-                // closure, the objects get released on a *different* thread when the task ends, and
-                // PyReference.deinit crashes inside `_PyInterpreterState_GET`. So we must extract
-                // every value we care about into Swift-native primitives RIGHT HERE on the calling
-                // thread, then ship only those primitives across the actor boundary.
-                let status = String(dict["status"] ?? "") ?? ""
-                let downloaded = Int(dict["downloaded_bytes"] ?? 0) ?? 0
-                let total = Int(dict["total_bytes"] ?? dict["total_bytes_estimate"] ?? 0) ?? 0
-                let speed = Int(dict["speed"] ?? 0) ?? 0
-                let eta = Int(dict["eta"] ?? 0) ?? 0
-                // `filename` tells us which stream this hook is for: <id>.<itag>.mp4 vs <id>.<itag>.m4a.
-                let filename = String(dict["filename"] ?? "") ?? ""
-                let phase: String
-                let lower = filename.lowercased()
-                if lower.hasSuffix(".m4a") || lower.hasSuffix(".webm") && lower.contains("audio") {
-                    phase = "audio"
-                } else if lower.hasSuffix(".mp4") || lower.hasSuffix(".webm") {
-                    phase = "video"
-                } else {
-                    phase = "stream"
-                }
-                Task { @MainActor [snapshotID, videoID = video.id, videoTitle = video.title] in
-                    self.handleProgress(
-                        status: status,
-                        downloaded: downloaded,
-                        total: total,
-                        speed: speed,
-                        eta: eta,
-                        phase: phase,
-                        snapshotID: snapshotID,
-                        videoID: videoID,
-                        videoTitle: videoTitle
-                    )
-                }
-            }, log: { [weak self, log] level, message in
-                // Bridge yt-dlp's Python logger to os_log so its diagnostics show up alongside ours.
-                // Levels we get: debug / info / warning / error.
-                if level == "error" {
-                    log.error("yt-dlp: \(message, privacy: .public)")
-                } else if level == "warning" {
-                    log.notice("yt-dlp: \(message, privacy: .public)")
-                } else {
-                    log.info("yt-dlp: \(message, privacy: .public)")
-                }
-                // The "[Merger]" line is yt-dlp's last visible step before it hands off to ffmpeg.
-                // Preserve overall progress during finalization instead of replacing it with
-                // an indeterminate spinner or resetting to zero between tracks.
-                if message.contains("[Merger]") || message.contains("[ExtractAudio]") || message.contains("Fixup") {
-                    let id = video.id
-                    Task { @MainActor in
-                        guard let self, let snapshot = self.taskRegistry.snapshot(for: snapshotID),
-                              !self.taskRegistry.isCancelled(snapshotID) else { return }
-                        self.phaseByVideoID[id] = "muxing"
-                        self.publish(snapshot: DownloadTaskSnapshot(
-                            id: snapshot.id, videoID: id, title: snapshot.title,
-                            state: .downloading(progress: 0), createdAt: snapshot.createdAt
-                        ))
-                    }
-                }
-            }, priority: priority == .userInitiated ? .high : .low)
-        } catch {
-            try Task.checkCancellation()
-            log.error("yt-dlp[\(video.id, privacy: .public)] threw: \(String(describing: error), privacy: .public)")
-            // **Don't fail yet** — try the YouTubeKit / TVHTML5_SIMPLY_EMBEDDED_PLAYER fallback
-            // before giving up. yt-dlp's no-JS-runtime path can produce "This video is not
-            // available" for entire classes of videos (kids content, PoT-gated music videos,
-            // some live recordings) where YouTubeKit's tvHtmlModel still returns playable URLs
-            // because that client profile is exempt from PoT enforcement on the video-info side.
-            do {
-                try await runYouTubeKitFallback(video: video, quality: quality, destination: destination, snapshotID: snapshotID)
-                try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
-                let dur = Date().timeIntervalSince(startedAt)
-                log.info("yt-dlp[\(video.id, privacy: .public)] FALLBACK SUCCESS in \(String(format: "%.1f", dur), privacy: .public)s")
-                await metadataWriter.persist(video: video, fileURL: destination)
-                publish(snapshot: DownloadTaskSnapshot(
-                    id: snapshotID, videoID: video.id, title: video.title,
-                    state: .completed(destination), createdAt: .now
-                ))
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    self.taskRegistry.remove(snapshotID)
-                    self.publishSnapshots()
-                }
-                return destination
-            } catch {
-                log.error("yt-dlp[\(video.id, privacy: .public)] YouTubeKit fallback also failed: \(String(describing: error), privacy: .public)")
-                try? FileManager.default.removeItem(at: destination)
-                publish(snapshot: DownloadTaskSnapshot(
-                    id: snapshotID,
-                    videoID: video.id,
-                    title: video.title,
-                    state: .failed(error.localizedDescription),
-                    createdAt: .now
-                ))
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-        }
-
-        let elapsed = Date().timeIntervalSince(startedAt)
-        log.info("yt-dlp[\(video.id, privacy: .public)] returned after \(String(format: "%.1f", elapsed), privacy: .public)s — locating output files")
-
-        // yt-dlp wrote either individual streams or one progressive fallback. Run the candidate
-        // scan off-main since `contentsOfDirectory` on a Downloads folder with hundreds of files
-        // becomes a noticeable hitch.
-        let intermediates: [URL] = await Task.detached(priority: .utility) {
-            let candidates = (try? FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil))?
-                .filter { $0.lastPathComponent.hasPrefix("\(stem).") } ?? []
-            // Don't include the canonical destination itself in mux inputs.
-            return candidates.filter { $0.path != destination.path }
-        }.value
-        var intermediatesToClean = intermediates
-        defer {
-            // A failed mux or later validation must not leave large separate tracks on disk.
-            // Success awaits this cleanup below before publishing the completed download.
-            let leftovers = intermediatesToClean
-            if !leftovers.isEmpty {
-                Task.detached(priority: .utility) {
-                    for url in leftovers { try? FileManager.default.removeItem(at: url) }
-                }
-            }
-        }
-        log.debug("yt-dlp[\(video.id, privacy: .public)] candidate files: \(intermediates.map(\.lastPathComponent).joined(separator: ", "), privacy: .public)")
-
-        // The output template records both codec roles. This is reliable even when the only
-        // available audio is WebM/Opus (an extension-only scan used to mistake it for video).
-        let videoFile = intermediates.first { $0.lastPathComponent.contains("-none.") }
-        let audioFile = intermediates.first { $0.lastPathComponent.contains("-none-") }
-
-        if let videoFile, let audioFile {
-            log.info("yt-dlp[\(video.id, privacy: .public)] muxing video=\(videoFile.lastPathComponent, privacy: .public) audio=\(audioFile.lastPathComponent, privacy: .public)")
-            do {
-                try await mediaFinalizer.mux(video: videoFile, audio: audioFile, destination: destination)
-            } catch {
-                log.error("yt-dlp[\(video.id, privacy: .public)] Swift-side mux failed: \(String(describing: error), privacy: .public)")
-                publish(snapshot: DownloadTaskSnapshot(
-                    id: snapshotID,
-                    videoID: video.id,
-                    title: video.title,
-                    state: .failed("Could not combine video + audio"),
-                    createdAt: .now
-                ))
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-            // Clean up the per-stream intermediates off-main — `removeItem` for each one is sync,
-            // and with N parallel downloads finishing back-to-back this can add up.
-            let toRemove = intermediates
-            await Task.detached(priority: .utility) {
-                for url in toRemove {
-                    try? FileManager.default.removeItem(at: url)
-                }
-            }.value
-            intermediatesToClean = []
-        } else if let single = intermediates.first {
-            // Single combined progressive file — just rename it to the destination.
-            log.info("yt-dlp[\(video.id, privacy: .public)] single-file mode (no mux needed): \(single.lastPathComponent, privacy: .public)")
-            try? FileManager.default.removeItem(at: destination)
-            do {
-                try FileManager.default.moveItem(at: single, to: destination)
-            } catch {
-                log.error("yt-dlp[\(video.id, privacy: .public)] could not move \(single.path, privacy: .public) → destination: \(String(describing: error), privacy: .public)")
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-        }
-
-        if !FileManager.default.fileExists(atPath: destination.path) {
-            log.notice("yt-dlp[\(video.id, privacy: .public)] post-mux: destination still missing — falling back to YouTubeKit/TVHTML5")
-            // Mirror the catch-branch fallback for the "yt-dlp returned without writing"
-            // case. Same TVHTML5_SIMPLY_EMBEDDED_PLAYER path — bypasses PoT for video-info,
-            // then downloads via plain URLSession.
-            do {
-                try await runYouTubeKitFallback(video: video, quality: quality, destination: destination, snapshotID: snapshotID)
-            } catch {
-                log.error("yt-dlp[\(video.id, privacy: .public)] YouTubeKit fallback also failed: \(String(describing: error), privacy: .public)")
-                publish(snapshot: DownloadTaskSnapshot(
-                    id: snapshotID,
-                    videoID: video.id,
-                    title: video.title,
-                    state: .failed("YouTube refused the download stream. Please try again."),
-                    createdAt: .now
-                ))
-                throw YouTubeServiceError.streamExtractionFailed
-            }
-        }
-
-        do {
-            try await mediaFinalizer.validateFile(at: destination, quality: quality, videoID: video.id)
-        } catch {
-            log.error("yt-dlp[\(video.id, privacy: .public)] final validation failed: \(String(describing: error), privacy: .public)")
-            try? FileManager.default.removeItem(at: destination)
-            publish(snapshot: DownloadTaskSnapshot(
-                id: snapshotID,
-                videoID: video.id,
-                title: video.title,
-                state: .failed("The downloaded file was incomplete. Please try again."),
-                createdAt: .now
-            ))
-            throw YouTubeServiceError.streamExtractionFailed
-        }
-
-        log.debug("yt-dlp[\(video.id, privacy: .public)] writing download metadata xattr")
-        await metadataWriter.persist(video: video, fileURL: destination)
-
-        log.debug("yt-dlp[\(video.id, privacy: .public)] → state=completed")
-        publish(snapshot: DownloadTaskSnapshot(
-            id: snapshotID,
-            videoID: video.id,
-            title: video.title,
-            state: .completed(destination),
-            createdAt: .now
-        ))
-        // Drop the completed snapshot after a moment so the in-progress section clears.
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            self.taskRegistry.remove(snapshotID)
-            self.publishSnapshots()
-        }
-
-        log.info("yt-dlp[\(video.id, privacy: .public)] SUCCESS in \(String(format: "%.1f", elapsed), privacy: .public)s → \(destination.path, privacy: .public)")
-        return destination
-    }
-
     /// Tries the playback resolver's source first, including one signed-URL refresh on authorization failure.
-    /// A non-cancellation failure returns false so the compatibility downloader can take over.
+    /// A non-cancellation failure returns false so the YouTubeKit direct-format path can take over.
     private func tryNativeDownload(
         video: Video,
         quality: VideoQuality,
@@ -605,8 +331,7 @@ final class DownloadManager {
         startedAt: Date
     ) async throws -> Bool {
         // The app already has a fast, proven stream resolver for playback. Prefer that same
-        // source for offline downloads instead of asking embedded yt-dlp to independently choose
-        // a client and a PoT-gated format. For ordinary video this is an HLS master manifest;
+        // source for offline downloads. For ordinary video this is an HLS master manifest;
         // FFmpeg downloads its media segments and remuxes them into the canonical local MP4.
         // A progressive/audio-only result follows the exact same path. YouTubeKit direct formats
         // remain available when the native resolver has no usable source.
@@ -687,9 +412,7 @@ final class DownloadManager {
         return false
     }
 
-    /// Renders a download progress event into a snapshot and a log line. Takes Swift primitives —
-    /// PythonObject extraction happens upstream on Python's GIL thread, see the progress closure in
-    /// `runCompatibilityDownload`.
+    /// Renders a download progress event into a snapshot and a log line.
     private func handleProgress(
         status: String,
         downloaded: Int,
@@ -747,12 +470,8 @@ final class DownloadManager {
     /// enforcement) to get fresh stream URLs, then downloads the bytes directly via
     /// `URLSession`. If only adaptive (video-only + audio-only) streams are available, the
     /// two pieces are muxed back into a single `.mp4` via the same `FFmpegRunner` we use for
-    /// other download sources.
-    ///
-    /// Why this works when yt-dlp doesn't: yt-dlp's defensive filter strips formats marked as
-    /// requiring a Proof-of-Origin token before download even starts. The TVHTML5 client
-    /// returns URLs that aren't tagged with that requirement, so YouTubeKit happily hands them
-    /// to us and URLSession fetches them like any other HTTPS resource.
+    /// other download sources. The TVHTML5 client can provide direct URLs when the native
+    /// resolver's candidate could not be downloaded.
     private func runYouTubeKitFallback(video: Video, quality: VideoQuality, destination: URL, snapshotID: String) async throws {
         log.info("youtube-kit-download[\(video.id, privacy: .public)] fetching stream info")
         publish(snapshot: DownloadTaskSnapshot(
@@ -874,7 +593,7 @@ final class DownloadManager {
 
     /// Materializes the native source used by playback. HLS, direct MP4, and separate MP4/M4A
     /// streams have distinct transfer paths; treating a video-only URL as a complete file would
-    /// fail final validation and needlessly invoke the embedded Python fallback.
+    /// fail final validation and needlessly invoke the direct-format fallback.
     private func downloadResolvedSource(
         _ source: NativeStreamResult,
         to destination: URL,
@@ -991,15 +710,13 @@ final class DownloadManager {
     /// Canonical on-disk location for a downloaded video. Files land at the **Documents
     /// root** so they're visible in the system Files app under "On My iPhone" /
     /// "On My iPad" (gated by `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`
-    /// in Info.plist). Every video gets a fixed `mp4` extension because yt-dlp's merger
+    /// in Info.plist). Every video gets a fixed `mp4` extension because the local muxer
     /// produces an mp4 container.
     static func fileURL(for videoID: String) -> URL {
         downloadsDirectory.appendingPathComponent("\(videoID).mp4")
     }
 
-    /// Resolve Documents once, before embedded Python can alter process-level path state.
-    /// Re-evaluating `.documentDirectory` after Python initialization produced a path with an
-    /// obsolete app-container Documents directory appended inside the current container.
+    /// Use the app's canonical Documents directory for all downloads.
     private static let downloadsDirectory = AppDirectories.documents
 
     // MARK: - Snapshots

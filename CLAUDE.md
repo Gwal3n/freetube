@@ -26,7 +26,7 @@ These come first. Violating them breaks the project.
 4. **No telemetry, analytics, or remote logging by default.** Logs go to `os.Logger` only. Never add SDKs that beacon out.
 5. **Anonymous operation is mandatory.** Never add login, capture or store account cookies, or synchronize local state with a YouTube account. `YouTubeKitClient` explicitly keeps both models cookie-free.
 6. **Signed stream URLs are sensitive and time-limited.** Never persist them. In-memory cache only (`StreamURLCache`), 30-minute TTL max.
-7. **MVVM with service layer is mandatory.** Views do not import `YouTubeKit` or `YoutubeDL`. ViewModels do not perform networking directly — they call services in `Core/Networking/`.
+7. **MVVM with service layer is mandatory.** Views do not import `YouTubeKit`. ViewModels do not perform networking directly — they call services in `Core/Networking/`.
 8. **SwiftUI only for UI.** No UIKit `UIViewController` subclasses except where bridging is unavoidable (`AVPlayerViewController`, `AVPictureInPictureController`). Wrap those in `UIViewControllerRepresentable` / `UIViewRepresentable`. There is no login `WKWebView`.
 9. **Swift Concurrency is the default.** Use `async`/`await` and `AsyncSequence`. Use Combine only inside `PlayerStateManager` for `AVPlayer` time observation. Do not introduce RxSwift.
 10. **No force unwraps in production code.** Use `guard let`, `if let`, or proper `throw`. Force unwraps allowed only in test fixtures.
@@ -42,18 +42,16 @@ These come first. Violating them breaks the project.
 | Async | Swift Concurrency, `AsyncSequence` |
 | Networking (YouTube) | `b5i/YouTubeKit` |
 | Native stream resolution | `alexeichhorn/YouTubeKit` 0.4.9, vendored as `FreeTubeStreamKit` |
-| Stream extraction / download | `kewlbear/YoutubeDL-iOS` (yt-dlp via `PythonKit`) |
+| Downloads | Native resolved HLS/direct/paired streams with `URLSession` and local FFmpeg muxing; YouTubeKit direct-format fallback |
 | In-process ffmpeg | `FFmpegSupport` (Swift wrapper around ffmpeg C library) |
 | Playback | `AVFoundation` / `AVKit` (`AVQueuePlayer`, `AVPlayerViewController`, `AVPictureInPictureController`) |
 | Mini / expanded player | Native `SwiftUIPlayerContainer` (SwiftUI presentation and gestures) |
 | Now-playing indicator | `SwimplyPlayIndicator` |
 | Images | `Kingfisher` |
 | Legacy credential cleanup | `Security` (deletes credentials left by older builds) |
-| Embedded-Python HTTPS trust | Bundled certifi Mozilla CA roots (`Resources/cacert.pem`) via `SSL_CERT_FILE` |
 | Persistence | `SwiftData` (`@Model`); `UserDefaults` for simple flags via `UserPreferences` |
 | Background work | `BackgroundTasks` processing jobs + finite UIKit background runtime (`BackgroundDownloadCoordinator`) |
 | Logging | `os.Logger` with subsystem `com.leshko.freetube` |
-| JavaScript runtime | `JavaScriptCore` (`JSContext`) — solves YouTube's N/SIG cipher challenges in-process by faking the `deno` runtime to yt-dlp; see §15.11 |
 
 The `b5i/YouTubeKit` project reference tracks `main`, but Xcode and CI honor the revision in
 `Package.resolved`. When updating playback extraction, update that resolved revision as well;
@@ -76,12 +74,8 @@ FreeTube/
 │   ├── Player/            # PlayerStateManager, PlaybackResolver, QueueManager,
 │   │                      # AudioSessionConfigurator, NowPlayingCenter,
 │   │                      # RemoteCommandCenter, StreamURLCache, HLSResourceLoaderDelegate
-│   ├── Download/          # DownloadManager (yt-dlp orchestration),
-│   │                      # BackgroundDownloadCoordinator, DownloadTask
-│   ├── JavaScript/        # JSEvaluator (JSContext wrapper), PythonJSBridge
-│   │                      # (yt-dlp ↔ JSCore glue), FreeTubeYtDlp (forked
-│   │                      # entry point that splices the bridge), EJSResources
-│   │                      # (loader for bundled yt-dlp-ejs JS)
+│   ├── Download/          # DownloadManager, NativeHLSDownloadService,
+│   │                      # BackgroundDownloadCoordinator, DownloadTaskSnapshot
 │   ├── Persistence/       # @Model types, PersistenceController, PersistenceWriter
 │   └── Models/            # Domain types: Video, Channel, Playlist, Comment,
 │                          # VideoFormat, VideoQuality, ErrorState,
@@ -103,9 +97,7 @@ FreeTube/
 │   │                      # NowPlayingIndicator, SectionHeader, LoadingView
 │   └── Modifiers/         # ErrorToastModifier
 ├── Resources/
-│   ├── Localizable.xcstrings    # en / es / ru / fr / de, 236 keys
-│   ├── core.min.js              # yt-dlp-ejs N/SIG solver (~7 KB, see §15.11)
-│   └── lib.min.js               # meriyah + astring bundle (~152 KB, see §15.11)
+│   └── Localizable.xcstrings    # en / es / ru / fr / de
 └── Assets.xcassets
 ```
 
@@ -340,7 +332,7 @@ and a rejected strategy is excluded before requesting the next candidate.
   Fullscreen-exit swipes hide controls and do not reveal them during the orientation transition;
   explicit fullscreen-button exit retains its existing control behavior.
 - **System-chrome clearance is measured, not guessed.** `PlayerLayoutMetrics` reads the existing key window and native `UITabBar` frames without creating UIKit UI. The expanded black canvas remains edge-to-edge while its portrait content starts below the status area; the custom SwiftUI mini-player sits immediately above the measured tab bar. Its default is Liquid Glass, with an independent OLED mini-player toggle.
-- **`AVPlayerViewController`** wrapped in `UIViewControllerRepresentable` (`PlayerSurface.swift`) remains the video-rendering and automatic-PiP engine, with `showsPlaybackControls = false` and video-frame analysis disabled. `CustomPlayerControls` owns the visible YouTube-style play/pause/replay, previous/next buttons, auto-hide chrome, and `SponsorBlockTimeline`; `FullScreenPlayer` renders the configurable top-right controls. `PlayerStateManager.hasEnded` is the authoritative natural-end state. The underlying `AVQueuePlayer` must use `actionAtItemEnd = .pause`; its default `.advance` removes the sole finished item, producing a black surface and leaving replay with nothing to seek. The app's end observer owns automatic queue advancement instead. An exhausted item therefore remains on its final frame, replay seeks that existing item to zero without resolving again, and seeking backward resumes playback. The in-player quality menu presents a **preferred maximum**, never a guaranteed delivered resolution: AVPlayer's HLS selection can stay below the ceiling. HLS ceilings apply through `preferredMaximumResolution`, while fixed progressive/local assets retain their encoded quality and use the preference on the next resolution. Optional top-right controls are placed in one of three persisted groups—directly on the player (no fixed count; the row scrolls horizontally on narrow surfaces), in the native More menu, or hidden—with migration from the previous order/hidden preferences. The collapse button remains fixed at leading. Controls use unbacked white glyphs with shadows rather than dark button circles. Fullscreen requests landscape-right and toggles back to portrait. Loop is not duplicated in Up Next. Native icon-only Share and Download controls sit trailing on the uploader row. Share consolidates the system share sheet, browser, clipboard, timestamp, and downloaded-file actions. Download calls the existing `DownloadManager.ensureDownloaded` yt-dlp path and reflects active/completed state. There is no separate transport bar below the video and no bottom Close pill. The controls remain mounted and fade by opacity so their layout does not churn during auto-hide. The initial hide timer is scheduled when the first item reaches `.readyToPlay`, since the view normally appears before playback begins. During horizontal gesture seeking, the timeline alone becomes visible and follows the preview target even when the rest of the chrome is hidden. The video remains full-width in compact-height landscape; only the timeline is lifted by the portion of the 16:9 surface extending below the viewport. The timeline seeks only on drag end, places time labels above the track, emits one light haptic when a scrub crosses a chapter boundary, and renders enabled SponsorBlock segments at exactly the track's thickness. `PlayerStateManager.seek` pins its optimistic target until AVPlayer confirms the seek (plus a short stale-tick drain), preventing the scrubber from flashing back to the old periodic-observer position. Automatic PiP-on-background is enabled; reopening the expanded player cycles `allowsPictureInPicturePlayback` off long enough to terminate its internally owned PiP presentation, then restores eligibility for the next background transition. There is intentionally no AirPlay or manual PiP button.
+- **`AVPlayerViewController`** wrapped in `UIViewControllerRepresentable` (`PlayerSurface.swift`) remains the video-rendering and automatic-PiP engine, with `showsPlaybackControls = false` and video-frame analysis disabled. `CustomPlayerControls` owns the visible YouTube-style play/pause/replay, previous/next buttons, auto-hide chrome, and `SponsorBlockTimeline`; `FullScreenPlayer` renders the configurable top-right controls. `PlayerStateManager.hasEnded` is the authoritative natural-end state. The underlying `AVQueuePlayer` must use `actionAtItemEnd = .pause`; its default `.advance` removes the sole finished item, producing a black surface and leaving replay with nothing to seek. The app's end observer owns automatic queue advancement instead. An exhausted item therefore remains on its final frame, replay seeks that existing item to zero without resolving again, and seeking backward resumes playback. The in-player quality menu presents a **preferred maximum**, never a guaranteed delivered resolution: AVPlayer's HLS selection can stay below the ceiling. HLS ceilings apply through `preferredMaximumResolution`, while fixed progressive/local assets retain their encoded quality and use the preference on the next resolution. Optional top-right controls are placed in one of three persisted groups—directly on the player (no fixed count; the row scrolls horizontally on narrow surfaces), in the native More menu, or hidden—with migration from the previous order/hidden preferences. The collapse button remains fixed at leading. Controls use unbacked white glyphs with shadows rather than dark button circles. Fullscreen requests landscape-right and toggles back to portrait. Loop is not duplicated in Up Next. Native icon-only Share and Download controls sit trailing on the uploader row. Share consolidates the system share sheet, browser, clipboard, timestamp, and downloaded-file actions. Download calls `DownloadManager.ensureDownloaded` and reflects active/completed state. There is no separate transport bar below the video and no bottom Close pill. The controls remain mounted and fade by opacity so their layout does not churn during auto-hide. The initial hide timer is scheduled when the first item reaches `.readyToPlay`, since the view normally appears before playback begins. During horizontal gesture seeking, the timeline alone becomes visible and follows the preview target even when the rest of the chrome is hidden. The video remains full-width in compact-height landscape; only the timeline is lifted by the portion of the 16:9 surface extending below the viewport. The timeline seeks only on drag end, places time labels above the track, emits one light haptic when a scrub crosses a chapter boundary, and renders enabled SponsorBlock segments at exactly the track's thickness. `PlayerStateManager.seek` pins its optimistic target until AVPlayer confirms the seek (plus a short stale-tick drain), preventing the scrubber from flashing back to the old periodic-observer position. Automatic PiP-on-background is enabled; reopening the expanded player cycles `allowsPictureInPicturePlayback` off long enough to terminate its internally owned PiP presentation, then restores eligibility for the next background transition. There is intentionally no AirPlay or manual PiP button.
 - **Player gestures recognize on `AVPlayerViewController.view`.** `contentOverlayView` is used only to draw feedback; it does not receive player touches on iOS 26. `PlayerGestureCoordinator` attaches simultaneous, non-cancelling recognizers to the controller root for single-tap control toggling, a two-finger tap for play/pause, double-tap left/right seek by the chosen 5/10/15/30-second or custom 1–120-second interval (default 10), a direct horizontal-drag seek, and an optional 0.35-second hold for a configurable temporary playback rate (default 2×), restoring the prior rate on release. The Off setting disables double-tap seeking and restores immediate single-tap control toggling. Disabling hold-for-speed disables only that recognizer. Two-finger playback toggling routes through `PlayerStateManager`, not directly through `AVPlayer`, so observable and Now Playing state remain synchronized. Play-state observation must not reveal the controls; each visible control action already does so explicitly, while gesture, remote, and automatic changes preserve chrome visibility. Horizontal seeking direction-locks only when horizontal velocity dominates vertical velocity, previews the signed offset from the drag's starting playback position in a compact top capsule, feeds that temporary target into the custom timeline, and commits on release. A slow full-width drag spans 60 seconds for videos below 30 minutes, 90 seconds below one hour, and 120 seconds for longer videos; horizontal velocity smoothly boosts the range up to 3× while vertical drags remain available to collapse the player. The coordinator owns a strict 0.22-second tap-pairing window instead of UIKit's more generous fixed double-tap timeout. After the initial pair, a 0.22-second seek session counts each additional tap as another chosen interval and displays the cumulative offset; each tap resets the timeout. This single owner prevents successful seek taps from leaking into control visibility toggles.
 - **Gesture feedback is compact and edge-biased.** Held-speed and horizontal-drag feedback use the same SwiftUI ultra-thin-material badge at 10% of the video surface height. The badge is 26 points high and grows to fit longer timestamps; live scrubbing shows the signed offset from the drag's start instead. Double-tap feedback has no backing capsule: it uses bold white text with a subtle black shadow plus two drawn, lightly pulsing chevrons at 18%/82% of the width. Horizontal swipe seeking can be disabled independently without removing timeline scrubbing. The Save, Share, and Download shortcuts beneath the video can each be hidden without deleting their data.
 - **SponsorBlock is opt-in and playback-independent.** `SponsorBlockService` performs a read-only
@@ -487,7 +479,7 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **Now Playing:** `NowPlayingCenter` keeps `MPNowPlayingInfoCenter.default().nowPlayingInfo` in sync — title, channel as artist, thumbnail (downloaded via Kingfisher) as artwork, elapsed/duration. Metadata and `MPMediaItemArtwork` are cached per current image; the 0.5-second playback tick updates only elapsed time and rate.
 - **Remote commands:** `RemoteCommandCenter` wires `MPRemoteCommandCenter` for play/pause/next/previous/skip ±15s/seek.
 - **The player area never shows a spinner on black while starting.** `PlayerArtworkBackdrop` paints `PlayerStateManager.currentArtwork` — the Kingfisher-cached thumbnail the user just tapped — over the video surface for every state except `.idle` / `.readyToPlay`, and `DownloadProgressOverlay` contributes only a small unlabelled spinner during `.resolving` / `.buffering`. Two constraints on that layer: it must sit *above* `PlayerSurface` in the ZStack (`AVPlayerViewController` paints its own opaque black background, so anything below it is invisible), and it must be `.allowsHitTesting(false)` or it swallows taps meant for the system playback controls. The dimmed scrim + text label + determinate bar treatment is reserved for `.downloading` and `.failed`, which are minutes-long or terminal and genuinely need words.
-- **`LoadState.buffering` means "URL installed, `play()` already issued, AVPlayer not ready yet".** In that state the mini-player shows the real thumbnail and the channel name, not a placeholder glyph and "Preparing…" — the point of the state existing is that there is nothing left to prepare. Only `.downloading` (a real yt-dlp file transfer the user can't preview) still swaps in the download glyph.
+- **`LoadState.buffering` means "URL installed, `play()` already issued, AVPlayer not ready yet".** In that state the mini-player shows the real thumbnail and the channel name, not a placeholder glyph and "Preparing…" — the point of the state existing is that there is nothing left to prepare. Only `.downloading` (a real file transfer the user can't preview) still swaps in the download glyph.
 - **Queue and navigation history are separate:** ordinary video loads replace the visible queue with the current video, then append at most 5 fresh recommendations. A private, bounded (50 item) browser-style playback history powers Previous/Next: Previous walks backward without adding rows to Up Next, and Next first walks forward to the video the user came from before resuming queue recommendations. Curated Play all / Shuffle all queues retain their explicit ordering and skip recommendation replacement. The Up next rows are collapsed by default so they do not participate in normal player redraws. On end-of-queue with repeat off, `playNext()` may re-fire recommendations using the current item as the seed.
 - **Comments paginate within their lazy section.** The default loads continuations when the
   bottom sentinel appears; a Player setting replaces that with an explicit Load more button.
@@ -524,11 +516,9 @@ and a rejected strategy is excluded before requesting the next candidate.
 
 ### User-initiated (Download button)
 
-- `DownloadManager.ensureDownloaded(video:quality:priority: .background)` from the explicit Download button in the player menu.
+- `DownloadManager.ensureDownloaded(video:quality:)` from the explicit Download button in the player menu.
 - Files go to the app container's canonical `Documents/<videoID>.mp4` and are discovered through
-  `DownloadsStore` filesystem metadata. Resolve that directory through `AppDirectories.documents`:
-  embedded Python can corrupt Foundation's lazy `.documentDirectory` search-path result into a
-  nested stale-container path.
+  `DownloadsStore` filesystem metadata. Resolve that directory through `AppDirectories.documents`.
 - Visible in the Downloads screen, playable offline.
 - Native audio-only and direct-file transfers use `DirectFileDownloadService`, which writes through
   a `URLSessionDownloadTask` with delegate progress. Do not return to per-byte
@@ -545,13 +535,6 @@ and a rejected strategy is excluded before requesting the next candidate.
   only after an explicit download.
 - Automatic next-item download prefetch is disabled; recommendation queue filling does not initiate downloads.
 
-### PythonRunner priority queue
-
-- **`.high` / `.userInitiated`** — explicitly initiated high-priority downloads. Jumps the line.
-- **`.low` / `.background`** — Download All, queue prefetch.
-- Within priority: FIFO. Cannot preempt the currently-running yt-dlp (Python has no safe interrupt point).
-- This priority lane keeps an explicit one-video download from waiting behind a playlist Download All batch.
-
 ### Network gate
 
 - `wifiOnlyDownloads` setting checked via `NWPathMonitor` before every `ensureDownloaded` returns from queued state.
@@ -565,10 +548,8 @@ and a rejected strategy is excluded before requesting the next candidate.
 ### Download storage
 
 - Downloaded media stays on device until the user explicitly removes it. Settings displays current storage usage; there is no automatic cache eviction.
-- The app does not refresh its yt-dlp module on a timer. The downloader package handles initial module setup when a compatibility fallback first needs it.
-- The yt-dlp compatibility fallback verifies HTTPS with the bundled certifi Mozilla CA roots.
-  `SecurityHardening` sets `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` at launch. Keep the bundle,
-  license, and source revision together; do not restore `--no-check-certificates`.
+- Existing installs may have a cached yt-dlp module from older builds. `SecurityHardening` removes
+  that known file on launch; new builds contain no Python downloader.
 
 ---
 
@@ -636,99 +617,40 @@ log.error("Stream extraction failed: \(error.localizedDescription, privacy: .pub
 
 ## 15. Critical workarounds (read before refactoring `Core/`)
 
-### 15.1 PythonRunner — Python-thread-pinning + serial drain
+### FFmpegRunner
 
-`PythonKit` + CPython assume one thread touches the interpreter — the thread that ran `PythonSupport.initialize()`. A plain `actor` rotates between cooperative-pool workers and Python crashes in `_PyInterpreterState_GET`. Fix: `PythonSerialExecutor` (a custom `SerialExecutor` backed by a serial `DispatchQueue`) — GCD reuses the same worker thread back-to-back for serial-queue jobs.
+`FFmpegSupport.ffmpeg(_:)` is not safe to call concurrently. The `+faststart` pass touches shared state and can crash when two downloads finish together. Route every ffmpeg invocation through `FFmpegRunner.shared.run(args)`, which serializes them with a chained task.
 
-A plain serial actor isn't enough either: actor methods only guarantee one *body* at a time, but `await` lets another caller in. Fix: strict Task chaining through the `pump()` drain — new tickets enqueue, only one `pump` task drains at a time.
+### AVQueuePlayer and an empty queue
 
-### 15.2 FFmpegRunner — ffmpeg C library serialization
+`replaceCurrentItem` is a no-op when the queue is empty. Use `removeAllItems()` followed by `insert(_:after:)`.
 
-`FFmpegSupport.ffmpeg(_:)` is not thread-safe. The `+faststart` post-pass walks global I/O buffers and crashes with `EXC_BAD_ACCESS` on concurrent calls. `setjmp`/`longjmp` in the Hook.m shim has undefined behavior across concurrent calls. Fix: `FFmpegRunner.shared.run(args)` serializes all ffmpeg calls through a chained `Task` FIFO. **Every** ffmpeg invocation goes through this actor.
+### Account-free networking
 
-### 15.3 yt-dlp's ffmpeg merger hangs on iOS
+Never add a login WebView or authenticated InnerTube mutations. `SecurityHardening` rejects shared response cookies and deletes legacy account credentials. Subscriptions, history, playlists, and favorites stay local.
 
-`subprocess.Popen.communicate` against ffmpeg never returns from inside the embedded Python on iOS — `longjmp` tears through the Python interpreter's stack. Fix: pass `--ffmpeg-location /dev/null/no-ffmpeg` to yt-dlp so it fails-fast at probe time instead of hanging. We mux ourselves with direct `FFmpegRunner` calls afterwards. Same reason `--postprocessor` flags must not request anything ffmpeg-backed inside yt-dlp.
+### SwiftUI body work
 
-### 15.4 yt-dlp PoT / n-cipher reality
+Views can re-evaluate many times per second. Keep functions called from `body` allocation-light and log-free; even a cheap file-existence check becomes expensive when it logs on every evaluation.
 
-YouTube has been enforcing Proof-of-Origin Tokens and rotating the `n`-parameter cipher in player.js on a 2–8-week cadence. Symptoms in logs:
-- `n challenge solving failed: Some formats may be missing.`
-- `Could not get n-parameter function.`
-- `HTTP Error 403: Forbidden` on download.
+### Native download pipeline
 
-**N-cipher: solved in-process via JavaScriptCore.** See §15.11 — `PythonJSBridge` routes current yt-dlp's `DenoJCP._run_js_runtime` directly through `JSContext` (with the older fake-`Popen` route retained as a compatibility fallback), and ships `yt-dlp-ejs` solver scripts in `Resources/`. The "n challenge solving failed" warnings should no longer fire for normal videos. The solver bundle (`yt-dlp-ejs 0.8.0`) needs re-pulling when YouTube rotates the cipher faster than yt-dlp's vendored regexes can match.
+`DownloadManager` first uses `NativeStreamService` to resolve the same source family used by playback. `NativeHLSDownloadService` downloads a quality-bounded HLS rendition and its audio segments, then remuxes them on disk. Direct files transfer through `URLSession`; paired MP4/M4A tracks are downloaded separately and muxed locally. If that path fails, `DownloadSourceSelector` requests YouTubeKit direct formats and retries with those URLs. Every completed file is validated before publication. The app does not download or run yt-dlp or Python code.
 
-**PoT: still unsolved.** Proof-of-Origin Tokens require attesting to YouTube via a Play Integrity / DroidGuard / WidevineCDM challenge — not something a JS runtime alone can answer. Tier 3 streaming (HLS or direct progressive URL from `VideoInfosResponse`) remains the user-facing safety net for PoT-locked content (typically kids/family videos, some music labels).
+### Default actor isolation
 
-### 15.5 AVQueuePlayer + `replaceCurrentItem` is a no-op when queue is empty
-
-Don't use it. Use `removeAllItems()` + `insert(_:after:)` (see `loadItem`).
-
-### 15.6 SourceKit "No such module 'FFmpegSupport' / 'Kingfisher'" warnings
-
-Stale Xcode index. Real compiler links these fine; `xcodebuild` shows `BUILD SUCCEEDED`. Ignore. Clean Build Folder clears it.
-
-### 15.7 Account-free networking
-
-Never add a login WebView or authenticated InnerTube mutations. `SecurityHardening` rejects shared
-response cookies and deletes the legacy Keychain credential on upgrade. Device-local subscriptions,
-history, playlists, and favorites are the only writable user state.
-
-### 15.10 Don't run heavy work from SwiftUI bodies
-
-`FileManager.fileExists` inside `Menu` bodies (e.g. `localFile(for:)`) fires hundreds of times per second under the player view's KVO storm. The function itself is cheap; logging from it is not. Generally: anything called from a re-evaluating body should be allocation-free and log-free.
-
-### 15.11 JavaScriptCore as yt-dlp's `deno` runtime
-
-YouTube serves stream URLs whose `n` parameter is obfuscated by a transform function defined in player.js. yt-dlp's solver (the `EJS` framework, package `yt-dlp-ejs`) extracts that JS, builds a script, and pipes it to an external JS runtime — `deno`, `node`, `bun`, or `qjs`. No such binary exists on iOS. Without intercepting this, the user sees `n challenge solving failed` followed by 403s at the CDN.
-
-We route yt-dlp's `deno` provider through `JavaScriptCore`. The bridge is **six pieces**, all installed by `PythonJSBridge.install()` at exactly one splice point inside our forked `freetube_yt_dlp(...)` entry — between `YtDlp()`'s init (which runs YoutubeDL-iOS's `injectFakePopen`) and `ydl.download` (which triggers JSC provider registration):
-
-1. **`builtins.eval_js(code: str) -> str`** — Python-callable hook that runs JS via `JSEvaluator.evaluate(_:)`. PythonKit supplies this single argument directly; do not read `args[0]`, which indexes the Python string and evaluates only its first character. The caller's source is wrapped in an IIFE that installs its capture object on `globalThis.console` and captures both `console.log` and `console.info`. Current EJS emits its JSON result through the global `console.log`.
-
-Download actions first resolve the same native source used by playback and dispatch by its media kind. For HLS, `NativeHLSDownloadService` parses the master/media playlists, chooses a quality-bounded native codec (AVC preferred, then HEVC) and the default audio rendition, downloads segments concurrently with `URLSession`, assembles tracks on disk, and uses the serialized in-process FFmpeg runner only for the final mux. Direct files are transferred without HLS parsing; paired MP4/M4A sources download both tracks and mux them. Do not select advertised AV1/VP9 renditions merely because their bandwidth is highest: AVPlayer filters incompatible variants during adaptive playback, but a persisted single-rendition file loses that protection. Embedded yt-dlp does not participate in this primary transfer path. Page extraction remains a compatibility fallback and must not enable `formats=missing_pot`: those formats are intentionally filtered because they lack a required Proof-of-Origin token and produce HTTP 403 or throttled transfers.
-
-2. **`yt_dlp_ejs` sys.modules shim** — yt-dlp gates the whole EJS path on `from yt_dlp.dependencies import yt_dlp_ejs as _has_ejs` being truthy. We synthesize three modules (`yt_dlp_ejs`, `.yt`, `.yt.solver`) in `sys.modules` with the package's exact API — `version`, `core()`, `lib()` — reading from our bundled `core.min.js` (the N/SIG solver, ~7 KB) and `lib.min.js` (meriyah + astring bundle, ~152 KB) via `EJSResources`. We also rebind `yt_dlp.dependencies.yt_dlp_ejs` after the fact in case it was imported before us.
-
-3. **`DenoJsRuntime._info` monkey-patch** — yt-dlp normally spawns `deno --version` and parses stdout to populate `_js_runtimes['deno'].info`. We replace `_info` to return a supported `JsRuntimeInfo` without any subprocess call.
-
-4. **Direct `DenoJCP._run_js_runtime` monkey-patch** — current yt-dlp exposes the complete EJS payload at this boundary. We pass it straight to `builtins.eval_js` and return the JSON result, avoiding the fragile subprocess/stdout emulation that produced empty output with yt-dlp 2026.08.19.
-
-5. **Pop class compatibility monkey-patch (not `subprocess.Popen`)** — retained for older yt-dlp providers. YoutubeDL-iOS replaces `subprocess.Popen` with its ffmpeg-only `Pop` class at init time, so the bridge extends that existing class and intercepts only our fake deno path. Everything else falls through to the original `Pop`.
-
-6. **`js_runtimes` ydl_opt** — even with the runtime detection stubbed, yt-dlp's `_js_runtimes` dict only gets populated from the `js_runtimes` ydl_opt. `FreeTubeYtDlp.swift` adds `ydl_opts["js_runtimes"] = {"deno": {"path": fakeDenoPath}}` so the dict has an entry to apply (3) to.
-
-**Maintenance:** when YoutubeDL-iOS bumps its yt-dlp version, re-pull `yt-dlp-ejs` from PyPI to match (check upstream `vendor.HASHES`), update `EJSResources.version`, drop new `core.min.js`/`lib.min.js` into `Resources/`. yt-dlp validates major/minor version of the script against its embedded `_SCRIPT_VERSION`; mismatch silently disables the EJS path.
-
-### 15.12 `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` runs anything unannotated on main
-
-This project sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` in both Debug and Release. Under that setting:
-
-- A top-level `public func foo() async throws { ... }` is implicitly `@MainActor`.
-- A top-level enum / struct / class with no isolation marker is implicitly `@MainActor`. Its static members inherit.
-- `Task { ... }` (the `init` form) inherits caller isolation, which under default-MainActor is main — **even when created from inside a non-main `actor` body** like `PythonRunner`.
-
-Symptom: a yt-dlp download stack shows up on Thread 1 (main) — `_ssl__SSLSocket_do_handshake` → many `_PyEval_EvalFrameDefault` → `ThrowingPythonObject.dynamicallyCall` → `freetube_yt_dlp` → `closure #1 in PythonRunner.pump()`. Main runloop is blocked for the entire download.
-
-**Fix for new code that touches Python / SSL / JSCore:**
-- Use `Task.detached(priority: .utility) { ... }` to dispatch, never plain `Task { }`. `.detached` is the explicit "do NOT inherit isolation" form.
-- Mark top-level Python-touching async functions `public nonisolated func ...`.
-- Mark enclosing enums / structs `nonisolated` so their static members aren't pulled to main either. `PythonJSBridge`, `JSEvaluator`, `EJSResources`, and `freetube_yt_dlp` all carry `nonisolated`.
-
-This bit twice during the JS-bridge work — the obvious "wrap in `Task`" fix didn't help because the wrapping Task itself was `@MainActor`. Don't revert `Task.detached` back to `Task` without also auditing the surrounding isolation annotations.
+The project sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. A plain `Task { ... }` inherits caller isolation and can accidentally perform slow I/O on main. Use an explicitly detached task for work that must run off main, and audit captured state before crossing actors.
 
 ---
-
 ## 16. Build priority (work top-down)
 
 Current state of the implementation. Items marked ✓ are shipped.
 
 - **P0 — MVP playback** ✓
-  - YouTubeKit + YoutubeDL-iOS SPM setup
+  - YouTubeKit SPM setup and vendored FreeTubeStreamKit
   - `SearchService` (+ autocomplete), `VideoService`
   - Search-only `HomeScreen` host, search results, video detail screen
-  - Three-tier playback resolver (yt-dlp / YouTubeKit / streaming HLS)
+  - Native HLS/direct playback resolver with YouTubeKit fallback
   - `PlayerStateManager`, mini player + expanded SwiftUI player container
   - Background audio + Now Playing + Remote Command Center
 - **P1 — Local library** ✓
@@ -736,13 +658,12 @@ Current state of the implementation. Items marked ✓ are shipped.
   - Channel screen and read-only public playlist screen
 - **P2 — Engagement** ✓ (mostly)
   - `CommentService` (read-only comments and replies)
-  - `DownloadManager` with priority queue and user-managed storage
+  - `DownloadManager` with native stream transfers and user-managed storage
   - Queue management UI
   - PiP, AirPlay
   - CarPlay audio mode — not yet
 - **P3 — Polish** (in flight)
   - Localization en / es / ru / fr / de ✓
-  - JavaScriptCore-based n-decoder ✓ (see §15.11 — `PythonJSBridge` fakes deno via JSCore; ships `yt-dlp-ejs` JS in `Resources/`)
   - Custom video controls beyond AVPlayerViewController — not in scope for v1
 
 ---
@@ -765,7 +686,7 @@ Do not ask before:
 - Adding shared components under `UI/Components/`.
 - Refactoring within a single file.
 - Writing or extending tests.
-- Adding `os.Logger` lines (outside of hot view-body paths — see §15.10).
+- Adding `os.Logger` lines (outside of hot view-body paths — see §15).
 
 ---
 
@@ -786,8 +707,7 @@ If asked to "make it more robust" or "production-ready", point to these realitie
 
 - YouTube can change its internal API at any time and silently break extraction. There is no SLA.
 - Some age-restricted or account-gated content is unavailable by design because the app is anonymous.
-- N-cipher-locked content downloads in-process via the JSCore bridge (§15.11). PoT-locked content (Play Integrity attestation, not solvable by a JS runtime) still **cannot be downloaded** and falls through to tier 3 streaming. Kids/family content is the usual PoT offender.
-- yt-dlp's HLS downloader needs ffmpeg, which is blocked by §15.3 — yt-dlp picking an HLS-only format fails on iOS. Tier 2/3 take over.
+- Some videos expose no usable anonymous download URL. The native and YouTubeKit direct-format paths can both fail; report that failure instead of starting a hidden download.
 - IP-level rate limiting from YouTube can hit users on shared networks (CGNAT, VPN). No client-side fix.
 - This codebase intentionally does not implement App Store evasion techniques. Sideload distribution is the assumption.
 - Playback is started before AVPlayer reports `.readyToPlay` (§7), so the transport can sit in `.waitingToPlayAtSpecifiedRate` for a moment after the thumbnail is up. AVPlayer still decides when it has buffered enough to begin, so this brings the start forward to the earliest instant AVPlayer allows rather than overriding its judgement.

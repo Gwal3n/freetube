@@ -10,7 +10,7 @@ import UIKit
 /// to the user in the Files app (Info.plist keys `UIFileSharingEnabled` +
 /// `LSSupportsOpeningDocumentsInPlace`), so they can drag files in/out, AirDrop, etc.
 ///
-/// **Reactivity** = `Notification.Name.downloadsDidChange`. After a download lands (yt-dlp
+/// **Reactivity** = `Notification.Name.downloadsDidChange`. After a download lands (native
 /// or URL-fetch) or a file is deleted, the writer posts this notification; this store
 /// listens and re-runs `refresh()`. Since the store is `@Observable`, any view holding it
 /// re-renders when `entries` mutates.
@@ -244,7 +244,7 @@ final class DownloadsStore {
 
     /// The directory we scan for downloads. **Documents root** — exposed to the user via
     /// the Files app (see Info.plist `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`).
-    /// Other app data (SwiftData store, yt-dlp Python module) lives in
+    /// Other app data (including the SwiftData store) lives in
     /// `Application Support/`, not Documents, so the user only sees their media files.
     nonisolated static func downloadsDirectory() -> URL {
         AppDirectories.documents

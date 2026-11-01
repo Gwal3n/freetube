@@ -1,5 +1,4 @@
 {
-  "originHash" : "d11c95bc79e9a530b4ad2e0d1589fc49c0a0389386d4286ad2e82c55cac7e846",
   "pins" : [
     {
       "identity" : "ffmpeg-ios-lame",
@@ -29,39 +28,12 @@
       }
     },
     {
-      "identity" : "python-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/kewlbear/Python-iOS.git",
-      "state" : {
-        "revision" : "4f3ca2bc0cff1ef2511555eb6114f9eb12e50412",
-        "version" : "0.1.1-b20230423-090254"
-      }
-    },
-    {
-      "identity" : "pythonkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pvieito/PythonKit.git",
-      "state" : {
-        "revision" : "6fee7617cfa910fbac7035276e295ba967adbbb4",
-        "version" : "0.5.1"
-      }
-    },
-    {
       "identity" : "swimplyplayindicator",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/obrhoff/SwimplyPlayIndicator.git",
       "state" : {
         "revision" : "b6cff801f62d5cb45372461666a5e0bf4cac9447",
         "version" : "1.2.0"
-      }
-    },
-    {
-      "identity" : "youtubedl-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/kewlbear/YoutubeDL-iOS.git",
-      "state" : {
-        "revision" : "64d9072cc33d2698b555d68cecf3d71f2f49b8dd",
-        "version" : "0.0.9"
       }
     },
     {
