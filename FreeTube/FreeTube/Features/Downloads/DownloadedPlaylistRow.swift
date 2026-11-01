@@ -43,7 +43,7 @@ struct DownloadedPlaylistRow: View {
                             .lineLimit(1)
                         if isActive, !manifest.videos.isEmpty, !isRemoving {
                             ProgressView(value: overallProgress)
-                                .tint(.white)
+                                .tint(Color.primary)
                         }
                     }
                 }

@@ -29,7 +29,7 @@ struct SubscriptionGroupsScreen: View {
                 NavigationStack { groupContent }
             }
         }
-        .tint(.white)
+        .tint(Color.primary)
     }
 
     private var groupContent: some View {
@@ -43,7 +43,9 @@ struct SubscriptionGroupsScreen: View {
                         Button(action: addGroup) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
-                                .foregroundStyle(canAdd ? Color.white : Color.secondary)
+                                .foregroundStyle(canAdd ? Color.primary : Color.secondary)
+                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(!canAdd)

@@ -17,7 +17,7 @@ struct PlaylistMoreActionsMenu: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .tint(.white)
+        .tint(Color.primary)
         .accessibilityLabel("More playlist actions")
     }
 }

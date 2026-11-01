@@ -29,7 +29,7 @@ struct ChannelGroupPickerSheet: View {
                 }
             }
         }
-        .tint(.white)
+        .tint(Color.primary)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
@@ -75,7 +75,9 @@ struct ChannelGroupPickerSheet: View {
                 Button(action: createGroup) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
-                        .foregroundStyle(canCreateGroup ? Color.white : Color.secondary)
+                        .foregroundStyle(canCreateGroup ? Color.primary : Color.secondary)
+                        .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!canCreateGroup)

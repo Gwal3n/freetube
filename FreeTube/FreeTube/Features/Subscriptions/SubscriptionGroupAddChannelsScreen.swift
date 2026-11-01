@@ -38,7 +38,7 @@ struct SubscriptionGroupAddChannelsScreen: View {
                             trailing: AnyView(
                                 Image(systemName: selectedIDs.contains(channel.id) ? "checkmark.circle.fill" : "circle")
                                     .font(.title3)
-                                    .foregroundStyle(selectedIDs.contains(channel.id) ? Color.white : Color.secondary)
+                                    .foregroundStyle(selectedIDs.contains(channel.id) ? Color.primary : Color.secondary)
                             )
                         )
                     }

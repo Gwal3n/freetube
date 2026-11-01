@@ -60,7 +60,7 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
                     total: Double(max(1, model.refreshChannelCount))
                 )
                 .progressViewStyle(.linear)
-                .tint(.white)
+                .tint(Color.primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 4)
                 .allowsHitTesting(false)

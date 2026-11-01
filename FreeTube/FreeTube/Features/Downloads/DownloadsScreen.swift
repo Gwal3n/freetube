@@ -402,7 +402,7 @@ struct DownloadsScreen: View {
             }
         }
         .textCase(nil)
-        .tint(.white)
+        .tint(Color.primary)
     }
 
     // MARK: - Transfer rows (in-progress)
