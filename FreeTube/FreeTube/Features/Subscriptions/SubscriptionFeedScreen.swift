@@ -109,24 +109,16 @@ struct SubscriptionFeedScreen: View {
                 }
 
                 if model.canLoadMore {
-                    Button {
+                    MediaPaginationFooter(isLoading: model.isLoadingMore) {
                         Task {
                             await model.loadMore()
                             if watchFilter != .all || durationFilter != .all || blocklist.rules.isActive {
                                 await fillFilteredFeed()
                             }
                         }
-                    } label: {
-                        Group {
-                            if model.isLoadingMore {
-                                ProgressView()
-                            } else {
-                                Label("Load more", systemImage: "chevron.down")
-                            }
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .disabled(model.isLoadingMore || model.isRefreshing)
+                    .disabled(model.isRefreshing)
+                    .listRowSeparator(.hidden)
                     .id(pageKey)
                     .onAppear {
                         guard autoLoadMoreFeedItems, !filtersAreActive,
@@ -198,7 +190,7 @@ struct SubscriptionFeedScreen: View {
                         Button("Try Again") {
                             Task { await model.refresh() }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
                     }
                 } else if model.hasLoaded && model.videos.isEmpty && !model.isRefreshing {
                     if model.selectedGroupID != nil {

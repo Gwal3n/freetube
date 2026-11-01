@@ -80,7 +80,7 @@ struct PlaylistScreen: View {
                             .buttonStyle(.bordered)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 32)
+                    .containerRelativeFrame(.vertical)
                 }
             }
         }
