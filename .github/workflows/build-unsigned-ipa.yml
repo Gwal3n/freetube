@@ -32,6 +32,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION="$FREETUBE_BUILD_NUMBER" \
             FREETUBE_COMMIT="$FREETUBE_COMMIT_SHA" \
+            ENABLE_DEBUG_DYLIB=NO \
             LD_GENERATE_MAP_FILE=YES \
             build
 
