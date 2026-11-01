@@ -9,6 +9,8 @@ import SwiftUI
 struct PlayerInformationPanel<Actions: View>: View {
     @AppStorage("playerPanelSectionOrder") private var storedSectionOrder = PlayerPanelSection.defaultOrder
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
+    @AppStorage("pinUpNextHeading") private var pinUpNextHeading = false
+    @AppStorage("pinQueueHeading") private var pinQueueHeading = false
     let video: Video
     let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
@@ -20,9 +22,11 @@ struct PlayerInformationPanel<Actions: View>: View {
     let detailsLoadFailed: Bool
     let showsDescription: Bool
     let showsUpNext: Bool
-    let upNextInitialCount: Int
+    @Binding var isUpNextExpanded: Bool
+    @Binding var upNextVisibleLimit: Int
     let contentWidth: CGFloat
     let showsComments: Bool
+    let onCollapseComments: () -> Void
     let onToggleDetails: () -> Void
     let onExpandDetails: () -> Void
     let onRetryDetails: () -> Void
@@ -43,9 +47,11 @@ struct PlayerInformationPanel<Actions: View>: View {
         detailsLoadFailed: Bool,
         showsDescription: Bool,
         showsUpNext: Bool,
-        upNextInitialCount: Int,
+        isUpNextExpanded: Binding<Bool>,
+        upNextVisibleLimit: Binding<Int>,
         contentWidth: CGFloat,
         showsComments: Bool,
+        onCollapseComments: @escaping () -> Void,
         onToggleDetails: @escaping () -> Void,
         onExpandDetails: @escaping () -> Void,
         onRetryDetails: @escaping () -> Void,
@@ -65,9 +71,11 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.detailsLoadFailed = detailsLoadFailed
         self.showsDescription = showsDescription
         self.showsUpNext = showsUpNext
-        self.upNextInitialCount = upNextInitialCount
+        self._isUpNextExpanded = isUpNextExpanded
+        self._upNextVisibleLimit = upNextVisibleLimit
         self.contentWidth = contentWidth
         self.showsComments = showsComments
+        self.onCollapseComments = onCollapseComments
         self.onToggleDetails = onToggleDetails
         self.onExpandDetails = onExpandDetails
         self.onRetryDetails = onRetryDetails
@@ -78,7 +86,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     }
 
     var body: some View {
-        if pinCommentsHeading {
+        if pinCommentsHeading || pinUpNextHeading || pinQueueHeading {
             // A pinned Section needs to belong to the panel's main lazy stack, not a lazy
             // stack nested around Comments alone. Keep the original one-point top probe gap.
             LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
@@ -133,14 +141,30 @@ struct PlayerInformationPanel<Actions: View>: View {
             case .savedMoments:
                 SavedMomentsSection(videoID: video.id, onSeek: onSeek)
             case .queue:
-                PlayerQueueSections(kind: .manualQueue, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth, onOpenChannel: onOpenRecommendationChannel)
+                PlayerQueueSections(
+                    kind: .manualQueue,
+                    contentWidth: contentWidth,
+                    isUpNextExpanded: $isUpNextExpanded,
+                    upNextVisibleLimit: $upNextVisibleLimit,
+                    onOpenChannel: onOpenRecommendationChannel
+                )
             case .upNext:
                 if showsUpNext {
-                    PlayerQueueSections(kind: .upNext, upNextInitialCount: upNextInitialCount, contentWidth: contentWidth, onOpenChannel: onOpenRecommendationChannel)
+                    PlayerQueueSections(
+                        kind: .upNext,
+                        contentWidth: contentWidth,
+                        isUpNextExpanded: $isUpNextExpanded,
+                        upNextVisibleLimit: $upNextVisibleLimit,
+                        onOpenChannel: onOpenRecommendationChannel
+                    )
                 }
             case .comments:
                 if showsComments {
-                    CommentsSection(videoID: video.id, countText: commentsCountText)
+                    CommentsSection(
+                        videoID: video.id,
+                        countText: commentsCountText,
+                        onCollapseRequested: onCollapseComments
+                    )
                         .id(video.id)
                 }
             }

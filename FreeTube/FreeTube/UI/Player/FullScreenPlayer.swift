@@ -49,6 +49,8 @@ struct FullScreenPlayer: View {
     @State private var isFrameStepping = false
     @State private var isHoldingForSpeed = false
     @State private var panelScrollOffset: CGFloat = 0
+    @State private var isUpNextExpanded = false
+    @State private var upNextVisibleLimit = 5
     @State private var isPlaylistPanelPresented = false
     @State private var playlistPanelExpansion: CGFloat = 0
     @State private var chapterPanelExpansion: CGFloat = 0
@@ -71,6 +73,8 @@ struct FullScreenPlayer: View {
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("showComments") private var showComments = true
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
+    @AppStorage("pinUpNextHeading") private var pinUpNextHeading = false
+    @AppStorage("pinQueueHeading") private var pinQueueHeading = false
     @AppStorage("playerScrollDiagnosticsEnabled") private var playerScrollDiagnosticsEnabled = false
     @AppStorage("showDescription") private var showDescription = true
     @AppStorage("showUpNext") private var showUpNext = true
@@ -90,6 +94,10 @@ struct FullScreenPlayer: View {
 
     private var seekPreviewStyle: SeekPreviewStyle {
         SeekPreviewStyle(rawValue: seekPreviewStyleRaw) ?? .compact
+    }
+
+    private var hasPinnedPanelHeading: Bool {
+        pinCommentsHeading || pinUpNextHeading || pinQueueHeading
     }
 
     private var liveRefreshVideoID: String? {
@@ -535,6 +543,15 @@ struct FullScreenPlayer: View {
         .onChange(of: player.currentVideo?.id, initial: true) { _, videoID in
             isTranscriptPresented = false
             captionsModel.reset(for: videoID)
+            if player.activePlaylist == nil {
+                isUpNextExpanded = false
+                upNextVisibleLimit = upNextInitialCount
+            } else {
+                upNextVisibleLimit = max(upNextVisibleLimit, upNextInitialCount)
+            }
+        }
+        .onChange(of: upNextInitialCount) { _, newValue in
+            upNextVisibleLimit = newValue
         }
         .task(id: player.fullScreenPresented && player.loadState == .readyToPlay ? player.currentVideo?.id : nil) {
             guard player.fullScreenPresented,
@@ -1125,48 +1142,52 @@ struct FullScreenPlayer: View {
         contentWidth: CGFloat,
         minimumContentHeight: CGFloat
     ) -> some View {
-        if #available(iOS 18.0, *) {
-            panelScrollView(
-                video,
-                collapseRange: collapseRange,
-                contentWidth: contentWidth,
-                minimumContentHeight: minimumContentHeight
-            )
-                .onScrollGeometryChange(for: PanelScrollSample.self) { geometry in
-                    let offset = max(0, geometry.contentOffset.y + geometry.contentInsets.top)
-                    return PanelScrollSample(
-                        collapseOffset: min(offset, collapseRange),
-                        isAtTop: offset <= 0.5,
-                        diagnosticOffset: playerScrollDiagnosticsEnabled ? offset : nil
-                    )
-                } action: { _, sample in
-                    updatePanelScroll(collapseOffset: sample.collapseOffset, isAtTop: sample.isAtTop)
-                    if let offset = sample.diagnosticOffset, offset > collapseRange + 1 {
-                        PlayerScrollDiagnostics.shared.record()
+        ScrollViewReader { scrollProxy in
+            if #available(iOS 18.0, *) {
+                panelScrollView(
+                    video,
+                    collapseRange: collapseRange,
+                    contentWidth: contentWidth,
+                    minimumContentHeight: minimumContentHeight,
+                    scrollProxy: scrollProxy
+                )
+                    .onScrollGeometryChange(for: PanelScrollSample.self) { geometry in
+                        let offset = max(0, geometry.contentOffset.y + geometry.contentInsets.top)
+                        return PanelScrollSample(
+                            collapseOffset: min(offset, collapseRange),
+                            isAtTop: offset <= 0.5,
+                            diagnosticOffset: playerScrollDiagnosticsEnabled ? offset : nil
+                        )
+                    } action: { _, sample in
+                        updatePanelScroll(collapseOffset: sample.collapseOffset, isAtTop: sample.isAtTop)
+                        if let offset = sample.diagnosticOffset, offset > collapseRange + 1 {
+                            PlayerScrollDiagnostics.shared.record()
+                        }
                     }
-                }
-                .onScrollPhaseChange { _, phase in
-                    guard playerScrollDiagnosticsEnabled else { return }
-                    if phase == .interacting {
-                        PlayerScrollDiagnostics.shared.begin()
-                    } else if phase == .idle {
-                        PlayerScrollDiagnostics.shared.finish()
+                    .onScrollPhaseChange { _, phase in
+                        guard playerScrollDiagnosticsEnabled else { return }
+                        if phase == .interacting {
+                            PlayerScrollDiagnostics.shared.begin()
+                        } else if phase == .idle {
+                            PlayerScrollDiagnostics.shared.finish()
+                        }
                     }
-                }
-        } else {
-            panelScrollView(
-                video,
-                collapseRange: collapseRange,
-                contentWidth: contentWidth,
-                minimumContentHeight: minimumContentHeight
-            )
-                .coordinateSpace(name: "playerPanelScroll")
-                .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
-                    updatePanelScroll(
-                        collapseOffset: min(max(offset, 0), collapseRange),
-                        isAtTop: offset <= 0.5
-                    )
-                }
+            } else {
+                panelScrollView(
+                    video,
+                    collapseRange: collapseRange,
+                    contentWidth: contentWidth,
+                    minimumContentHeight: minimumContentHeight,
+                    scrollProxy: scrollProxy
+                )
+                    .coordinateSpace(name: "playerPanelScroll")
+                    .onPreferenceChange(PlayerPanelScrollOffsetKey.self) { offset in
+                        updatePanelScroll(
+                            collapseOffset: min(max(offset, 0), collapseRange),
+                            isAtTop: offset <= 0.5
+                        )
+                    }
+            }
         }
     }
 
@@ -1185,21 +1206,26 @@ struct FullScreenPlayer: View {
         _ video: Video,
         collapseRange: CGFloat,
         contentWidth: CGFloat,
-        minimumContentHeight: CGFloat
+        minimumContentHeight: CGFloat,
+        scrollProxy: ScrollViewProxy
     ) -> some View {
         ScrollView {
             Group {
-                if pinCommentsHeading {
+                if hasPinnedPanelHeading {
                     // The pinned Section belongs to the ScrollView's direct lazy content.
-                    panelInformation(video, contentWidth: contentWidth)
-                        .reportPlayerPanelScrollOffset()
+                    panelInformation(video, contentWidth: contentWidth) {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                            scrollProxy.scrollTo("playerPanelTop", anchor: .top)
+                        }
+                    }
+                    .reportPlayerPanelScrollOffset()
                 } else {
                     VStack(alignment: .leading, spacing: 16) {
                         Color.clear
                             // Keep the geometry probe alive so it reliably emits scroll preferences.
                             .frame(height: 1)
                             .reportPlayerPanelScrollOffset()
-                        panelInformation(video, contentWidth: contentWidth)
+                        panelInformation(video, contentWidth: contentWidth) {}
                     }
                 }
             }
@@ -1215,13 +1241,18 @@ struct FullScreenPlayer: View {
             // Preserve enough scroll extent to consume the complete header collapse even when
             // comments and Up Next are both collapsed and the natural feed is very short.
             .frame(minHeight: minimumContentHeight, alignment: .top)
+            .id("playerPanelTop")
         }
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
         .onDisappear { PlayerScrollDiagnostics.shared.finish() }
     }
 
-    private func panelInformation(_ video: Video, contentWidth: CGFloat) -> some View {
+    private func panelInformation(
+        _ video: Video,
+        contentWidth: CGFloat,
+        onCollapseComments: @escaping () -> Void
+    ) -> some View {
         PlayerInformationPanel(
             video: video,
             fullVideoLabel: SponsorBlockSegment.primaryFullVideoLabel(
@@ -1238,9 +1269,11 @@ struct FullScreenPlayer: View {
             detailsLoadFailed: detailsModel.loadFailed,
             showsDescription: showDescription,
             showsUpNext: showUpNext,
-            upNextInitialCount: upNextInitialCount,
+            isUpNextExpanded: $isUpNextExpanded,
+            upNextVisibleLimit: $upNextVisibleLimit,
             contentWidth: contentWidth,
             showsComments: showComments,
+            onCollapseComments: onCollapseComments,
             onToggleDetails: {
                 withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     detailsModel.isExpanded.toggle()

@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Manual queue and recommendations shown below the expanded player's metadata.
 ///
-/// This view owns only disclosure/windowing state. Playback and queue mutations remain in the
-/// shared `PlayerStateManager`, while navigation out of the player remains with its parent.
+/// The expanded player owns Up Next disclosure and windowing so scrolling cannot reset them.
+/// Playback and queue mutations remain in `PlayerStateManager`.
 @available(iOS 17.0, *)
 struct PlayerQueueSections: View {
     enum Kind: Equatable {
@@ -16,17 +16,32 @@ struct PlayerQueueSections: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("upNextRowSize") private var upNextRowSizeRaw = UpNextRowSize.compact.rawValue
+    @AppStorage("pinUpNextHeading") private var pinUpNextHeading = false
+    @AppStorage("pinQueueHeading") private var pinQueueHeading = false
 
     let kind: Kind
-    let upNextInitialCount: Int
     let contentWidth: CGFloat
     let onOpenChannel: (String) -> Void
 
-    @State private var isQueueExpanded = false
+    @Binding var isUpNextExpanded: Bool
+    @Binding var upNextVisibleLimit: Int
     @State private var isManualQueueExpanded = true
-    @State private var upNextVisibleLimit = 5
     @State private var queueToSave: [Video] = []
     @State private var showingSaveQueue = false
+
+    init(
+        kind: Kind,
+        contentWidth: CGFloat,
+        isUpNextExpanded: Binding<Bool>,
+        upNextVisibleLimit: Binding<Int>,
+        onOpenChannel: @escaping (String) -> Void
+    ) {
+        self.kind = kind
+        self.contentWidth = contentWidth
+        self._isUpNextExpanded = isUpNextExpanded
+        self._upNextVisibleLimit = upNextVisibleLimit
+        self.onOpenChannel = onOpenChannel
+    }
 
     // The DeArrow switch overlays the thumbnail, so it never changes row height as branding loads.
     private let queueRowHeight: CGFloat = 56
@@ -45,8 +60,28 @@ struct PlayerQueueSections: View {
     var body: some View {
         Group {
             switch kind {
-            case .manualQueue: manualQueuePanel
-            case .upNext: queuePanel
+            case .manualQueue:
+                if pinQueueHeading {
+                    if !visibleManualQueue.isEmpty {
+                        Section {
+                            if isManualQueueExpanded { manualQueueList }
+                        } header: {
+                            manualQueueHeader.background(Color(uiColor: .systemBackground))
+                        }
+                    }
+                } else {
+                    manualQueuePanel
+                }
+            case .upNext:
+                if pinUpNextHeading {
+                    Section {
+                        if isUpNextExpanded { upNextList }
+                    } header: {
+                        upNextHeader.background(Color(uiColor: .systemBackground))
+                    }
+                } else {
+                    queuePanel
+                }
             }
         }
         .sheet(isPresented: $showingSaveQueue) {
@@ -60,89 +95,94 @@ struct PlayerQueueSections: View {
     private var manualQueuePanel: some View {
         if !visibleManualQueue.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 0) {
-                    Button {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            isManualQueueExpanded.toggle()
-                        }
-                    } label: {
-                        PlayerSectionHeading(
-                            title: "Queue",
-                            detail: "\(visibleManualQueue.count)",
-                            isExpanded: isManualQueueExpanded,
-                            showsDisclosureIndicator: false
-                        )
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-
-                    Menu {
-                        Button {
-                            var seen = Set<String>()
-                            queueToSave = ([player.currentVideo].compactMap { $0 } + player.manualQueue)
-                                .filter { !blocklist.blocks($0) && seen.insert($0.id).inserted }
-                            showingSaveQueue = true
-                        } label: {
-                            Label("Save queue to playlist", systemImage: "text.badge.plus")
-                        }
-                        Button(role: .destructive) {
-                            player.clearManualQueueWithUndo()
-                        } label: {
-                            Label("Clear queue", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                            .contentShape(Rectangle())
-                    }
-                    .tint(.primary)
-                    .accessibilityLabel("Queue actions")
-
-                    Button {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            isManualQueueExpanded.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(isManualQueueExpanded ? 90 : 0))
-                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(ResponsiveButtonStyle())
-                    .accessibilityLabel(isManualQueueExpanded ? "Collapse queue" : "Expand queue")
-                }
-                .padding(.horizontal)
-
-                if isManualQueueExpanded {
-                    List {
-                        ForEach(visibleManualQueue) { video in
-                            queueRow(
-                                video,
-                                onPlay: { player.playManualQueueItem(video) },
-                                onRemove: { player.removeFromManualQueueWithUndo(videoID: video.id) },
-                                showsRemoveButton: true
-                            )
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .frame(height: queueRowHeight)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                        }
-                        .onMove { offsets, destination in
-                            player.moveManualQueue(fromOffsets: offsets, toOffset: destination)
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .scrollDisabled(true)
-                    .environment(\.editMode, .constant(.active))
-                    .frame(height: manualQueueListHeight)
-                    .transition(.opacity)
-                }
+                manualQueueHeader
+                if isManualQueueExpanded { manualQueueList }
             }
         }
+    }
+
+    private var manualQueueHeader: some View {
+        HStack(spacing: 0) {
+            Button {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    isManualQueueExpanded.toggle()
+                }
+            } label: {
+                PlayerSectionHeading(
+                    title: "Queue",
+                    detail: "\(visibleManualQueue.count)",
+                    isExpanded: isManualQueueExpanded,
+                    showsDisclosureIndicator: false
+                )
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+
+            Menu {
+                Button {
+                    var seen = Set<String>()
+                    queueToSave = ([player.currentVideo].compactMap { $0 } + player.manualQueue)
+                        .filter { !blocklist.blocks($0) && seen.insert($0.id).inserted }
+                    showingSaveQueue = true
+                } label: {
+                    Label("Save queue to playlist", systemImage: "text.badge.plus")
+                }
+                Button(role: .destructive) {
+                    player.clearManualQueueWithUndo()
+                } label: {
+                    Label("Clear queue", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Rectangle())
+            }
+            .tint(.primary)
+            .accessibilityLabel("Queue actions")
+
+            Button {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    isManualQueueExpanded.toggle()
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isManualQueueExpanded ? 90 : 0))
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityLabel(isManualQueueExpanded ? "Collapse queue" : "Expand queue")
+        }
+        .padding(.horizontal)
+    }
+
+    private var manualQueueList: some View {
+        List {
+            ForEach(visibleManualQueue) { video in
+                queueRow(
+                    video,
+                    onPlay: { player.playManualQueueItem(video) },
+                    onRemove: { player.removeFromManualQueueWithUndo(videoID: video.id) },
+                    showsRemoveButton: true
+                )
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .frame(height: queueRowHeight)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+            }
+            .onMove { offsets, destination in
+                player.moveManualQueue(fromOffsets: offsets, toOffset: destination)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollDisabled(true)
+        .environment(\.editMode, .constant(.active))
+        .frame(height: manualQueueListHeight)
+        .transition(.opacity)
     }
 
     // MARK: - Sizing
@@ -180,82 +220,75 @@ struct PlayerQueueSections: View {
 
     private var queuePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button {
-                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                    isQueueExpanded.toggle()
-                }
-            } label: {
-                PlayerSectionHeading(title: "Up next", isExpanded: isQueueExpanded)
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .padding(.horizontal)
+            upNextHeader
+            if isUpNextExpanded { upNextList }
+        }
+    }
 
-            if isQueueExpanded {
-                List {
-                    ForEach(displayedUpNextVideos) { video in
-                        queueRow(video)
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    player.enqueue(video)
-                                } label: {
-                                    Label("Add to queue", systemImage: "text.badge.plus")
-                                }
-                                .tint(.indigo)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    player.removeFromUpNext(videoID: video.id)
-                                } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
-                            }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .frame(height: upNextRowHeight)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    }
-                    if canRevealMoreUpNext {
+    private var upNextHeader: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                isUpNextExpanded.toggle()
+            }
+        } label: {
+            PlayerSectionHeading(title: "Up next", isExpanded: isUpNextExpanded)
+        }
+        .buttonStyle(ResponsiveButtonStyle())
+        .padding(.horizontal)
+    }
+
+    private var upNextList: some View {
+        List {
+            ForEach(displayedUpNextVideos) { video in
+                queueRow(video)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         Button {
-                            Task { await revealMoreUpNext() }
+                            player.enqueue(video)
                         } label: {
-                            HStack {
-                                Spacer()
-                                if player.isLoadingMoreRecommendations {
-                                    ProgressView()
-                                } else {
-                                    Label("Load more", systemImage: "chevron.down")
-                                        .font(.subheadline.weight(.medium))
-                                }
-                                Spacer()
-                            }
-                            .frame(height: queueRowHeight)
+                            Label("Add to queue", systemImage: "text.badge.plus")
                         }
-                        .buttonStyle(ResponsiveButtonStyle())
-                        .disabled(player.isLoadingMoreRecommendations)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .tint(.indigo)
                     }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            player.removeFromUpNext(videoID: video.id)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .frame(height: upNextRowHeight)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+            }
+            if canRevealMoreUpNext {
+                Button {
+                    Task { await revealMoreUpNext() }
+                } label: {
+                    HStack {
+                        Spacer()
+                        if player.isLoadingMoreRecommendations {
+                            ProgressView()
+                        } else {
+                            Label("Load more", systemImage: "chevron.down")
+                                .font(.subheadline.weight(.medium))
+                        }
+                        Spacer()
+                    }
+                    .frame(height: queueRowHeight)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollDisabled(true)
-                .frame(height: queueListHeight)
-                .transition(.opacity)
+                .buttonStyle(ResponsiveButtonStyle())
+                .disabled(player.isLoadingMoreRecommendations)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
         }
-        .onChange(of: player.currentVideo?.id) {
-            // Playlist switches should not close the lower panel and shift the entire details
-            // view while the video changes. A standalone selection still starts with a clean Up Next.
-            if player.activePlaylist == nil {
-                isQueueExpanded = false
-                upNextVisibleLimit = upNextInitialCount
-            }
-        }
-        .onChange(of: upNextInitialCount) { _, newValue in
-            upNextVisibleLimit = newValue
-        }
-        .onAppear { upNextVisibleLimit = upNextInitialCount }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollDisabled(true)
+        .frame(height: queueListHeight)
+        .transition(.opacity)
     }
 
     private func revealMoreUpNext() async {

@@ -22,6 +22,8 @@ struct PlayerSettingsScreen: View {
     @AppStorage("openUpNextChannelsOnTap") private var openUpNextChannelsOnTap = false
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
+    @AppStorage("pinUpNextHeading") private var pinUpNextHeading = false
+    @AppStorage("pinQueueHeading") private var pinQueueHeading = false
     @State private var showingCustomSeekEditor = false
     @State private var customSeekSecondsText = ""
 
@@ -190,6 +192,9 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show Up Next")
                 if model.showUpNext {
+                    Toggle("Keep Up Next heading visible", isOn: $pinUpNextHeading)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Keep Up Next heading visible")
                     Toggle("Show channel avatars in Up Next", isOn: $showUpNextChannelAvatars)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Show channel avatars in Up Next")
@@ -211,6 +216,9 @@ struct PlayerSettingsScreen: View {
                     }
                     .settingsSearchRow("Initial Up Next videos")
                 }
+                Toggle("Keep queue heading visible", isOn: $pinQueueHeading)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Keep queue heading visible")
                 NavigationLink {
                     PlayerSectionsSettingsScreen()
                 } label: {

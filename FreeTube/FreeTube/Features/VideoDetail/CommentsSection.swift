@@ -3,9 +3,11 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct CommentsSection: View {
     let countText: String?
+    let onCollapseRequested: () -> Void
     @State private var model: CommentsViewModel
     /// Collapsed and unloaded by default. Showing the header does not load the comment tree.
     @State private var isExpanded = false
+    @State private var collapseAfterScroll = false
     @State private var expandedReplyCommentIDs: Set<String> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PlayerStateManager.self) private var player
@@ -15,8 +17,13 @@ struct CommentsSection: View {
     @AppStorage("openCommentAuthorChannels") private var openCommentAuthorChannels = false
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
 
-    init(videoID: String, countText: String? = nil) {
+    init(
+        videoID: String,
+        countText: String? = nil,
+        onCollapseRequested: @escaping () -> Void
+    ) {
         self.countText = countText
+        self.onCollapseRequested = onCollapseRequested
         _model = State(wrappedValue: CommentsViewModel(videoID: videoID))
     }
 
@@ -45,6 +52,12 @@ struct CommentsSection: View {
         .onAppear { PlayerScrollDiagnostics.shared.setCommentsExpanded(isExpanded) }
         .onChange(of: isExpanded) { _, expanded in
             PlayerScrollDiagnostics.shared.setCommentsExpanded(expanded)
+        }
+        .onChange(of: player.playerPanelAtTop) { _, isAtTop in
+            if isAtTop && collapseAfterScroll {
+                collapseAfterScroll = false
+                setCommentsExpanded(false)
+            }
         }
         .onDisappear { PlayerScrollDiagnostics.shared.setCommentsExpanded(false) }
         // Covers state restoration where the section mounts expanded. Collapsed sections remain
@@ -354,8 +367,20 @@ struct CommentsSection: View {
     }
 
     private func toggleComments() {
+        guard !collapseAfterScroll else { return }
+        if isExpanded && pinCommentsHeading && !player.playerPanelAtTop {
+            // Keep the expanded tree in place while the outer panel scrolls home. Removing it
+            // first leaves the scroll view beyond its new content extent and flashes the canvas.
+            collapseAfterScroll = true
+            onCollapseRequested()
+            return
+        }
+        setCommentsExpanded(!isExpanded)
+    }
+
+    private func setCommentsExpanded(_ expanded: Bool) {
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-            isExpanded.toggle()
+            isExpanded = expanded
         }
         if !isExpanded { model.focusComment(nil) }
         if isExpanded && model.comments.isEmpty && !model.isLoading {
