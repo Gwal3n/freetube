@@ -16,7 +16,7 @@ struct SettingsSearchScrollModifier: ViewModifier {
                     if reduceMotion {
                         proxy.scrollTo(searchTarget, anchor: .center)
                     } else {
-                        withAnimation(.easeInOut(duration: 0.28)) {
+                        withAnimation(InterfaceMotion.content) {
                             proxy.scrollTo(searchTarget, anchor: .center)
                         }
                     }

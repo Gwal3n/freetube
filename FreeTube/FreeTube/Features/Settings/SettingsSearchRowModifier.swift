@@ -25,17 +25,13 @@ struct SettingsSearchRowModifier: ViewModifier {
                 }
                 try? await Task.sleep(for: .milliseconds(280))
                 guard !Task.isCancelled else { return }
-                if reduceMotion {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                     highlighted = true
-                } else {
-                    withAnimation(.easeIn(duration: 0.18)) { highlighted = true }
                 }
                 try? await Task.sleep(for: .seconds(1.4))
                 guard !Task.isCancelled else { return }
-                if reduceMotion {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.notice) {
                     highlighted = false
-                } else {
-                    withAnimation(.easeOut(duration: 0.5)) { highlighted = false }
                 }
             }
     }
