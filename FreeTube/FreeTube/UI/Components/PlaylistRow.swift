@@ -21,6 +21,10 @@ struct PlaylistRow: View {
 
     var showsMoreMenu: Bool = false
 
+    private var videoCount: Int? {
+        playlist.videoCount ?? resolvedVideoCount
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             if let onTap {
@@ -70,7 +74,7 @@ struct PlaylistRow: View {
                     .scaledToFill()
                     .frame(width: 96, height: 56)
 
-                if let count = playlist.videoCount ?? resolvedVideoCount {
+                if let count = videoCount, !dynamicTypeSize.isAccessibilitySize {
                     HStack(spacing: 4) {
                         Image(systemName: "rectangle.stack.fill")
                             .font(.system(size: 10, weight: .semibold))
@@ -97,7 +101,12 @@ struct PlaylistRow: View {
                     Text(channelName)
                         .appFont(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                }
+                if dynamicTypeSize.isAccessibilitySize, let count = videoCount {
+                    Text("\(count.formatted()) \(count == 1 ? "video" : "videos")")
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             Spacer()

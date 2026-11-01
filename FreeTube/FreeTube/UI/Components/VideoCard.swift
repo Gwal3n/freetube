@@ -130,12 +130,16 @@ struct VideoCard: View {
             }
             VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 title(branding: branding)
-                HStack(spacing: 6) {
-                    newUploadLabel
-                    Text(metadataLine)
-                        .appFont(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) {
+                        newUploadLabel
+                        metadataText
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        newUploadLabel
+                        metadataText
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -162,30 +166,50 @@ struct VideoCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(ResponsiveButtonStyle())
+                .accessibilityLabel(cardAccessibilityLabel(title: branding.title(for: video)))
                 .accessibilityHint("Plays video")
-                HStack(spacing: 6) {
-                    newUploadLabel
-                    Button(action: onTapChannel) {
-                        Text(video.channelName)
-                            .appFont(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) {
+                        linkedMetadataItems(onTapChannel: onTapChannel)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open \(video.channelName)")
-                    if !metadataDetails.isEmpty {
-                        Button(action: openVideo) {
-                            Text(verbatim: " • \(metadataDetails)")
-                                .appFont(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        .buttonStyle(ResponsiveButtonStyle())
-                        .accessibilityHidden(true)
+                } else {
+                    HStack(spacing: 6) {
+                        linkedMetadataItems(onTapChannel: onTapChannel)
                     }
                 }
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    private var metadataText: some View {
+        Text(metadataLine)
+            .appFont(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+    }
+
+    @ViewBuilder
+    private func linkedMetadataItems(onTapChannel: @escaping () -> Void) -> some View {
+        newUploadLabel
+        Button(action: onTapChannel) {
+            Text(video.channelName)
+                .appFont(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(video.channelName)")
+        if !metadataDetails.isEmpty {
+            Button(action: openVideo) {
+                Text(verbatim: dynamicTypeSize.isAccessibilitySize
+                     ? metadataDetails : " • \(metadataDetails)")
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityHidden(true)
         }
     }
 

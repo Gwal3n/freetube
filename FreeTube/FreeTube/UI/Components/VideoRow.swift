@@ -171,7 +171,7 @@ struct VideoRow: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(ResponsiveButtonStyle())
-                .accessibilityLabel(branding.title(for: video))
+                .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
                 .accessibilityHint("Plays video")
 
                 if let onTapChannel {
@@ -247,7 +247,7 @@ struct VideoRow: View {
             Text(video.channelName)
                 .appFont(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
         }
     }
 
@@ -265,7 +265,7 @@ struct VideoRow: View {
                 Text(statsLine)
                     .appFont(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
             }
         } else if isNewSinceLastVisit {
             Text("New")

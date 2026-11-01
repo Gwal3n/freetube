@@ -5,6 +5,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LibraryVideoShelfCard: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
@@ -48,9 +49,9 @@ struct LibraryVideoShelfCard: View {
                     launchAnchor.frame = frame
                 }
                 Text(entry.title)
-                    .font(.caption.weight(.medium))
+                    .appFont(.caption, weight: .medium)
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
                     .multilineTextAlignment(.leading)
             }
             .frame(width: 160, alignment: .leading)
