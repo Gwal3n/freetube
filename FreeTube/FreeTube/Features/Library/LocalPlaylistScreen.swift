@@ -380,7 +380,7 @@ struct LocalPlaylistScreen: View {
                 value: Double(playlist.metadataRefreshProcessed),
                 total: Double(playlist.metadataRefreshTotal)
             )
-            .tint(.white)
+            .tint(Color.primary)
             .accessibilityLabel("Refreshing video details")
             .accessibilityValue("\(playlist.metadataRefreshProcessed) of \(playlist.metadataRefreshTotal)")
             .padding(.horizontal)

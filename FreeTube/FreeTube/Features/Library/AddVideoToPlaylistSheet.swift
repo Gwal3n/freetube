@@ -52,14 +52,16 @@ struct AddVideoToPlaylistSheet: View {
                         model.query = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.white.opacity(0.75))
+                            .foregroundStyle(.secondary)
+                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                            .contentShape(Rectangle())
                     }
-                    .tint(.white)
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Clear Search")
                 }
             }
+            .frame(minHeight: MediaStyle.actionSize)
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

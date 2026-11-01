@@ -140,7 +140,7 @@ struct LibraryScreen: View {
                     systemImage: "clock.arrow.circlepath"
                 )
             }
-            .tint(.white)
+            .tint(Color.primary)
 
             if !savedMomentStore.moments.isEmpty {
                 NavigationLink {
@@ -154,7 +154,7 @@ struct LibraryScreen: View {
                         systemImage: "bookmark"
                     )
                 }
-                .tint(.white)
+                .tint(Color.primary)
             }
 
             if showContinueWatchingMenu {
@@ -167,7 +167,7 @@ struct LibraryScreen: View {
                         systemImage: "play.rectangle"
                     )
                 }
-                .tint(.white)
+                .tint(Color.primary)
             }
 
             NavigationLink {
@@ -180,7 +180,7 @@ struct LibraryScreen: View {
                     systemImage: "person.2.fill"
                 )
             }
-            .tint(.white)
+            .tint(Color.primary)
 
             NavigationLink {
                 LocalPlaylistsScreen()
@@ -192,7 +192,7 @@ struct LibraryScreen: View {
                     systemImage: "music.note.list"
                 )
             }
-            .tint(.white)
+            .tint(Color.primary)
         }
     }
 
