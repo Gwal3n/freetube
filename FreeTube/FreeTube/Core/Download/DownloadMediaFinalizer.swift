@@ -18,7 +18,7 @@ final class DownloadMediaFinalizer {
               let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attributes[.size] as? NSNumber,
               size.int64Value >= Self.minimumFileSize else {
-            log.error("yt-dlp[\(videoID, privacy: .public)] validation: output missing or smaller than \(Self.minimumFileSize, privacy: .public) bytes")
+            log.error("download[\(videoID, privacy: .public)] validation: output missing or smaller than \(Self.minimumFileSize, privacy: .public) bytes")
             throw YouTubeServiceError.streamExtractionFailed
         }
 
@@ -36,18 +36,18 @@ final class DownloadMediaFinalizer {
                 ? !audioTracks.isEmpty
                 : !videoTracks.isEmpty && !audioTracks.isEmpty
             guard playable, seconds.isFinite, seconds > 0, hasExpectedTracks else {
-                log.error("yt-dlp[\(videoID, privacy: .public)] validation: playable=\(playable, privacy: .public) duration=\(seconds, privacy: .public) videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
+                log.error("download[\(videoID, privacy: .public)] validation: playable=\(playable, privacy: .public) duration=\(seconds, privacy: .public) videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
                 throw YouTubeServiceError.streamExtractionFailed
             }
             if let videoTrack = videoTracks.first,
                let size = try? await videoTrack.load(.naturalSize),
                size.width.isFinite, size.height.isFinite,
                abs(size.width) < 100_000, abs(size.height) < 100_000 {
-                log.info("yt-dlp[\(videoID, privacy: .public)] output video dimensions=\(Int(size.width), privacy: .public)x\(Int(size.height), privacy: .public)")
+                log.info("download[\(videoID, privacy: .public)] output video dimensions=\(Int(size.width), privacy: .public)x\(Int(size.height), privacy: .public)")
             }
-            log.info("yt-dlp[\(videoID, privacy: .public)] validation passed: size=\(size.int64Value, privacy: .public) duration=\(seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
+            log.info("download[\(videoID, privacy: .public)] validation passed: size=\(size.int64Value, privacy: .public) duration=\(seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
         } catch {
-            log.error("yt-dlp[\(videoID, privacy: .public)] validation could not read asset: \(String(describing: error), privacy: .public)")
+            log.error("download[\(videoID, privacy: .public)] validation could not read asset: \(String(describing: error), privacy: .public)")
             throw YouTubeServiceError.streamExtractionFailed
         }
     }
