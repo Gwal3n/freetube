@@ -4,9 +4,6 @@
 //
 //  Created by leshko on 17/5/26.
 //
-//  CLAUDE.md says iOS 16.0+, but SwiftData and `@Observable` require iOS 17.0+. The deployment
-//  target should be bumped to 17.0 in the Xcode project; this file requires iOS 17.
-//
 
 import SwiftUI
 import SwiftData

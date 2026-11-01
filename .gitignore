@@ -47,6 +47,10 @@ Carthage/Build/
 
 # Log files
 *.log
+/log/
+
+# Old UI screenshots are kept locally until replacement images are ready.
+/screenshots/
 
 # Package files
 *.jar

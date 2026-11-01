@@ -17,8 +17,13 @@ struct AboutSettingsScreen: View {
                         .textSelection(.enabled)
                 }
             } footer: {
-                Text("An account-free YouTube client for personal use. Playback and downloads may break when YouTube changes its internal APIs.")
-                Text("[freetube.io](https://freetube.io)")
+                Text("An account-free YouTube client. Playback and downloads may break when YouTube changes its internal APIs.")
+            }
+
+            Section("Source") {
+                Text("[Project on GitHub](https://github.com/Gwal3n/freetube)")
+                Text("[Original project by Leshko](https://github.com/leshkodev/freetube)")
+                Text("[MIT license](https://github.com/Gwal3n/freetube/blob/main/LICENSE)")
             }
         }
         .navigationTitle("About")
