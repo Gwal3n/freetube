@@ -10,6 +10,7 @@
 		AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = AC591D772FB9E26E009EE538 /* YouTubeKit */; };
 		AC591DA82FB9E35C009EE538 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = AC591DA72FB9E35C009EE538 /* Kingfisher */; };
 		AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */ = {isa = PBXBuildFile; productRef = AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */; };
+		AC591F052FB9F300009EE538 /* FFmpeg-iOS-Lame in Frameworks */ = {isa = PBXBuildFile; productRef = AC591F032FB9F300009EE538 /* FFmpeg-iOS-Lame */; };
 		AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */ = {isa = PBXBuildFile; productRef = AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */; };
 		AC5930012FC00001009EE538 /* FreeTubeStreamKit in Frameworks */ = {isa = PBXBuildFile; productRef = AC5930032FC00001009EE538 /* FreeTubeStreamKit */; };
 /* End PBXBuildFile section */
@@ -66,6 +67,7 @@
 				AC591DA82FB9E35C009EE538 /* Kingfisher in Frameworks */,
 				AC591D782FB9E26E009EE538 /* YouTubeKit in Frameworks */,
 				AC591F022FB9F300009EE538 /* FFmpeg-iOS-Support in Frameworks */,
+				AC591F052FB9F300009EE538 /* FFmpeg-iOS-Lame in Frameworks */,
 				AC5924CE2FBB5F2B009EE538 /* SwimplyPlayIndicator in Frameworks */,
 				AC5930012FC00001009EE538 /* FreeTubeStreamKit in Frameworks */,
 			);
@@ -146,6 +148,7 @@
 				AC591D772FB9E26E009EE538 /* YouTubeKit */,
 				AC591DA72FB9E35C009EE538 /* Kingfisher */,
 				AC591F012FB9F300009EE538 /* FFmpeg-iOS-Support */,
+				AC591F032FB9F300009EE538 /* FFmpeg-iOS-Lame */,
 				AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */,
 				AC5930032FC00001009EE538 /* FreeTubeStreamKit */,
 			);
@@ -187,6 +190,7 @@
 				AC591D762FB9E26E009EE538 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
 				AC591DA62FB9E35C009EE538 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */,
+				AC591F042FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Lame" */,
 				AC5924CC2FBB5F2B009EE538 /* XCRemoteSwiftPackageReference "SwimplyPlayIndicator" */,
 				AC5930022FC00001009EE538 /* XCLocalSwiftPackageReference "FreeTubeStreamKit" */,
 			);
@@ -576,6 +580,14 @@
 				minimumVersion = 0.0.2;
 			};
 		};
+		AC591F042FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Lame" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kewlbear/FFmpeg-iOS-Lame";
+			requirement = {
+				kind = exactVersion;
+				version = "0.0.6-b20230730-000000";
+			};
+		};
 		AC5924CC2FBB5F2B009EE538 /* XCRemoteSwiftPackageReference "SwimplyPlayIndicator" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/obrhoff/SwimplyPlayIndicator.git";
@@ -601,6 +613,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AC591F002FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Support" */;
 			productName = "FFmpeg-iOS-Support";
+		};
+		AC591F032FB9F300009EE538 /* FFmpeg-iOS-Lame */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AC591F042FB9F300009EE538 /* XCRemoteSwiftPackageReference "FFmpeg-iOS-Lame" */;
+			productName = "FFmpeg-iOS-Lame";
 		};
 		AC5924CD2FBB5F2B009EE538 /* SwimplyPlayIndicator */ = {
 			isa = XCSwiftPackageProductDependency;
