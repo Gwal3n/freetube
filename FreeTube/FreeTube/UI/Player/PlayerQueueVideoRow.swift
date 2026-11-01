@@ -45,9 +45,7 @@ struct PlayerQueueVideoRow: View {
 
     private var rowThumbnailSize: CGSize {
         if kind == .upNext && upNextSize == .small {
-            return dynamicTypeSize.isAccessibilitySize
-                ? CGSize(width: 104, height: 58.5)
-                : CGSize(width: 144, height: 81)
+            return MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
         }
         return CGSize(width: 80, height: 45)
     }

@@ -38,7 +38,7 @@ struct ChannelRow: View {
     }
 
     private var content: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: MediaStyle.spacing) {
             KFImage(channel.thumbnailURL)
                 .thumbnail(size: CGSize(width: 48, height: 48)) {
                     Circle().fill(MediaStyle.placeholderFill)
@@ -48,7 +48,7 @@ struct ChannelRow: View {
                 .frame(width: 48, height: 48)
                 .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 Text(channel.name).appFont(.subheadline, weight: .semibold)
                 if !detailLine.isEmpty {
                     Text(detailLine)

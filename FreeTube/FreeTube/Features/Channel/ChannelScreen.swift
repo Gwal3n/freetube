@@ -43,6 +43,9 @@ struct ChannelScreen: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private let prefetchLookahead = 5
+    private var compactThumbnailSize: CGSize {
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
+    }
 
     init(channelID: String) {
         _model = State(wrappedValue: ChannelViewModel(channelID: channelID))
@@ -513,8 +516,8 @@ struct ChannelScreen: View {
                         RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                             .fill(MediaStyle.placeholderFill)
                             .frame(
-                                width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
-                                height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
+                                width: compactThumbnailSize.width,
+                                height: compactThumbnailSize.height
                             )
                         VStack(alignment: .leading, spacing: 8) {
                             RoundedRectangle(cornerRadius: 3)

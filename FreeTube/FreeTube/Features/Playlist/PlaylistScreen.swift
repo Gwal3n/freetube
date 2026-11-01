@@ -14,6 +14,9 @@ struct PlaylistScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var compactThumbnailSize: CGSize {
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
+    }
     @State private var isSavedLocally = false
     @State private var isSavingLocally = false
     @State private var playlistDownloads = PlaylistDownloadCoordinator.shared
@@ -165,8 +168,8 @@ struct PlaylistScreen: View {
                         RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                             .fill(.quaternary)
                             .frame(
-                                width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
-                                height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
+                                width: compactThumbnailSize.width,
+                                height: compactThumbnailSize.height
                             )
                         VStack(alignment: .leading, spacing: 9) {
                             RoundedRectangle(cornerRadius: 3)

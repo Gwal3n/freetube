@@ -5,16 +5,17 @@ import SwiftUI
 struct MediaListPlaceholder: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    private var thumbnailSize: CGSize {
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
+    }
+
     var body: some View {
         List {
             ForEach(0..<6, id: \.self) { _ in
                 HStack(spacing: MediaStyle.spacing) {
                     RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                         .fill(.quaternary)
-                        .frame(
-                            width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
-                            height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
-                        )
+                        .frame(width: thumbnailSize.width, height: thumbnailSize.height)
                     VStack(alignment: .leading, spacing: 9) {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(.quaternary)

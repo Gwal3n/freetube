@@ -60,10 +60,7 @@ struct VideoRow: View {
     /// Playback count + relative upload date joined by a middle dot. Either half can be empty
     /// (older listings sometimes omit one), so we filter before joining to avoid stray separators.
     private var statsLine: String {
-        [video.viewCountString,
-         relativeDateReference.flatMap { video.publishedText(relativeTo: $0) } ?? video.publishedRelative ?? ""]
-            .filter { !$0.isEmpty }
-            .joined(separator: " • ")
+        VideoMetadataLine.details(for: video, relativeTo: relativeDateReference)
     }
 
     var body: some View {
@@ -97,7 +94,7 @@ struct VideoRow: View {
         .overlay(alignment: .topLeading) {
             if showsThumbnailToggle && branding.hasReplacement(for: video) {
                 DeArrowToggleButton(video: video, model: branding, onThumbnail: true)
-                    .frame(width: thumbnailWidth, height: thumbnailHeight, alignment: .topTrailing)
+                    .frame(width: thumbnailSize.width, height: thumbnailSize.height, alignment: .topTrailing)
             }
         }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -128,12 +125,8 @@ struct VideoRow: View {
         return true
     }
 
-    private var thumbnailWidth: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 104 : 144
-    }
-
-    private var thumbnailHeight: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
+    private var thumbnailSize: CGSize {
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
     }
 
     private func rowAccessibilityLabel(title: String) -> String {
@@ -218,7 +211,7 @@ struct VideoRow: View {
     private func thumbnail(branding: DeArrowVideoViewModel) -> some View {
         VideoThumbnail(
             video: video,
-            size: CGSize(width: thumbnailWidth, height: thumbnailHeight),
+            size: thumbnailSize,
             progress: playbackProgress,
             watchStatus: watchStatus,
             replacementData: branding.thumbnailData(for: video),
@@ -235,7 +228,7 @@ struct VideoRow: View {
         Text(branding.title(for: video))
             .contentTransition(.opacity)
             .appFont(.subheadline, weight: .semibold)
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
+            .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
     }
 
     private var channelLine: some View {

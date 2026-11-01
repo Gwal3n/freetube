@@ -60,7 +60,7 @@ struct PlaylistRow: View {
     }
 
     private var content: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: MediaStyle.spacing) {
             ZStack(alignment: .bottom) {
                 KFImage(playlist.thumbnailURL)
                     .thumbnail(size: CGSize(width: 96, height: 56)) {
@@ -89,10 +89,10 @@ struct PlaylistRow: View {
             .frame(width: 96, height: 56)
             .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 Text(playlist.title)
                     .appFont(.subheadline, weight: .semibold)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
+                    .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
                 if let channelName = playlist.channelName, !channelName.isEmpty {
                     Text(channelName)
                         .appFont(.caption)

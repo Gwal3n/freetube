@@ -71,7 +71,10 @@ struct SubscriptionFeedScreen: View {
 
                 if shouldShowLoadingRows {
                     ForEach(0..<6, id: \.self) { _ in
-                        FeedSkeletonRow(largeThumbnail: largeVideoThumbnails)
+                        FeedSkeletonRow(
+                            largeThumbnail: largeVideoThumbnails,
+                            showsChannelAvatar: showChannelAvatars
+                        )
                             .modifier(SkeletonPulse(dimmedOpacity: 0.52))
                     }
                 }

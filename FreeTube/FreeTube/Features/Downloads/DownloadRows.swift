@@ -124,7 +124,7 @@ struct DownloadedVideoRow<MenuContent: View>: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .appFont(.subheadline, weight: .semibold)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
+                    .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
                 if !item.channelName.isEmpty {
                     Text(item.channelName)
                         .appFont(.caption)
@@ -156,9 +156,7 @@ struct DownloadedVideoRow<MenuContent: View>: View {
     }
 
     private var thumbnailSize: CGSize {
-        dynamicTypeSize.isAccessibilitySize
-            ? CGSize(width: 104, height: 58.5)
-            : CGSize(width: 144, height: 81)
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
     }
 
     @ViewBuilder

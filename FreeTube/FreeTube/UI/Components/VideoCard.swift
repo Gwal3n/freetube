@@ -28,23 +28,15 @@ struct VideoCard: View {
     /// the line reads naturally and any missing segment is dropped without leaving stray
     /// separators ("Channel" / "Channel • 1.2M views" / "Channel • 1.2M views • 3 days ago").
     private var metadataLine: String {
-        let publishedText = relativeDateReference.flatMap { video.publishedText(relativeTo: $0) }
-            ?? video.publishedRelative ?? ""
-        let parts = [video.channelName, video.viewCountString, publishedText]
-            .filter { !$0.isEmpty }
-        return parts.joined(separator: " • ")
+        VideoMetadataLine.withChannel(for: video, relativeTo: relativeDateReference)
     }
 
     private var metadataDetails: String {
-        let publishedText = relativeDateReference.flatMap { video.publishedText(relativeTo: $0) }
-            ?? video.publishedRelative ?? ""
-        return [video.viewCountString, publishedText]
-            .filter { !$0.isEmpty }
-            .joined(separator: " • ")
+        VideoMetadataLine.details(for: video, relativeTo: relativeDateReference)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: MediaStyle.cardContentSpacing) {
             ZStack(alignment: .topTrailing) {
                 Button(action: openVideo) {
                     thumbnail(branding: branding)
@@ -63,8 +55,8 @@ struct VideoCard: View {
             metadataRow(branding: branding)
         }
         // Include spacing in the List row that the native menu lifts and returns to.
-        .padding(.top, 4)
-        .padding(.bottom, 14)
+        .padding(.top, MediaStyle.cardTopPadding)
+        .padding(.bottom, MediaStyle.cardBottomPadding)
         .loadDeArrowBranding(video: video, model: branding)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             if offersPlayNext {
@@ -101,7 +93,7 @@ struct VideoCard: View {
     }
 
     private func metadataRow(branding: DeArrowVideoViewModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: MediaStyle.spacing) {
             if let onTapChannel {
                 linkedMetadataContent(branding: branding, onTapChannel: onTapChannel)
             } else {
@@ -122,21 +114,21 @@ struct VideoCard: View {
 
     private func channelAvatar() -> some View {
         KFImage(video.channelThumbnailURL)
-            .thumbnail(size: CGSize(width: 36, height: 36)) {
+            .thumbnail(size: CGSize(width: MediaStyle.cardAvatarSize, height: MediaStyle.cardAvatarSize)) {
                 Circle().fill(MediaStyle.placeholderFill)
             }
             .resizable()
             .scaledToFill()
-            .frame(width: 36, height: 36)
+            .frame(width: MediaStyle.cardAvatarSize, height: MediaStyle.cardAvatarSize)
             .clipShape(Circle())
     }
 
     private func playbackMetadataContent(branding: DeArrowVideoViewModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: MediaStyle.spacing) {
             if showsChannelAvatar {
                 channelAvatar()
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 title(branding: branding)
                 HStack(spacing: 6) {
                     newUploadLabel
@@ -154,7 +146,7 @@ struct VideoCard: View {
     private func linkedMetadataContent(
         branding: DeArrowVideoViewModel, onTapChannel: @escaping () -> Void
     ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: MediaStyle.spacing) {
             if showsChannelAvatar {
                 Button(action: onTapChannel) {
                     channelAvatar()
@@ -163,7 +155,7 @@ struct VideoCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open \(video.channelName)")
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 Button(action: openVideo) {
                     title(branding: branding)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -201,7 +193,7 @@ struct VideoCard: View {
         Text(branding.title(for: video))
             .contentTransition(.opacity)
             .appFont(.subheadline, weight: .semibold)
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
+            .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
     }
 
     @ViewBuilder

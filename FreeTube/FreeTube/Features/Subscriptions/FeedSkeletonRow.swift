@@ -7,13 +7,18 @@ struct FeedSkeletonRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let largeThumbnail: Bool
+    let showsChannelAvatar: Bool
+
+    private var compactThumbnailSize: CGSize {
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
+    }
 
     @ViewBuilder
     var body: some View {
         if largeThumbnail {
             largeRow
-                .padding(.top, 4)
-                .padding(.bottom, 14)
+                .padding(.top, MediaStyle.cardTopPadding)
+                .padding(.bottom, MediaStyle.cardBottomPadding)
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
@@ -31,14 +36,18 @@ struct FeedSkeletonRow: View {
             HStack(alignment: .top, spacing: MediaStyle.spacing) {
                 RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                     .fill(.quaternary)
-                    .frame(
-                        width: dynamicTypeSize.isAccessibilitySize ? 104 : 144,
-                        height: dynamicTypeSize.isAccessibilitySize ? 58.5 : 81
-                    )
+                    .frame(width: compactThumbnailSize.width, height: compactThumbnailSize.height)
 
                 VStack(alignment: .leading, spacing: 9) {
                     placeholderLine(width: 170, height: 12)
-                    placeholderLine(width: 112, height: 12)
+                    HStack(spacing: 5) {
+                        if showsChannelAvatar {
+                            Circle()
+                                .fill(.quaternary)
+                                .frame(width: 18, height: 18)
+                        }
+                        placeholderLine(width: 112, height: 12)
+                    }
                     placeholderLine(width: 70, height: 9)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,15 +60,17 @@ struct FeedSkeletonRow: View {
     }
 
     private var largeRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: MediaStyle.cardContentSpacing) {
             RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
                 .fill(.quaternary)
                 .aspectRatio(16 / 9, contentMode: .fit)
 
-            HStack(alignment: .top, spacing: 12) {
-                Circle()
-                    .fill(.quaternary)
-                    .frame(width: 36, height: 36)
+            HStack(alignment: .top, spacing: MediaStyle.spacing) {
+                if showsChannelAvatar {
+                    Circle()
+                        .fill(.quaternary)
+                        .frame(width: MediaStyle.cardAvatarSize, height: MediaStyle.cardAvatarSize)
+                }
 
                 VStack(alignment: .leading, spacing: 7) {
                     placeholderLine(width: 240, height: 12)
