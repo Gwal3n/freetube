@@ -32,6 +32,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION="$FREETUBE_BUILD_NUMBER" \
             FREETUBE_COMMIT="$FREETUBE_COMMIT_SHA" \
+            LD_GENERATE_MAP_FILE=YES \
             build
 
       - name: Package unsigned IPA
@@ -50,4 +51,19 @@ jobs:
         with:
           name: FreeTube-unsigned
           path: FreeTube-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Collect app link map
+        run: |
+          MAP_DIR="$RUNNER_TEMP/FreeTube-link-map"
+          mkdir -p "$MAP_DIR"
+          find "$RUNNER_TEMP/DerivedData/Build/Intermediates.noindex/FreeTube.build" \
+            -type f -iname '*linkmap*.txt' -exec cp {} "$MAP_DIR/" \;
+          test -n "$(find "$MAP_DIR" -type f -print -quit)"
+
+      - name: Upload app link map
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeTube-link-map
+          path: ${{ runner.temp }}/FreeTube-link-map/
           if-no-files-found: error
