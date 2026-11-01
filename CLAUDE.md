@@ -46,7 +46,6 @@ These come first. Violating them breaks the project.
 | In-process ffmpeg | `FFmpegSupport` (Swift wrapper around ffmpeg C library) |
 | Playback | `AVFoundation` / `AVKit` (`AVQueuePlayer`, `AVPlayerViewController`, `AVPictureInPictureController`) |
 | Mini / expanded player | Native `SwiftUIPlayerContainer` (SwiftUI presentation and gestures) |
-| Now-playing indicator | `SwimplyPlayIndicator` |
 | Images | `Kingfisher` |
 | Legacy credential cleanup | `Security` (deletes credentials left by older builds) |
 | Persistence | `SwiftData` (`@Model`); `UserDefaults` for simple flags via `UserPreferences` |
@@ -94,7 +93,7 @@ FreeTube/
 │   ├── Player/            # FullScreenPlayer, PlayerSurface, DownloadProgressOverlay
 │   ├── Components/        # VideoCard, VideoRow, ChannelRow, CommentRow,
 │   │                      # PlaylistRow, AddToPlaylistSheet, ActivityShareSheet,
-│   │                      # NowPlayingIndicator, SectionHeader, LoadingView
+│   │                      # SectionHeader, LoadingView
 │   └── Modifiers/         # ErrorToastModifier
 ├── Resources/
 │   └── Localizable.xcstrings    # en / es / ru / fr / de

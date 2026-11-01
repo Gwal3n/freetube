@@ -28,15 +28,6 @@
       }
     },
     {
-      "identity" : "swimplyplayindicator",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/obrhoff/SwimplyPlayIndicator.git",
-      "state" : {
-        "revision" : "b6cff801f62d5cb45372461666a5e0bf4cac9447",
-        "version" : "1.2.0"
-      }
-    },
-    {
       "identity" : "youtubekit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/b5i/YouTubeKit",

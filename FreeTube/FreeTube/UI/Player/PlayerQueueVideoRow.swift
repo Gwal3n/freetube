@@ -103,9 +103,6 @@ struct PlayerQueueVideoRow: View {
                             passiveQueueMetadata(for: video)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        if video.id == player.currentVideo?.id {
-                            NowPlayingIndicator(videoID: video.id)
-                        }
                     }
                     .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
                     .contentShape(Rectangle())
@@ -168,9 +165,6 @@ struct PlayerQueueVideoRow: View {
                 linkedChannelMetadata(for: video)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if video.id == player.currentVideo?.id {
-                NowPlayingIndicator(videoID: video.id)
-            }
         }
         .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
     }
