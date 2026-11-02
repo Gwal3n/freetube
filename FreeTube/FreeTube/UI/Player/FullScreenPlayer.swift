@@ -51,6 +51,7 @@ struct FullScreenPlayer: View {
     @State private var panelScrollOffset: CGFloat = 0
     @State private var panelViewportHeight: CGFloat = 0
     @State private var commentsHeadingBottom: CGFloat = 0
+    @State private var pendingTopCommentsCollapse: (() -> Void)?
     @State private var isUpNextExpanded = false
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistPanelPresented = false
@@ -545,6 +546,7 @@ struct FullScreenPlayer: View {
         .onChange(of: player.currentVideo?.id, initial: true) { _, videoID in
             isTranscriptPresented = false
             captionsModel.reset(for: videoID)
+            pendingTopCommentsCollapse = nil
             if player.activePlaylist == nil {
                 isUpNextExpanded = false
                 upNextVisibleLimit = upNextInitialCount
@@ -554,6 +556,11 @@ struct FullScreenPlayer: View {
         }
         .onChange(of: upNextInitialCount) { _, newValue in
             upNextVisibleLimit = newValue
+        }
+        .onChange(of: player.playerPanelAtTop) { _, isAtTop in
+            guard isAtTop, let finish = pendingTopCommentsCollapse else { return }
+            pendingTopCommentsCollapse = nil
+            finish()
         }
         .task(id: player.fullScreenPresented && player.loadState == .readyToPlay ? player.currentVideo?.id : nil) {
             guard player.fullScreenPresented,
@@ -627,6 +634,7 @@ struct FullScreenPlayer: View {
             if !isPresented { chapterPanelExpansion = 0 }
         }
         .onDisappear {
+            pendingTopCommentsCollapse = nil
             swipeAdjustment.cancel()
             gestureSeekFeedback = nil
             player.playerPresentationGestureEnabled = true
@@ -1216,23 +1224,26 @@ struct FullScreenPlayer: View {
                 if hasPinnedPanelHeading {
                     // The pinned Section belongs to the ScrollView's direct lazy content.
                     panelInformation(video, contentWidth: contentWidth) { completion in
-                        withAnimation(
-                            reduceMotion ? nil : InterfaceMotion.content,
-                            completionCriteria: .logicallyComplete
-                        ) {
-                            let bottomPadding = player.activePlaylist == nil
-                                ? CGFloat(16)
-                                : 84 + PlayerLayoutMetrics.safeAreaInsets.bottom
-                            // A short panel cannot retain a bottom-aligned heading after the
-                            // comment rows disappear. Scroll home instead of overshooting into
-                            // those rows and letting the scroll view snap back during collapse.
-                            if commentsHeadingBottom + bottomPadding <= panelViewportHeight {
+                        let bottomPadding = player.activePlaylist == nil
+                            ? CGFloat(16)
+                            : 84 + PlayerLayoutMetrics.safeAreaInsets.bottom
+                        // A short panel cannot retain a bottom-aligned heading after the
+                        // comment rows disappear. Wait for the actual top offset before removing
+                        // the rows; an animation completion can run before scrolling settles.
+                        if commentsHeadingBottom + bottomPadding <= panelViewportHeight {
+                            pendingTopCommentsCollapse = completion
+                            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                                 scrollProxy.scrollTo("playerPanelTop", anchor: .top)
-                            } else {
-                                scrollProxy.scrollTo(CommentsSection.collapseAnchorID, anchor: .bottom)
                             }
-                        } completion: {
-                            completion()
+                        } else {
+                            withAnimation(
+                                reduceMotion ? nil : InterfaceMotion.content,
+                                completionCriteria: .logicallyComplete
+                            ) {
+                                scrollProxy.scrollTo(CommentsSection.collapseAnchorID, anchor: .bottom)
+                            } completion: {
+                                completion()
+                            }
                         }
                     }
                     .reportPlayerPanelScrollOffset()
