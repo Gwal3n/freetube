@@ -126,63 +126,26 @@ struct FullScreenPlayer: View {
             let isFloating = !player.fullScreenPresented
             let isLandscape = verticalSizeClass == .compact
             let usesPortraitFullscreen = portraitVideoFullscreen && isPortraitVideo && !isLandscape
-            let sidePanelWidth: CGFloat = !isFloating && isLandscape && (player.chapterListPresented || isPlaylistPanelPresented)
-                ? min(360, proxy.size.width * 0.38)
-                : 0
-            let surfaceWidth = proxy.size.width - sidePanelWidth
-            // Landscape controls occupy the available viewport instead of insisting on a 16:9
-            // frame taller than a modern phone's safe height. AVPlayer aspect-fits the video in
-            // that region, preventing the timeline and bottom edge from being cropped.
-            let compactSurfaceHeight = isFloating || isLandscape
-                ? proxy.size.height
-                : PlayerViewportLayout.compactSurfaceHeight(
-                    width: surfaceWidth,
-                    presentationSize: player.videoPresentationSize
-                )
-            let expandedSurfaceHeight = isFloating || usesPortraitFullscreen
-                ? proxy.size.height
-                : isLandscape
-                    ? compactSurfaceHeight
-                    : PlayerViewportLayout.expandedSurfaceHeight(
-                        width: surfaceWidth,
-                        viewportHeight: max(proxy.size.height, expandedViewportHeight),
-                        isLandscape: isLandscape,
-                        presentationSize: player.videoPresentationSize
-                    )
-            let collapseRange = usesPortraitFullscreen
-                ? 0
-                : max(0, expandedSurfaceHeight - compactSurfaceHeight)
-            let consumedCollapse = min(max(panelScrollOffset, 0), collapseRange)
-            // Opening the playlist must not resize or lift the video. The browser overlays
-            // the lower content, and can be pulled over the video when more room is needed.
-            let uncollapsedSurfaceHeight = expandedSurfaceHeight - consumedCollapse
-            let floatingAspectHeight = surfaceWidth * 9 / 16
-            let floatingAspectMix = min(1, max(0, (collapseProgress - 0.65) / 0.35))
-            let desiredSurfaceHeight = uncollapsedSurfaceHeight
-                + (floatingAspectHeight - uncollapsedSurfaceHeight) * floatingAspectMix
-            let surfaceHeight = collapseProgress > 0
-                ? min(desiredSurfaceHeight, proxy.size.height) : desiredSurfaceHeight
-            let controlFrame = PlayerViewportLayout.controlFrame(
-                surfaceSize: CGSize(width: surfaceWidth, height: surfaceHeight),
-                isLandscape: isLandscape,
-                hasChapterSidebar: sidePanelWidth > 0,
+            let viewport = PlayerViewportGeometry(
+                viewportSize: proxy.size,
+                expandedViewportHeight: expandedViewportHeight,
                 presentationSize: player.videoPresentationSize,
-                safeAreaInsets: PlayerLayoutMetrics.safeAreaInsets
+                safeAreaInsets: PlayerLayoutMetrics.safeAreaInsets,
+                isFloating: isFloating,
+                isLandscape: isLandscape,
+                usesPortraitFullscreen: usesPortraitFullscreen,
+                sidePanelPresented: player.chapterListPresented || isPlaylistPanelPresented,
+                panelScrollOffset: panelScrollOffset,
+                collapseProgress: collapseProgress,
+                controlsVisible: controlsVisibility.isVisible
             )
-            let timelineBottomPadding = max(
-                PlayerViewportLayout.timelineBottomPadding(
-                    availableSize: controlFrame.size,
-                    isLandscape: isLandscape
-                ),
-                isLandscape || usesPortraitFullscreen
-                    ? PlayerLayoutMetrics.safeAreaInsets.bottom + 14
-                    : 0
-            )
-            let captionBottomPadding = controlsVisibility.isVisible
-                ? timelineBottomPadding + 28
-                : isLandscape || usesPortraitFullscreen
-                    ? PlayerLayoutMetrics.safeAreaInsets.bottom + 18
-                    : 14
+            let sidePanelWidth = viewport.sidePanelWidth
+            let surfaceWidth = viewport.surfaceWidth
+            let surfaceHeight = viewport.surfaceHeight
+            let collapseRange = viewport.collapseRange
+            let controlFrame = viewport.controlFrame
+            let timelineBottomPadding = viewport.timelineBottomPadding
+            let captionBottomPadding = viewport.captionBottomPadding
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 // Pinning the ZStack to width × width*9/16 keeps the surface a stable height
@@ -434,10 +397,7 @@ struct FullScreenPlayer: View {
                     video,
                     collapseRange: collapseRange,
                     contentWidth: surfaceWidth,
-                    minimumContentHeight: max(
-                        0,
-                        proxy.size.height - compactSurfaceHeight + collapseRange
-                    )
+                    minimumContentHeight: viewport.minimumPanelContentHeight
                 )
                 // Keep the previous landscape video/sidebar geometry. Only constrain the lower
                 // metadata column so its title and rows cannot extend underneath a side panel.
