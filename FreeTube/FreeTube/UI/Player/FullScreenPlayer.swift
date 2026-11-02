@@ -1230,7 +1230,7 @@ struct FullScreenPlayer: View {
                             // Keep the geometry probe alive so it reliably emits scroll preferences.
                             .frame(height: 1)
                             .reportPlayerPanelScrollOffset()
-                        panelInformation(video, contentWidth: contentWidth) {}
+                        panelInformation(video, contentWidth: contentWidth) { _ in }
                     }
                 }
             }
