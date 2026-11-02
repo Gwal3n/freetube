@@ -49,6 +49,8 @@ struct FullScreenPlayer: View {
     @State private var isFrameStepping = false
     @State private var isHoldingForSpeed = false
     @State private var panelScrollOffset: CGFloat = 0
+    @State private var panelViewportHeight: CGFloat = 0
+    @State private var commentsHeadingBottom: CGFloat = 0
     @State private var isUpNextExpanded = false
     @State private var upNextVisibleLimit = 5
     @State private var isPlaylistPanelPresented = false
@@ -1218,7 +1220,17 @@ struct FullScreenPlayer: View {
                             reduceMotion ? nil : InterfaceMotion.content,
                             completionCriteria: .logicallyComplete
                         ) {
-                            scrollProxy.scrollTo(CommentsSection.collapseAnchorID, anchor: .bottom)
+                            let bottomPadding = player.activePlaylist == nil
+                                ? CGFloat(16)
+                                : 84 + PlayerLayoutMetrics.safeAreaInsets.bottom
+                            // A short panel cannot retain a bottom-aligned heading after the
+                            // comment rows disappear. Scroll home instead of overshooting into
+                            // those rows and letting the scroll view snap back during collapse.
+                            if commentsHeadingBottom + bottomPadding <= panelViewportHeight {
+                                scrollProxy.scrollTo("playerPanelTop", anchor: .top)
+                            } else {
+                                scrollProxy.scrollTo(CommentsSection.collapseAnchorID, anchor: .bottom)
+                            }
                         } completion: {
                             completion()
                         }
@@ -1238,6 +1250,7 @@ struct FullScreenPlayer: View {
             .padding(.bottom, player.activePlaylist == nil
                 ? 16
                 : 84 + PlayerLayoutMetrics.safeAreaInsets.bottom)
+            .coordinateSpace(name: "playerPanelContent")
             // While the header is collapsing, counteract the ScrollView's own content movement.
             // Use real padding rather than a visual offset: an offset does not enlarge the
             // ScrollView's measured content and made the final comments unreachable by exactly
@@ -1246,9 +1259,24 @@ struct FullScreenPlayer: View {
             // Preserve enough scroll extent to consume the complete header collapse even when
             // comments and Up Next are both collapsed and the natural feed is very short.
             .frame(minHeight: minimumContentHeight, alignment: .top)
+            .id("playerPanelTop")
         }
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: PlayerPanelViewportHeightKey.self,
+                    value: geometry.size.height
+                )
+            }
+        }
+        .onPreferenceChange(PlayerPanelViewportHeightKey.self) { height in
+            if height > 0 { panelViewportHeight = height }
+        }
+        .onPreferenceChange(PlayerCommentsAnchorPreferenceKey.self) { bottom in
+            if bottom > 0 { commentsHeadingBottom = bottom }
+        }
         .onDisappear { PlayerScrollDiagnostics.shared.finish() }
     }
 
@@ -1422,4 +1450,12 @@ struct FullScreenPlayer: View {
         player.requestPlayerCollapse(then: navigate)
     }
 
+}
+
+private struct PlayerPanelViewportHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
 }

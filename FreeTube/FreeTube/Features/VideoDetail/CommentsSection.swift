@@ -39,14 +39,25 @@ struct CommentsSection: View {
                     .clipped()
                 } header: {
                     header.background(Color(uiColor: .systemBackground))
-                        .id(Self.collapseAnchorID)
                 }
             } else {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    header.id(Self.collapseAnchorID)
+                    header
                     commentsContent
                 }
                 .clipped()
+            }
+        }
+        .background(alignment: .top) {
+            GeometryReader { geometry in
+                Color.clear
+                    .frame(height: 44)
+                    .id(Self.collapseAnchorID)
+                    .preference(
+                        key: PlayerCommentsAnchorPreferenceKey.self,
+                        value: geometry.frame(in: .named("playerPanelContent")).minY + 44
+                    )
+                    .allowsHitTesting(false)
             }
         }
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
@@ -398,6 +409,15 @@ struct CommentsSection: View {
         if model.comments.isEmpty && !model.isLoading {
             Task { await model.load() }
         }
+    }
+}
+
+struct PlayerCommentsAnchorPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > 0 { value = next }
     }
 }
 
