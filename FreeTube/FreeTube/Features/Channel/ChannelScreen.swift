@@ -1,5 +1,4 @@
 import SwiftUI
-import Kingfisher
 import UIKit
 
 @available(iOS 17.0, *)
@@ -29,8 +28,8 @@ struct ChannelScreen: View {
     /// Seeded with estimates rather than zero. These are replaced by the measured values on the
     /// first layout pass, but starting at zero would put every page's first row under the header
     /// for one frame and then shove it down, which reads as a flinch each time a channel opens.
-    @State private var headerContentHeight: CGFloat = Metrics.estimatedHeaderHeight
-    @State private var tabBarHeight: CGFloat = Metrics.estimatedTabBarHeight
+    @State private var headerContentHeight: CGFloat = ChannelProfileMetrics.estimatedHeaderHeight
+    @State private var tabBarHeight: CGFloat = ChannelProfileMetrics.estimatedTabBarHeight
     @AppStorage("showChannelShortsTab") private var showShortsTab = true
     @AppStorage("showChannelLiveTab") private var showLiveTab = true
     @AppStorage("showChannelPlaylistsTab") private var showPlaylistsTab = true
@@ -39,13 +38,8 @@ struct ChannelScreen: View {
     private static let pagerSpace = "channelPager"
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.colorScheme) private var colorScheme
 
     private let prefetchLookahead = 5
-    private var compactThumbnailSize: CGSize {
-        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
-    }
 
     init(channelID: String) {
         _model = State(wrappedValue: ChannelViewModel(channelID: channelID))
@@ -73,7 +67,7 @@ struct ChannelScreen: View {
                 pager(details)
                 header(details)
             } else if model.isLoading {
-                channelHeaderPlaceholder
+                ChannelProfilePlaceholder(headerOffset: headerOffset)
             } else {
                 ContentUnavailableView {
                     Label(
@@ -156,7 +150,7 @@ struct ChannelScreen: View {
     /// visible below it, which read as two competing titles.
     private var showsNavigationTitle: Bool {
         guard headerContentHeight > 0 else { return false }
-        return headerOffset > headerContentHeight - Metrics.navigationTitleLead
+        return headerOffset > headerContentHeight - ChannelProfileMetrics.navigationTitleLead
     }
 
     /// Fractional page position: 1.4 means 40% of the way from the second tab to the third.
@@ -300,7 +294,7 @@ struct ChannelScreen: View {
             VStack(spacing: 0) {
                 // Reserves the header's footprint, plus a little air so the first row isn't
                 // crowded against the tab bar. The header is drawn over the top of this.
-                Color.clear.frame(height: headerTotalHeight + Metrics.contentTopInset)
+                Color.clear.frame(height: headerTotalHeight + ChannelProfileMetrics.contentTopInset)
                 // Reserve only enough content for the header to collapse. A full viewport here
                 // adds the tab bar and top inset again, letting short tabs scroll into blank space.
                 channelContent(details, tab: tab)
@@ -308,7 +302,7 @@ struct ChannelScreen: View {
                         maxWidth: .infinity,
                         minHeight: Self.minimumPageContentHeight(
                             viewport: pageViewportHeight, tabBar: tabBarHeight,
-                            topInset: Metrics.contentTopInset
+                            topInset: ChannelProfileMetrics.contentTopInset
                         ),
                         alignment: .topLeading
                     )
@@ -350,15 +344,20 @@ struct ChannelScreen: View {
 
     private func header(_ details: ChannelDetails) -> some View {
         VStack(spacing: 0) {
-            channelHeader(details.channel)
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(
-                            key: ChannelHeaderHeightKey.self,
-                            value: geometry.size.height
-                        )
-                    }
+            ChannelProfileHeader(
+                channel: details.channel,
+                statsText: channelStats(details.channel),
+                headerOffset: headerOffset,
+                onToggleSubscribe: { Task { await model.toggleSubscribe() } }
+            )
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ChannelHeaderHeightKey.self,
+                        value: geometry.size.height
+                    )
                 }
+            }
             ChannelProfileTabBar(
                 tabs: availableTabs(for: details),
                 selectedTab: selectedTab,
@@ -430,299 +429,6 @@ struct ChannelScreen: View {
                 .accessibilityLabel("Channel actions")
             }
         }
-    }
-
-    // MARK: - Header
-
-    /// Named `Metrics` rather than `Layout` so it can't be confused with SwiftUI's `Layout`
-    /// protocol, which a nested type of that name would shadow throughout this file.
-    private enum Metrics {
-        static let bannerHeight: CGFloat = 190
-        /// Smaller than the straddling version needed to be: in a row the avatar sits beside the
-        /// text rather than carrying the composition on its own.
-        static let avatarSize: CGFloat = 72
-        static let headerRowSpacing: CGFloat = 14
-        static let headerRowInset: CGFloat = 20
-        /// How far before the header is fully collapsed the navigation title starts to appear.
-        static let navigationTitleLead: CGFloat = 20
-        /// Breathing room between the tab bar and the first row of content.
-        static let contentTopInset: CGFloat = 12
-        /// First-frame approximations only — both are corrected by measurement immediately.
-        /// Banner plus the identity row and its padding.
-        static var estimatedHeaderHeight: CGFloat { bannerHeight + avatarSize + 34 }
-        static let estimatedTabBarHeight: CGFloat = 44
-    }
-
-    /// Reserves the loaded header, tabs, and first video rows without starting any page scrolling
-    /// or pagination. The banner uses the same layout as real artwork, including its extension
-    /// behind the navigation and status areas, so the loading-to-content handoff stays still.
-    private var channelHeaderPlaceholder: some View {
-        VStack(spacing: 0) {
-            banner(nil)
-
-            HStack(alignment: .center, spacing: Metrics.headerRowSpacing) {
-                Circle()
-                    .fill(MediaStyle.placeholderFill)
-                    .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
-
-                VStack(alignment: .leading, spacing: 7) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(MediaStyle.placeholderFill)
-                        .frame(maxWidth: 160)
-                        .frame(height: 18)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(MediaStyle.placeholderFill)
-                        .frame(maxWidth: 110)
-                        .frame(height: 12)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(MediaStyle.placeholderFill)
-                        .frame(maxWidth: 135)
-                        .frame(height: 11)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Capsule()
-                    .fill(MediaStyle.placeholderFill)
-                    .frame(width: 92, height: 34)
-            }
-            .padding(.horizontal, Metrics.headerRowInset)
-            .padding(.top, 16)
-            .padding(.bottom, 18)
-
-            HStack(spacing: 26) {
-                ForEach([CGFloat(54), 48, 62, 47], id: \.self) { width in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(MediaStyle.placeholderFill)
-                        .frame(width: width, height: 12)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 17)
-            .padding(.bottom, 20)
-
-            HStack {
-                Spacer()
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(MediaStyle.placeholderFill)
-                    .frame(width: 82, height: 13)
-            }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 16)
-
-            LazyVStack(spacing: 16) {
-                ForEach(0..<4, id: \.self) { _ in
-                    HStack(spacing: MediaStyle.spacing) {
-                        RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius)
-                            .fill(MediaStyle.placeholderFill)
-                            .frame(
-                                width: compactThumbnailSize.width,
-                                height: compactThumbnailSize.height
-                            )
-                        VStack(alignment: .leading, spacing: 8) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(MediaStyle.placeholderFill)
-                                .frame(maxWidth: 170)
-                                .frame(height: 12)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(MediaStyle.placeholderFill)
-                                .frame(maxWidth: 115)
-                                .frame(height: 11)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(MediaStyle.placeholderFill)
-                                .frame(width: 72, height: 10)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Color.clear
-                            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    }
-                    .padding(.horizontal, 28)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .modifier(SkeletonPulse())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Loading channel")
-        .allowsHitTesting(false)
-    }
-
-    /// Leading identity row under the banner: avatar, then name and stats, then the subscribe
-    /// button pinned trailing. The App Store product page is the closest Apple precedent, and it
-    /// matches the leading alignment `PlaylistScreen` already uses.
-    ///
-    /// The avatar no longer straddles the banner's bottom edge. A straddle reads well above a
-    /// centred column, where the overhang has empty space either side of it to sit in, but in a
-    /// horizontal row it has to pull the adjacent text up with it or sit visually detached from
-    /// the line it belongs to. Dropping it keeps the row on one baseline.
-    private func channelHeader(_ channel: Channel) -> some View {
-        VStack(spacing: 0) {
-            banner(channel)
-
-            HStack(alignment: .center, spacing: Metrics.headerRowSpacing) {
-                avatar(channel)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(channel.name)
-                        .appFont(.title3, weight: .bold)
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-
-                    if let handle = channel.handle, !handle.isEmpty {
-                        Text(handle)
-                            .appFont(.subheadline)
-                        .foregroundStyle(Color.primary.opacity(0.7))
-                            .lineLimit(1)
-                    }
-
-                    if !channelStats(channel).isEmpty {
-                        Text(channelStats(channel))
-                            .appFont(.footnote)
-                            .foregroundStyle(Color.primary.opacity(0.5))
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                // The button keeps its intrinsic width, so a long name wraps rather than squeezing
-                // it. `minLength` keeps a gap between the two even when the name uses every point
-                // it can.
-                Spacer(minLength: 12)
-
-                subscribeButton(channel)
-            }
-            .padding(.horizontal, Metrics.headerRowInset)
-            .padding(.top, 16)
-            .padding(.bottom, 18)
-        }
-    }
-
-    private func avatar(_ channel: Channel) -> some View {
-        ZStack {
-            Circle().fill(MediaStyle.placeholderFill)
-            Text(channel.name.prefix(1).uppercased())
-                .font(.title.weight(.semibold))
-                .foregroundStyle(Color.primary.opacity(0.7))
-            KFImage(channel.thumbnailURL)
-                .thumbnail(size: CGSize(width: Metrics.avatarSize, height: Metrics.avatarSize)) {
-                    Color.clear
-                }
-                .resizable()
-                .scaledToFill()
-                // Both axes, always. A `scaledToFill` image constrained on one axis reports the
-                // size it needs to *cover* the other, which is how an image ends up wider than its
-                // container and, through the container, wider than the screen.
-                .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
-        }
-        .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
-        .clipShape(Circle())
-        // A hairline rather than the thick black ring the straddling version used. That ring was
-        // cutting the avatar out of the banner behind it; here there is nothing behind it but the
-        // page, so the edge only needs defining against a dark image.
-        .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
-    }
-
-    /// Full-bleed banner whose layout stays at its original height while only its artwork extends
-    /// behind the transparent navigation bar and status area. The profile row and pager therefore
-    /// keep their existing measured positions and collapse behaviour.
-    ///
-    /// `Color.clear` is the only thing here that participates in layout: it accepts the proposed
-    /// width and the fixed height, and that is the size the banner reports to the header. The
-    /// artwork lives in an `overlay`, which by contract cannot influence its host's size no matter
-    /// what it asks for — so a wide banner scaled to fill overflows and is clipped, instead of
-    /// widening this view. The previous version let a `scaledToFill` image size the container with
-    /// only a height to go on; a 6:1 banner asked to be 178pt tall reports itself roughly 1075pt
-    /// wide, and every ancestor inherited that.
-    private func banner(_ channel: Channel?) -> some View {
-        GeometryReader { geometry in
-            // `headerOffset` cancels the header's own upward translation while it collapses,
-            // keeping the artwork's extra height stable instead of resizing it during scroll.
-            let topExtension = max(0, geometry.frame(in: .global).minY + headerOffset)
-            let artworkHeight = Metrics.bannerHeight + topExtension
-
-            Color.clear
-                .frame(width: geometry.size.width, height: artworkHeight)
-                .overlay {
-                    if let bannerURL = channel?.bannerURL {
-                        KFImage(bannerURL)
-                            .thumbnail(size: CGSize(width: 900, height: 300)) {
-                                bannerPlaceholder
-                            }
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: artworkHeight)
-                    } else {
-                        bannerPlaceholder
-                    }
-                }
-                .overlay {
-                    // Keep navigation actions legible over bright banners and dissolve the lower
-                    // edge into the profile row's current system background.
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black.opacity(0.55), location: 0),
-                            .init(color: .clear, location: 0.35),
-                            .init(color: .clear, location: 0.55),
-                            .init(color: MediaStyle.pageBackground.opacity(0.95), location: 1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-                .clipped()
-                .offset(y: -topExtension)
-        }
-        .frame(height: Metrics.bannerHeight)
-        .accessibilityHidden(true)
-        .allowsHitTesting(false)
-    }
-
-    private var bannerPlaceholder: some View {
-        LinearGradient(
-            colors: [Color(white: 0.22), Color(white: 0.10)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    /// Subscribed state is the quiet one. An unsubscribed channel gets a solid white capsule
-    /// because subscribing is the screen's primary action; once subscribed the control becomes a
-    /// low-contrast confirmation so it stops competing with the content below it. The
-    /// prominent capsule inverts with the current appearance for readable contrast.
-    @ViewBuilder
-    private func subscribeButton(_ channel: Channel) -> some View {
-        Button {
-            Task { await model.toggleSubscribe() }
-        } label: {
-            Group {
-                if channel.isSubscribed {
-                    Text("Subscribed")
-                } else {
-                    Text("Subscribe")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(channel.isSubscribed
-                ? Color.primary
-                : (colorScheme == .dark ? Color.black : Color.white))
-            // `fixedSize` so the capsule hugs its label. Without it the button inherits the
-            // header's width and spans the screen.
-            .fixedSize(horizontal: true, vertical: false)
-            // Tighter than the centred layout's capsule. There it had a row to itself and could
-            // afford to be generous; here every point it takes comes out of the channel name
-            // beside it.
-            .padding(.horizontal, channel.isSubscribed ? 12 : 18)
-            .frame(height: 34)
-            .background(
-                channel.isSubscribed
-                    ? AnyShapeStyle(Color.primary.opacity(0.12))
-                    : AnyShapeStyle(colorScheme == .dark ? Color.white : Color.black),
-                in: Capsule()
-            )
-            .contentShape(Capsule())
-        }
-        .buttonStyle(ResponsiveButtonStyle())
-        .animation(reduceMotion ? nil : InterfaceMotion.quick, value: channel.isSubscribed)
     }
 
     // MARK: - Tabs
