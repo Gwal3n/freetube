@@ -60,7 +60,6 @@ struct CommentsSection: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: model.teaserText)
         .errorToast(Bindable(model).errorState)
         .onAppear { PlayerScrollDiagnostics.shared.setCommentsExpanded(isExpanded) }
@@ -384,16 +383,24 @@ struct CommentsSection: View {
             onCollapseRequested {
                 guard collapseAfterScroll else { return }
                 collapseAfterScroll = false
-                setCommentsExpanded(false)
+                setCommentsExpanded(false, animated: false)
             }
             return
         }
-        setCommentsExpanded(!isExpanded)
+        setCommentsExpanded(!isExpanded, animated: !pinCommentsHeading || !isExpanded)
     }
 
-    private func setCommentsExpanded(_ expanded: Bool) {
-        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-            isExpanded = expanded
+    private func setCommentsExpanded(_ expanded: Bool, animated: Bool = true) {
+        if animated {
+            withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                isExpanded = expanded
+            }
+        } else {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                isExpanded = expanded
+            }
         }
         if !isExpanded { model.focusComment(nil) }
         if isExpanded && model.comments.isEmpty && !model.isLoading {
