@@ -5,31 +5,9 @@ import UIKit
 struct ChannelScreen: View {
     @State private var model: ChannelViewModel
     @State private var blocklist = VideoBlocklist.shared
-    @State private var selectedTab: ChannelProfileTab = .videos
+    @State private var pagerState = ChannelPagerState()
     @State private var videoSort: ChannelVideoSort = .newest
     @State private var showingGroupPicker = false
-    /// Live horizontal offset of the pager, in points. Divided by the page width this gives a
-    /// fractional page position — 1.4 means "40% of the way from tab 1 to tab 2".
-    @State private var pagerOffset: CGFloat = 0
-    @State private var pageWidth: CGFloat = 0
-    @State private var pageViewportHeight: CGFloat = 0
-    /// Pending "scroll yourself down to here" requests, keyed by tab id. See `alignPages`.
-    @State private var pageScrollTargets: [String: PageScrollTarget] = [:]
-    /// Shared header position, 0 (open) to `headerContentHeight` (closed). The whole screen agrees
-    /// on this one value; pages are moved to suit it rather than the other way round.
-    @State private var headerCollapse: CGFloat = 0
-    /// Per tab, which point in that tab's own content is sitting directly under the tab bar.
-    /// This is the thing a tab switch has to preserve — it is what "the video that was at the top
-    /// is still at the top" means — and it is deliberately independent of the header position.
-    @State private var pageContentPositions: [String: CGFloat] = [:]
-    /// Vertical scroll offset of each page, keyed by tab id. Only the active page's value is used,
-    /// but they are kept per tab so switching tabs restores that tab's own header state.
-    @State private var pageOffsets: [String: CGFloat] = [:]
-    /// Seeded with estimates rather than zero. These are replaced by the measured values on the
-    /// first layout pass, but starting at zero would put every page's first row under the header
-    /// for one frame and then shove it down, which reads as a flinch each time a channel opens.
-    @State private var headerContentHeight: CGFloat = ChannelProfileMetrics.estimatedHeaderHeight
-    @State private var tabBarHeight: CGFloat = ChannelProfileMetrics.estimatedTabBarHeight
     @AppStorage("showChannelShortsTab") private var showShortsTab = true
     @AppStorage("showChannelLiveTab") private var showLiveTab = true
     @AppStorage("showChannelPlaylistsTab") private var showPlaylistsTab = true
@@ -67,7 +45,7 @@ struct ChannelScreen: View {
                 pager(details)
                 header(details)
             } else if model.isLoading {
-                ChannelProfilePlaceholder(headerOffset: headerOffset)
+                ChannelProfilePlaceholder(headerOffset: pagerState.headerOffset)
             } else {
                 ContentUnavailableView {
                     Label(
@@ -84,14 +62,14 @@ struct ChannelScreen: View {
                 }
             }
         }
-        .navigationTitle(showsNavigationTitle ? (model.details?.channel.name ?? "") : "")
+        .navigationTitle(pagerState.showsNavigationTitle ? (model.details?.channel.name ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             channelActionsToolbar
         }
         // Transparent over the banner, then the same system background as the profile row
         // once the title appears. This avoids a seam in either light or dark appearance.
-        .toolbarBackground(showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
+        .toolbarBackground(pagerState.showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .toolbarBackground(MediaStyle.pageBackground, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
@@ -99,12 +77,7 @@ struct ChannelScreen: View {
             if let channel = model.details?.channel { RecentChannel.record(channel) }
         }
         .onChange(of: currentTabs) { _, tabs in
-            guard !tabs.isEmpty else { return }
-            let destination = tabs.contains(selectedTab) ? selectedTab : .videos
-            selectedTab = destination
-            if let index = tabs.firstIndex(of: destination), pageWidth > 0 {
-                pagerOffset = CGFloat(index) * pageWidth
-            }
+            pagerState.updateTabs(tabs)
         }
         .sheet(isPresented: $showingGroupPicker) {
             if let channel = model.details?.channel, channel.isSubscribed {
@@ -118,126 +91,21 @@ struct ChannelScreen: View {
         .errorToast(Bindable(model).errorState)
     }
 
-    // MARK: - Derived scroll state
+    // MARK: - Pager bridge
 
     private var currentTabs: [ChannelProfileTab] {
         model.details.map(availableTabs(for:)) ?? []
     }
 
-    /// `ScrollPosition` — the only way to put a scroll view at a chosen offset — is iOS 18. Where
-    /// it is missing, pages cannot be moved to suit the header, so the header has to go back to
-    /// following the active page instead.
-    private static let supportsPageAlignment: Bool = {
-        if #available(iOS 18.0, *) { return true }
-        return false
-    }()
-
-    /// How far the header is currently translated up, clamped to its own height so the tab bar
-    /// comes to rest against the navigation bar and stays there.
-    private var headerOffset: CGFloat {
-        let raw = Self.supportsPageAlignment ? headerCollapse : (pageOffsets[selectedTab.id] ?? 0)
-        return min(max(0, raw), headerContentHeight)
-    }
-
-    /// Total space each page reserves at the top so its first row starts below the header.
-    private var headerTotalHeight: CGFloat {
-        headerContentHeight + tabBarHeight
-    }
-
-    /// The title takes over only once the header is fully collapsed — that is, once the last of
-    /// the channel's own name, stats and subscribe button has gone under the bar. Revealing it at
-    /// a fixed depth part-way through put it on screen while the subscribe button was still
-    /// visible below it, which read as two competing titles.
-    private var showsNavigationTitle: Bool {
-        guard headerContentHeight > 0 else { return false }
-        return headerOffset > headerContentHeight - ChannelProfileMetrics.navigationTitleLead
-    }
-
-    /// Fractional page position: 1.4 means 40% of the way from the second tab to the third.
-    private var pagePosition: CGFloat {
-        guard pageWidth > 0 else { return 0 }
-        return max(0, pagerOffset / pageWidth)
-    }
-
-    /// True as soon as the pager leaves a whole page, i.e. the moment a sideways drag begins.
-    /// The threshold is about four points, so the neighbouring page is barely a sliver on screen
-    /// when this flips — early enough to align it before anyone can see it move.
-    private var isPagingActive: Bool {
-        guard pageWidth > 0 else { return false }
-        return abs(pagePosition - pagePosition.rounded()) > 0.01
-    }
-
-    /// Splits a page's scroll movement between the header and that page's own content, the way a
-    /// collapsing header behaves natively: scrolling down closes the header first and only then
-    /// moves content; scrolling up returns the content first and only then reopens the header.
-    ///
-    /// The reason to track the two separately, rather than deriving the header from the raw scroll
-    /// offset, is that a single offset cannot express both at once. A tab that is deep into its
-    /// content and a header that is wide open is a perfectly reasonable state to be in — it is
-    /// exactly what you get by swiping from the top of one tab to a tab you had already read into
-    /// — but there is no single scroll offset that means it. Keeping the header position and the
-    /// content position as separate numbers is what lets a tab switch preserve both.
-    private func handlePageScroll(tab: ChannelProfileTab, offset: CGFloat) {
-        // Rubber-banding is native visual feedback, not movement through the channel's content.
-        // Counting its negative offset and positive rebound collapses the header on every pull.
-        let offset = Self.normalizedPageOffset(offset)
-        let previous = pageOffsets[tab.id] ?? offset
-        pageOffsets[tab.id] = offset
-        // Only the page the user is actually looking at moves the header. Everything else that
-        // changes a page's offset is us, in `alignPages`.
-        guard tab.id == selectedTab.id else { return }
-
-        let delta = offset - previous
-        guard delta != 0 else { return }
-
-        let limit = headerContentHeight
-        var collapse = min(max(0, headerCollapse), limit)
-        var content = max(0, pageContentPositions[tab.id] ?? 0)
-        if delta > 0 {
-            let toHeader = min(delta, limit - collapse)
-            collapse += toHeader
-            content += delta - toHeader
-        } else {
-            let toContent = min(-delta, content)
-            content -= toContent
-            collapse = max(0, collapse - (-delta - toContent))
-        }
-        headerCollapse = collapse
-        pageContentPositions[tab.id] = content
-    }
-
-    /// Re-seats every page that is not driving the header so that the shared header position and
-    /// that page's own reading position are both true of it.
-    ///
-    /// This is the piece that removes the jump rather than smoothing it. A page's content is laid
-    /// out relative to where the header is, so the two have to be reconciled on a tab switch, and
-    /// the only question is which one moves. Moving the header is the several-hundred-point lurch.
-    /// Moving the page costs nothing, because it happens while the page is off screen or a sliver
-    /// wide — and because the target is built from the page's own stored content position, it
-    /// re-seats the page without losing its place. Whichever way the header has to travel.
-    private func alignPages(excluding driver: ChannelProfileTab) {
-        guard Self.supportsPageAlignment else { return }
-        for tab in currentTabs where tab.id != driver.id {
-            let target = headerOffset + max(0, pageContentPositions[tab.id] ?? 0)
-            guard abs((pageOffsets[tab.id] ?? 0) - target) > 1 else { continue }
-            // Record the destination up front so the scroll this provokes reports no movement and
-            // cannot be mistaken for the user scrolling once this page becomes the driver.
-            pageOffsets[tab.id] = target
-            let token = (pageScrollTargets[tab.id]?.token ?? 0) + 1
-            pageScrollTargets[tab.id] = PageScrollTarget(y: target, token: token)
-        }
-    }
-
-    /// Two-way bridge between `selectedTab` and the pager's scroll position. Tapping a tab writes
-    /// `selectedTab`, which moves the pager; swiping moves the pager, which writes `selectedTab`.
+    /// Tapping a tab writes the selection and moves the pager; swiping the pager writes it back.
     private var pagerSelection: Binding<String?> {
         Binding(
-            get: { selectedTab.id },
+            get: { pagerState.selectedTab.id },
             set: { newValue in
                 guard let newValue,
                       let tab = ChannelProfileTab(rawValue: newValue),
-                      tab != selectedTab else { return }
-                selectedTab = tab
+                      tab != pagerState.selectedTab else { return }
+                pagerState.selectedTab = tab
             }
         )
     }
@@ -278,14 +146,14 @@ struct ChannelScreen: View {
         }
         // Consumed only where the exact API below is unavailable, so the two never fight.
         .onPreferenceChange(ChannelPagerOffsetKey.self) { value in
-            if #unavailable(iOS 18.0) { pagerOffset = value }
+            if #unavailable(iOS 18.0) { pagerState.pagerOffset = value }
         }
         .onPreferenceChange(ChannelPageWidthKey.self) { value in
-            if #unavailable(iOS 18.0) { pageWidth = value }
+            if #unavailable(iOS 18.0) { pagerState.pageWidth = value }
         }
-        .modifier(PagerScrollGeometry(offset: $pagerOffset, width: $pageWidth, height: $pageViewportHeight))
-        .onChange(of: isPagingActive) { _, active in
-            if active { alignPages(excluding: selectedTab) }
+        .modifier(PagerScrollGeometry(state: pagerState))
+        .onChange(of: pagerState.isPagingActive) { _, active in
+            if active { pagerState.alignPages(currentTabs, excluding: pagerState.selectedTab) }
         }
     }
 
@@ -294,14 +162,14 @@ struct ChannelScreen: View {
             VStack(spacing: 0) {
                 // Reserves the header's footprint, plus a little air so the first row isn't
                 // crowded against the tab bar. The header is drawn over the top of this.
-                Color.clear.frame(height: headerTotalHeight + ChannelProfileMetrics.contentTopInset)
+                Color.clear.frame(height: pagerState.headerTotalHeight + ChannelProfileMetrics.contentTopInset)
                 // Reserve only enough content for the header to collapse. A full viewport here
                 // adds the tab bar and top inset again, letting short tabs scroll into blank space.
                 channelContent(details, tab: tab)
                     .frame(
                         maxWidth: .infinity,
-                        minHeight: Self.minimumPageContentHeight(
-                            viewport: pageViewportHeight, tabBar: tabBarHeight,
+                        minHeight: ChannelPagerState.minimumPageContentHeight(
+                            viewport: pagerState.pageViewportHeight, tabBar: pagerState.tabBarHeight,
                             topInset: ChannelProfileMetrics.contentTopInset
                         ),
                         alignment: .topLeading
@@ -322,22 +190,16 @@ struct ChannelScreen: View {
             await model.refresh(activeSort: tab == .videos ? videoSort : .newest)
         }
         .onPreferenceChange(ChannelPageOffsetKey.self) { offsets in
-            if #unavailable(iOS 18.0) { pageOffsets.merge(offsets) { _, new in new } }
+            if #unavailable(iOS 18.0) {
+                pagerState.pageOffsets.merge(offsets) { _, new in new }
+            }
         }
-        .modifier(PageScrollGeometry { handlePageScroll(tab: tab, offset: $0) })
-        .modifier(PageScrollAlignment(request: pageScrollTargets[tab.id]))
+        .modifier(PageScrollGeometry { pagerState.handlePageScroll(tab: tab, offset: $0) })
+        .modifier(PageScrollAlignment(request: pagerState.pageScrollTargets[tab.id]))
     }
 
     private static func pageSpace(_ tab: ChannelProfileTab) -> String {
         "channelPage-\(tab.id)"
-    }
-
-    static func normalizedPageOffset(_ offset: CGFloat) -> CGFloat {
-        max(0, offset)
-    }
-
-    static func minimumPageContentHeight(viewport: CGFloat, tabBar: CGFloat, topInset: CGFloat) -> CGFloat {
-        max(0, viewport - tabBar - topInset)
     }
 
     // MARK: - Header
@@ -347,7 +209,7 @@ struct ChannelScreen: View {
             ChannelProfileHeader(
                 channel: details.channel,
                 statsText: channelStats(details.channel),
-                headerOffset: headerOffset,
+                headerOffset: pagerState.headerOffset,
                 onToggleSubscribe: { Task { await model.toggleSubscribe() } }
             )
             .background {
@@ -360,8 +222,8 @@ struct ChannelScreen: View {
             }
             ChannelProfileTabBar(
                 tabs: availableTabs(for: details),
-                selectedTab: selectedTab,
-                pagePosition: pagePosition,
+                selectedTab: pagerState.selectedTab,
+                pagePosition: pagerState.pagePosition,
                 reduceMotion: reduceMotion,
                 onSelect: selectTab
             )
@@ -376,9 +238,9 @@ struct ChannelScreen: View {
         }
         // Opaque, because the pages scroll underneath it rather than below it.
         .background(MediaStyle.pageBackground)
-        .offset(y: -headerOffset)
-        .onPreferenceChange(ChannelHeaderHeightKey.self) { headerContentHeight = $0 }
-        .onPreferenceChange(ChannelTabBarHeightKey.self) { tabBarHeight = $0 }
+        .offset(y: -pagerState.headerOffset)
+        .onPreferenceChange(ChannelHeaderHeightKey.self) { pagerState.headerContentHeight = $0 }
+        .onPreferenceChange(ChannelTabBarHeightKey.self) { pagerState.tabBarHeight = $0 }
     }
 
     @ToolbarContentBuilder
@@ -390,7 +252,7 @@ struct ChannelScreen: View {
                 } label: {
                     Image(systemName: "square.stack.3d.up")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(showsNavigationTitle ? Color.primary : Color.white)
+                        .foregroundStyle(pagerState.showsNavigationTitle ? Color.primary : Color.white)
                 }
                 .accessibilityLabel("Add channel to group")
             }
@@ -424,7 +286,7 @@ struct ChannelScreen: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(showsNavigationTitle ? Color.primary : Color.white)
+                        .foregroundStyle(pagerState.showsNavigationTitle ? Color.primary : Color.white)
                 }
                 .accessibilityLabel("Channel actions")
             }
@@ -448,9 +310,9 @@ struct ChannelScreen: View {
     private func selectTab(_ tab: ChannelProfileTab) {
         // Before the pager moves, not after — the destination has to already be at the header's
         // height by the time it slides into view.
-        alignPages(excluding: selectedTab)
+        pagerState.alignPages(currentTabs, excluding: pagerState.selectedTab)
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
-            selectedTab = tab
+            pagerState.selectedTab = tab
         }
     }
 
@@ -676,8 +538,6 @@ struct ChannelScreen: View {
     }
 }
 
-// MARK: - Layout probes
-
 // MARK: - Scroll tracking
 
 /// Reads the pager's live offset and page width from the scroll view itself.
@@ -689,9 +549,7 @@ struct ChannelScreen: View {
 /// Adding the content insets makes the value read zero at rest rather than minus the inset.
 @available(iOS 17.0, *)
 private struct PagerScrollGeometry: ViewModifier {
-    @Binding var offset: CGFloat
-    @Binding var width: CGFloat
-    @Binding var height: CGFloat
+    let state: ChannelPagerState
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -700,13 +558,13 @@ private struct PagerScrollGeometry: ViewModifier {
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
                     geometry.contentOffset.x + geometry.contentInsets.leading
                 } action: { _, new in
-                    offset = new
+                    state.pagerOffset = new
                 }
                 .onScrollGeometryChange(for: CGSize.self) { geometry in
                     geometry.containerSize
                 } action: { _, new in
-                    width = new.width
-                    height = new.height
+                    state.pageWidth = new.width
+                    state.pageViewportHeight = new.height
                 }
         } else {
             content
@@ -714,20 +572,9 @@ private struct PagerScrollGeometry: ViewModifier {
     }
 }
 
-/// A request for one page to put itself at a given vertical offset.
-///
-/// The token is what makes a repeat of the same offset a new request, and it is also how a page
-/// that was created *after* the request was issued — the usual case, since the pager is lazy and
-/// the neighbour is built as it slides in — knows to apply it on appear without re-applying an
-/// old one later.
-private struct PageScrollTarget: Equatable {
-    var y: CGFloat
-    var token: Int
-}
-
 @available(iOS 17.0, *)
 private struct PageScrollAlignment: ViewModifier {
-    let request: PageScrollTarget?
+    let request: ChannelPageScrollTarget?
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -743,7 +590,7 @@ private struct PageScrollAlignment: ViewModifier {
 
 @available(iOS 18.0, *)
 private struct PageScrollAlignmentBody<Content: View>: View {
-    let request: PageScrollTarget?
+    let request: ChannelPageScrollTarget?
     let content: Content
 
     @State private var position = ScrollPosition()
@@ -774,7 +621,7 @@ private struct PageScrollGeometry: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content.onScrollGeometryChange(for: CGFloat.self) { geometry in
-                ChannelScreen.normalizedPageOffset(geometry.contentOffset.y + geometry.contentInsets.top)
+                ChannelPagerState.normalizedPageOffset(geometry.contentOffset.y + geometry.contentInsets.top)
             } action: { _, new in
                 onScroll(new)
             }
