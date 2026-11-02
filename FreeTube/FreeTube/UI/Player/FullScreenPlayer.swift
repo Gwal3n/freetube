@@ -1213,9 +1213,14 @@ struct FullScreenPlayer: View {
             Group {
                 if hasPinnedPanelHeading {
                     // The pinned Section belongs to the ScrollView's direct lazy content.
-                    panelInformation(video, contentWidth: contentWidth) {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            scrollProxy.scrollTo("playerPanelTop", anchor: .top)
+                    panelInformation(video, contentWidth: contentWidth) { completion in
+                        withAnimation(
+                            reduceMotion ? nil : InterfaceMotion.content,
+                            completionCriteria: .logicallyComplete
+                        ) {
+                            scrollProxy.scrollTo(CommentsSection.collapseAnchorID, anchor: .bottom)
+                        } completion: {
+                            completion()
                         }
                     }
                     .reportPlayerPanelScrollOffset()
@@ -1241,7 +1246,6 @@ struct FullScreenPlayer: View {
             // Preserve enough scroll extent to consume the complete header collapse even when
             // comments and Up Next are both collapsed and the natural feed is very short.
             .frame(minHeight: minimumContentHeight, alignment: .top)
-            .id("playerPanelTop")
         }
         .scrollDisabled(player.playerPresentationGestureActive)
         .scrollContentBackground(.hidden)
@@ -1251,7 +1255,7 @@ struct FullScreenPlayer: View {
     private func panelInformation(
         _ video: Video,
         contentWidth: CGFloat,
-        onCollapseComments: @escaping () -> Void
+        onCollapseComments: @escaping (@escaping () -> Void) -> Void
     ) -> some View {
         PlayerInformationPanel(
             video: video,

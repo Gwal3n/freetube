@@ -26,7 +26,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     @Binding var upNextVisibleLimit: Int
     let contentWidth: CGFloat
     let showsComments: Bool
-    let onCollapseComments: () -> Void
+    let onCollapseComments: (@escaping () -> Void) -> Void
     let onToggleDetails: () -> Void
     let onExpandDetails: () -> Void
     let onRetryDetails: () -> Void
@@ -51,7 +51,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         upNextVisibleLimit: Binding<Int>,
         contentWidth: CGFloat,
         showsComments: Bool,
-        onCollapseComments: @escaping () -> Void,
+        onCollapseComments: @escaping (@escaping () -> Void) -> Void,
         onToggleDetails: @escaping () -> Void,
         onExpandDetails: @escaping () -> Void,
         onRetryDetails: @escaping () -> Void,

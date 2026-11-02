@@ -2,8 +2,10 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct CommentsSection: View {
+    static let collapseAnchorID = "playerCommentsHeading"
+
     let countText: String?
-    let onCollapseRequested: () -> Void
+    let onCollapseRequested: (@escaping () -> Void) -> Void
     @State private var model: CommentsViewModel
     /// Collapsed and unloaded by default. Showing the header does not load the comment tree.
     @State private var isExpanded = false
@@ -20,7 +22,7 @@ struct CommentsSection: View {
     init(
         videoID: String,
         countText: String? = nil,
-        onCollapseRequested: @escaping () -> Void
+        onCollapseRequested: @escaping (@escaping () -> Void) -> Void
     ) {
         self.countText = countText
         self.onCollapseRequested = onCollapseRequested
@@ -37,10 +39,11 @@ struct CommentsSection: View {
                     .clipped()
                 } header: {
                     header.background(Color(uiColor: .systemBackground))
+                        .id(Self.collapseAnchorID)
                 }
             } else {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    header
+                    header.id(Self.collapseAnchorID)
                     commentsContent
                 }
                 .clipped()
@@ -52,12 +55,6 @@ struct CommentsSection: View {
         .onAppear { PlayerScrollDiagnostics.shared.setCommentsExpanded(isExpanded) }
         .onChange(of: isExpanded) { _, expanded in
             PlayerScrollDiagnostics.shared.setCommentsExpanded(expanded)
-        }
-        .onChange(of: player.playerPanelAtTop) { _, isAtTop in
-            if isAtTop && collapseAfterScroll {
-                collapseAfterScroll = false
-                setCommentsExpanded(false)
-            }
         }
         .onDisappear { PlayerScrollDiagnostics.shared.setCommentsExpanded(false) }
         // Covers state restoration where the section mounts expanded. Collapsed sections remain
@@ -369,10 +366,15 @@ struct CommentsSection: View {
     private func toggleComments() {
         guard !collapseAfterScroll else { return }
         if isExpanded && pinCommentsHeading && !player.playerPanelAtTop {
-            // Keep the expanded tree in place while the outer panel scrolls home. Removing it
-            // first leaves the scroll view beyond its new content extent and flashes the canvas.
+            // Preserve the comment tree until the heading reaches the bottom of the panel.
+            // Removing it while scrolled deep inside comments leaves the scroll view beyond its
+            // new content extent and flashes the canvas.
             collapseAfterScroll = true
-            onCollapseRequested()
+            onCollapseRequested {
+                guard collapseAfterScroll else { return }
+                collapseAfterScroll = false
+                setCommentsExpanded(false)
+            }
             return
         }
         setCommentsExpanded(!isExpanded)
