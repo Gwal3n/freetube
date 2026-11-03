@@ -6,6 +6,8 @@ struct BrowsingSettingsScreen: View {
     @AppStorage("autoLoadMoreSearchItems") private var autoLoadMoreSearchItems = true
     @AppStorage("autoLoadMoreFeedItems") private var autoLoadMoreFeedItems = true
     @AppStorage("openFeedChannelsOnTap") private var openFeedChannelsOnTap = false
+    @AppStorage("feedSuggestionsEnabled") private var feedSuggestionsEnabled = false
+    @AppStorage("feedSuggestionDensity") private var feedSuggestionDensity = 10
     let model: SettingsViewModel
 
     var body: some View {
@@ -34,6 +36,24 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Load more feed videos automatically", isOn: $autoLoadMoreFeedItems)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Load more feed videos automatically")
+                Toggle("Mix suggested videos into Feed", isOn: $feedSuggestionsEnabled)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Mix suggested videos into Feed")
+                if feedSuggestionsEnabled {
+                    VStack(alignment: .leading, spacing: 8) {
+                        LabeledContent("Suggestion density") {
+                            Text(verbatim: "\(feedSuggestionDensity)%")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { Double(feedSuggestionDensity) },
+                            set: { feedSuggestionDensity = Int($0) }
+                        ), in: 0...50, step: 5)
+                        .tint(settingsToggleTint)
+                    }
+                    .settingsSearchRow("Suggestion density")
+                }
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Mark new uploads")
@@ -103,7 +123,7 @@ struct BrowsingSettingsScreen: View {
             } header: {
                 Text("Feed")
             } footer: {
-                Text("Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Automatic updates run only while Feed is selected and the app is active. View counts update four channels per interval without reloading the feed.")
+                Text("Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Suggested videos appear only in All subscriptions. Automatic updates run only while Feed is selected and the app is active. View counts update four channels per interval without reloading the feed.")
             }
 
             Section("Channels") {

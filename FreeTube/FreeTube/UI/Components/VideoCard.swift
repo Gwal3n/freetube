@@ -22,6 +22,7 @@ struct VideoCard: View {
     var playbackProgress: Double? = nil
     var watchStatus: WatchHistoryStatus? = nil
     var isNewSinceLastVisit = false
+    var isSuggested = false
     var relativeDateReference: Date? = nil
 
     /// Channel name plus the playback count and relative upload date. Joined by middle dots so
@@ -222,7 +223,13 @@ struct VideoCard: View {
 
     @ViewBuilder
     private var newUploadLabel: some View {
-        if isNewSinceLastVisit {
+        if isSuggested {
+            Text("Suggested")
+                .appFont(.caption, weight: .semibold)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .accessibilityHidden(true)
+        } else if isNewSinceLastVisit {
             Text("New")
                 .appFont(.caption, weight: .semibold)
                 .foregroundStyle(.primary)
@@ -232,7 +239,8 @@ struct VideoCard: View {
     }
 
     private func cardAccessibilityLabel(title: String) -> String {
-        [isNewSinceLastVisit ? String(localized: "New since last visit") : "",
+        [isSuggested ? String(localized: "Suggested") : "",
+         isNewSinceLastVisit ? String(localized: "New since last visit") : "",
          title, metadataLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")

@@ -54,6 +54,8 @@ struct UserPreferences {
     /// Reorder only nearby feed uploads; the independent gap controls can be zero to disable
     /// either same-channel or shared-group spacing without turning off the other one.
     @AppStorage("spaceSubscriptionFeedVideos") var spaceSubscriptionFeedVideos: Bool = true
+    @AppStorage("feedSuggestionsEnabled") var feedSuggestionsEnabled: Bool = false
+    @AppStorage("feedSuggestionDensity") var feedSuggestionDensity: Int = 10
     @AppStorage("feedChannelSpacing") var feedChannelSpacing: Int = 2
     @AppStorage("feedGroupSpacing") var feedGroupSpacing: Int = 2
     @AppStorage("feedSpacingMaximumShiftHours") var feedSpacingMaximumShiftHours: Int = 24

@@ -2,10 +2,17 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SubscriptionFeedScreen: View {
+    private struct DisplayRow: Identifiable {
+        let video: Video
+        let isSuggested: Bool
+        var id: String { (isSuggested ? "suggested:" : "subscription:") + video.id }
+    }
+
     @Binding var selectedTab: RootView.Tab
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @Environment(AppVisitState.self) private var appVisitState
     @State private var model = SubscriptionFeedViewModel()
+    @State private var suggestionsModel = FeedSuggestionsViewModel()
     @State private var groups = LocalSubscriptionGroupStore.shared
     @State private var blocklist = VideoBlocklist.shared
     @State private var path: [AppNavigationRequest.Destination] = []
@@ -15,6 +22,7 @@ struct SubscriptionFeedScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
+    @AppStorage("incognitoHideFeed") private var incognitoHideFeed = true
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
@@ -30,6 +38,8 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("automaticFeedViewCountInterval") private var automaticFeedViewCountIntervalRaw = FeedRefreshInterval.hourly.rawValue
     @AppStorage("autoLoadMoreFeedItems") private var autoLoadMoreFeedItems = true
     @AppStorage("spaceSubscriptionFeedVideos") private var spaceSubscriptionFeedVideos = true
+    @AppStorage("feedSuggestionsEnabled") private var feedSuggestionsEnabled = false
+    @AppStorage("feedSuggestionDensity") private var feedSuggestionDensity = 10
     @AppStorage("feedChannelSpacing") private var feedChannelSpacing = 2
     @AppStorage("feedGroupSpacing") private var feedGroupSpacing = 2
     @AppStorage("feedSpacingMaximumShiftHours") private var feedSpacingMaximumShiftHours = 24
@@ -45,6 +55,7 @@ struct SubscriptionFeedScreen: View {
         NavigationStack(path: $path) {
             // Share one filtered snapshot with rows, pagination, and empty-state checks.
             let visibleVideos = filteredVideos
+            let displayRows = mixedRows(from: visibleVideos)
             let filteredLookaheadIDs = Set(visibleVideos.suffix(5).map(\.id))
             let filtersAreActive = watchFilter != .all || durationFilter != .all || blocklist.rules.isActive
             let pageKey = automaticLoadKey
@@ -80,12 +91,12 @@ struct SubscriptionFeedScreen: View {
                     }
                 }
 
-                ForEach(visibleVideos) { video in
-                    feedRow(video)
+                ForEach(displayRows) { row in
+                    feedRow(row.video, isSuggested: row.isSuggested)
                         .onAppear {
-                            guard autoLoadMoreFeedItems, filtersAreActive,
+                            guard !row.isSuggested, autoLoadMoreFeedItems, filtersAreActive,
                                   visibleVideos.count >= 12,
-                                  filteredLookaheadIDs.contains(video.id),
+                                  filteredLookaheadIDs.contains(row.video.id),
                                   model.canLoadMore,
                                   !model.isLoadingMore,
                                   !model.isRefreshing else { return }
@@ -167,6 +178,22 @@ struct SubscriptionFeedScreen: View {
             }
             .refreshable { await model.refresh() }
             .task(id: filteredFillKey) { await fillFilteredFeed() }
+            .task(id: suggestionTaskKey) {
+                await suggestionsModel.update(
+                    context: suggestionContextKey,
+                    subscriptionVideos: filteredVideos,
+                    allSubscriptionIDs: Set(model.videos.map(\.id)),
+                    density: min(50, max(0, feedSuggestionDensity)),
+                    enabled: feedSuggestionsEnabled && model.selectedGroupID == nil
+                        && !(incognitoEnabled && incognitoHideFeed),
+                    canFetch: selectedTab == .feed && scenePhase == .active
+                        && !model.isRefreshing && !player.fullScreenPresented && path.isEmpty,
+                    watchFilter: watchFilter,
+                    durationFilter: durationFilter,
+                    minimumMinutes: customMinimumMinutes,
+                    maximumMinutes: customMaximumMinutes
+                )
+            }
             .onChange(of: filteredFillKey) { _, _ in lastFilteredPrefetchKey = nil }
             .overlay {
                 if model.hasLoaded && !model.hasSubscriptions && model.videos.isEmpty {
@@ -241,7 +268,10 @@ struct SubscriptionFeedScreen: View {
                 if phase == .active { currentDate = .now }
             }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
-                Task { await model.refreshProgress() }
+                Task {
+                    await model.refreshProgress()
+                    await suggestionsModel.refreshProgress()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .subscriptionFeedChannelDidRefresh)) { _ in
                 Task { await model.reloadCachedFeed() }
@@ -263,6 +293,14 @@ struct SubscriptionFeedScreen: View {
 
     private var feedOrderingKey: String {
         "\(spaceSubscriptionFeedVideos):\(feedChannelSpacing):\(feedGroupSpacing):\(feedSpacingMaximumShiftHours)"
+    }
+
+    private var suggestionContextKey: String {
+        "\(model.firstPageRevision):\(model.lastRefreshAt?.timeIntervalSince1970 ?? 0):\(model.selectedGroupID?.uuidString ?? "all"):\(feedSuggestionDensity):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
+    }
+
+    private var suggestionTaskKey: String {
+        "\(suggestionContextKey):\(feedSuggestionsEnabled):\(model.videos.count):\(filteredVideos.count):\(selectedTab == .feed):\(scenePhase == .active):\(model.isRefreshing):\(player.fullScreenPresented):\(path.isEmpty):\(incognitoEnabled):\(incognitoHideFeed)"
     }
 
     private var filteredFillKey: String {
@@ -292,6 +330,27 @@ struct SubscriptionFeedScreen: View {
                     maximumMinutes: customMaximumMinutes
                 )
         }
+    }
+
+    private func mixedRows(from videos: [Video]) -> [DisplayRow] {
+        guard feedSuggestionsEnabled, feedSuggestionDensity > 0,
+              model.selectedGroupID == nil,
+              !(incognitoEnabled && incognitoHideFeed) else {
+            return videos.map { DisplayRow(video: $0, isSuggested: false) }
+        }
+        var rows: [DisplayRow] = []
+        rows.reserveCapacity(videos.count + suggestionsModel.videosByAnchor.count)
+        for video in videos {
+            rows.append(DisplayRow(video: video, isSuggested: false))
+            guard let suggested = suggestionsModel.videosByAnchor[video.id],
+                  !blocklist.blocks(suggested),
+                  watchFilter.includes(suggestionsModel.watchStatuses[suggested.id]),
+                  durationFilter.includes(suggested.duration,
+                                          minimumMinutes: customMinimumMinutes,
+                                          maximumMinutes: customMaximumMinutes) else { continue }
+            rows.append(DisplayRow(video: suggested, isSuggested: true))
+        }
+        return rows
     }
 
     private var shouldShowLoadingRows: Bool {
@@ -496,7 +555,7 @@ struct SubscriptionFeedScreen: View {
     }
 
     @ViewBuilder
-    private func feedRow(_ video: Video) -> some View {
+    private func feedRow(_ video: Video, isSuggested: Bool) -> some View {
         if largeVideoThumbnails {
             VideoCard(
                 video: video,
@@ -506,9 +565,12 @@ struct SubscriptionFeedScreen: View {
                 showsChannelAvatar: showChannelAvatars,
                 onTapChannel: openFeedChannelsOnTap && !video.channelID.isEmpty
                     ? { path.append(.channel(video.channelID)) } : nil,
-                playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
-                watchStatus: displaysWatchProgress ? model.watchStatuses[video.id] : nil,
-                isNewSinceLastVisit: isNewSinceLastVisit(video),
+                playbackProgress: displaysWatchProgress ? (isSuggested
+                    ? suggestionsModel.playbackProgress[video.id] : model.playbackProgress[video.id]) : nil,
+                watchStatus: displaysWatchProgress ? (isSuggested
+                    ? suggestionsModel.watchStatuses[video.id] : model.watchStatuses[video.id]) : nil,
+                isNewSinceLastVisit: !isSuggested && isNewSinceLastVisit(video),
+                isSuggested: isSuggested,
                 relativeDateReference: currentDate
             )
         } else {
@@ -516,9 +578,12 @@ struct SubscriptionFeedScreen: View {
                 video: video,
                 accessory: .actions(offersPlayNext: true),
                 showsChannelAvatar: showChannelAvatars,
-                playbackProgress: displaysWatchProgress ? model.playbackProgress[video.id] : nil,
-                watchStatus: displaysWatchProgress ? model.watchStatuses[video.id] : nil,
-                isNewSinceLastVisit: isNewSinceLastVisit(video),
+                playbackProgress: displaysWatchProgress ? (isSuggested
+                    ? suggestionsModel.playbackProgress[video.id] : model.playbackProgress[video.id]) : nil,
+                watchStatus: displaysWatchProgress ? (isSuggested
+                    ? suggestionsModel.watchStatuses[video.id] : model.watchStatuses[video.id]) : nil,
+                isNewSinceLastVisit: !isSuggested && isNewSinceLastVisit(video),
+                isSuggested: isSuggested,
                 relativeDateReference: currentDate,
                 onTapChannel: openFeedChannelsOnTap && !video.channelID.isEmpty
                     ? { path.append(.channel(video.channelID)) } : nil

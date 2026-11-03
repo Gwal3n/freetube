@@ -23,6 +23,7 @@ struct VideoRow: View {
     var playbackProgress: Double?
     var watchStatus: WatchHistoryStatus?
     var isNewSinceLastVisit = false
+    var isSuggested = false
     var relativeDateReference: Date?
     var onOpenChannel: (() -> Void)?
     var channelLinkID: String?
@@ -38,6 +39,7 @@ struct VideoRow: View {
         playbackProgress: Double? = nil,
         watchStatus: WatchHistoryStatus? = nil,
         isNewSinceLastVisit: Bool = false,
+        isSuggested: Bool = false,
         relativeDateReference: Date? = nil,
         onOpenChannel: (() -> Void)? = nil,
         channelLinkID: String? = nil,
@@ -50,6 +52,7 @@ struct VideoRow: View {
         self.playbackProgress = playbackProgress
         self.watchStatus = watchStatus
         self.isNewSinceLastVisit = isNewSinceLastVisit
+        self.isSuggested = isSuggested
         self.relativeDateReference = relativeDateReference
         self.onOpenChannel = onOpenChannel
         self.channelLinkID = channelLinkID
@@ -130,7 +133,8 @@ struct VideoRow: View {
     }
 
     private func rowAccessibilityLabel(title: String) -> String {
-        [isNewSinceLastVisit ? String(localized: "New since last visit") : "",
+        [isSuggested ? String(localized: "Suggested") : "",
+         isNewSinceLastVisit ? String(localized: "New since last visit") : "",
          title, video.channelName, statsLine, video.durationString]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
@@ -194,7 +198,7 @@ struct VideoRow: View {
                     .accessibilityLabel("Open \(video.channelName)")
                 }
 
-                if !statsLine.isEmpty || isNewSinceLastVisit {
+                if !statsLine.isEmpty || isNewSinceLastVisit || isSuggested {
                     Button(action: openVideo) {
                         secondaryLine
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,7 +259,13 @@ struct VideoRow: View {
     private var secondaryLine: some View {
         if !statsLine.isEmpty {
             HStack(spacing: 6) {
-                if isNewSinceLastVisit {
+                if isSuggested {
+                    Text("Suggested")
+                        .appFont(.caption2, weight: .semibold)
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                        .accessibilityHidden(true)
+                } else if isNewSinceLastVisit {
                     Text("New")
                         .appFont(.caption2, weight: .semibold)
                         .foregroundStyle(.primary)
@@ -267,6 +277,11 @@ struct VideoRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
             }
+        } else if isSuggested {
+            Text("Suggested")
+                .appFont(.caption2, weight: .semibold)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         } else if isNewSinceLastVisit {
             Text("New")
                 .appFont(.caption2, weight: .semibold)
