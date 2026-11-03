@@ -159,7 +159,7 @@ final class AppBackupService {
         "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "useAccentTheme", "accentNavigationOnly", "appCustomAccentHex", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
-        "concurrentFragments", "customDoubleTapSeekSeconds", "customPlaybackSpeeds", "playbackSpeedChoices", "sleepTimerMinuteChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "formattedCaptions",
+        "concurrentFragments", "customDoubleTapSeekSeconds", "customPlaybackSpeeds", "playbackSpeedChoices", "sleepTimerMinuteChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "centerTapPlayPauseEnabled", "formattedCaptions",
         "floatingPlayerWidth", "floatingPlayerCorner", "floatingPlayerVerticalFraction",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",
         "com.leshko.freetube.deArrowRandomThumbnails",

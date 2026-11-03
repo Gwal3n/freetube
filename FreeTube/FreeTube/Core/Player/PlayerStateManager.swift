@@ -143,6 +143,8 @@ final class PlayerStateManager {
     /// details ScrollView pauses for that gesture so its rubber band cannot move metadata faster
     /// than the player surface that contains it.
     var playerPresentationGestureActive: Bool = false
+    /// The video surface owns the touch while hold-for-speed is active.
+    var playerHoldGestureActive: Bool = false
 
     func removeFromUpNext(videoID: String) {
         if activePlaylist != nil {
@@ -834,6 +836,7 @@ final class PlayerStateManager {
         playerPresentationGestureEnabled = true
         portraitPlayerFullscreenActive = false
         playerPresentationGestureActive = false
+        playerHoldGestureActive = false
         currentVideo = nil
         loadState = .idle
         hasEnded = false

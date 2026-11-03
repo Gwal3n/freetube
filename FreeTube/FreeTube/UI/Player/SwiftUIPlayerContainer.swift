@@ -22,6 +22,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     @State private var dragIsVertical: Bool?
     @State private var expandedDragStartedDown = false
     @State private var expandedDragCanCollapse = false
+    @State private var expandedDragBlockedByHold = false
     @State private var captionPresentationReady = true
     @State private var chromePresentationReady = true
     @State private var floatingCorner: FloatingCorner = .bottomTrailing
@@ -316,6 +317,15 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             guard player.miniPlayerVisible, !player.fullScreenPresented else { return }
             expandPlayer()
         }
+        .onChange(of: player.playerHoldGestureActive) { _, isHolding in
+            guard isHolding else { return }
+            if dragIsVertical != nil { expandedDragBlockedByHold = true }
+            presentationTranslation = 0
+            dragIsVertical = nil
+            expandedDragStartedDown = false
+            expandedDragCanCollapse = false
+            player.playerPresentationGestureActive = false
+        }
         .onChange(of: player.fullScreenPresented) { _, isPresented in
             if isPresented {
                 floatingPinchGeneration &+= 1
@@ -464,6 +474,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     private func expandedPresentationGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
+                if player.playerHoldGestureActive {
+                    expandedDragBlockedByHold = true
+                    return
+                }
+                guard !expandedDragBlockedByHold else { return }
                 guard player.fullScreenPresented,
                       verticalSizeClass != .compact,
                       player.playerPresentationGestureEnabled,
@@ -490,12 +505,15 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             }
             .onEnded { value in
                 defer {
+                    expandedDragBlockedByHold = false
                     dragIsVertical = nil
                     expandedDragStartedDown = false
                     expandedDragCanCollapse = false
                     player.playerPresentationGestureActive = false
                 }
                 guard player.fullScreenPresented,
+                      !player.playerHoldGestureActive,
+                      !expandedDragBlockedByHold,
                       dragIsVertical == true,
                       expandedDragStartedDown,
                       expandedDragCanCollapse else {

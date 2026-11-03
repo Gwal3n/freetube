@@ -6,6 +6,7 @@ struct PlayerSettingsScreen: View {
     let model: SettingsViewModel
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
+    @AppStorage("centerTapPlayPauseEnabled") private var centerTapPlayPauseEnabled = false
     @AppStorage("showPlayerSaveButton") private var showPlayerSaveButton = true
     @AppStorage("showPlayerShareButton") private var showPlayerShareButton = true
     @AppStorage("showPlayerDownloadButton") private var showPlayerDownloadButton = true
@@ -32,6 +33,9 @@ struct PlayerSettingsScreen: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Tap center to play or pause", isOn: $centerTapPlayPauseEnabled)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Tap center to play or pause")
                 Toggle("Swipe horizontally to seek", isOn: $horizontalSwipeToSeekEnabled)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Swipe horizontally to seek")

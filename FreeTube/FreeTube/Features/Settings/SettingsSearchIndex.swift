@@ -171,7 +171,7 @@ enum SettingsSearchIndex {
             "Autoplay next video", "Allow audio from other apps", "Resume after interruptions"
         ]),
         Group(destination: .player, titles: [
-            "Player", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
+            "Player", "Tap center to play or pause", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
             "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
             "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
             "Show comments", "Keep comments heading visible", "Load more comments automatically", "Show commenter photos", "Open commenter channels", "Featured comment preview", "Show Up Next",

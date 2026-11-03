@@ -122,6 +122,7 @@ struct UserPreferences {
     @AppStorage("defaultPlaybackRate") var defaultPlaybackRate: Double = 1.0
     @AppStorage("customPlaybackSpeeds") var customPlaybackSpeedsRaw: String = ""
     @AppStorage("holdForSpeedEnabled") var holdForSpeedEnabled: Bool = true
+    @AppStorage("centerTapPlayPauseEnabled") var centerTapPlayPauseEnabled: Bool = false
     @AppStorage("holdSpeedRate") var holdSpeedRate: Double = 2.0
     @AppStorage("showHoldSpeedPill") var showHoldSpeedPill: Bool = true
     @AppStorage("playerScrubberColorMode") var playerScrubberColorModeRaw: String = PlayerScrubberColorMode.standard.rawValue

@@ -21,6 +21,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var onHoldSpeedChange: (Double?) -> Double
     private var effectivePlaybackRate: Double
     private var onToggleControls: () -> Void
+    private var onCenterTapPlayPause: () -> Void
     private var onRestoreFromPictureInPicture: () -> Void
     private var gestures: [UIGestureRecognizer] = []
     private var continuationTapGesture: UITapGestureRecognizer?
@@ -47,6 +48,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var holdSpeedRate: Float
     private var horizontalSeekEnabled: Bool
     private var doubleTapSeekSeconds: Int
+    private var centerTapPlayPauseEnabled: Bool
+    private var customControlsVisible: Bool
     private var lastPiPDismissalRequest: Int
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerGestures")
 
@@ -57,6 +60,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         holdSpeedRate: Double,
         horizontalSeekEnabled: Bool,
         doubleTapSeekSeconds: Int,
+        centerTapPlayPauseEnabled: Bool,
+        customControlsVisible: Bool,
         effectivePlaybackRate: Double,
         onHoldSpeedChange: @escaping (Double?) -> Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
@@ -66,6 +71,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         liveSeekableRange: @escaping () -> ClosedRange<TimeInterval>?,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void,
+        onCenterTapPlayPause: @escaping () -> Void,
         onRestoreFromPictureInPicture: @escaping () -> Void
     ) {
         self.player = player
@@ -74,6 +80,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.holdSpeedRate = Self.validatedHoldRate(holdSpeedRate)
         self.horizontalSeekEnabled = horizontalSeekEnabled
         self.doubleTapSeekSeconds = Self.validatedSeekInterval(doubleTapSeekSeconds)
+        self.centerTapPlayPauseEnabled = centerTapPlayPauseEnabled
+        self.customControlsVisible = customControlsVisible
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
         self.onSeekRelative = onSeekRelative
@@ -83,6 +91,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.liveSeekableRange = liveSeekableRange
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
+        self.onCenterTapPlayPause = onCenterTapPlayPause
         self.onRestoreFromPictureInPicture = onRestoreFromPictureInPicture
     }
 
@@ -107,6 +116,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         holdSpeedRate: Double,
         horizontalSeekEnabled: Bool,
         doubleTapSeekSeconds: Int,
+        centerTapPlayPauseEnabled: Bool,
+        customControlsVisible: Bool,
         effectivePlaybackRate: Double,
         onHoldSpeedChange: @escaping (Double?) -> Double,
         onSeekRelative: @escaping (TimeInterval) -> Void,
@@ -116,6 +127,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         liveSeekableRange: @escaping () -> ClosedRange<TimeInterval>?,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void,
+        onCenterTapPlayPause: @escaping () -> Void,
         onRestoreFromPictureInPicture: @escaping () -> Void
     ) {
         self.player = player
@@ -139,6 +151,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             endSeekSession(hideFeedback: true)
         }
         self.doubleTapSeekSeconds = seekSeconds
+        self.centerTapPlayPauseEnabled = centerTapPlayPauseEnabled
+        self.customControlsVisible = customControlsVisible
         self.effectivePlaybackRate = effectivePlaybackRate
         self.onHoldSpeedChange = onHoldSpeedChange
         self.onSeekRelative = onSeekRelative
@@ -148,6 +162,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.liveSeekableRange = liveSeekableRange
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
+        self.onCenterTapPlayPause = onCenterTapPlayPause
         self.onRestoreFromPictureInPicture = onRestoreFromPictureInPicture
     }
 
@@ -261,8 +276,12 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     @objc private func didPrimaryTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else { return }
+        let shouldPlayPause = centerTapPlayPauseEnabled
+            && !customControlsVisible
+            && isCenterTap(gesture.location(in: gestureView))
         if doubleTapSeekSeconds == 0 {
-            onToggleControls()
+            if shouldPlayPause { onCenterTapPlayPause() }
+            else { onToggleControls() }
             return
         }
         if let pendingSingleTapWorkItem {
@@ -273,11 +292,24 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         }
 
         let workItem = DispatchWorkItem { [weak self] in
-            self?.pendingSingleTapWorkItem = nil
-            self?.onToggleControls()
+            guard let self else { return }
+            self.pendingSingleTapWorkItem = nil
+            if shouldPlayPause { self.onCenterTapPlayPause() }
+            else { self.onToggleControls() }
         }
         pendingSingleTapWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: workItem)
+    }
+
+    private func isCenterTap(_ location: CGPoint) -> Bool {
+        guard let view = gestureView else { return false }
+        let bounds = view.bounds
+        return CGRect(
+            x: bounds.width * 0.34,
+            y: bounds.height * 0.30,
+            width: bounds.width * 0.32,
+            height: bounds.height * 0.40
+        ).contains(location)
     }
 
     private func performDoubleTapSeek(at location: CGPoint) {

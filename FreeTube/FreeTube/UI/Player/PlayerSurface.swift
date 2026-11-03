@@ -12,6 +12,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
     let holdSpeedRate: Double
     let horizontalSeekEnabled: Bool
     let doubleTapSeekSeconds: Int
+    let centerTapPlayPauseEnabled: Bool
+    let customControlsVisible: Bool
     let effectivePlaybackRate: Double
     var onHoldSpeedChange: (Double?) -> Double
     var onSeekRelative: (TimeInterval) -> Void
@@ -21,6 +23,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var liveSeekableRange: () -> ClosedRange<TimeInterval>?
     var onTogglePlayback: () -> Void
     var onToggleControls: () -> Void
+    var onCenterTapPlayPause: () -> Void
     var onRestoreFromPictureInPicture: () -> Void
     var showsControls: Bool = false
     var entersPiPAutomatically: Bool = true
@@ -37,6 +40,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
             holdSpeedRate: holdSpeedRate,
             horizontalSeekEnabled: horizontalSeekEnabled,
             doubleTapSeekSeconds: doubleTapSeekSeconds,
+            centerTapPlayPauseEnabled: centerTapPlayPauseEnabled,
+            customControlsVisible: customControlsVisible,
             effectivePlaybackRate: effectivePlaybackRate,
             onHoldSpeedChange: onHoldSpeedChange,
             onSeekRelative: onSeekRelative,
@@ -46,6 +51,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             liveSeekableRange: liveSeekableRange,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls,
+            onCenterTapPlayPause: onCenterTapPlayPause,
             onRestoreFromPictureInPicture: onRestoreFromPictureInPicture
         )
     }
@@ -92,6 +98,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
             holdSpeedRate: holdSpeedRate,
             horizontalSeekEnabled: horizontalSeekEnabled,
             doubleTapSeekSeconds: doubleTapSeekSeconds,
+            centerTapPlayPauseEnabled: centerTapPlayPauseEnabled,
+            customControlsVisible: customControlsVisible,
             effectivePlaybackRate: effectivePlaybackRate,
             onHoldSpeedChange: onHoldSpeedChange,
             onSeekRelative: onSeekRelative,
@@ -101,6 +109,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
             liveSeekableRange: liveSeekableRange,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls,
+            onCenterTapPlayPause: onCenterTapPlayPause,
             onRestoreFromPictureInPicture: onRestoreFromPictureInPicture
         )
         context.coordinator.install(on: controller)

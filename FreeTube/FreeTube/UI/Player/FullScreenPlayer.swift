@@ -89,6 +89,7 @@ struct FullScreenPlayer: View {
     @AppStorage("formattedCaptions") private var formattedCaptions = true
     @AppStorage("seekPreviewStyle") private var seekPreviewStyleRaw = SeekPreviewStyle.compact.rawValue
     @AppStorage("holdForSpeedEnabled") private var holdForSpeedEnabled = true
+    @AppStorage("centerTapPlayPauseEnabled") private var centerTapPlayPauseEnabled = false
     @AppStorage("holdSpeedRate") private var holdSpeedRate = 2.0
     @AppStorage("showHoldSpeedPill") private var showHoldSpeedPill = true
     @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
@@ -167,6 +168,8 @@ struct FullScreenPlayer: View {
                         holdSpeedRate: holdSpeedRate,
                         horizontalSeekEnabled: horizontalSwipeToSeekEnabled,
                         doubleTapSeekSeconds: doubleTapSeekSeconds,
+                        centerTapPlayPauseEnabled: centerTapPlayPauseEnabled,
+                        customControlsVisible: showsPlayerControls,
                         effectivePlaybackRate: player.effectivePlaybackRate,
                         onHoldSpeedChange: { rate in
                             if let rate {
@@ -175,6 +178,7 @@ struct FullScreenPlayer: View {
                                 player.endTemporaryPlaybackRate()
                             }
                             isHoldingForSpeed = rate != nil
+                            player.playerHoldGestureActive = rate != nil
                             return player.effectivePlaybackRate
                         },
                         onSeekRelative: { seconds in
@@ -194,6 +198,10 @@ struct FullScreenPlayer: View {
                             player.togglePlayPause()
                         },
                         onToggleControls: { togglePlayerControls() },
+                        onCenterTapPlayPause: {
+                            player.togglePlayPause()
+                            showPlayerControls()
+                        },
                         onRestoreFromPictureInPicture: {
                             let hadInlinePlayer = player.miniPlayerVisible
                             player.miniPlayerVisible = true
@@ -338,6 +346,7 @@ struct FullScreenPlayer: View {
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     isFrameStepping = false
                     isHoldingForSpeed = false
+                    player.playerHoldGestureActive = false
                     gestureSeekPreview = nil
                     gestureSeekFeedback = nil
                     scrubberSeekPreview = nil
@@ -554,6 +563,7 @@ struct FullScreenPlayer: View {
                 if isHoldingForSpeed {
                     player.endTemporaryPlaybackRate()
                     isHoldingForSpeed = false
+                    player.playerHoldGestureActive = false
                 }
                 isFrameStepping = false
                 isTranscriptPresented = false
@@ -605,6 +615,7 @@ struct FullScreenPlayer: View {
             swipeAdjustment.cancel()
             gestureSeekFeedback = nil
             player.playerPresentationGestureEnabled = true
+            player.playerHoldGestureActive = false
             player.playlistPanelPresented = false
             player.portraitPlayerFullscreenActive = false
         }
