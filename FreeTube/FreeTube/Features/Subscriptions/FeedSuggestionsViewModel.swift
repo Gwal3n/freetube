@@ -17,11 +17,11 @@ final class FeedSuggestionsViewModel {
     @ObservationIgnored private let writer: PersistenceWriter
 
     init(
-        service: FeedSuggestionService = FeedSuggestionService(),
-        writer: PersistenceWriter = .shared
+        service: FeedSuggestionService? = nil,
+        writer: PersistenceWriter? = nil
     ) {
-        self.service = service
-        self.writer = writer
+        self.service = service ?? FeedSuggestionService()
+        self.writer = writer ?? .shared
     }
 
     func clear() {
