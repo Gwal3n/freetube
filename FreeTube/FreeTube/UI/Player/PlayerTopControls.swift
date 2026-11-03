@@ -8,7 +8,6 @@ struct PlayerTopControls: View {
     @AppStorage("playbackSpeedChoices") private var savedRatesRaw = ""
     @AppStorage("customPlaybackSpeeds") private var legacyCustomRatesRaw = ""
     @AppStorage("sleepTimerMinuteChoices") private var savedSleepTimerMinutesRaw = ""
-    @AppStorage("showPlaybackDetails") private var showPlaybackDetails = false
     @State private var isEnteringCustomSpeed = false
     @State private var customSpeedText = ""
     @State private var isEnteringCustomSleepTimer = false
@@ -89,7 +88,7 @@ struct PlayerTopControls: View {
             ForEach(controls) { control in
                 controlView(control)
             }
-            if !overflowControls.isEmpty || showPlaybackDetails {
+            if !overflowControls.isEmpty {
                 Menu {
                     ForEach(overflowControls) { control in
                         if control != overflowControls.first,
@@ -97,12 +96,6 @@ struct PlayerTopControls: View {
                             Divider()
                         }
                         overflowItem(control)
-                    }
-                    if showPlaybackDetails {
-                        if !overflowControls.isEmpty { Divider() }
-                        Button(action: onShowPlaybackDetails) {
-                            Label("Playback details", systemImage: "info.circle")
-                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -172,8 +165,14 @@ struct PlayerTopControls: View {
                     .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
             }
             .disabled(isAudioOnly)
-            .accessibilityLabel("Reported picture quality")
+            .accessibilityLabel("Current quality")
             .accessibilityValue(reportedQualityLabel)
+        case .playbackDetails:
+            Button(action: onShowPlaybackDetails) {
+                Image(systemName: control.systemImage)
+                    .playerTopControl()
+            }
+            .accessibilityLabel("Playback details")
         case .captions:
             captionsMenu(onPlayer: true)
         case .sleepTimer:
@@ -210,9 +209,13 @@ struct PlayerTopControls: View {
             Menu {
                 qualityChoices
             } label: {
-                Label("Picture: \(reportedQualityLabel)", systemImage: control.systemImage)
+                Label("Quality: \(reportedQualityLabel)", systemImage: control.systemImage)
             }
             .disabled(isAudioOnly)
+        case .playbackDetails:
+            Button(action: onShowPlaybackDetails) {
+                Label("Playback details", systemImage: control.systemImage)
+            }
         case .loop:
             Button(action: onToggleLoop) {
                 Label(isLooping ? "Turn loop off" : "Loop current video",

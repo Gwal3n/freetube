@@ -185,7 +185,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .playerControls, titles: [
             "Customize controls", "On player", "More menu", "Hidden",
-            "More menu separators", "Fine seeking", "Quality", "Captions"
+            "More menu separators", "Fine seeking", "Quality", "Playback details", "Captions"
         ]),
         Group(destination: .browsing, titles: [
             "Browsing", "Show search suggestions", "Load more search results automatically",
@@ -227,7 +227,7 @@ enum SettingsSearchIndex {
             "Community chapters"
         ]),
         Group(destination: .diagnostics, titles: [
-            "Diagnostics", "Save logs to file", "Measure player scrolling", "Show playback details", "Share latest log…", "Show log folder", "Clear all logs"
+            "Diagnostics", "Save logs to file", "Measure player scrolling", "Share latest log…", "Show log folder", "Clear all logs"
         ]),
         Group(destination: .about, titles: ["About"])
     ]

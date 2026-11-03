@@ -13,13 +13,11 @@ struct PlayerPlaybackDetailsScreen: View {
         NavigationStack {
             Form {
                 Section {
-                    detail("Reported quality", snapshot.quality)
+                    detail("Current quality", snapshot.quality)
                     detail("Picture size", snapshot.pictureSize)
                     detail("Preferred maximum", snapshot.maximum)
                 } header: {
                     Text("Picture")
-                } footer: {
-                    Text("AVPlayer reports the picture size. It may not identify the exact HLS rendition currently being downloaded.")
                 }
 
                 Section("Playback") {
