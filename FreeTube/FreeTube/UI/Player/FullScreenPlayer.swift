@@ -38,6 +38,7 @@ struct FullScreenPlayer: View {
     @State private var actionsModel = PlayerActionsModel()
     @State private var captionsModel = PlayerCaptionsModel()
     @State private var isTranscriptPresented = false
+    @State private var isPlaybackDetailsPresented = false
     @State private var savedMomentFeedbackCount = 0
     /// File URL the user wants to hand off to another app via the system "Open in…" share sheet.
     /// Non-nil → present the activity controller; tapped row sets this, sheet dismissal clears it.
@@ -502,6 +503,11 @@ struct FullScreenPlayer: View {
                 .presentationDragIndicator(.visible)
             }
         }
+        .sheet(isPresented: $isPlaybackDetailsPresented) {
+            PlayerPlaybackDetailsScreen()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .confirmationDialog(
             "Delete downloaded video?",
             isPresented: Binding(
@@ -657,6 +663,7 @@ struct FullScreenPlayer: View {
                     playbackRate: player.playbackRate,
                     effectivePlaybackRate: player.effectivePlaybackRate,
                     playbackQuality: player.playbackQuality,
+                    videoPresentationSize: player.videoPresentationSize,
                     isMuted: player.isMuted,
                     isLooping: player.isLoopingCurrentVideo,
                     isAutoplayEnabled: autoplayNext,
@@ -677,6 +684,7 @@ struct FullScreenPlayer: View {
                         player.setPlaybackQuality(quality)
                         showPlayerControls()
                     },
+                    onShowPlaybackDetails: { isPlaybackDetailsPresented = true },
                     onToggleLoop: {
                         player.toggleLoopCurrentVideo()
                         showPlayerControls()

@@ -8,6 +8,7 @@ struct PlayerTopControls: View {
     @AppStorage("playbackSpeedChoices") private var savedRatesRaw = ""
     @AppStorage("customPlaybackSpeeds") private var legacyCustomRatesRaw = ""
     @AppStorage("sleepTimerMinuteChoices") private var savedSleepTimerMinutesRaw = ""
+    @AppStorage("showPlaybackDetails") private var showPlaybackDetails = false
     @State private var isEnteringCustomSpeed = false
     @State private var customSpeedText = ""
     @State private var isEnteringCustomSleepTimer = false
@@ -18,6 +19,7 @@ struct PlayerTopControls: View {
     let playbackRate: Double
     let effectivePlaybackRate: Double
     let playbackQuality: VideoQuality
+    let videoPresentationSize: CGSize
     let isMuted: Bool
     let isLooping: Bool
     let isAutoplayEnabled: Bool
@@ -31,6 +33,7 @@ struct PlayerTopControls: View {
     let captionsModel: PlayerCaptionsModel
     let onSetPlaybackRate: (Double) -> Void
     let onSetPlaybackQuality: (VideoQuality) -> Void
+    let onShowPlaybackDetails: () -> Void
     let onToggleLoop: () -> Void
     let onToggleMute: () -> Void
     let onToggleFullscreen: () -> Void
@@ -86,7 +89,7 @@ struct PlayerTopControls: View {
             ForEach(controls) { control in
                 controlView(control)
             }
-            if !overflowControls.isEmpty {
+            if !overflowControls.isEmpty || showPlaybackDetails {
                 Menu {
                     ForEach(overflowControls) { control in
                         if control != overflowControls.first,
@@ -94,6 +97,12 @@ struct PlayerTopControls: View {
                             Divider()
                         }
                         overflowItem(control)
+                    }
+                    if showPlaybackDetails {
+                        if !overflowControls.isEmpty { Divider() }
+                        Button(action: onShowPlaybackDetails) {
+                            Label("Playback details", systemImage: "info.circle")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -156,15 +165,15 @@ struct PlayerTopControls: View {
             Menu {
                 qualityChoices
             } label: {
-                Text(playbackQuality.displayName)
+                Text(verbatim: reportedQualityLabel)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(minWidth: 44, minHeight: 44)
                     .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
             }
             .disabled(isAudioOnly)
-            .accessibilityLabel("Quality limit")
-            .accessibilityValue(playbackQuality.displayName)
+            .accessibilityLabel("Reported picture quality")
+            .accessibilityValue(reportedQualityLabel)
         case .captions:
             captionsMenu(onPlayer: true)
         case .sleepTimer:
@@ -201,7 +210,7 @@ struct PlayerTopControls: View {
             Menu {
                 qualityChoices
             } label: {
-                Label("Quality limit: \(playbackQuality.displayName)", systemImage: control.systemImage)
+                Label("Picture: \(reportedQualityLabel)", systemImage: control.systemImage)
             }
             .disabled(isAudioOnly)
         case .loop:
@@ -431,6 +440,11 @@ struct PlayerTopControls: View {
                 }
             }
         }
+    }
+
+    private var reportedQualityLabel: String {
+        isAudioOnly ? String(localized: "Audio")
+            : VideoQuality.reportedPictureLabel(for: videoPresentationSize) ?? "—"
     }
 
     private func rateLabel(_ rate: Double) -> String {

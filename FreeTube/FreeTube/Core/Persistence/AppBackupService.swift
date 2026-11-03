@@ -167,7 +167,7 @@ final class AppBackupService {
         "largeSubscriptionFeedThumbnails",
         "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
-        "logToFile", "playerScrollDiagnosticsEnabled", "manualQueue",
+        "logToFile", "playerScrollDiagnosticsEnabled", "showPlaybackDetails", "manualQueue",
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "playerPanelSectionOrder",
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 enum VideoQuality: String, CaseIterable, Identifiable, Sendable {
@@ -35,5 +36,17 @@ enum VideoQuality: String, CaseIterable, Identifiable, Sendable {
         case .p2160: return 2160
         case .audioOnly: return 0
         }
+    }
+}
+
+extension VideoQuality {
+    /// AVPlayer's reported picture size is a useful live indication, but it is not a
+    /// guaranteed identifier for the HLS rendition currently being downloaded.
+    static func reportedPictureLabel(for size: CGSize) -> String? {
+        let shorterSide = min(size.width, size.height)
+        guard size.width.isFinite, size.height.isFinite,
+              size.width >= 1, size.height >= 1,
+              size.width <= 16_384, size.height <= 16_384 else { return nil }
+        return "≈\(Int(shorterSide.rounded()))p"
     }
 }

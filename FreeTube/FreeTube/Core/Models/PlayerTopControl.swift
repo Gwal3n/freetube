@@ -22,7 +22,7 @@ enum PlayerTopControl: String, CaseIterable, Identifiable, Sendable {
         case .fullscreen: return String(localized: "Fullscreen")
         case .autoplay: return String(localized: "Autoplay")
         case .audioOnly: return String(localized: "Audio only")
-        case .quality: return String(localized: "Quality limit")
+        case .quality: return String(localized: "Quality")
         case .captions: return String(localized: "Captions")
         case .sleepTimer: return String(localized: "Sleep timer")
         case .frameStepping: return String(localized: "Fine seeking")
