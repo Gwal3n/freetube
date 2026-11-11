@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Native numeric interval editor shared by the local duration and view-count filters.
-/// Both the minimum and maximum sliders end at Unlimited; typed values stay authoritative
-/// for concrete amounts.
+/// One dual-thumb slider sets both bounds; the text fields stay available for exact values.
+/// The trailing end of the track is Unlimited (open maximum).
 @available(iOS 17.0, *)
 struct SearchNumericRangeSheet: View {
     enum Kind: Equatable {
@@ -34,17 +34,14 @@ struct SearchNumericRangeSheet: View {
         }
     }
 
-    /// Normalized track: `0...finiteEnd` maps to concrete values; `unlimitedPosition` is Unlimited.
+    /// Normalized track: `0...finiteEnd` maps to concrete values; `1` is Unlimited for the max thumb.
     private static let finiteEnd = 0.92
-    private static let unlimitedPosition = 1.0
 
     @Environment(\.dismiss) private var dismiss
     @State private var minimumText: String
     @State private var maximumText: String
-    @State private var minimumSlider: Double
-    @State private var maximumSlider: Double
-    @State private var minimumIsUnlimited: Bool
-    @State private var maximumIsUnlimited: Bool
+    @State private var lowerPosition: Double
+    @State private var upperPosition: Double
 
     let kind: Kind
     let onApply: (SearchVideoFilters.NumericRange) -> Void
@@ -56,41 +53,33 @@ struct SearchNumericRangeSheet: View {
     ) {
         self.kind = kind
         self.onApply = onApply
-        // No floor is stored as minimum 0; treat that as Unlimited so both ends share the same stop.
-        let minimumUnlimited = range == nil || range?.minimum == 0
-        let maximumUnlimited = range?.maximum == nil
-        let minimumValue = range?.minimum ?? 0
-        _minimumIsUnlimited = State(initialValue: minimumUnlimited)
-        _maximumIsUnlimited = State(initialValue: maximumUnlimited)
-        _minimumText = State(initialValue: minimumUnlimited ? "" : String(minimumValue))
-        _maximumText = State(
-            initialValue: maximumUnlimited ? "" : String(range?.maximum ?? 0)
-        )
-        _minimumSlider = State(
-            initialValue: minimumUnlimited
-                ? Self.unlimitedPosition
-                : Self.sliderPosition(for: minimumValue, kind: kind)
-        )
-        _maximumSlider = State(
-            initialValue: maximumUnlimited
-                ? Self.unlimitedPosition
-                : Self.sliderPosition(for: range?.maximum ?? 0, kind: kind)
+        let minimum = max(0, range?.minimum ?? 0)
+        let maximum = range?.maximum
+        _minimumText = State(initialValue: String(minimum))
+        _maximumText = State(initialValue: maximum.map(String.init) ?? "")
+        _lowerPosition = State(initialValue: Self.sliderPosition(for: minimum, kind: kind))
+        _upperPosition = State(
+            initialValue: maximum.map { Self.sliderPosition(for: $0, kind: kind) } ?? 1
         )
     }
 
-    private var resolvedMinimum: Int? {
-        if minimumIsUnlimited { return 0 }
-        return Int(minimumText.trimmingCharacters(in: .whitespacesAndNewlines))
+    private var minimum: Int? {
+        Int(minimumText.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    private var resolvedMaximum: Int? {
-        if maximumIsUnlimited { return nil }
-        return Int(maximumText.trimmingCharacters(in: .whitespacesAndNewlines))
+    private var maximum: Int? {
+        let text = maximumText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : Int(text)
+    }
+
+    private var maximumIsUnlimited: Bool {
+        maximumText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || upperPosition >= Self.finiteEnd
     }
 
     private var canApply: Bool {
-        guard let minimum = resolvedMinimum, minimum >= 0 else { return false }
-        guard let maximum = resolvedMaximum else { return true }
+        guard let minimum, minimum >= 0 else { return false }
+        guard let maximum else { return true }
         return maximum >= minimum
     }
 
@@ -98,20 +87,43 @@ struct SearchNumericRangeSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    boundEditor(
-                        title: "Minimum",
-                        text: $minimumText,
-                        slider: $minimumSlider,
-                        isUnlimited: $minimumIsUnlimited,
-                        accessibilityNoun: "Minimum"
-                    )
-                    boundEditor(
-                        title: "Maximum",
-                        text: $maximumText,
-                        slider: $maximumSlider,
-                        isUnlimited: $maximumIsUnlimited,
-                        accessibilityNoun: "Maximum"
-                    )
+                    HStack {
+                        Text("Minimum")
+                        Spacer()
+                        TextField("0", text: $minimumText)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 120)
+                            .accessibilityLabel("Minimum \(kind.unitLabel)")
+                    }
+                    HStack {
+                        Text("Maximum")
+                        Spacer()
+                        TextField("Unlimited", text: $maximumText)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 120)
+                            .accessibilityLabel("Maximum \(kind.unitLabel)")
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        SearchNumericRangeSlider(
+                            lower: lowerBinding,
+                            upper: upperBinding,
+                            lowerAccessibilityValue: minimum.map(String.init) ?? "0",
+                            upperAccessibilityValue: maximumIsUnlimited
+                                ? "Unlimited"
+                                : (maximum.map(String.init) ?? "Unlimited")
+                        )
+                        HStack {
+                            Text(verbatim: "0")
+                            Spacer()
+                            Text("Unlimited")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                 } header: {
                     Text(kind.unitLabel)
                 } footer: {
@@ -126,13 +138,15 @@ struct SearchNumericRangeSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
-                        guard canApply, let minimum = resolvedMinimum else { return }
-                        onApply(.init(minimum: minimum, maximum: resolvedMaximum))
+                        guard canApply, let minimum else { return }
+                        onApply(.init(minimum: minimum, maximum: maximum))
                         dismiss()
                     }
                     .disabled(!canApply)
                 }
             }
+            .onChange(of: minimumText) { _, _ in syncLowerFromText() }
+            .onChange(of: maximumText) { _, _ in syncUpperFromText() }
         }
         .presentationDetents([.medium, .large])
     }
@@ -140,75 +154,66 @@ struct SearchNumericRangeSheet: View {
     private var footerText: String {
         switch kind {
         case .minutes:
-            return "Slide all the way right for Unlimited on either bound, or type an exact minute count."
+            return "Drag either end of the range. The right end is Unlimited; you can also type exact minutes."
         case .views:
-            return "Slide all the way right for Unlimited on either bound. The track is logarithmic up to 10M; type a larger number when needed."
+            return "Drag either end of the range. The right end is Unlimited. The track is logarithmic up to 10M; type a larger number when needed."
         }
     }
 
-    private func boundEditor(
-        title: String,
-        text: Binding<String>,
-        slider: Binding<Double>,
-        isUnlimited: Binding<Bool>,
-        accessibilityNoun: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title)
-                Spacer()
-                TextField("Unlimited", text: text)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 120)
-                    .accessibilityLabel("\(accessibilityNoun) \(kind.unitLabel)")
-                    .onChange(of: text.wrappedValue) { _, newValue in
-                        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if trimmed.isEmpty {
-                            isUnlimited.wrappedValue = true
-                            slider.wrappedValue = Self.unlimitedPosition
-                            return
-                        }
-                        guard let parsed = Int(trimmed), parsed >= 0 else { return }
-                        isUnlimited.wrappedValue = false
-                        slider.wrappedValue = Self.sliderPosition(for: parsed, kind: kind)
-                    }
+    private var lowerBinding: Binding<Double> {
+        Binding(
+            get: { lowerPosition },
+            set: { newValue in
+                lowerPosition = min(newValue, upperPosition)
+                applyLowerPosition()
             }
-            Slider(
-                value: Binding(
-                    get: { slider.wrappedValue },
-                    set: { newValue in
-                        slider.wrappedValue = newValue
-                        applySlider(newValue, text: text, isUnlimited: isUnlimited)
-                    }
-                ),
-                in: 0...Self.unlimitedPosition
-            )
-            .accessibilityLabel("\(accessibilityNoun) \(kind.unitLabel) slider")
-            .accessibilityValue(
-                isUnlimited.wrappedValue
-                    ? "Unlimited"
-                    : (text.wrappedValue.isEmpty ? "Unlimited" : text.wrappedValue)
-            )
-        }
+        )
     }
 
-    private func applySlider(
-        _ position: Double,
-        text: Binding<String>,
-        isUnlimited: Binding<Bool>
-    ) {
-        if position >= Self.finiteEnd {
-            isUnlimited.wrappedValue = true
-            text.wrappedValue = ""
+    private var upperBinding: Binding<Double> {
+        Binding(
+            get: { upperPosition },
+            set: { newValue in
+                upperPosition = max(newValue, lowerPosition)
+                applyUpperPosition()
+            }
+        )
+    }
+
+    private func syncLowerFromText() {
+        guard let minimum, minimum >= 0 else { return }
+        let position = Self.sliderPosition(for: minimum, kind: kind)
+        lowerPosition = min(position, upperPosition)
+    }
+
+    private func syncUpperFromText() {
+        let text = maximumText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty {
+            upperPosition = 1
             return
         }
-        isUnlimited.wrappedValue = false
-        text.wrappedValue = String(Self.finiteValue(at: position, kind: kind))
+        guard let maximum, maximum >= 0 else { return }
+        let position = Self.sliderPosition(for: maximum, kind: kind)
+        upperPosition = max(position, lowerPosition)
+    }
+
+    private func applyLowerPosition() {
+        // The lower thumb stays on the finite band; Unlimited is only a maximum stop.
+        let capped = min(lowerPosition, Self.finiteEnd - 0.001)
+        if capped != lowerPosition { lowerPosition = capped }
+        minimumText = String(Self.finiteValue(at: lowerPosition, kind: kind))
+    }
+
+    private func applyUpperPosition() {
+        if upperPosition >= Self.finiteEnd {
+            maximumText = ""
+            return
+        }
+        maximumText = String(Self.finiteValue(at: upperPosition, kind: kind))
     }
 
     /// Position on `0...finiteEnd` for a concrete value. Values above the finite band sit at the
-    /// band’s end so Unlimited remains a distinct final gesture.
+    /// band’s end so Unlimited remains a distinct final gesture for the upper thumb.
     private static func sliderPosition(for value: Int, kind: Kind) -> Double {
         let clamped = max(0, Double(value))
         let upper = kind.finiteUpperBound
