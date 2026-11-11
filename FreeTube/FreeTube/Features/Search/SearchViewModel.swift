@@ -141,13 +141,10 @@ final class SearchViewModel {
         do {
             let next = try await service.fetchMore(continuation: token)
             guard searchGeneration == generation else { return }
-            let mergedVideos = current.videos + next.videos
-            let mergedChannels = current.channels + next.channels
-            let mergedPlaylists = current.playlists + next.playlists
+            let known = Set(current.items.map(\.id))
+            let appended = next.items.filter { !known.contains($0.id) }
             results = SearchResult(
-                videos: mergedVideos,
-                channels: mergedChannels,
-                playlists: mergedPlaylists,
+                items: current.items + appended,
                 continuationToken: next.continuationToken
             )
         } catch {

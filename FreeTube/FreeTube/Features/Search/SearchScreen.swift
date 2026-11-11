@@ -9,7 +9,6 @@ struct SearchContent: View {
     private struct FilterFillRequest: Equatable {
         let resultsRevision: Int
         let filters: SearchVideoFilters
-        let isExpanded: Bool
         let blockingRevision: Int
     }
 
@@ -24,10 +23,6 @@ struct SearchContent: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismissSearch) private var dismissSearch
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var arePlaylistsExpanded = false
-    @State private var areChannelsExpanded = true
-    @State private var areVideosExpanded = true
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
@@ -84,9 +79,6 @@ struct SearchContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: model.submittedQuery) { _, _ in
-            arePlaylistsExpanded = false
-            areChannelsExpanded = true
-            areVideosExpanded = true
             lastFilteredPrefetch = nil
         }
         .onChange(of: model.videoFilters) { oldValue, _ in
@@ -99,38 +91,17 @@ struct SearchContent: View {
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
         let now = Date.now
-        let resultType = model.videoFilters.resultType
-        let showsChannels = resultType == .any || resultType == .channel
-        let showsPlaylists = resultType == .any || resultType == .playlist
-        let showsVideos = resultType == .any || resultType == .video
-        // Always honor type locally so a plain-query fallback cannot resurface other families.
-        let visibleChannels = showsChannels
-            ? results.channels.filter { !blocklist.blocks($0) }
-            : []
-        let visiblePlaylists = showsPlaylists
-            ? results.playlists.filter { !blocklist.blocks($0) }
-            : []
-        let unblockedVideos = showsVideos
-            ? results.videos.filter { !blocklist.blocks($0) }
-            : []
-        let visibleVideos = model.videoFilters.isActive
-            ? unblockedVideos.filter {
-                model.videoFilters.includes(
-                    $0,
-                    status: watchStatusByVideoID[$0.id],
-                    now: now,
-                    applyServerMirroredLocally: model.applyServerMirroredLocally
-                )
-            }
-            : unblockedVideos
-        if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
+        let unblockedItems = results.items.filter { !isBlocked($0) }
+        let visibleItems = unblockedItems.filter {
+            includes($0, now: now, status: watchStatus(for: $0))
+        }
+        if results.items.isEmpty {
             ContentUnavailableView(
                 "No Results",
                 systemImage: "magnifyingglass",
                 description: Text("No results were found for “\(model.submittedQuery ?? model.query)”.")
             )
-        } else if visibleChannels.isEmpty && visiblePlaylists.isEmpty &&
-                    unblockedVideos.isEmpty && results.continuationToken == nil {
+        } else if unblockedItems.isEmpty && results.continuationToken == nil {
             ContentUnavailableView(
                 "No Unblocked Results",
                 systemImage: "hand.raised",
@@ -138,129 +109,77 @@ struct SearchContent: View {
             )
         } else {
             List {
-                if !visibleChannels.isEmpty {
-                    Section {
-                        if areChannelsExpanded {
-                            ForEach(visibleChannels) { channel in
-                                // Avoid `NavigationLink` here: inside a List it draws a trailing
-                                // disclosure chevron that does not belong on a media browsing row.
-                                Button {
-                                    dismissKeyboard()
-                                    onOpenDestination(.channel(channel.id))
-                                } label: {
-                                    ChannelRow(channel: channel)
-                                }
-                                .buttonStyle(ResponsiveButtonStyle())
-                                .mediaListRow()
-                                .accessibilityAddTraits(.isLink)
+                if visibleItems.isEmpty {
+                    VStack(spacing: 8) {
+                        Group {
+                            if results.continuationToken == nil {
+                                Text("No results match your filters or blocking rules")
+                            } else {
+                                Text(model.isLoading
+                                     ? "Finding matching results…"
+                                     : "No loaded results match. Load more to check the next page.")
                             }
                         }
-                    } header: {
-                        collapsibleHeader(
-                            "Channels",
-                            count: visibleChannels.count,
-                            isExpanded: $areChannelsExpanded
-                        )
+                        .foregroundStyle(.secondary)
+                        if model.videoFilters.isActive {
+                            Button("Reset Filters") {
+                                model.videoFilters = SearchVideoFilters()
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, minHeight: 76)
+                    .listRowSeparator(.hidden)
                 }
-                if !visiblePlaylists.isEmpty {
-                    Section {
-                        if arePlaylistsExpanded {
-                            ForEach(visiblePlaylists) { playlist in
-                                PlaylistRow(
-                                    playlist: playlist,
-                                    onTap: {
-                                        navigationLog.info("Search playlist row tapped: \(playlist.id, privacy: .public)")
-                                        dismissKeyboard()
-                                        onOpenDestination(.playlist(playlist.id))
-                                    },
-                                    showsMoreMenu: true
+
+                let lookaheadIDs = Set(
+                    (model.videoFilters.isActive || blocklist.rules.isActive ? visibleItems : unblockedItems)
+                        .suffix(5)
+                        .map(\.id)
+                )
+                ForEach(visibleItems) { hit in
+                    searchHitRow(hit)
+                        .onAppear {
+                            guard autoLoadMoreSearchItems, lookaheadIDs.contains(hit.id),
+                                  results.continuationToken != nil,
+                                  !model.paginationFailed,
+                                  !model.isLoading else { return }
+                            if model.videoFilters.isActive || blocklist.rules.isActive {
+                                guard visibleItems.count >= 12 else { return }
+                                let key = FilterPageKey(
+                                    request: .init(
+                                        resultsRevision: model.resultsRevision,
+                                        filters: model.videoFilters,
+                                        blockingRevision: blocklist.revision
+                                    ),
+                                    loadedCount: results.items.count
                                 )
-                                .accessibilityAddTraits(.isLink)
+                                guard lastFilteredPrefetch != key else { return }
+                                lastFilteredPrefetch = key
                             }
-                        }
-                    } header: {
-                        collapsibleHeader("Playlists", count: visiblePlaylists.count, isExpanded: $arePlaylistsExpanded)
-                    }
-                }
-                if showsVideos && !results.videos.isEmpty {
-                    Section {
-                        if areVideosExpanded {
-                            if visibleVideos.isEmpty {
-                                VStack(spacing: 8) {
-                                    Group {
-                                        if results.continuationToken == nil {
-                                            Text("No videos match your filters or blocking rules")
-                                        } else {
-                                            Text(model.isLoading
-                                                 ? "Finding matching videos…"
-                                                 : "No loaded videos match. Load more to check the next page.")
-                                        }
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    if model.videoFilters.isActive {
-                                        Button("Reset Filters") {
-                                            model.videoFilters = SearchVideoFilters()
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
+                            Task {
+                                await model.loadMore()
+                                if model.videoFilters.isActive || blocklist.rules.isActive {
+                                    await fillFilteredResults()
                                 }
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity, minHeight: 76)
-                                .listRowSeparator(.hidden)
-                            }
-                            let lookaheadIDs = Set((model.videoFilters.isActive || blocklist.rules.isActive ? visibleVideos : unblockedVideos)
-                                .suffix(5).map(\.id))
-                            ForEach(visibleVideos) { video in
-                                searchVideoRow(video)
-                                    .onAppear {
-                                        guard autoLoadMoreSearchItems, lookaheadIDs.contains(video.id),
-                                              results.continuationToken != nil,
-                                              !model.paginationFailed,
-                                              !model.isLoading else { return }
-                                        if model.videoFilters.isActive || blocklist.rules.isActive {
-                                            // The bounded fill owns sparse first pages. Once there
-                                            // are enough visible rows, scrolling near their end can
-                                            // prefetch the next page without a repeated button tap.
-                                            guard visibleVideos.count >= 12 else { return }
-                                            let key = FilterPageKey(
-                                                request: .init(
-                                                    resultsRevision: model.resultsRevision,
-                                                    filters: model.videoFilters,
-                                                    isExpanded: areVideosExpanded,
-                                                    blockingRevision: blocklist.revision
-                                                ),
-                                                loadedCount: results.videos.count
-                                            )
-                                            guard lastFilteredPrefetch != key else { return }
-                                            lastFilteredPrefetch = key
-                                        }
-                                        Task {
-                                            await model.loadMore()
-                                            if model.videoFilters.isActive || blocklist.rules.isActive {
-                                                await fillFilteredResults()
-                                            }
-                                        }
-                                    }
                             }
                         }
-                    } header: {
-                        collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
-                    }
                 }
-                if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {
+
+                if results.continuationToken != nil || model.isLoading {
                     MediaPaginationFooter(isLoading: model.isLoading, isRetry: model.paginationFailed) {
                         Task {
                             await model.loadMore()
-                            if model.videoFilters.isActive || blocklist.rules.isActive { await fillFilteredResults() }
+                            if model.videoFilters.isActive || blocklist.rules.isActive {
+                                await fillFilteredResults()
+                            }
                         }
                     }
                     .listRowSeparator(.hidden)
                     .onAppear {
-                        // The bounded filtered fill owns sparse pages. Ordinary unfiltered
-                        // browsing retains its existing automatic footer pagination.
-                        guard autoLoadMoreSearchItems, !model.videoFilters.isActive, !blocklist.rules.isActive,
-                              !model.paginationFailed else { return }
+                        guard autoLoadMoreSearchItems, !model.videoFilters.isActive,
+                              !blocklist.rules.isActive, !model.paginationFailed else { return }
                         Task { await model.loadMore() }
                     }
                 }
@@ -271,7 +190,6 @@ struct SearchContent: View {
             .task(id: FilterFillRequest(
                 resultsRevision: model.resultsRevision,
                 filters: model.videoFilters,
-                isExpanded: areVideosExpanded,
                 blockingRevision: blocklist.revision
             )) {
                 await fillFilteredResults()
@@ -282,6 +200,35 @@ struct SearchContent: View {
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await loadProgress(for: results.videos) }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func searchHitRow(_ hit: SearchHit) -> some View {
+        switch hit {
+        case .video(let video):
+            searchVideoRow(video)
+        case .channel(let channel):
+            Button {
+                dismissKeyboard()
+                onOpenDestination(.channel(channel.id))
+            } label: {
+                ChannelRow(channel: channel)
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .mediaListRow()
+            .accessibilityAddTraits(.isLink)
+        case .playlist(let playlist):
+            PlaylistRow(
+                playlist: playlist,
+                onTap: {
+                    navigationLog.info("Search playlist row tapped: \(playlist.id, privacy: .public)")
+                    dismissKeyboard()
+                    onOpenDestination(.playlist(playlist.id))
+                },
+                showsMoreMenu: true
+            )
+            .accessibilityAddTraits(.isLink)
         }
     }
 
@@ -330,33 +277,40 @@ struct SearchContent: View {
         }
     }
 
-    private func collapsibleHeader(
-        _ title: String,
-        count: Int?,
-        isExpanded: Binding<Bool>
-    ) -> some View {
-        Button {
-            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                isExpanded.wrappedValue.toggle()
-            }
-        } label: {
-            HStack {
-                Text(title)
-                Spacer()
-                if let count {
-                    Text(verbatim: count.formatted())
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                        .animation(reduceMotion ? nil : InterfaceMotion.content, value: count)
-                }
-                Image(systemName: "chevron.right")
-                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
-            }
-            .frame(minHeight: MediaStyle.actionSize)
-            .contentShape(Rectangle())
+    private func isBlocked(_ hit: SearchHit) -> Bool {
+        switch hit {
+        case .video(let video): blocklist.blocks(video)
+        case .channel(let channel): blocklist.blocks(channel)
+        case .playlist(let playlist): blocklist.blocks(playlist)
         }
-        .buttonStyle(ResponsiveButtonStyle())
-        .accessibilityValue(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
+    }
+
+    private func watchStatus(for hit: SearchHit) -> WatchHistoryStatus? {
+        guard case .video(let video) = hit else { return nil }
+        return watchStatusByVideoID[video.id]
+    }
+
+    private func includes(
+        _ hit: SearchHit,
+        now: Date,
+        status: WatchHistoryStatus?
+    ) -> Bool {
+        let resultType = model.videoFilters.resultType
+        switch hit {
+        case .video(let video):
+            guard resultType == .any || resultType == .video else { return false }
+            guard model.videoFilters.isActive else { return true }
+            return model.videoFilters.includes(
+                video,
+                status: status,
+                now: now,
+                applyServerMirroredLocally: model.applyServerMirroredLocally
+            )
+        case .channel:
+            return resultType == .any || resultType == .channel
+        case .playlist:
+            return resultType == .any || resultType == .playlist
+        }
     }
 
     private func progressLookupID(for videos: [Video]) -> String {
@@ -369,7 +323,7 @@ struct SearchContent: View {
         guard autoLoadMoreSearchItems else { return }
         let filters = model.videoFilters
         let blockingRevision = blocklist.revision
-        guard (filters.isActive || blocklist.rules.isActive), areVideosExpanded,
+        guard (filters.isActive || blocklist.rules.isActive),
               let query = model.submittedQuery else { return }
         let revision = model.resultsRevision
         let targetCount = 12
@@ -383,7 +337,6 @@ struct SearchContent: View {
             guard !Task.isCancelled,
                   filters == model.videoFilters,
                   blocklist.revision == blockingRevision,
-                  areVideosExpanded,
                   model.resultsRevision == revision,
                   model.submittedQuery == query,
                   !model.isEditingNewQuery,
@@ -404,14 +357,11 @@ struct SearchContent: View {
                 statuses = summary.statuses
             }
             let now = Date.now
-            let visibleCount = results.videos.filter {
-                !blocklist.blocks($0)
-                    && filters.includes(
-                        $0,
-                        status: statuses[$0.id],
-                        now: now,
-                        applyServerMirroredLocally: model.applyServerMirroredLocally
-                    )
+            let visibleCount = results.items.filter { hit in
+                !isBlocked(hit) && includes(hit, now: now, status: {
+                    guard case .video(let video) = hit else { return nil }
+                    return statuses[video.id]
+                }())
             }.count
             if visibleCount >= targetCount { return }
 

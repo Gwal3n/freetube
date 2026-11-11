@@ -15,7 +15,10 @@ final class SearchLoadingTests: XCTestCase {
         await model.submit()
         service.completePage(.success(service.result("late")))
         await page.value
-        XCTAssertEqual(model.results?.playlists.map(\.id), ["second"])
+        XCTAssertEqual(model.results?.items.compactMap {
+            if case .playlist(let playlist) = $0 { return playlist.id }
+            return nil
+        }, ["second"])
         XCTAssertFalse(model.isLoading)
         XCTAssertNil(model.errorState)
     }
@@ -69,7 +72,7 @@ final class SearchLoadingTests: XCTestCase {
         await retry.value
         XCTAssertFalse(model.paginationFailed)
         XCTAssertNil(model.errorState)
-        XCTAssertEqual(model.results?.playlists.map(\.id), ["first", "next"])
+        XCTAssertEqual(model.results?.items.map(\.id), ["p:first", "p:next"])
         XCTAssertEqual(model.resultsRevision, firstPageRevision)
 
         await model.refresh()
@@ -170,11 +173,12 @@ private final class ControlledSearchService: SearchServicing {
 
     func result(_ id: String) -> SearchResult {
         SearchResult(
-            videos: [], channels: [],
-            playlists: [Playlist(
-                id: id, title: id, channelID: nil, channelName: nil,
-                thumbnailURL: nil, videoCount: 0, descriptionText: nil, isOwnedByUser: false
-            )],
+            items: [
+                .playlist(Playlist(
+                    id: id, title: id, channelID: nil, channelName: nil,
+                    thumbnailURL: nil, videoCount: 0, descriptionText: nil, isOwnedByUser: false
+                ))
+            ],
             continuationToken: "next"
         )
     }

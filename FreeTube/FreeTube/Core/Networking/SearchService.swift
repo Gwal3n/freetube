@@ -2,11 +2,36 @@ import Foundation
 import OSLog
 import YouTubeKit
 
+/// Search page with hits kept in YouTube relevance order (videos, channels, and playlists mixed).
 struct SearchResult: Sendable {
-    let videos: [Video]
-    let channels: [Channel]
-    let playlists: [Playlist]
+    let items: [SearchHit]
     let continuationToken: String?
+
+    var videos: [Video] {
+        items.compactMap {
+            if case .video(let video) = $0 { return video }
+            return nil
+        }
+    }
+
+    var channels: [Channel] {
+        items.compactMap {
+            if case .channel(let channel) = $0 { return channel }
+            return nil
+        }
+    }
+
+    var playlists: [Playlist] {
+        items.compactMap {
+            if case .playlist(let playlist) = $0 { return playlist }
+            return nil
+        }
+    }
+
+    init(items: [SearchHit], continuationToken: String?) {
+        self.items = items
+        self.continuationToken = continuationToken
+    }
 }
 
 protocol SearchServicing: Sendable {
@@ -92,19 +117,19 @@ final class SearchService: SearchServicing {
     }
 
     private func mapResults(_ results: [any YTSearchResult], continuation: String?) -> SearchResult {
-        var videos: [Video] = []
-        var channels: [Channel] = []
-        var playlists: [Playlist] = []
-        for result in results {
+        let items: [SearchHit] = results.compactMap { result in
             if let yt = result as? YTVideo {
-                videos.append(Mappers.video(from: yt))
-            } else if let yt = result as? YTChannel {
-                channels.append(Mappers.channel(from: yt))
-            } else if let yt = result as? YTPlaylist {
-                playlists.append(Mappers.playlist(from: yt))
+                return .video(Mappers.video(from: yt))
             }
+            if let yt = result as? YTChannel {
+                return .channel(Mappers.channel(from: yt))
+            }
+            if let yt = result as? YTPlaylist {
+                return .playlist(Mappers.playlist(from: yt))
+            }
+            return nil
         }
-        return SearchResult(videos: videos, channels: channels, playlists: playlists, continuationToken: continuation)
+        return SearchResult(items: items, continuationToken: continuation)
     }
 
     /// YouTubeKit's default search body has no `params` field. This mirrors that body and inserts
