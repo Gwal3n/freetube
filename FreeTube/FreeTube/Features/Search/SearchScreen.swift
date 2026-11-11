@@ -39,6 +39,10 @@ struct SearchContent: View {
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("recentChannelsJSON") private var recentChannelsJSON = "[]"
     @AppStorage("autoLoadMoreSearchItems") private var autoLoadMoreSearchItems = true
+    /// Shared with Feed so Search and subscription browsing keep the same density and avatar
+    /// chrome. The browsing settings toggles write these same keys.
+    @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
+    @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var videoFilters = SearchVideoFilters()
@@ -86,13 +90,6 @@ struct SearchContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .toolbar {
-            if let results = model.results, !results.videos.isEmpty, !model.isEditingNewQuery {
-                ToolbarItem(placement: .topBarTrailing) {
-                    videoFilterMenu
-                }
-            }
-        }
         .onChange(of: model.submittedQuery) { _, _ in
             arePlaylistsExpanded = false
             areChannelsExpanded = true
@@ -159,12 +156,17 @@ struct SearchContent: View {
                     Section {
                         if areChannelsExpanded {
                             ForEach(visibleChannels) { channel in
-                                NavigationLink {
-                                    ChannelScreen(channelID: channel.id)
+                                // Avoid `NavigationLink` here: inside a List it draws a trailing
+                                // disclosure chevron that does not belong on a media browsing row.
+                                Button {
+                                    dismissKeyboard()
+                                    onOpenDestination(.channel(channel.id))
                                 } label: {
                                     ChannelRow(channel: channel)
                                 }
+                                .buttonStyle(ResponsiveButtonStyle())
                                 .mediaListRow()
+                                .accessibilityAddTraits(.isLink)
                             }
                         }
                     } header: {
@@ -224,51 +226,40 @@ struct SearchContent: View {
                             let lookaheadIDs = Set((videoFilters.isActive || blocklist.rules.isActive ? visibleVideos : unblockedVideos)
                                 .suffix(5).map(\.id))
                             ForEach(visibleVideos) { video in
-                                VideoRow(
-                                    video: video,
-                                    accessory: .actions(offersPlayNext: true),
-                                    playbackProgress: progressByVideoID[video.id],
-                                    watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil,
-                                    channelLinkID: video.channelID.isEmpty ? nil : video.channelID
-                                ) {
-                                    // Playback overlays this screen, so preserve the native search
-                                    // session and its results for the user's return. Calling
-                                    // `dismissSearch()` here can clear the bound query, which in
-                                    // turn intentionally resets `SearchViewModel.results`.
-                                    dismissKeyboard()
-                                    player.load(video)
-                                }
-                                .onAppear {
-                                    guard autoLoadMoreSearchItems, lookaheadIDs.contains(video.id),
-                                          results.continuationToken != nil,
-                                          !model.paginationFailed,
-                                          !model.isLoading else { return }
-                                    if videoFilters.isActive || blocklist.rules.isActive {
-                                        // The bounded fill owns sparse first pages. Once there
-                                        // are enough visible rows, scrolling near their end can
-                                        // prefetch the next page without a repeated button tap.
-                                        guard visibleVideos.count >= 12 else { return }
-                                        let key = FilterPageKey(
-                                            request: .init(
-                                                resultsRevision: model.resultsRevision,
-                                                filters: videoFilters,
-                                                isExpanded: areVideosExpanded,
-                                                blockingRevision: blocklist.revision
-                                            ),
-                                            loadedCount: results.videos.count
-                                        )
-                                        guard lastFilteredPrefetch != key else { return }
-                                        lastFilteredPrefetch = key
+                                searchVideoRow(video)
+                                    .onAppear {
+                                        guard autoLoadMoreSearchItems, lookaheadIDs.contains(video.id),
+                                              results.continuationToken != nil,
+                                              !model.paginationFailed,
+                                              !model.isLoading else { return }
+                                        if videoFilters.isActive || blocklist.rules.isActive {
+                                            // The bounded fill owns sparse first pages. Once there
+                                            // are enough visible rows, scrolling near their end can
+                                            // prefetch the next page without a repeated button tap.
+                                            guard visibleVideos.count >= 12 else { return }
+                                            let key = FilterPageKey(
+                                                request: .init(
+                                                    resultsRevision: model.resultsRevision,
+                                                    filters: videoFilters,
+                                                    isExpanded: areVideosExpanded,
+                                                    blockingRevision: blocklist.revision
+                                                ),
+                                                loadedCount: results.videos.count
+                                            )
+                                            guard lastFilteredPrefetch != key else { return }
+                                            lastFilteredPrefetch = key
+                                        }
+                                        Task {
+                                            await model.loadMore()
+                                            if videoFilters.isActive || blocklist.rules.isActive {
+                                                await fillFilteredResults()
+                                            }
+                                        }
                                     }
-                                    Task {
-                                        await model.loadMore()
-                                        if videoFilters.isActive || blocklist.rules.isActive { await fillFilteredResults() }
-                                    }
-                                }
                             }
                         }
                     } header: {
-                        collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
+                        videosSectionHeader
                     }
                 }
                 if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {
@@ -305,6 +296,77 @@ struct SearchContent: View {
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
                 Task { await loadProgress(for: results.videos) }
             }
+        }
+    }
+
+    /// Same density and avatar treatment as the subscription feed, so Search does not look like a
+    /// second, poorer list style. Channel taps route through `onOpenDestination` (which ends the
+    /// searchable session first) instead of a List `NavigationLink`, which is what drew the
+    /// trailing disclosure chevron on every video row.
+    @ViewBuilder
+    private func searchVideoRow(_ video: Video) -> some View {
+        let openChannel: (() -> Void)? = video.channelID.isEmpty
+            ? nil
+            : {
+                dismissKeyboard()
+                onOpenDestination(.channel(video.channelID))
+            }
+        if largeVideoThumbnails {
+            VideoCard(
+                video: video,
+                onTap: {
+                    // Playback overlays this screen, so preserve the native search session and its
+                    // results for the user's return. Calling `dismissSearch()` here can clear the
+                    // bound query, which in turn intentionally resets `SearchViewModel.results`.
+                    dismissKeyboard()
+                    player.load(video)
+                },
+                showsMoreMenu: true,
+                offersPlayNext: true,
+                showsChannelAvatar: showChannelAvatars,
+                onTapChannel: openChannel,
+                playbackProgress: progressByVideoID[video.id],
+                watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil
+            )
+        } else {
+            VideoRow(
+                video: video,
+                accessory: .actions(offersPlayNext: true),
+                showsChannelAvatar: showChannelAvatars,
+                playbackProgress: progressByVideoID[video.id],
+                watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil,
+                onOpenChannel: openChannel,
+                onTapChannel: openChannel
+            ) {
+                dismissKeyboard()
+                player.load(video)
+            }
+        }
+    }
+
+    /// Keeps the local filter menu next to the Videos heading so it is not lost in the
+    /// `.searchable` toolbar chrome.
+    private var videosSectionHeader: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                    areVideosExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Videos")
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .rotationEffect(.degrees(areVideosExpanded ? 90 : 0))
+                }
+                .frame(minHeight: MediaStyle.actionSize)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .accessibilityValue(areVideosExpanded ? "Expanded" : "Collapsed")
+
+            videoFilterMenu
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
         }
     }
 

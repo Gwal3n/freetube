@@ -71,7 +71,12 @@ struct VideoCard: View {
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
-        .videoContextMenu(video: video, previewBranding: branding, offersPlayNext: offersPlayNext)
+        .videoContextMenu(
+            video: video,
+            previewBranding: branding,
+            offersPlayNext: offersPlayNext,
+            onOpenChannel: onTapChannel
+        )
     }
 
     private func thumbnail(branding: DeArrowVideoViewModel) -> some View {
@@ -107,7 +112,11 @@ struct VideoCard: View {
             }
 
             if showsMoreMenu {
-                VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext)
+                VideoMoreActionsMenu(
+                    video: video,
+                    offersPlayNext: offersPlayNext,
+                    onOpenChannel: onTapChannel
+                )
             }
         }
         .padding(.horizontal, MediaStyle.cardHorizontalPadding)

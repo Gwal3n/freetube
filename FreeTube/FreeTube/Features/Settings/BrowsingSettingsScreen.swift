@@ -30,6 +30,13 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Show channel avatars", isOn: Bindable(model).showFeedChannelAvatars)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show channel avatars")
+            } header: {
+                Text("Video lists")
+            } footer: {
+                Text("Applies to Feed and Search results.")
+            }
+
+            Section {
                 Toggle("Open feed channels from name or avatar", isOn: $openFeedChannelsOnTap)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Open feed channels from name or avatar")
