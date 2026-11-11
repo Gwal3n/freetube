@@ -87,7 +87,7 @@ struct HomeScreen: View {
                     }
                 case .length:
                     SearchNumericRangeSheet(
-                        kind: .minutes,
+                        kind: .duration,
                         range: searchModel.videoFilters.customLengthRange
                     ) { selected in
                         searchModel.videoFilters.customLengthRange = selected
@@ -131,6 +131,12 @@ struct HomeScreen: View {
                 // `.searchable(isPresented:)` does not always clear its presentation binding when
                 // UIKit dismisses the keyboard interactively. Keep a submitted query visible in
                 // the native field; only collapse an unfinished search drawer.
+                if searchModel.results != nil,
+                   searchModel.submittedQuery != nil,
+                   !searchModel.isEditingNewQuery {
+                    isSearchPresented = true
+                    return
+                }
                 if searchModel.submittedQuery == nil || searchModel.isEditingNewQuery {
                     isSearchPresented = false
                 }
@@ -189,6 +195,12 @@ struct HomeScreen: View {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         searchModel.query = trimmed
+        // Pin searchable chrome before resigning the keyboard. After a clear, presentation is
+        // false; keyboardDidHide can also race ahead of `submittedQuery` and collapse the bar,
+        // which hides the filter toolbar and lets results sit under the top safe area.
+        if searchModel.directVideo(from: trimmed) == nil {
+            isSearchPresented = true
+        }
         // Respond immediately; network completion must not later dismiss a keyboard the user
         // has reopened to edit a different query.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -213,6 +225,9 @@ struct HomeScreen: View {
             return
         }
         await searchModel.submit()
+        if searchModel.submittedQuery != nil {
+            isSearchPresented = true
+        }
     }
 
 }

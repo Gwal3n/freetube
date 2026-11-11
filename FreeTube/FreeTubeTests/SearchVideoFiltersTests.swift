@@ -55,7 +55,7 @@ final class SearchVideoFiltersTests: XCTestCase {
     func testCustomDurationAndViewRangesAreInclusiveAndOpenEnded() {
         var filters = SearchVideoFilters()
         filters.length = .custom
-        filters.customLengthRange = .init(minimum: 5, maximum: 10)
+        filters.customLengthRange = .init(minimum: 300, maximum: 600)
         filters.views = .custom
         filters.customViewsRange = .init(minimum: 1_000, maximum: nil)
 

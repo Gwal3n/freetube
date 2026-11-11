@@ -159,7 +159,7 @@ struct LocalPlaylistScreen: View {
                 }
             case .length:
                 SearchNumericRangeSheet(
-                    kind: .minutes, range: videoFilters.customLengthRange
+                    kind: .duration, range: videoFilters.customLengthRange
                 ) { selected in
                     videoFilters.customLengthRange = selected
                     videoFilters.length = .custom

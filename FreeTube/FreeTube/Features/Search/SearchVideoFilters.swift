@@ -195,8 +195,9 @@ struct SearchVideoFilters: Equatable {
             case .fourToTwentyMinutes: duration >= 240 && duration <= 1200
             case .overTwentyMinutes: duration > 1200
             case .custom: customRange.map {
-                duration >= Double($0.minimum) * 60
-                    && ($0.maximum.map { maximum in duration <= Double(maximum) * 60 } ?? true)
+                // Custom length ranges are stored in seconds.
+                duration >= Double($0.minimum)
+                    && ($0.maximum.map { maximum in duration <= Double(maximum) } ?? true)
             } ?? false
             }
         }
