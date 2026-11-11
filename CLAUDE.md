@@ -449,9 +449,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   and a successful keyboard/suggestion/history submission swaps the root content to results in
   place—the same native search bar and query remain mounted, with no results-page push animation.
   The native clear button in the search field—or a swipe from the leading screen edge—clears that
-  result/query state and reveals recent searches; do not add a separate Back button. Keep the
-  search presentation mounted after submission so the submitted query and native clear button stay
-  visible. Channels and playlists still push normally from their result rows. Results include
+ result/query state and reveals recent searches; do not add a separate Back button. Submission
+ ends active search presentation (active presentation hides the navigation title, filter button,
+ and bar inset, putting results under the status bar) while restoring the submitted text if
+ SwiftUI clears it during that transition, so the query and native clear button stay visible.
+ Never force `isPresented = true` after submitting. Channels and playlists still push normally from their result rows. Results include
   videos, channels, and playlists. iPhone and iPad retain native
   `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
   native search collapses awkwardly there. Search stays an ordinary peer tab—never assign

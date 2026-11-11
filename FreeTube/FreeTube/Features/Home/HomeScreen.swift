@@ -18,6 +18,8 @@ struct HomeScreen: View {
     @State private var searchModel = SearchViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var isSearchPresented = false
+    /// Submitted query to restore if ending native search presentation clears the field text.
+    @State private var queryPreservedDuringDismissal: String?
     @State private var customRange: CustomRange?
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
@@ -129,29 +131,33 @@ struct HomeScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
                 navigationLog.info("Search keyboard hidden; presented=\(isSearchPresented, privacy: .public)")
                 // `.searchable(isPresented:)` does not always clear its presentation binding when
-                // UIKit dismisses the keyboard interactively. Keep a submitted query visible in
-                // the native field; only collapse an unfinished search drawer.
-                if searchModel.results != nil,
-                   searchModel.submittedQuery != nil,
-                   !searchModel.isEditingNewQuery {
-                    isSearchPresented = true
-                    return
-                }
-                if searchModel.submittedQuery == nil || searchModel.isEditingNewQuery {
+                // UIKit dismisses the keyboard interactively. Active presentation hides the
+                // navigation bar (title, filter, and its safe-area inset), so a lingering true
+                // value leaves results under the status bar.
+                guard isSearchPresented else { return }
+                if let submitted = searchModel.submittedQuery, !searchModel.isEditingNewQuery {
+                    endActiveSearch(preserving: submitted)
+                } else {
                     isSearchPresented = false
                 }
             }
             .onChange(of: isSearchPresented) { _, isPresented in
                 navigationLog.info("Search presentation changed: \(isPresented, privacy: .public)")
+                if isPresented {
+                    queryPreservedDuringDismissal = nil
+                }
             }
             .onChange(of: path) { oldPath, newPath in
                 navigationLog.info("Search path changed: \(oldPath.count, privacy: .public) → \(newPath.count, privacy: .public)")
             }
             // Clearing the field returns to recent searches (or the clean empty state).
             .onChange(of: searchModel.query) { _, newValue in
-                if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
-                    searchModel.clearResults()
+                guard newValue.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                if let preserved = queryPreservedDuringDismissal {
+                    searchModel.query = preserved
+                    return
                 }
+                searchModel.clearResults()
             }
             .onChange(of: navigationRouter.search?.id, initial: true) { _, _ in
                 guard let request = navigationRouter.search else { return }
@@ -195,12 +201,6 @@ struct HomeScreen: View {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         searchModel.query = trimmed
-        // Pin searchable chrome before resigning the keyboard. After a clear, presentation is
-        // false; keyboardDidHide can also race ahead of `submittedQuery` and collapse the bar,
-        // which hides the filter toolbar and lets results sit under the top safe area.
-        if searchModel.directVideo(from: trimmed) == nil {
-            isSearchPresented = true
-        }
         // Respond immediately; network completion must not later dismiss a keyboard the user
         // has reopened to edit a different query.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -224,9 +224,23 @@ struct HomeScreen: View {
             }
             return
         }
+        // End active search as soon as the query is submitted so the navigation bar (title and
+        // filter) returns and results lay out below it, independent of keyboard notifications.
+        endActiveSearch(preserving: trimmed)
         await searchModel.submit()
-        if searchModel.submittedQuery != nil {
-            isSearchPresented = true
+    }
+
+    /// Ends native search presentation while keeping `query` in the field. SwiftUI may clear the
+    /// bound text as part of that transition; the guard window restores it instead of treating
+    /// it as the user's clear action. Later clears (native clear button) behave normally.
+    private func endActiveSearch(preserving query: String) {
+        queryPreservedDuringDismissal = query
+        isSearchPresented = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            if queryPreservedDuringDismissal == query {
+                queryPreservedDuringDismissal = nil
+            }
         }
     }
 
