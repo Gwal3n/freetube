@@ -18,11 +18,6 @@ struct SearchContent: View {
         let loadedCount: Int
     }
 
-    private enum CustomRange: String, Identifiable {
-        case uploaded, length, views
-        var id: String { rawValue }
-    }
-
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
     let onOpenDestination: (AppNavigationRequest.Destination) -> Void
@@ -45,9 +40,7 @@ struct SearchContent: View {
     @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
     @State private var progressByVideoID: [String: Double] = [:]
     @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
-    @State private var videoFilters = SearchVideoFilters()
     @State private var blocklist = VideoBlocklist.shared
-    @State private var customRange: CustomRange?
     @State private var lastFilteredPrefetch: FilterPageKey?
     @State private var showingClearSearchHistoryConfirmation = false
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
@@ -94,36 +87,10 @@ struct SearchContent: View {
             arePlaylistsExpanded = false
             areChannelsExpanded = true
             areVideosExpanded = true
-            videoFilters = SearchVideoFilters()
             lastFilteredPrefetch = nil
         }
-        .onChange(of: videoFilters) { _, _ in lastFilteredPrefetch = nil }
+        .onChange(of: model.videoFilters) { _, _ in lastFilteredPrefetch = nil }
         .errorToast($model.errorState)
-        .sheet(item: $customRange) { range in
-            switch range {
-            case .uploaded:
-                SearchDateRangeSheet(range: videoFilters.customUploadedRange) { selected in
-                    videoFilters.customUploadedRange = selected
-                    videoFilters.uploaded = .custom
-                }
-            case .length:
-                SearchNumericRangeSheet(
-                    title: "Duration Range", unit: "Minutes",
-                    range: videoFilters.customLengthRange
-                ) { selected in
-                    videoFilters.customLengthRange = selected
-                    videoFilters.length = .custom
-                }
-            case .views:
-                SearchNumericRangeSheet(
-                    title: "View Count Range", unit: "Views",
-                    range: videoFilters.customViewsRange
-                ) { selected in
-                    videoFilters.customViewsRange = selected
-                    videoFilters.views = .custom
-                }
-            }
-        }
     }
 
     @ViewBuilder
@@ -132,9 +99,9 @@ struct SearchContent: View {
         let visibleChannels = results.channels.filter { !blocklist.blocks($0) }
         let visiblePlaylists = results.playlists.filter { !blocklist.blocks($0) }
         let unblockedVideos = results.videos.filter { !blocklist.blocks($0) }
-        let visibleVideos = videoFilters.isActive
+        let visibleVideos = model.videoFilters.isActive
             ? unblockedVideos.filter {
-                videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
+                model.videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
             }
             : unblockedVideos
         if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
@@ -212,9 +179,9 @@ struct SearchContent: View {
                                         }
                                     }
                                     .foregroundStyle(.secondary)
-                                    if videoFilters.isActive {
+                                    if model.videoFilters.isActive {
                                         Button("Reset Filters") {
-                                            videoFilters = SearchVideoFilters()
+                                            model.videoFilters = SearchVideoFilters()
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -223,7 +190,7 @@ struct SearchContent: View {
                                 .frame(maxWidth: .infinity, minHeight: 76)
                                 .listRowSeparator(.hidden)
                             }
-                            let lookaheadIDs = Set((videoFilters.isActive || blocklist.rules.isActive ? visibleVideos : unblockedVideos)
+                            let lookaheadIDs = Set((model.videoFilters.isActive || blocklist.rules.isActive ? visibleVideos : unblockedVideos)
                                 .suffix(5).map(\.id))
                             ForEach(visibleVideos) { video in
                                 searchVideoRow(video)
@@ -232,7 +199,7 @@ struct SearchContent: View {
                                               results.continuationToken != nil,
                                               !model.paginationFailed,
                                               !model.isLoading else { return }
-                                        if videoFilters.isActive || blocklist.rules.isActive {
+                                        if model.videoFilters.isActive || blocklist.rules.isActive {
                                             // The bounded fill owns sparse first pages. Once there
                                             // are enough visible rows, scrolling near their end can
                                             // prefetch the next page without a repeated button tap.
@@ -240,7 +207,7 @@ struct SearchContent: View {
                                             let key = FilterPageKey(
                                                 request: .init(
                                                     resultsRevision: model.resultsRevision,
-                                                    filters: videoFilters,
+                                                    filters: model.videoFilters,
                                                     isExpanded: areVideosExpanded,
                                                     blockingRevision: blocklist.revision
                                                 ),
@@ -251,7 +218,7 @@ struct SearchContent: View {
                                         }
                                         Task {
                                             await model.loadMore()
-                                            if videoFilters.isActive || blocklist.rules.isActive {
+                                            if model.videoFilters.isActive || blocklist.rules.isActive {
                                                 await fillFilteredResults()
                                             }
                                         }
@@ -259,21 +226,21 @@ struct SearchContent: View {
                             }
                         }
                     } header: {
-                        videosSectionHeader
+                        collapsibleHeader("Videos", count: nil, isExpanded: $areVideosExpanded)
                     }
                 }
                 if areVideosExpanded && (results.continuationToken != nil || model.isLoading) {
                     MediaPaginationFooter(isLoading: model.isLoading, isRetry: model.paginationFailed) {
                         Task {
                             await model.loadMore()
-                            if videoFilters.isActive || blocklist.rules.isActive { await fillFilteredResults() }
+                            if model.videoFilters.isActive || blocklist.rules.isActive { await fillFilteredResults() }
                         }
                     }
                     .listRowSeparator(.hidden)
                     .onAppear {
                         // The bounded filtered fill owns sparse pages. Ordinary unfiltered
                         // browsing retains its existing automatic footer pagination.
-                        guard autoLoadMoreSearchItems, !videoFilters.isActive, !blocklist.rules.isActive,
+                        guard autoLoadMoreSearchItems, !model.videoFilters.isActive, !blocklist.rules.isActive,
                               !model.paginationFailed else { return }
                         Task { await model.loadMore() }
                     }
@@ -284,7 +251,7 @@ struct SearchContent: View {
             .refreshable { await model.refresh() }
             .task(id: FilterFillRequest(
                 resultsRevision: model.resultsRevision,
-                filters: videoFilters,
+                filters: model.videoFilters,
                 isExpanded: areVideosExpanded,
                 blockingRevision: blocklist.revision
             )) {
@@ -344,32 +311,6 @@ struct SearchContent: View {
         }
     }
 
-    /// Keeps the local filter menu next to the Videos heading so it is not lost in the
-    /// `.searchable` toolbar chrome.
-    private var videosSectionHeader: some View {
-        HStack(spacing: 8) {
-            Button {
-                withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                    areVideosExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    Text("Videos")
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .rotationEffect(.degrees(areVideosExpanded ? 90 : 0))
-                }
-                .frame(minHeight: MediaStyle.actionSize)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .accessibilityValue(areVideosExpanded ? "Expanded" : "Collapsed")
-
-            videoFilterMenu
-                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-        }
-    }
-
     private func collapsibleHeader(
         _ title: String,
         count: Int?,
@@ -399,100 +340,6 @@ struct SearchContent: View {
         .accessibilityValue(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
     }
 
-    private var videoFilterMenu: some View {
-        Menu {
-            Menu {
-                ForEach(SearchVideoFilters.Watch.allCases) { option in
-                    Button {
-                        videoFilters.watch = option
-                    } label: {
-                        if videoFilters.watch == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            } label: {
-                Text("Watch history")
-            }
-            Menu {
-                ForEach(SearchVideoFilters.Uploaded.allCases) { option in
-                    Button {
-                        if option == .custom {
-                            customRange = .uploaded
-                        } else {
-                            videoFilters.uploaded = option
-                        }
-                    } label: {
-                        if videoFilters.uploaded == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            } label: {
-                Text("Upload date")
-            }
-            Menu {
-                ForEach(SearchVideoFilters.Length.allCases) { option in
-                    Button {
-                        if option == .custom {
-                            customRange = .length
-                        } else {
-                            videoFilters.length = option
-                        }
-                    } label: {
-                        if videoFilters.length == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            } label: {
-                Text("Length")
-            }
-            Menu {
-                ForEach(SearchVideoFilters.Views.allCases) { option in
-                    Button {
-                        if option == .custom {
-                            customRange = .views
-                        } else {
-                            videoFilters.views = option
-                        }
-                    } label: {
-                        if videoFilters.views == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            } label: {
-                Text("Views")
-            }
-            Divider()
-            Button("Reset Filters") {
-                videoFilters = SearchVideoFilters()
-            }
-            .disabled(!videoFilters.isActive)
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease")
-                .overlay(alignment: .topTrailing) {
-                    if videoFilters.isActive {
-                        Circle()
-                            .fill(.primary)
-                            .frame(width: 5, height: 5)
-                            .offset(x: 4, y: -4)
-                    }
-                }
-        }
-        .accessibilityLabel("Filter search videos")
-        .accessibilityValue(videoFilters.isActive ? "On" : "Off")
-    }
-
     private func progressLookupID(for videos: [Video]) -> String {
         "\(showHistoryProgressBars):\(incognitoEnabled):\(incognitoHideWatchProgress):" + videos.map(\.id).joined(separator: ",")
     }
@@ -501,7 +348,7 @@ struct SearchContent: View {
     /// of YouTube requests. A later explicit Load more starts another bounded batch.
     private func fillFilteredResults() async {
         guard autoLoadMoreSearchItems else { return }
-        let filters = videoFilters
+        let filters = model.videoFilters
         let blockingRevision = blocklist.revision
         guard (filters.isActive || blocklist.rules.isActive), areVideosExpanded,
               let query = model.submittedQuery else { return }
@@ -515,7 +362,7 @@ struct SearchContent: View {
                 catch { return }
             }
             guard !Task.isCancelled,
-                  filters == videoFilters,
+                  filters == model.videoFilters,
                   blocklist.revision == blockingRevision,
                   areVideosExpanded,
                   model.resultsRevision == revision,
@@ -532,7 +379,7 @@ struct SearchContent: View {
                 let summary = await PersistenceWriter.shared.watchHistorySummary(
                     videoIDs: results.videos.map(\.id)
                 )
-                guard !Task.isCancelled, filters == videoFilters,
+                guard !Task.isCancelled, filters == model.videoFilters,
                       blocklist.revision == blockingRevision,
                       model.resultsRevision == revision else { return }
                 statuses = summary.statuses

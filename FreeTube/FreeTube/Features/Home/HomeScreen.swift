@@ -9,10 +9,16 @@ import UIKit
 /// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
+    private enum CustomRange: String, Identifiable {
+        case uploaded, length, views
+        var id: String { rawValue }
+    }
+
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var searchModel = SearchViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var isSearchPresented = false
+    @State private var customRange: CustomRange?
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
@@ -22,6 +28,11 @@ struct HomeScreen: View {
     /// Recent search queries — same store the previous Search tab used. Stays here so the
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
+
+    private var showsSearchFilter: Bool {
+        guard let results = searchModel.results, !results.videos.isEmpty else { return false }
+        return !searchModel.isEditingNewQuery
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -43,6 +54,18 @@ struct HomeScreen: View {
             .contentShape(Rectangle())
             .navigationTitle("Search")
             .toolbar {
+                // Same trailing placement as Feed's filter control so the system Liquid Glass
+                // capsule wraps this button with the rest of the navigation chrome.
+                if showsSearchFilter {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SearchVideoFilterMenu(
+                            filters: Bindable(searchModel).videoFilters,
+                            onCustomUploaded: { customRange = .uploaded },
+                            onCustomLength: { customRange = .length },
+                            onCustomViews: { customRange = .views }
+                        )
+                    }
+                }
                 if incognitoEnabled && incognitoHideLibrary {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -51,6 +74,31 @@ struct HomeScreen: View {
                             Image(systemName: "gearshape")
                         }
                         .accessibilityLabel("Settings")
+                    }
+                }
+            }
+            .sheet(item: $customRange) { range in
+                switch range {
+                case .uploaded:
+                    SearchDateRangeSheet(range: searchModel.videoFilters.customUploadedRange) { selected in
+                        searchModel.videoFilters.customUploadedRange = selected
+                        searchModel.videoFilters.uploaded = .custom
+                    }
+                case .length:
+                    SearchNumericRangeSheet(
+                        title: "Duration Range", unit: "Minutes",
+                        range: searchModel.videoFilters.customLengthRange
+                    ) { selected in
+                        searchModel.videoFilters.customLengthRange = selected
+                        searchModel.videoFilters.length = .custom
+                    }
+                case .views:
+                    SearchNumericRangeSheet(
+                        title: "View Count Range", unit: "Views",
+                        range: searchModel.videoFilters.customViewsRange
+                    ) { selected in
+                        searchModel.videoFilters.customViewsRange = selected
+                        searchModel.videoFilters.views = .custom
                     }
                 }
             }

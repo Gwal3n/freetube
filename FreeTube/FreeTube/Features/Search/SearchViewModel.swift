@@ -22,6 +22,9 @@ final class SearchViewModel {
     private(set) var didSearchFail = false
     private(set) var paginationFailed = false
     var errorState: ErrorState?
+    /// Presentation-only filters for the current result set. Reset whenever a new query is
+    /// submitted or results are cleared so a previous search's constraints never linger.
+    var videoFilters = SearchVideoFilters()
 
     private let service: any SearchServicing
     private let videoService: any VideoServicing
@@ -75,6 +78,7 @@ final class SearchViewModel {
         didSearchFail = false
         paginationFailed = false
         errorState = nil
+        videoFilters = SearchVideoFilters()
         autocompleteTask?.cancel()
     }
 
@@ -94,6 +98,7 @@ final class SearchViewModel {
         errorState = nil
         didSearchFail = false
         paginationFailed = false
+        videoFilters = SearchVideoFilters()
         self.submittedQuery = submittedQuery
         isLoading = true
         defer {
