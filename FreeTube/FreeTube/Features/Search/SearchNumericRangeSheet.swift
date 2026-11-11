@@ -22,8 +22,8 @@ struct SearchNumericRangeSheet: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .minutes: "Minutes"
-            case .seconds: "Seconds"
+            case .minutes: String(localized: "Minutes")
+            case .seconds: String(localized: "Seconds")
             }
         }
     }
@@ -31,8 +31,8 @@ struct SearchNumericRangeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var minimumText: String
     @State private var maximumText: String
-    @State private var lowerIndex: Double
-    @State private var upperIndex: Double
+    @State private var lowerIndex: Int
+    @State private var upperIndex: Int
     @State private var durationUnit: DurationUnit
 
     let kind: Kind
@@ -49,19 +49,19 @@ struct SearchNumericRangeSheet: View {
         _durationUnit = State(initialValue: unit)
         let stops = Self.stops(for: kind, unit: unit)
         let minimumStored = max(0, range?.minimum ?? 0)
-        let maximumStored = range?.maximum
         let minimumDisplay = kind == .duration
             ? Self.displayValue(seconds: minimumStored, unit: unit)
             : minimumStored
-        let maximumDisplay = maximumStored.map {
+        let maximumDisplay = range?.maximum.map {
             kind == .duration ? Self.displayValue(seconds: $0, unit: unit) : $0
         }
-        _minimumText = State(initialValue: String(minimumDisplay))
-        _maximumText = State(initialValue: maximumDisplay.map(String.init) ?? "")
-        _lowerIndex = State(initialValue: Double(Self.nearestStopIndex(minimumDisplay, in: stops)))
+        _minimumText = State(initialValue: Self.grouped(minimumDisplay))
+        _maximumText = State(initialValue: maximumDisplay.map(Self.grouped) ?? "")
+        let lower = min(Self.nearestStopIndex(minimumDisplay, in: stops), stops.count - 1)
+        _lowerIndex = State(initialValue: lower)
         _upperIndex = State(
-            initialValue: maximumDisplay.map { Double(Self.nearestStopIndex($0, in: stops)) }
-                ?? Double(stops.count) // Unlimited
+            initialValue: maximumDisplay.map { max(Self.nearestStopIndex($0, in: stops), lower) }
+                ?? stops.count // Unlimited
         )
     }
 
@@ -70,93 +70,67 @@ struct SearchNumericRangeSheet: View {
     }
 
     /// Finite stops plus one Unlimited slot at `stops.count`.
-    private var maxIndex: Double {
-        Double(stops.count)
+    private var unlimitedIndex: Int {
+        stops.count
     }
 
-    private var minimumDisplay: Int? {
-        Int(minimumText.trimmingCharacters(in: .whitespacesAndNewlines))
+    private var minimumValue: Int? {
+        Self.parse(minimumText)
     }
 
-    private var maximumDisplay: Int? {
-        let text = maximumText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? nil : Int(text)
-    }
-
-    private var maximumIsUnlimited: Bool {
-        maximumDisplay == nil || Int(upperIndex.rounded()) >= stops.count
+    private var maximumValue: Int? {
+        Self.parse(maximumText)
     }
 
     private var canApply: Bool {
-        guard let minimumDisplay, minimumDisplay >= 0 else { return false }
-        guard let maximumDisplay else { return true }
-        return maximumDisplay >= minimumDisplay
+        guard let minimumValue, minimumValue >= 0 else { return false }
+        guard let maximumValue else { return true }
+        return maximumValue >= minimumValue
     }
 
     private var unitLabel: String {
         switch kind {
         case .duration: durationUnit.label
-        case .views: "Views"
+        case .views: String(localized: "Views")
         }
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                if kind == .duration {
-                    Section {
-                        Picker("Unit", selection: $durationUnit) {
-                            ForEach(DurationUnit.allCases) { unit in
-                                Text(unit.label).tag(unit)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .onChange(of: durationUnit) { oldUnit, newUnit in
-                            convertDisplayedValues(from: oldUnit, to: newUnit)
-                        }
-                    }
-                }
-
                 Section {
-                    HStack {
-                        Text("Minimum")
-                        Spacer()
-                        TextField("0", text: $minimumText)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(maxWidth: 120)
-                            .accessibilityLabel("Minimum \(unitLabel)")
-                    }
-                    HStack {
-                        Text("Maximum")
-                        Spacer()
-                        TextField("Unlimited", text: $maximumText)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(maxWidth: 120)
-                            .accessibilityLabel("Maximum \(unitLabel)")
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(spacing: 10) {
+                        rangeSummary
                         SearchNumericRangeSlider(
                             lower: lowerBinding,
                             upper: upperBinding,
-                            lowerAccessibilityValue: minimumDisplay.map(Self.formatStop) ?? "0",
-                            upperAccessibilityValue: maximumIsUnlimited
-                                ? "Unlimited"
-                                : (maximumDisplay.map(Self.formatStop) ?? "Unlimited")
+                            maxIndex: unlimitedIndex,
+                            lowerAccessibilityValue: Self.grouped(minimumValue ?? 0),
+                            upperAccessibilityValue: maximumValue.map(Self.grouped)
+                                ?? String(localized: "Unlimited")
                         )
                         HStack {
-                            Text(verbatim: formatLeadingStop)
+                            Text(verbatim: stops.first.map(Self.abbreviated) ?? "0")
                             Spacer()
                             Text("Unlimited")
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
-                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                    .padding(.vertical, 6)
                 } header: {
-                    Text(unitLabel)
+                    HStack {
+                        Text(kind == .duration ? String(localized: "Duration") : String(localized: "Views"))
+                        Spacer()
+                        if kind == .duration {
+                            unitMenu
+                        }
+                    }
+                }
+
+                Section {
+                    valueField("Minimum", placeholder: "0", text: $minimumText)
+                    valueField("Maximum", placeholder: "Unlimited", text: $maximumText)
                 } footer: {
                     Text(footerText)
                 }
@@ -169,11 +143,11 @@ struct SearchNumericRangeSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
-                        guard canApply, let minimumDisplay else { return }
+                        guard canApply, let minimumValue else { return }
                         onApply(
                             .init(
-                                minimum: storedValue(fromDisplay: minimumDisplay),
-                                maximum: maximumDisplay.map { storedValue(fromDisplay: $0) }
+                                minimum: storedValue(fromDisplay: minimumValue),
+                                maximum: maximumValue.map { storedValue(fromDisplay: $0) }
                             )
                         )
                         dismiss()
@@ -181,113 +155,169 @@ struct SearchNumericRangeSheet: View {
                     .disabled(!canApply)
                 }
             }
-            .onChange(of: minimumText) { _, _ in syncLowerFromText() }
-            .onChange(of: maximumText) { _, _ in syncUpperFromText() }
+            .onChange(of: minimumText) { _, text in
+                if reformat(text, into: $minimumText) { return }
+                syncLowerFromText()
+            }
+            .onChange(of: maximumText) { _, text in
+                if reformat(text, into: $maximumText) { return }
+                syncUpperFromText()
+            }
         }
         .presentationDetents([.medium, .large])
     }
 
-    private var formatLeadingStop: String {
-        stops.first.map(Self.formatStop) ?? "0"
+    // MARK: - Subviews
+
+    private var rangeSummary: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if (minimumValue ?? 0) == 0, maximumValue == nil {
+                Text("Any")
+                    .font(.title3.weight(.semibold))
+            } else {
+                Text(verbatim: summaryValue)
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                    .contentTransition(.numericText())
+                Text(unitLabel)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .animation(.snappy(duration: 0.2), value: summaryValue)
+    }
+
+    private var summaryValue: String {
+        let low = Self.grouped(minimumValue ?? 0)
+        guard let maximumValue else { return "\(low)+" }
+        return "\(low) – \(Self.grouped(maximumValue))"
+    }
+
+    private var unitMenu: some View {
+        Menu {
+            Picker("Unit", selection: unitBinding) {
+                ForEach(DurationUnit.allCases) { unit in
+                    Text(unit.label).tag(unit)
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(durationUnit.label)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.footnote)
+            .textCase(nil)
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityLabel("Unit")
+        .accessibilityValue(durationUnit.label)
+    }
+
+    private func valueField(
+        _ title: LocalizedStringKey,
+        placeholder: LocalizedStringKey,
+        text: Binding<String>
+    ) -> some View {
+        LabeledContent(title) {
+            TextField(placeholder, text: text)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+                .frame(maxWidth: 140)
+                .accessibilityLabel(Text(title) + Text(verbatim: " ") + Text(unitLabel))
+        }
     }
 
     private var footerText: String {
         switch kind {
         case .duration:
-            return "Drag either end of the range. Stops are logarithmic round values; the right end is Unlimited. Switch between minutes and seconds above, or type an exact value."
+            return String(localized: "Drag either end to snap to round lengths, or type an exact value.")
         case .views:
-            return "Drag either end of the range. Stops snap to round view counts; the right end is Unlimited. Type an exact count when you need one."
+            return String(localized: "Drag either end to snap to round view counts, or type an exact count.")
         }
     }
 
-    private var lowerBinding: Binding<Double> {
+    // MARK: - Bindings
+
+    private var lowerBinding: Binding<Int> {
         Binding(
-            get: { lowerIndex / maxIndex },
-            set: { normalized in
-                let index = snapIndex(normalized * maxIndex, upperBound: upperIndex)
-                lowerIndex = min(index, Double(stops.count - 1))
-                applyLowerIndex()
+            get: { lowerIndex },
+            set: { index in
+                lowerIndex = min(max(0, index), upperIndex, unlimitedIndex - 1)
+                minimumText = Self.grouped(stops[lowerIndex])
             }
         )
     }
 
-    private var upperBinding: Binding<Double> {
+    private var upperBinding: Binding<Int> {
         Binding(
-            get: { upperIndex / maxIndex },
-            set: { normalized in
-                let index = snapIndex(normalized * maxIndex, lowerBound: lowerIndex)
-                upperIndex = max(index, 0)
-                applyUpperIndex()
+            get: { upperIndex },
+            set: { index in
+                upperIndex = min(max(index, lowerIndex), unlimitedIndex)
+                maximumText = upperIndex >= unlimitedIndex ? "" : Self.grouped(stops[upperIndex])
             }
         )
     }
 
-    private func snapIndex(_ raw: Double, lowerBound: Double? = nil, upperBound: Double? = nil) -> Double {
-        var index = raw.rounded()
-        if let lowerBound { index = max(index, lowerBound.rounded()) }
-        if let upperBound { index = min(index, upperBound.rounded()) }
-        return min(maxIndex, max(0, index))
+    /// Converts the typed values and slider positions in the same update as the unit change, so
+    /// the slider never renders indices from one unit against the other unit's stop count.
+    private var unitBinding: Binding<DurationUnit> {
+        Binding(
+            get: { durationUnit },
+            set: { newUnit in
+                guard newUnit != durationUnit else { return }
+                let oldUnit = durationUnit
+                let minimumSeconds = minimumValue.map { Self.seconds(fromDisplay: $0, unit: oldUnit) }
+                let maximumSeconds = maximumValue.map { Self.seconds(fromDisplay: $0, unit: oldUnit) }
+                let newStops = Self.stops(for: kind, unit: newUnit)
+
+                let minimum = minimumSeconds.map { Self.displayValue(seconds: $0, unit: newUnit) } ?? 0
+                let lower = min(Self.nearestStopIndex(minimum, in: newStops), newStops.count - 1)
+                var upper = newStops.count
+                var maximumDisplay: Int?
+                if let maximumSeconds {
+                    let value = Self.displayValue(seconds: maximumSeconds, unit: newUnit)
+                    maximumDisplay = value
+                    upper = max(Self.nearestStopIndex(value, in: newStops), lower)
+                }
+
+                durationUnit = newUnit
+                lowerIndex = lower
+                upperIndex = upper
+                minimumText = Self.grouped(minimum)
+                maximumText = maximumDisplay.map(Self.grouped) ?? ""
+            }
+        )
+    }
+
+    // MARK: - Text sync
+
+    /// Re-applies digit grouping to typed text. Returns true when the text was rewritten; the
+    /// resulting change callback performs the slider sync.
+    private func reformat(_ text: String, into binding: Binding<String>) -> Bool {
+        let formatted = Self.parse(text).map(Self.grouped) ?? ""
+        guard formatted != text else { return false }
+        binding.wrappedValue = formatted
+        return true
     }
 
     private func syncLowerFromText() {
-        guard let minimumDisplay, minimumDisplay >= 0 else { return }
-        let index = Double(Self.nearestStopIndex(minimumDisplay, in: stops))
-        lowerIndex = min(index, upperIndex, Double(stops.count - 1))
+        guard let minimumValue else { return }
+        let index = Self.nearestStopIndex(minimumValue, in: stops)
+        lowerIndex = min(index, upperIndex, unlimitedIndex - 1)
     }
 
     private func syncUpperFromText() {
-        let text = maximumText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty {
-            upperIndex = maxIndex
+        guard let maximumValue else {
+            upperIndex = unlimitedIndex
             return
         }
-        guard let maximumDisplay, maximumDisplay >= 0 else { return }
-        let index = Double(Self.nearestStopIndex(maximumDisplay, in: stops))
-        upperIndex = max(index, lowerIndex)
+        upperIndex = max(Self.nearestStopIndex(maximumValue, in: stops), lowerIndex)
     }
 
-    private func applyLowerIndex() {
-        let idx = Int(lowerIndex.rounded())
-        guard stops.indices.contains(idx) else { return }
-        minimumText = String(stops[idx])
-    }
-
-    private func applyUpperIndex() {
-        let idx = Int(upperIndex.rounded())
-        if idx >= stops.count {
-            maximumText = ""
-            return
-        }
-        guard stops.indices.contains(idx) else { return }
-        maximumText = String(stops[idx])
-    }
-
-    private func convertDisplayedValues(from oldUnit: DurationUnit, to newUnit: DurationUnit) {
-        guard kind == .duration, oldUnit != newUnit else { return }
-        if let minimumDisplay {
-            let seconds = Self.seconds(fromDisplay: minimumDisplay, unit: oldUnit)
-            let converted = Self.displayValue(seconds: seconds, unit: newUnit)
-            minimumText = String(converted)
-        }
-        if let maximumDisplay {
-            let seconds = Self.seconds(fromDisplay: maximumDisplay, unit: oldUnit)
-            let converted = Self.displayValue(seconds: seconds, unit: newUnit)
-            maximumText = String(converted)
-        } else {
-            maximumText = ""
-        }
-        let newStops = Self.stops(for: .duration, unit: newUnit)
-        if let minimumDisplay = Int(minimumText) {
-            lowerIndex = Double(Self.nearestStopIndex(minimumDisplay, in: newStops))
-        }
-        if maximumText.isEmpty {
-            upperIndex = Double(newStops.count)
-        } else if let maximumDisplay = Int(maximumText) {
-            upperIndex = Double(Self.nearestStopIndex(maximumDisplay, in: newStops))
-        }
-        lowerIndex = min(lowerIndex, upperIndex, Double(newStops.count - 1))
-        upperIndex = max(upperIndex, lowerIndex)
-    }
+    // MARK: - Values
 
     private func storedValue(fromDisplay value: Int) -> Int {
         switch kind {
@@ -310,6 +340,17 @@ struct SearchNumericRangeSheet: View {
         }
     }
 
+    /// Digits only; grouping separators and other typed characters are ignored.
+    private static func parse(_ text: String) -> Int? {
+        let digits = text.filter(\.isWholeNumber)
+        guard !digits.isEmpty else { return nil }
+        return Int(digits.prefix(15))
+    }
+
+    private static func grouped(_ value: Int) -> String {
+        value.formatted(.number.grouping(.automatic))
+    }
+
     private static func nearestStopIndex(_ value: Int, in stops: [Int]) -> Int {
         guard let first = stops.first else { return 0 }
         if value <= first { return 0 }
@@ -329,7 +370,16 @@ struct SearchNumericRangeSheet: View {
     private static func stops(for kind: Kind, unit: DurationUnit) -> [Int] {
         switch kind {
         case .views:
-            return [0, 100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000]
+            return [
+                0, 100, 250, 500,
+                1_000, 2_500, 5_000,
+                10_000, 25_000, 50_000,
+                100_000, 250_000, 500_000,
+                1_000_000, 2_500_000, 5_000_000,
+                10_000_000, 25_000_000, 50_000_000,
+                100_000_000, 250_000_000, 500_000_000,
+                1_000_000_000
+            ]
         case .duration:
             switch unit {
             case .minutes:
@@ -340,16 +390,7 @@ struct SearchNumericRangeSheet: View {
         }
     }
 
-    private static func formatStop(_ value: Int) -> String {
-        switch value {
-        case 1_000_000...:
-            let millions = Double(value) / 1_000_000
-            return millions.rounded() == millions ? "\(Int(millions))M" : String(format: "%.1fM", millions)
-        case 1_000...:
-            let thousands = Double(value) / 1_000
-            return thousands.rounded() == thousands ? "\(Int(thousands))K" : String(format: "%.1fK", thousands)
-        default:
-            return value.formatted()
-        }
+    private static func abbreviated(_ value: Int) -> String {
+        value.formatted(.number.notation(.compactName))
     }
 }

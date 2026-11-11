@@ -1,73 +1,97 @@
 import SwiftUI
 
-/// Dual-thumb track used by `SearchNumericRangeSheet`. Positions are normalized `0...1`; the
-/// leading thumb is the lower bound and the trailing thumb is the upper bound.
+/// Dual-thumb track used by `SearchNumericRangeSheet`, styled after the system `UISlider`.
+/// Values are stop indices in `0...maxIndex`; the leading thumb is the lower bound and the
+/// trailing thumb the upper bound. Width is read from the enclosing `GeometryReader` rather than
+/// from the track's own content so a transient out-of-range value can never widen the layout.
 @available(iOS 17.0, *)
 struct SearchNumericRangeSlider: View {
     private enum Thumb {
         case lower, upper
     }
 
-    @Binding var lower: Double
-    @Binding var upper: Double
+    @Binding var lower: Int
+    @Binding var upper: Int
+    let maxIndex: Int
 
     var lowerAccessibilityValue: String
     var upperAccessibilityValue: String
 
     @State private var activeThumb: Thumb?
-    @State private var trackWidth: CGFloat = 0
 
-    private let thumbDiameter: CGFloat = 28
+    private let thumbDiameter: CGFloat = 27
     private let trackHeight: CGFloat = 4
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.25))
-                .frame(height: trackHeight)
+        GeometryReader { proxy in
+            let usableWidth = max(1, proxy.size.width - thumbDiameter)
+            let lowerX = offset(for: lower, usableWidth: usableWidth)
+            let upperX = offset(for: upper, usableWidth: usableWidth)
 
-            Capsule()
-                .fill(Color.accentColor)
-                .frame(width: max(0, (upper - lower) * trackWidth), height: trackHeight)
-                .offset(x: lower * trackWidth)
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(.systemFill))
+                    .frame(width: usableWidth, height: trackHeight)
+                    .offset(x: thumbDiameter / 2)
 
-            thumb(highlighted: activeThumb == .lower)
-                .offset(x: lower * trackWidth - thumbDiameter / 2)
-                .accessibilityLabel("Minimum")
-                .accessibilityValue(lowerAccessibilityValue)
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: max(0, upperX - lowerX), height: trackHeight)
+                    .offset(x: thumbDiameter / 2 + lowerX)
 
-            thumb(highlighted: activeThumb == .upper)
-                .offset(x: upper * trackWidth - thumbDiameter / 2)
-                .accessibilityLabel("Maximum")
-                .accessibilityValue(upperAccessibilityValue)
-        }
-        .frame(height: thumbDiameter)
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear { trackWidth = proxy.size.width }
-                    .onChange(of: proxy.size.width) { _, width in trackWidth = width }
+                thumb(highlighted: activeThumb == .lower)
+                    .offset(x: lowerX)
+                    .accessibilityElement()
+                    .accessibilityLabel("Minimum")
+                    .accessibilityValue(lowerAccessibilityValue)
+                    .accessibilityAdjustableAction { direction in
+                        adjust(.lower, direction: direction)
+                    }
+
+                thumb(highlighted: activeThumb == .upper)
+                    .offset(x: upperX)
+                    .accessibilityElement()
+                    .accessibilityLabel("Maximum")
+                    .accessibilityValue(upperAccessibilityValue)
+                    .accessibilityAdjustableAction { direction in
+                        adjust(.upper, direction: direction)
+                    }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+            .contentShape(Rectangle())
+            .gesture(trackDrag(usableWidth: usableWidth))
         }
-        .contentShape(Rectangle())
-        .gesture(trackDrag)
-        .padding(.vertical, 6)
-        .accessibilityElement(children: .contain)
+        .frame(height: thumbDiameter + 10)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: activeThumb)
+        .sensoryFeedback(.selection, trigger: lower)
+        .sensoryFeedback(.selection, trigger: upper)
     }
 
-    private var trackDrag: some Gesture {
+    private func offset(for index: Int, usableWidth: CGFloat) -> CGFloat {
+        guard maxIndex > 0 else { return 0 }
+        let clamped = min(max(index, 0), maxIndex)
+        return CGFloat(clamped) / CGFloat(maxIndex) * usableWidth
+    }
+
+    private func index(at x: CGFloat, usableWidth: CGFloat) -> Int {
+        let fraction = min(1, max(0, (x - thumbDiameter / 2) / usableWidth))
+        return Int((fraction * CGFloat(maxIndex)).rounded())
+    }
+
+    private func trackDrag(usableWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                guard trackWidth > 0 else { return }
                 if activeThumb == nil {
-                    activeThumb = nearestThumb(to: value.startLocation.x)
+                    activeThumb = chooseThumb(for: value, usableWidth: usableWidth)
                 }
-                let position = min(1, max(0, value.location.x / trackWidth))
+                let target = index(at: value.location.x, usableWidth: usableWidth)
                 switch activeThumb {
                 case .lower:
-                    lower = min(position, upper)
+                    let next = min(target, upper)
+                    if next != lower { lower = next }
                 case .upper:
-                    upper = max(position, lower)
+                    let next = max(target, lower)
+                    if next != upper { upper = next }
                 case .none:
                     break
                 }
@@ -77,23 +101,40 @@ struct SearchNumericRangeSlider: View {
             }
     }
 
-    private func thumb(highlighted: Bool) -> some View {
-        Circle()
-            .fill(Color(.systemBackground))
-            .frame(width: thumbDiameter, height: thumbDiameter)
-            .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-            .overlay {
-                Circle().strokeBorder(Color.accentColor, lineWidth: 1.5)
-            }
-            .scaleEffect(highlighted ? 1.08 : 1)
-            .allowsHitTesting(false)
+    /// Picks the nearer thumb. When both share a stop, the drag direction decides so either end
+    /// can be pulled apart; no choice is made until the finger has moved.
+    private func chooseThumb(for value: DragGesture.Value, usableWidth: CGFloat) -> Thumb? {
+        let x = value.startLocation.x - thumbDiameter / 2
+        let lowerDistance = abs(x - offset(for: lower, usableWidth: usableWidth))
+        let upperDistance = abs(x - offset(for: upper, usableWidth: usableWidth))
+        if lower == upper {
+            let dx = value.translation.width
+            guard abs(dx) > 2 else { return nil }
+            return dx < 0 ? .lower : .upper
+        }
+        return lowerDistance <= upperDistance ? .lower : .upper
     }
 
-    private func nearestThumb(to x: CGFloat) -> Thumb {
-        let lowerX = lower * trackWidth
-        let upperX = upper * trackWidth
-        // Prefer the upper thumb when they overlap so Unlimited stays reachable from a shared point.
-        if abs(x - lowerX) == abs(x - upperX) { return .upper }
-        return abs(x - lowerX) < abs(x - upperX) ? .lower : .upper
+    private func adjust(_ thumb: Thumb, direction: AccessibilityAdjustmentDirection) {
+        let step: Int
+        switch direction {
+        case .increment: step = 1
+        case .decrement: step = -1
+        @unknown default: return
+        }
+        switch thumb {
+        case .lower: lower = min(max(0, lower + step), upper)
+        case .upper: upper = max(min(maxIndex, upper + step), lower)
+        }
+    }
+
+    private func thumb(highlighted: Bool) -> some View {
+        Circle()
+            .fill(.white)
+            .frame(width: thumbDiameter, height: thumbDiameter)
+            .shadow(color: .black.opacity(0.12), radius: 0.5, y: 0.5)
+            .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
+            .scaleEffect(highlighted ? 1.12 : 1)
+            .allowsHitTesting(false)
     }
 }

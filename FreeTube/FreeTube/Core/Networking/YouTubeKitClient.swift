@@ -29,7 +29,23 @@ nonisolated final class YouTubeKitClient: @unchecked Sendable {
         model.alwaysUseCookies = false
         tvHtmlModel.cookies = ""
         tvHtmlModel.alwaysUseCookies = false
+        let locale = Self.requestLocale()
+        model.selectedLocale = locale
+        tvHtmlModel.selectedLocale = locale
         installTVHTML5Overrides()
+    }
+
+    /// InnerTube `hl`/`gl` for every WEB request. YouTubeKit defaults to
+    /// `Locale.preferredLanguages[0]`, and YouTube auto-translates titles into `hl`, so a first
+    /// system language the app does not ship (e.g. Arabic) replaced original titles in results.
+    /// Use the language the app UI actually resolved to, keeping the device region for `gl`.
+    private static func requestLocale() -> String {
+        let language = Bundle.main.preferredLocalizations
+            .first { $0.lowercased() != "base" }
+            .map { Locale(identifier: $0).language.languageCode?.identifier ?? $0 }
+            ?? "en"
+        guard let region = Locale.current.region?.identifier else { return language }
+        return "\(language)-\(region)"
     }
 
     /// Replaces the `.videoInfos` request the default `YouTubeKitClient.tvHtmlModel` would otherwise
