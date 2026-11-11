@@ -28,6 +28,20 @@ final class SearchVideoFiltersTests: XCTestCase {
         XCTAssertFalse(filters.includes(makeVideo(publishedRelative: nil), status: nil, now: now))
     }
 
+    func testServerMirroredPresetsSkipLocalUploadAndLengthChecks() {
+        var filters = SearchVideoFilters()
+        filters.uploaded = .pastWeek
+        filters.length = .underFourMinutes
+        let video = makeVideo(duration: 600, publishedRelative: "2 weeks ago")
+
+        XCTAssertFalse(filters.includes(
+            video, status: nil, now: .now, applyServerMirroredLocally: true
+        ))
+        XCTAssertTrue(filters.includes(
+            video, status: nil, now: .now, applyServerMirroredLocally: false
+        ))
+    }
+
     func testLengthAndViewRangesExcludeUnknownMetadata() {
         var filters = SearchVideoFilters()
         filters.length = .fourToTwentyMinutes
@@ -73,6 +87,42 @@ final class SearchVideoFiltersTests: XCTestCase {
         XCTAssertFalse(filters.includes(
             makeVideo(publishedAt: nextDay), status: nil, now: nextDay
         ))
+    }
+
+    func testServerParamsMatchKnownYouTubeTokens() {
+        XCTAssertNil(SearchVideoFilters().serverParams)
+
+        var videoOnly = SearchVideoFilters()
+        videoOnly.resultType = .video
+        XCTAssertEqual(videoOnly.serverParams, "EgIQAQ==")
+
+        var thisWeek = SearchVideoFilters()
+        thisWeek.uploaded = .pastWeek
+        XCTAssertEqual(thisWeek.serverParams, "EgIIAw==")
+
+        var short = SearchVideoFilters()
+        short.length = .underFourMinutes
+        XCTAssertEqual(short.serverParams, "EgIYAQ==")
+
+        var byDate = SearchVideoFilters()
+        byDate.sort = .uploadDate
+        XCTAssertEqual(byDate.serverParams, "CAI=")
+
+        var channelType = SearchVideoFilters()
+        channelType.resultType = .channel
+        channelType.uploaded = .pastWeek
+        channelType.length = .underFourMinutes
+        // Upload/length are video-only on YouTube; type alone remains.
+        XCTAssertEqual(channelType.serverParams, "EgIQAg==")
+    }
+
+    func testAffectsServerQueryTracksParamsPresence() {
+        var filters = SearchVideoFilters()
+        XCTAssertFalse(filters.affectsServerQuery)
+        filters.watch = .hideWatched
+        XCTAssertFalse(filters.affectsServerQuery)
+        filters.sort = .viewCount
+        XCTAssertTrue(filters.affectsServerQuery)
     }
 
     private func makeVideo(

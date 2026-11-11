@@ -30,8 +30,9 @@ struct HomeScreen: View {
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
 
     private var showsSearchFilter: Bool {
-        guard let results = searchModel.results, !results.videos.isEmpty else { return false }
-        return !searchModel.isEditingNewQuery
+        // Keep the control available for type/sort filters even when the current page has no
+        // videos (e.g. Channels-only results).
+        searchModel.results != nil && !searchModel.isEditingNewQuery
     }
 
     var body: some View {

@@ -10,9 +10,15 @@ struct SearchResult: Sendable {
 }
 
 protocol SearchServicing: Sendable {
-    func search(query: String) async throws -> SearchResult
+    func search(query: String, params: String?) async throws -> SearchResult
     func fetchMore(continuation: String) async throws -> SearchResult
     func autocomplete(query: String) async throws -> [SearchSuggestion]
+}
+
+extension SearchServicing {
+    func search(query: String) async throws -> SearchResult {
+        try await search(query: query, params: nil)
+    }
 }
 
 /// Wraps `SearchResponse` (+Continuation) and `AutoCompletionResponse`.
@@ -24,12 +30,36 @@ final class SearchService: SearchServicing {
         self.client = client
     }
 
-    func search(query: String) async throws -> SearchResult {
-        log.info("Search query=\(query, privacy: .public)")
+    func search(query: String, params: String? = nil) async throws -> SearchResult {
+        let trimmedParams = params?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedParams = (trimmedParams?.isEmpty == false) ? trimmedParams : nil
+        log.info(
+            "Search query=\(query, privacy: .public) params=\(resolvedParams != nil ? "yes" : "no", privacy: .public)"
+        )
+
+        var data: YouTubeResponse.RequestData = [.query: query]
+        if let resolvedParams {
+            data[.params] = resolvedParams
+            // Stock YouTubeKit search bodies have no `params` slot. Temporarily install the same
+            // shape as restricted search so filter tokens can be omitted entirely when inactive.
+            let previousHeaders = client.model.customHeaders[.search]
+            client.model.customHeaders[.search] = Self.searchHeadersWithParams()
+            defer { client.model.customHeaders[.search] = previousHeaders }
+            do {
+                let response = try await AppSearchResponse.sendThrowingRequest(
+                    youtubeModel: client.model,
+                    data: data
+                )
+                return mapResults(response.results, continuation: response.continuationToken)
+            } catch {
+                throw YouTubeServiceError.network(error)
+            }
+        }
+
         do {
             let response = try await AppSearchResponse.sendThrowingRequest(
                 youtubeModel: client.model,
-                data: [.query: query]
+                data: data
             )
             return mapResults(response.results, continuation: response.continuationToken)
         } catch {
@@ -75,6 +105,47 @@ final class SearchService: SearchServicing {
             }
         }
         return SearchResult(videos: videos, channels: channels, playlists: playlists, continuationToken: continuation)
+    }
+
+    /// YouTubeKit's default search body has no `params` field. This mirrors that body and inserts
+    /// the same params slot restricted-search already uses.
+    private static func searchHeadersWithParams() -> HeadersList {
+        let model = YouTubeKitClient.shared.model
+        let language = model.selectedLocaleLanguageCode
+        let country = model.selectedLocaleCountryCode.uppercased()
+        let locale = model.selectedLocale
+        return HeadersList(
+            url: URL(string: "https://www.youtube.com/youtubei/v1/search")!,
+            method: .POST,
+            headers: [
+                .init(name: "Accept", content: "*/*"),
+                .init(name: "Accept-Encoding", content: "gzip, deflate, br"),
+                .init(name: "Host", content: "www.youtube.com"),
+                .init(name: "User-Agent", content: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15"),
+                .init(name: "Accept-Language", content: "\(locale);q=0.9"),
+                .init(name: "Origin", content: "https://www.youtube.com/"),
+                .init(name: "Referer", content: "https://www.youtube.com/"),
+                .init(name: "Connection", content: "keep-alive"),
+                .init(name: "Content-Type", content: "application/json"),
+                .init(name: "X-Youtube-Client-Name", content: "1"),
+                .init(name: "Priority", content: "u=3, i"),
+                .init(name: "X-Origin", content: "https://www.youtube.com")
+            ],
+            addQueryAfterParts: [
+                .init(index: 0, encode: true, content: .query),
+                .init(index: 1, encode: false, content: .query),
+                .init(index: 2, encode: false, content: .params, optional: false)
+            ],
+            httpBody: [
+                "{\"context\":{\"client\":{\"hl\":\"\(language)\",\"gl\":\"\(country)\",\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15,gzip(gfe)\",\"clientName\":\"WEB\",\"clientVersion\":\"2.20260213.01.00\",\"osName\":\"Macintosh\",\"osVersion\":\"10_15_7\",\"timeZone\":\"Europe/Zurich\",\"browserName\":\"Safari\",\"browserVersion\":\"16.2\",\"utcOffsetMinutes\":60,\"mainAppWebInfo\":{\"graftUrl\":\"/results?search_query=",
+                "\"}},\"user\":{\"lockedSafetyMode\":false},\"request\":{\"useSsl\":true,\"internalExperimentFlags\":[],\"consistencyTokenJars\":[]}},\"query\":\"",
+                "\", \"params\": \"",
+                "\"}"
+            ],
+            parameters: [
+                .init(name: "prettyPrint", content: "false")
+            ]
+        )
     }
 }
 

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Presentation-only filters for the video section of a submitted search. Search itself and
-/// its continuation token remain untouched; missing metadata is excluded only when that filter
-/// is active. Upload-age presets are approximate because YouTube returns relative text here.
+/// Hybrid search filters: YouTube-native constraints travel as InnerTube `params`, while
+/// watch-history / view-count / custom ranges stay local. When the server path falls back to a
+/// plain query, the mirrored upload/length presets are applied locally instead.
 struct SearchVideoFilters: Equatable {
     struct NumericRange: Equatable {
         let minimum: Int
@@ -25,6 +25,60 @@ struct SearchVideoFilters: Equatable {
                 return false
             }
             return date >= start && date < end
+        }
+    }
+
+    enum Sort: String, CaseIterable, Identifiable {
+        case relevance, uploadDate, viewCount, rating
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .relevance: "Relevance"
+            case .uploadDate: "Upload date"
+            case .viewCount: "View count"
+            case .rating: "Rating"
+            }
+        }
+
+        /// Protobuf field-1 value. Relevance is the default and may be omitted when alone.
+        var serverValue: Int? {
+            switch self {
+            case .relevance: nil
+            case .rating: 1
+            case .uploadDate: 2
+            case .viewCount: 3
+            }
+        }
+    }
+
+    enum ResultType: String, CaseIterable, Identifiable {
+        case any, video, channel, playlist
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .any: "Any type"
+            case .video: "Videos"
+            case .channel: "Channels"
+            case .playlist: "Playlists"
+            }
+        }
+
+        var serverValue: Int? {
+            switch self {
+            case .any: nil
+            case .video: 1
+            case .channel: 2
+            case .playlist: 3
+            }
+        }
+
+        /// Duration and upload-date filters only apply to video (and movie) results on YouTube.
+        var supportsVideoConstraints: Bool {
+            self == .any || self == .video
         }
     }
 
@@ -55,29 +109,41 @@ struct SearchVideoFilters: Equatable {
     }
 
     enum Uploaded: String, CaseIterable, Identifiable {
-        case anytime, pastDay, pastWeek, pastMonth, pastYear, custom
+        case anytime, pastHour, pastDay, pastWeek, pastMonth, pastYear, custom
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .anytime: "Any time"
-            case .pastDay: "Past 24 hours"
-            case .pastWeek: "Past week"
-            case .pastMonth: "Past month"
-            case .pastYear: "Past year"
+            case .pastHour: "Last hour"
+            case .pastDay: "Today"
+            case .pastWeek: "This week"
+            case .pastMonth: "This month"
+            case .pastYear: "This year"
             case .custom: "Custom date range…"
+            }
+        }
+
+        var serverValue: Int? {
+            switch self {
+            case .anytime, .custom: nil
+            case .pastHour: 1
+            case .pastDay: 2
+            case .pastWeek: 3
+            case .pastMonth: 4
+            case .pastYear: 5
             }
         }
 
         var maximumAge: TimeInterval? {
             switch self {
-            case .anytime: nil
+            case .anytime, .custom: nil
+            case .pastHour: 3_600
             case .pastDay: 86_400
             case .pastWeek: 604_800
             case .pastMonth: 2_629_746
             case .pastYear: 31_556_952
-            case .custom: nil
             }
         }
 
@@ -108,6 +174,15 @@ struct SearchVideoFilters: Equatable {
             case .fourToTwentyMinutes: "4–20 minutes"
             case .overTwentyMinutes: "Over 20 minutes"
             case .custom: "Custom duration…"
+            }
+        }
+
+        var serverValue: Int? {
+            switch self {
+            case .any, .custom: nil
+            case .underFourMinutes: 1
+            case .overTwentyMinutes: 2
+            case .fourToTwentyMinutes: 3
             }
         }
 
@@ -157,6 +232,8 @@ struct SearchVideoFilters: Equatable {
         }
     }
 
+    var sort: Sort = .relevance
+    var resultType: ResultType = .any
     var watch: Watch = .all
     var uploaded: Uploaded = .anytime
     var length: Length = .any
@@ -166,13 +243,50 @@ struct SearchVideoFilters: Equatable {
     var customViewsRange: NumericRange? = nil
 
     var isActive: Bool {
-        watch != .all || uploaded != .anytime || length != .any || views != .any
+        sort != .relevance
+            || resultType != .any
+            || watch != .all
+            || uploaded != .anytime
+            || length != .any
+            || views != .any
     }
 
-    func includes(_ video: Video, status: WatchHistoryStatus?, now: Date) -> Bool {
-        watch.includes(status)
-            && uploaded.includes(video, now: now, customRange: customUploadedRange)
-            && length.includes(video.duration, customRange: customLengthRange)
+    /// True when changing this filter requires a new YouTube search rather than local trimming.
+    var affectsServerQuery: Bool {
+        serverParams != nil
+    }
+
+    /// InnerTube `params` blob, or `nil` when the request should stay an unfiltered query.
+    var serverParams: String? {
+        let uploadedForServer = resultType.supportsVideoConstraints ? uploaded : .anytime
+        let lengthForServer = resultType.supportsVideoConstraints ? length : .any
+        return SearchParamsEncoder.encode(
+            sort: sort,
+            resultType: resultType,
+            uploaded: uploadedForServer,
+            length: lengthForServer
+        )
+    }
+
+    /// - Parameter applyServerMirroredLocally: When `false`, upload/length presets that were already
+    ///   sent to YouTube are not re-applied on the client (missing metadata would over-filter).
+    ///   Set `true` after a plain-query fallback so those presets still take effect locally.
+    ///   Defaults to `true` for local-only callers such as playlist filtering.
+    func includes(
+        _ video: Video,
+        status: WatchHistoryStatus?,
+        now: Date,
+        applyServerMirroredLocally: Bool = true
+    ) -> Bool {
+        let applyUploadedLocally = applyServerMirroredLocally
+            || uploaded == .custom
+            || uploaded.serverValue == nil
+        let applyLengthLocally = applyServerMirroredLocally
+            || length == .custom
+            || length.serverValue == nil
+        return watch.includes(status)
+            && (!applyUploadedLocally || uploaded.includes(video, now: now, customRange: customUploadedRange))
+            && (!applyLengthLocally || length.includes(video.duration, customRange: customLengthRange))
             && views.includes(video.viewCount, customRange: customViewsRange)
     }
 }

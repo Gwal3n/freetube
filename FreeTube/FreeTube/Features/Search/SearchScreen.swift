@@ -89,19 +89,38 @@ struct SearchContent: View {
             areVideosExpanded = true
             lastFilteredPrefetch = nil
         }
-        .onChange(of: model.videoFilters) { _, _ in lastFilteredPrefetch = nil }
+        .onChange(of: model.videoFilters) { oldValue, _ in
+            lastFilteredPrefetch = nil
+            model.serverFiltersDidChange(from: oldValue)
+        }
         .errorToast($model.errorState)
     }
 
     @ViewBuilder
     private func resultsList(_ results: SearchResult) -> some View {
         let now = Date.now
-        let visibleChannels = results.channels.filter { !blocklist.blocks($0) }
-        let visiblePlaylists = results.playlists.filter { !blocklist.blocks($0) }
-        let unblockedVideos = results.videos.filter { !blocklist.blocks($0) }
+        let resultType = model.videoFilters.resultType
+        let showsChannels = resultType == .any || resultType == .channel
+        let showsPlaylists = resultType == .any || resultType == .playlist
+        let showsVideos = resultType == .any || resultType == .video
+        // Always honor type locally so a plain-query fallback cannot resurface other families.
+        let visibleChannels = showsChannels
+            ? results.channels.filter { !blocklist.blocks($0) }
+            : []
+        let visiblePlaylists = showsPlaylists
+            ? results.playlists.filter { !blocklist.blocks($0) }
+            : []
+        let unblockedVideos = showsVideos
+            ? results.videos.filter { !blocklist.blocks($0) }
+            : []
         let visibleVideos = model.videoFilters.isActive
             ? unblockedVideos.filter {
-                model.videoFilters.includes($0, status: watchStatusByVideoID[$0.id], now: now)
+                model.videoFilters.includes(
+                    $0,
+                    status: watchStatusByVideoID[$0.id],
+                    now: now,
+                    applyServerMirroredLocally: model.applyServerMirroredLocally
+                )
             }
             : unblockedVideos
         if results.videos.isEmpty && results.channels.isEmpty && results.playlists.isEmpty {
@@ -164,7 +183,7 @@ struct SearchContent: View {
                         collapsibleHeader("Playlists", count: visiblePlaylists.count, isExpanded: $arePlaylistsExpanded)
                     }
                 }
-                if !results.videos.isEmpty {
+                if showsVideos && !results.videos.isEmpty {
                     Section {
                         if areVideosExpanded {
                             if visibleVideos.isEmpty {
@@ -386,7 +405,13 @@ struct SearchContent: View {
             }
             let now = Date.now
             let visibleCount = results.videos.filter {
-                !blocklist.blocks($0) && filters.includes($0, status: statuses[$0.id], now: now)
+                !blocklist.blocks($0)
+                    && filters.includes(
+                        $0,
+                        status: statuses[$0.id],
+                        now: now,
+                        applyServerMirroredLocally: model.applyServerMirroredLocally
+                    )
             }.count
             if visibleCount >= targetCount { return }
 

@@ -22,8 +22,12 @@ final class SearchViewModel {
     private(set) var didSearchFail = false
     private(set) var paginationFailed = false
     var errorState: ErrorState?
-    /// Presentation-only filters for the current result set. Reset whenever a new query is
-    /// submitted or results are cleared so a previous search's constraints never linger.
+    /// When `true`, upload/length presets that normally ride on InnerTube `params` are also
+    /// enforced locally (plain-query fallback, or no server params active).
+    private(set) var applyServerMirroredLocally = true
+    /// Presentation filters for the current result set. Reset whenever a new query is submitted
+    /// or results are cleared. Changing server-backed fields re-runs the search via
+    /// `serverFiltersDidChange(from:)`.
     var videoFilters = SearchVideoFilters()
 
     private let service: any SearchServicing
@@ -78,7 +82,7 @@ final class SearchViewModel {
         didSearchFail = false
         paginationFailed = false
         errorState = nil
-        videoFilters = SearchVideoFilters()
+        resetFilters()
         autocompleteTask?.cancel()
     }
 
@@ -98,7 +102,7 @@ final class SearchViewModel {
         errorState = nil
         didSearchFail = false
         paginationFailed = false
-        videoFilters = SearchVideoFilters()
+        resetFilters()
         self.submittedQuery = submittedQuery
         isLoading = true
         defer {
@@ -110,7 +114,7 @@ final class SearchViewModel {
             }
         }
         do {
-            let result = try await service.search(query: submittedQuery)
+            let result = try await fetchFirstPage(query: submittedQuery, generation: generation)
             guard searchGeneration == generation,
                   query.trimmingCharacters(in: .whitespacesAndNewlines) == submittedQuery
             else { return }
@@ -165,7 +169,7 @@ final class SearchViewModel {
         isLoading = true
         defer { if searchGeneration == generation { isLoading = false } }
         do {
-            let refreshed = try await service.search(query: submittedQuery)
+            let refreshed = try await fetchFirstPage(query: submittedQuery, generation: generation)
             guard searchGeneration == generation else { return }
             results = refreshed
             resultsRevision &+= 1
@@ -174,6 +178,79 @@ final class SearchViewModel {
             log.notice("Refreshing search failed: \(String(describing: error), privacy: .public)")
             errorState = ErrorState(message: "Search results couldn’t be refreshed. Please try again.")
         }
+    }
+
+    /// Called from Search UI when `videoFilters` changes. Local-only edits are ignored; a changed
+    /// InnerTube `params` blob re-runs the current query without clearing the list.
+    /// Requires mounted results so submit/clear resets (which nil out `results` first) do not
+    /// schedule a redundant search.
+    func serverFiltersDidChange(from oldValue: SearchVideoFilters) {
+        guard oldValue.serverParams != videoFilters.serverParams else { return }
+        guard submittedQuery != nil, results != nil, !isEditingNewQuery else { return }
+        Task { await reloadForServerFilters() }
+    }
+
+    /// Re-runs the current query after a server-backed filter change. Keeps the list mounted so
+    /// local-only filters can keep trimming without a flash back to history.
+    private func reloadForServerFilters() async {
+        guard let submittedQuery else { return }
+        searchGeneration &+= 1
+        let generation = searchGeneration
+        let paramsSnapshot = videoFilters.serverParams
+        errorState = nil
+        paginationFailed = false
+        didSearchFail = false
+        isLoading = true
+        defer { if searchGeneration == generation { isLoading = false } }
+        do {
+            let refreshed = try await fetchFirstPage(
+                query: submittedQuery,
+                generation: generation,
+                params: paramsSnapshot
+            )
+            guard searchGeneration == generation,
+                  videoFilters.serverParams == paramsSnapshot else { return }
+            results = refreshed
+            resultsRevision &+= 1
+        } catch {
+            guard searchGeneration == generation else { return }
+            log.notice("Server-filter search failed: \(String(describing: error), privacy: .public)")
+            errorState = ErrorState(message: "Search couldn’t be completed. Please try again.")
+        }
+    }
+
+    /// Tries InnerTube `params` when present; on failure retries the plain query and mirrors
+    /// those presets locally instead of asking the user to flip a mode switch.
+    private func fetchFirstPage(
+        query: String,
+        generation: Int,
+        params: String? = nil
+    ) async throws -> SearchResult {
+        let resolvedParams = params ?? videoFilters.serverParams
+        guard let resolvedParams else {
+            applyServerMirroredLocally = true
+            return try await service.search(query: query, params: nil)
+        }
+        do {
+            let result = try await service.search(query: query, params: resolvedParams)
+            guard searchGeneration == generation else { return result }
+            applyServerMirroredLocally = false
+            return result
+        } catch {
+            log.notice(
+                "Server search params failed; falling back to plain query: \(String(describing: error), privacy: .public)"
+            )
+            let result = try await service.search(query: query, params: nil)
+            guard searchGeneration == generation else { return result }
+            applyServerMirroredLocally = true
+            errorState = ErrorState(message: "Server filters unavailable. Using local filters.")
+            return result
+        }
+    }
+
+    private func resetFilters() {
+        videoFilters = SearchVideoFilters()
+        applyServerMirroredLocally = true
     }
 
     private func scheduleAutocomplete() {

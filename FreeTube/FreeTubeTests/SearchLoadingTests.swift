@@ -75,17 +75,76 @@ final class SearchLoadingTests: XCTestCase {
         await model.refresh()
         XCTAssertEqual(model.resultsRevision, firstPageRevision + 1)
     }
+
+    func testServerFilterChangeResearchesWithParams() async {
+        let service = ControlledSearchService()
+        let model = SearchViewModel(service: service)
+        model.query = "cats"
+        await model.submit()
+        XCTAssertEqual(service.searches.map(\.params), [nil])
+        XCTAssertTrue(model.applyServerMirroredLocally)
+
+        let beforeFilters = model.videoFilters
+        model.videoFilters.uploaded = .pastWeek
+        XCTAssertNotNil(model.results)
+        model.serverFiltersDidChange(from: beforeFilters)
+        await waitUntil(service.searches.count == 2)
+
+        XCTAssertEqual(service.searches.last?.params, model.videoFilters.serverParams)
+        XCTAssertFalse(model.applyServerMirroredLocally)
+        XCTAssertEqual(model.resultsRevision, 2)
+    }
+
+    func testServerFilterFailureFallsBackToPlainQuery() async {
+        let service = ControlledSearchService()
+        let model = SearchViewModel(service: service)
+        model.query = "cats"
+        await model.submit()
+
+        service.failWhenParamsPresent = true
+        let beforeFilters = model.videoFilters
+        model.videoFilters.length = .underFourMinutes
+        model.serverFiltersDidChange(from: beforeFilters)
+        await waitUntil(service.searches.count >= 3)
+
+        XCTAssertEqual(service.searches.dropFirst().map(\.params).contains(where: { $0 != nil }), true)
+        XCTAssertEqual(service.searches.last?.params, nil)
+        XCTAssertTrue(model.applyServerMirroredLocally)
+        XCTAssertEqual(
+            model.errorState?.message,
+            "Server filters unavailable. Using local filters."
+        )
+        XCTAssertNotNil(model.results)
+        XCTAssertFalse(model.didSearchFail)
+    }
+
+    private func waitUntil(
+        _ condition: @autoclosure () -> Bool,
+        timeout: TimeInterval = 1
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(condition())
+    }
 }
 
 /// Continuations make request ordering deterministic without timers or real networking.
 @MainActor
 private final class ControlledSearchService: SearchServicing {
     var failSearch = false
+    var failWhenParamsPresent = false
+    private(set) var searches: [(query: String, params: String?)] = []
     private var pendingPage: CheckedContinuation<SearchResult, Error>?
     private var pageStarted: CheckedContinuation<Void, Never>?
 
-    func search(query: String) async throws -> SearchResult {
+    func search(query: String, params: String?) async throws -> SearchResult {
+        searches.append((query, params))
         if failSearch { throw URLError(.notConnectedToInternet) }
+        if failWhenParamsPresent, params != nil {
+            throw URLError(.badServerResponse)
+        }
         return result(query)
     }
 
