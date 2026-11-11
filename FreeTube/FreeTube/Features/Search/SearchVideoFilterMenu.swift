@@ -3,7 +3,7 @@ import SwiftUI
 /// Hybrid search filters in a trailing navigation-bar menu. Matches `FeedFilterMenu` so the
 /// control picks up the system Liquid Glass treatment of other top-right toolbar buttons.
 /// Sort / type / upload / length presets go to YouTube when possible; watch history, views, and
-/// custom ranges stay local.
+/// custom ranges stay local. Category rows that currently constrain results show a checkmark.
 @available(iOS 17.0, *)
 struct SearchVideoFilterMenu: View {
     @Binding var filters: SearchVideoFilters
@@ -18,45 +18,33 @@ struct SearchVideoFilterMenu: View {
                     Button {
                         filters.sort = option
                     } label: {
-                        if filters.sort == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filters.sort == option)
                     }
                 }
             } label: {
-                Text("Sort by")
+                categoryLabel("Sort by", active: filters.sort != .relevance)
             }
             Menu {
                 ForEach(SearchVideoFilters.ResultType.allCases) { option in
                     Button {
                         filters.resultType = option
                     } label: {
-                        if filters.resultType == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filters.resultType == option)
                     }
                 }
             } label: {
-                Text("Type")
+                categoryLabel("Type", active: filters.resultType != .any)
             }
             Menu {
                 ForEach(SearchVideoFilters.Watch.allCases) { option in
                     Button {
                         filters.watch = option
                     } label: {
-                        if filters.watch == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filters.watch == option)
                     }
                 }
             } label: {
-                Text("Watch history")
+                categoryLabel("Watch history", active: filters.watch != .all)
             }
             Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
@@ -67,15 +55,11 @@ struct SearchVideoFilterMenu: View {
                             filters.uploaded = option
                         }
                     } label: {
-                        if filters.uploaded == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filters.uploaded == option)
                     }
                 }
             } label: {
-                Text("Upload date")
+                categoryLabel("Upload date", active: filters.uploaded != .anytime)
             }
             .disabled(!filters.resultType.supportsVideoConstraints)
             Menu {
@@ -87,15 +71,11 @@ struct SearchVideoFilterMenu: View {
                             filters.length = option
                         }
                     } label: {
-                        if filters.length == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filters.length == option)
                     }
                 }
             } label: {
-                Text("Length")
+                categoryLabel("Length", active: filters.length != .any)
             }
             .disabled(!filters.resultType.supportsVideoConstraints)
             Menu {
@@ -107,15 +87,11 @@ struct SearchVideoFilterMenu: View {
                             filters.views = option
                         }
                     } label: {
-                        if filters.views == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filters.views == option)
                     }
                 }
             } label: {
-                Text("Views")
+                categoryLabel("Views", active: filters.views != .any)
             }
             .disabled(!filters.resultType.supportsVideoConstraints)
             Divider()
@@ -136,5 +112,23 @@ struct SearchVideoFilterMenu: View {
         }
         .accessibilityLabel("Filter search videos")
         .accessibilityValue(filters.isActive ? "On" : "Off")
+    }
+
+    @ViewBuilder
+    private func categoryLabel(_ title: String, active: Bool) -> some View {
+        if active {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
+    }
+
+    @ViewBuilder
+    private func optionLabel(_ title: String, selected: Bool) -> some View {
+        if selected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
     }
 }

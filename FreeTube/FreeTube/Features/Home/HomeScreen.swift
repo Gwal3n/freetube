@@ -87,7 +87,7 @@ struct HomeScreen: View {
                     }
                 case .length:
                     SearchNumericRangeSheet(
-                        title: "Duration Range", unit: "Minutes",
+                        kind: .minutes,
                         range: searchModel.videoFilters.customLengthRange
                     ) { selected in
                         searchModel.videoFilters.customLengthRange = selected
@@ -95,7 +95,7 @@ struct HomeScreen: View {
                     }
                 case .views:
                     SearchNumericRangeSheet(
-                        title: "View Count Range", unit: "Views",
+                        kind: .views,
                         range: searchModel.videoFilters.customViewsRange
                     ) { selected in
                         searchModel.videoFilters.customViewsRange = selected

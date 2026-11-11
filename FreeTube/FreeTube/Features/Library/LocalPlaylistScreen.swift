@@ -159,14 +159,14 @@ struct LocalPlaylistScreen: View {
                 }
             case .length:
                 SearchNumericRangeSheet(
-                    title: "Duration Range", unit: "Minutes", range: videoFilters.customLengthRange
+                    kind: .minutes, range: videoFilters.customLengthRange
                 ) { selected in
                     videoFilters.customLengthRange = selected
                     videoFilters.length = .custom
                 }
             case .views:
                 SearchNumericRangeSheet(
-                    title: "View Count Range", unit: "Views", range: videoFilters.customViewsRange
+                    kind: .views, range: videoFilters.customViewsRange
                 ) { selected in
                     videoFilters.customViewsRange = selected
                     videoFilters.views = .custom
@@ -490,22 +490,34 @@ struct LocalPlaylistScreen: View {
 
     private var playlistFilterMenu: some View {
         Menu {
-            Menu("Sort by") {
+            Menu {
                 Picker("Sort videos", selection: $videoSort) {
                     ForEach(LocalPlaylistVideoSort.allCases) { sort in
                         Text(sort.title).tag(sort)
                     }
                 }
+            } label: {
+                if videoSort == .custom {
+                    Text("Sort by")
+                } else {
+                    Label("Sort by", systemImage: "checkmark")
+                }
             }
             Divider()
-            Menu("Watch history") {
+            Menu {
                 Picker("Watch history", selection: $videoFilters.watch) {
                     ForEach(SearchVideoFilters.Watch.allCases) { option in
                         Text(option.title).tag(option)
                     }
                 }
+            } label: {
+                if videoFilters.watch == .all {
+                    Text("Watch history")
+                } else {
+                    Label("Watch history", systemImage: "checkmark")
+                }
             }
-            Menu("Upload date") {
+            Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
                     Button {
                         if option == .custom { customRange = .uploaded }
@@ -515,8 +527,14 @@ struct LocalPlaylistScreen: View {
                         else { Text(option.title) }
                     }
                 }
+            } label: {
+                if videoFilters.uploaded == .anytime {
+                    Text("Upload date")
+                } else {
+                    Label("Upload date", systemImage: "checkmark")
+                }
             }
-            Menu("Length") {
+            Menu {
                 ForEach(SearchVideoFilters.Length.allCases) { option in
                     Button {
                         if option == .custom { customRange = .length }
@@ -526,8 +544,14 @@ struct LocalPlaylistScreen: View {
                         else { Text(option.title) }
                     }
                 }
+            } label: {
+                if videoFilters.length == .any {
+                    Text("Length")
+                } else {
+                    Label("Length", systemImage: "checkmark")
+                }
             }
-            Menu("Views") {
+            Menu {
                 ForEach(SearchVideoFilters.Views.allCases) { option in
                     Button {
                         if option == .custom { customRange = .views }
@@ -536,6 +560,12 @@ struct LocalPlaylistScreen: View {
                         if videoFilters.views == option { Label(option.title, systemImage: "checkmark") }
                         else { Text(option.title) }
                     }
+                }
+            } label: {
+                if videoFilters.views == .any {
+                    Text("Views")
+                } else {
+                    Label("Views", systemImage: "checkmark")
                 }
             }
             Divider()
