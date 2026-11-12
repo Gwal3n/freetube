@@ -103,10 +103,12 @@ struct SearchVideoFilterMenu: View {
             }
             .disabled(!filters.isNarrowedBeyondType)
         } label: {
-            // A fixed square that fits either symbol keeps the button from resizing when the
-            // source changes, so the List row never re-measures.
+            // The large glass style pads its label by 15 pt per side, so a fixed 14 pt label gives
+            // Feed's 44 pt toolbar circle and never resizes when the symbol changes. The 22 pt
+            // glyph matches the toolbar's and may extend past that label frame.
             Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .frame(width: 24, height: 24)
+                .font(.system(size: 22))
+                .frame(width: 14, height: 14)
         }
         .modifier(FilterButtonStyle())
         .overlay(alignment: .topTrailing) {

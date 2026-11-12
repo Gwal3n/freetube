@@ -529,7 +529,7 @@ struct SearchContent: View {
                     onCustomLength: onCustomLength,
                     onCustomViews: onCustomViews
                 )
-                .padding(.trailing, 4.33)
+                .padding(.trailing, -0.67)
             }
             .frame(height: 44)
             Text("Search")
