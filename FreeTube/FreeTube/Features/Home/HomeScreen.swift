@@ -44,6 +44,10 @@ struct HomeScreen: View {
                         Task { await runSearch(query: query) }
                     },
                     onOpenDestination: openDestination,
+                    onEditQuery: { query in
+                        searchModel.query = query
+                        isSearchPresented = true
+                    },
                     onCustomUploaded: { customRange = .uploaded },
                     onCustomLength: { customRange = .length },
                     onCustomViews: { customRange = .views }

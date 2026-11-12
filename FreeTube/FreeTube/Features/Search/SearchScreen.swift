@@ -20,6 +20,8 @@ struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
     let onOpenDestination: (AppNavigationRequest.Destination) -> Void
+    /// Opens the native field with this query filled in, ready to submit.
+    let onEditQuery: (String) -> Void
     let onCustomUploaded: () -> Void
     let onCustomLength: () -> Void
     let onCustomViews: () -> Void
@@ -66,11 +68,8 @@ struct SearchContent: View {
                     }
                     .buttonStyle(.bordered)
                 }
-            } else if (isSearching || MacIntegration.isRunningOnMac)
-                        && (!history.isEmpty || !recentChannels.isEmpty)
+            } else if (!history.isEmpty || !recentChannels.isEmpty)
                         && !(incognitoEnabled && incognitoSkipSearchHistory) {
-                // As in system apps, recent searches belong to the active field, so every search
-                // starts from (and its results stay in) the same active presentation.
                 historyList
             } else {
                 ContentUnavailableView(
@@ -457,9 +456,15 @@ struct SearchContent: View {
                 Section {
                     ForEach(history) { entry in
                         Button {
-                            model.query = entry.query
-                            onRunSearch(entry.query)
-                            dismissKeyboard()
+                            if isSearching || MacIntegration.isRunningOnMac {
+                                model.query = entry.query
+                                onRunSearch(entry.query)
+                                dismissKeyboard()
+                            } else {
+                                // Running from the inactive screen would show results outside the
+                                // active search; fill the field instead and submit from there.
+                                onEditQuery(entry.query)
+                            }
                         } label: {
                             HStack {
                                 Image(systemName: "clock.arrow.circlepath")
@@ -509,28 +514,28 @@ struct SearchContent: View {
     }
 
     /// Active search hides the navigation title and toolbar, so the results begin with their own
-    /// title, trailing filter, and separator. It is the first List row and scrolls away with the
-    /// results; a bar pinned over the List fought its scroll edge.
+    /// title and trailing filter. It is the first List row and scrolls away with the results; a
+    /// bar pinned over the List fought its scroll edge.
     private var resultsHeader: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center) {
-                Text("Search")
-                    .font(.largeTitle.bold())
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 8)
-                SearchVideoFilterMenu(
-                    filters: $model.videoFilters,
-                    onCustomUploaded: onCustomUploaded,
-                    onCustomLength: onCustomLength,
-                    onCustomViews: onCustomViews
-                )
-                .padding(.trailing, -10)
-            }
-            .padding(.leading, 16)
-            .padding(.trailing, 16)
-            .padding(.bottom, 4)
-            Divider()
+        // Matches the system large title: 34 pt bold, 16 pt margins, in a 52 pt row with a little
+        // breathing room above and before the first result.
+        HStack(alignment: .center) {
+            Text("Search")
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            SearchVideoFilterMenu(
+                filters: $model.videoFilters,
+                onCustomUploaded: onCustomUploaded,
+                onCustomLength: onCustomLength,
+                onCustomViews: onCustomViews
+            )
+            .padding(.trailing, -10)
         }
+        .frame(minHeight: 52)
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
     }

@@ -449,16 +449,18 @@ and a rejected strategy is excluded before requesting the next candidate.
   direct-URL placeholder titles/uploader details without restarting playback.
 - **Search is search-only and follows stock iOS search.** It must not request or render a
  home/trending/discovery feed. The field uses `.navigationBarDrawer(displayMode: .always)`.
- Inactive, the screen shows only the clean empty state. Activating the field shows recent
- searches and recent channels (gated on `isSearching`, as in system apps), then live suggestions
- while typing. A keyboard/suggestion/history submission swaps the content to results in place and
+ Recent channels and recent searches show whether or not search is active (the clean empty
+ state appears only when both are empty). Inactive, a recent search opens the field with that
+ query filled in and its suggestions showing, ready to submit; it never runs from the inactive
+ screen, because that would show results outside the active search. Active, a recent search runs
+ immediately. Live suggestions appear while typing. A keyboard/suggestion/history submission swaps the content to results in place and
  search stays active—query and Cancel in the field, keyboard dismissed. Every search therefore
  starts from, and its results stay in, that one active state; never force `isPresented` or end
  presentation to change it. Cancel or the field's clear button empties the query and clears the
  results. Channels and playlists push over the active search (only the keyboard is resigned), and
  going back returns to the same query and results. Active search hides navigation-bar items, so
- the first results row is a custom "Search" title with a trailing fixed-size filter icon and a
- full-width divider, and it scrolls away with the list; do not pin it over the List or move it to
+ the first results row is a custom "Search" title with a trailing fixed-size filter icon, spaced like
+ the native large title (no divider), and it scrolls away with the list; do not pin it over the List or move it to
  the toolbar. The filter label must not change size (the active dot is an overlay), because a
  resizing Menu label re-measures the List row and stutters. Its Source option switches between YouTube (default)
  and YouTube Music; the source is a mode that survives new queries and filter resets, and Music
