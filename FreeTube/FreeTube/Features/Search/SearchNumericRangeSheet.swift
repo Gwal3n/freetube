@@ -177,14 +177,16 @@ struct SearchNumericRangeSheet: View {
             } else {
                 Text(verbatim: summaryValue)
                     .font(.title3.weight(.semibold).monospacedDigit())
-                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text(unitLabel)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .fixedSize()
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .animation(.snappy(duration: 0.2), value: summaryValue)
+        .transaction { $0.animation = nil }
     }
 
     private var summaryValue: String {

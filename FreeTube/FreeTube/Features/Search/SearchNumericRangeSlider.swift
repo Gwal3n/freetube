@@ -39,7 +39,7 @@ struct SearchNumericRangeSlider: View {
                     .frame(width: max(0, upperX - lowerX), height: trackHeight)
                     .offset(x: thumbDiameter / 2 + lowerX)
 
-                thumb(highlighted: activeThumb == .lower)
+                thumb
                     .offset(x: lowerX)
                     .accessibilityElement()
                     .accessibilityLabel("Minimum")
@@ -48,7 +48,7 @@ struct SearchNumericRangeSlider: View {
                         adjust(.lower, direction: direction)
                     }
 
-                thumb(highlighted: activeThumb == .upper)
+                thumb
                     .offset(x: upperX)
                     .accessibilityElement()
                     .accessibilityLabel("Maximum")
@@ -62,7 +62,7 @@ struct SearchNumericRangeSlider: View {
             .gesture(trackDrag(usableWidth: usableWidth))
         }
         .frame(height: thumbDiameter + 10)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: activeThumb)
+        .transaction { $0.animation = nil }
         .sensoryFeedback(.selection, trigger: lower)
         .sensoryFeedback(.selection, trigger: upper)
     }
@@ -128,13 +128,12 @@ struct SearchNumericRangeSlider: View {
         }
     }
 
-    private func thumb(highlighted: Bool) -> some View {
+    private var thumb: some View {
         Circle()
             .fill(.white)
             .frame(width: thumbDiameter, height: thumbDiameter)
             .shadow(color: .black.opacity(0.12), radius: 0.5, y: 0.5)
             .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
-            .scaleEffect(highlighted ? 1.12 : 1)
             .allowsHitTesting(false)
     }
 }

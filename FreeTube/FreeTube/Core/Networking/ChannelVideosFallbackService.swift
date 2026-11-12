@@ -194,6 +194,8 @@ final class ChannelVideosFallbackService: Sendable {
 
     private static func clientContext() -> [String: Any] {
         [
+            "hl": "en",
+            "gl": "US",
             "clientName": "WEB",
             "clientVersion": "2.20260213.01.00",
             "deviceMake": "Apple",

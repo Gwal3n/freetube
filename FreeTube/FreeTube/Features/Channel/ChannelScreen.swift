@@ -220,6 +220,8 @@ struct ChannelScreen: View {
                     )
                 }
             }
+            // Opaque, because the pages scroll underneath it rather than below it.
+            .background(MediaStyle.pageBackground)
             ChannelProfileTabBar(
                 tabs: availableTabs(for: details),
                 selectedTab: pagerState.selectedTab,
@@ -235,9 +237,14 @@ struct ChannelScreen: View {
                         )
                     }
                 }
+                // Pinned under the navigation bar once the header collapses; blur the pages
+                // scrolling beneath it like the title bar, tinted toward the page background.
+                .background {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(MediaStyle.pageBackground.opacity(0.55))
+                }
         }
-        // Opaque, because the pages scroll underneath it rather than below it.
-        .background(MediaStyle.pageBackground)
         .offset(y: -pagerState.headerOffset)
         .onPreferenceChange(ChannelHeaderHeightKey.self) { pagerState.headerContentHeight = $0 }
         .onPreferenceChange(ChannelTabBarHeightKey.self) { pagerState.tabBarHeight = $0 }

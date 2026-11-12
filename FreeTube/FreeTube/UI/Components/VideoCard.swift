@@ -180,11 +180,11 @@ struct VideoCard: View {
                 .accessibilityHint("Plays video")
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 4) {
-                        linkedMetadataItems(onTapChannel: onTapChannel)
+                        linkedMetadataItems()
                     }
                 } else {
                     HStack(spacing: 6) {
-                        linkedMetadataItems(onTapChannel: onTapChannel)
+                        linkedMetadataItems()
                     }
                 }
             }
@@ -200,16 +200,17 @@ struct VideoCard: View {
     }
 
     @ViewBuilder
-    private func linkedMetadataItems(onTapChannel: @escaping () -> Void) -> some View {
+    private func linkedMetadataItems() -> some View {
         newUploadLabel
-        Button(action: onTapChannel) {
+        // Only the avatar opens the channel; the name belongs to the playback target.
+        Button(action: openVideo) {
             Text(video.channelName)
                 .appFont(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open \(video.channelName)")
+        .buttonStyle(ResponsiveButtonStyle())
+        .accessibilityHidden(true)
         if !metadataDetails.isEmpty {
             Button(action: openVideo) {
                 Text(verbatim: dynamicTypeSize.isAccessibilitySize

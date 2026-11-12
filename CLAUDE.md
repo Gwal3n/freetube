@@ -418,7 +418,9 @@ and a rejected strategy is excluded before requesting the next candidate.
   remains compact. The current video
   is hidden from the visible Up Next rows; compact autoplay and repeat icons appear beside the
   heading only while Up Next is expanded. The optional sticky Comments heading defaults off.
-  Feed and Up Next channel-name/avatar navigation are separate opt-in preferences. Up Next
+  Feed and Up Next channel navigation are separate opt-in preferences. In Feed and search rows
+  only the channel avatar opens the channel; the channel name plays the video like the rest of
+  the row. Up Next
   avatars have their own preference; channel actions use the player's existing collapse-and-route
   path, while video titles and thumbnails keep their playback action.
   When enabled, its pinned Section belongs to the panel's main lazy stack. Keep the unpinned
@@ -510,6 +512,9 @@ and a rejected strategy is excluded before requesting the next candidate.
 - A one-way migration deletes the legacy Keychain credential created by older builds.
 - Subscriptions, history, playlists, and favorites are device-local. Import/export is their backup mechanism.
 - YouTube's anonymous `visitorData` token is request metadata, not an account credential; it remains memory-only.
+- InnerTube requests always send `hl=en`/`gl=US` (`YouTubeKitClient.requestLocale` and custom
+ request bodies). YouTube auto-translates titles into the request language, and device locales or
+ VPN exit regions otherwise produced translated titles.
 
 ---
 

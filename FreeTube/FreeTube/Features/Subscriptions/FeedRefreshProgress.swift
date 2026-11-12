@@ -63,6 +63,7 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
                 .tint(Color.primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 4)
+                .transaction { $0.animation = nil }
                 .allowsHitTesting(false)
             }
         }
@@ -73,11 +74,9 @@ struct FeedRefreshProgress<LeadingContent: View>: View {
         Group {
             if model.showsRefreshProgress {
                 Text("Refreshing \(model.refreshedChannels)/\(model.refreshChannelCount)")
-                    .contentTransition(.numericText())
-                    .animation(reduceMotion ? nil : InterfaceMotion.content,
-                               value: model.refreshedChannels)
-                    .animation(reduceMotion ? nil : InterfaceMotion.content,
-                               value: model.refreshChannelCount)
+                    .monospacedDigit()
+                    .contentTransition(.identity)
+                    .transaction { $0.animation = nil }
             } else if let lastRefreshAt = model.lastRefreshAt {
                 if referenceDate.timeIntervalSince(lastRefreshAt) < 3_600 {
                     ViewThatFits(in: .horizontal) {

@@ -178,24 +178,32 @@ struct VideoRow: View {
                 .accessibilityLabel(rowAccessibilityLabel(title: branding.title(for: video)))
                 .accessibilityHint("Plays video")
 
-                if let onTapChannel {
-                    Button(action: onTapChannel) {
-                        channelLine
+                // Only the avatar opens the channel; the name belongs to the playback target.
+                HStack(spacing: 5) {
+                    if showsChannelAvatar {
+                        if let onTapChannel {
+                            Button(action: onTapChannel) {
+                                channelAvatar.contentShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Open \(video.channelName)")
+                        } else if let channelID {
+                            NavigationLink {
+                                ChannelScreen(channelID: channelID)
+                            } label: {
+                                channelAvatar.contentShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Open \(video.channelName)")
+                        }
+                    }
+                    Button(action: openVideo) {
+                        channelName
                             .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open \(video.channelName)")
-                } else if let channelID {
-                    NavigationLink {
-                        ChannelScreen(channelID: channelID)
-                    } label: {
-                        channelLine
-                            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open \(video.channelName)")
+                    .buttonStyle(ResponsiveButtonStyle())
+                    .accessibilityHidden(true)
                 }
 
                 if !statsLine.isEmpty || isNewSinceLastVisit || isSuggested {
@@ -238,21 +246,29 @@ struct VideoRow: View {
     private var channelLine: some View {
         HStack(spacing: 5) {
             if showsChannelAvatar {
-                KFImage(video.channelThumbnailURL)
-                    .thumbnail(size: CGSize(width: 18, height: 18)) {
-                        Circle().fill(MediaStyle.placeholderFill)
-                    }
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 18, height: 18)
-                    .clipShape(Circle())
-                    .accessibilityHidden(true)
+                channelAvatar
             }
-            Text(video.channelName)
-                .appFont(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+            channelName
         }
+    }
+
+    private var channelAvatar: some View {
+        KFImage(video.channelThumbnailURL)
+            .thumbnail(size: CGSize(width: 18, height: 18)) {
+                Circle().fill(MediaStyle.placeholderFill)
+            }
+            .resizable()
+            .scaledToFill()
+            .frame(width: 18, height: 18)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+
+    private var channelName: some View {
+        Text(video.channelName)
+            .appFont(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
     }
 
     @ViewBuilder
