@@ -125,6 +125,15 @@ struct HomeScreen: View {
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                // Reopening the field over results and dismissing the keyboard without editing
+                // returns to the same closed state that submission produces. An edited query keeps
+                // search open so its suggestions stay available.
+                guard isSearchPresented,
+                      let submitted = searchModel.submittedQuery,
+                      !searchModel.isEditingNewQuery else { return }
+                endActiveSearch(preserving: submitted)
+            }
             .onChange(of: isSearchPresented) { _, isPresented in
                 navigationLog.info("Search presentation changed: \(isPresented, privacy: .public)")
                 if isPresented {
@@ -228,10 +237,24 @@ struct HomeScreen: View {
     /// bound text as part of that transition; the guard window restores it instead of treating
     /// it as the user's clear action. Later clears (native clear button) behave normally.
     private func endActiveSearch(preserving query: String) {
+        let wasPresented = isSearchPresented
         queryPreservedDuringDismissal = query
         isSearchPresented = false
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
+            if wasPresented {
+                // UIKit can blank the native field at the end of the dismissal without reporting
+                // it, leaving the binding correct but the bar empty. Re-sending the value after
+                // the animation makes the closed bar show the query, as when a recent search is
+                // chosen without opening the field; the guard restores it within the same update.
+                try? await Task.sleep(for: .milliseconds(450))
+                guard queryPreservedDuringDismissal == query,
+                      !isSearchPresented,
+                      searchModel.query == query else { return }
+                searchModel.query = ""
+                try? await Task.sleep(for: .milliseconds(150))
+            } else {
+                try? await Task.sleep(for: .milliseconds(600))
+            }
             if queryPreservedDuringDismissal == query {
                 queryPreservedDuringDismissal = nil
             }

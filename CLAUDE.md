@@ -468,8 +468,12 @@ and a rejected strategy is excluded before requesting the next candidate.
   selection-binding activation token that drives `.searchable(isPresented:)`; it returns from any
   pushed destination and focuses the field without clearing the current query or results. The live
   field value and last submitted query are tracked separately, so editing a displayed query reveals
-  its live suggestions rather than leaving stale results in front. Keyboard disappearance never
-  mutates search-presentation state; that coupling made the navigation bar jump during scroll.
+  its live suggestions rather than leaving stale results in front. Results always appear in one
+  state: search closed, title and filter visible, and the submitted query shown in the closed
+  bar. Ending an active presentation can blank the native field without updating the binding, so
+  `endActiveSearch` re-sends the query once the dismissal finishes. Keyboard disappearance ends
+  presentation only when the field still holds the submitted query; an edited query stays open
+  with its suggestions.
   No UIKit tab gesture observer is
   installed. Selecting a suggestion or history entry passes that row's query explicitly
   to the search submission before resigning keyboard focus; never rely on a later read of field state.
