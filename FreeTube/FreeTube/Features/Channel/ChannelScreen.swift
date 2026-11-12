@@ -138,6 +138,7 @@ struct ChannelScreen: View {
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: pagerSelection)
         .scrollIndicators(.hidden)
+        .modifier(HiddenTopScrollEdgeEffect())
         .coordinateSpace(name: Self.pagerSpace)
         .background {
             GeometryReader { geometry in
@@ -185,6 +186,7 @@ struct ChannelScreen: View {
             }
         }
         .scrollIndicators(.hidden)
+        .modifier(HiddenTopScrollEdgeEffect())
         .coordinateSpace(name: Self.pageSpace(tab))
         .refreshable {
             await model.refresh(activeSort: tab == .videos ? videoSort : .newest)
@@ -220,8 +222,6 @@ struct ChannelScreen: View {
                     )
                 }
             }
-            // Opaque, because the pages scroll underneath it rather than below it.
-            .background(MediaStyle.pageBackground)
             ChannelProfileTabBar(
                 tabs: availableTabs(for: details),
                 selectedTab: pagerState.selectedTab,
@@ -237,14 +237,9 @@ struct ChannelScreen: View {
                         )
                     }
                 }
-                // Pinned under the navigation bar once the header collapses; blur the pages
-                // scrolling beneath it like the title bar, tinted toward the page background.
-                .background {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .overlay(MediaStyle.pageBackground.opacity(0.55))
-                }
         }
+        // Opaque, because the pages scroll underneath it rather than below it.
+        .background(MediaStyle.pageBackground)
         .offset(y: -pagerState.headerOffset)
         .onPreferenceChange(ChannelHeaderHeightKey.self) { pagerState.headerContentHeight = $0 }
         .onPreferenceChange(ChannelTabBarHeightKey.self) { pagerState.tabBarHeight = $0 }
@@ -676,5 +671,18 @@ struct ChannelTabBarHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+/// iOS 26 draws a gray blur under the navigation bar where content scrolls beneath it. The
+/// channel header and pinned tab bar are opaque page background, so suppress it to keep the
+/// whole top region one solid color.
+private struct HiddenTopScrollEdgeEffect: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectHidden(true, for: .top)
+        } else {
+            content
+        }
     }
 }
