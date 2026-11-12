@@ -20,9 +20,6 @@ struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
     let onOpenDestination: (AppNavigationRequest.Destination) -> Void
-    let onCustomUploaded: () -> Void
-    let onCustomLength: () -> Void
-    let onCustomViews: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismissSearch) private var dismissSearch
@@ -52,7 +49,6 @@ struct SearchContent: View {
                 suggestionContent
             } else if let results = model.results {
                 resultsList(results)
-                    .modifier(SearchFilterBarInset { filterBar })
             } else if model.isLoading {
                 MediaListPlaceholder()
             } else if model.didSearchFail {
@@ -496,22 +492,6 @@ struct SearchContent: View {
         }
     }
 
-    /// Native search hides the navigation bar while active, so the filter lives above results.
-    private var filterBar: some View {
-        HStack {
-            SearchVideoFilterMenu(
-                filters: $model.videoFilters,
-                labelStyle: .chip,
-                onCustomUploaded: onCustomUploaded,
-                onCustomLength: onCustomLength,
-                onCustomViews: onCustomViews
-            )
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-    }
-
     private var recentChannels: [RecentChannel] {
         RecentChannel.entries(from: recentChannelsJSON)
     }
@@ -537,21 +517,6 @@ struct SearchContent: View {
         dismissKeyboard()
     }
 
-}
-
-/// Pins the filter chip above the results. iOS 26 `safeAreaBar` gives it the system scroll-edge
-/// treatment as rows pass beneath; earlier systems use an ordinary inset.
-@available(iOS 17.0, *)
-private struct SearchFilterBarInset<Bar: View>: ViewModifier {
-    @ViewBuilder let bar: () -> Bar
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.safeAreaBar(edge: .top, spacing: 0) { bar() }
-        } else {
-            content.safeAreaInset(edge: .top, spacing: 0) { bar() }
-        }
-    }
 }
 
 /// Inline field used on Mac, where native `.searchable` collapses to a toolbar button.
@@ -596,7 +561,14 @@ struct ConditionalSearchable: ViewModifier {
 
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(text: $text, isPresented: $isPresented, prompt: Text(prompt))
+            // Always visible, so ending presentation after submission keeps the query on screen
+            // with an ordinary navigation bar instead of hiding the field on scroll.
+            content.searchable(
+                text: $text,
+                isPresented: $isPresented,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: Text(prompt)
+            )
         } else {
             content
         }

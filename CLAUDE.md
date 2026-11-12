@@ -452,14 +452,15 @@ and a rejected strategy is excluded before requesting the next candidate.
   and a successful keyboard/suggestion/history submission swaps the root content to results in
   place—the same native search bar and query remain mounted, with no results-page push animation.
   The native clear button in the search field—or a swipe from the leading screen edge—clears that
- result/query state and reveals recent searches; do not add a separate Back button. Submission
- follows stock iOS: only the keyboard is dismissed and search stays active with the query and
- Cancel button in the field. Active search hides navigation-bar items, so the search filter is a
- chip pinned above results (`safeAreaBar` on iOS 26), not a toolbar item. Its Source option
- switches between YouTube (default) and YouTube Music; the source is a mode that survives new
- queries and filter resets, and Music disables sort/upload-date/length. Pushing a channel or
- playlist ends presentation first (iOS 26 can otherwise refocus the field and drop the push) while
- restoring the submitted text if SwiftUI clears it during that transition. Channels and playlists still push normally from their result rows. Results include
+ result/query state and reveals recent searches; do not add a separate Back button. The field uses
+ `.navigationBarDrawer(displayMode: .always)`, and submission ends presentation while preserving
+ the query, so results sit under an ordinary navigation bar with the field and the toolbar filter
+ visible. Keeping search active over results was tried and made the large title show through
+ faded and the list stick in its top bounce. The filter's Source option switches between YouTube
+ (default) and YouTube Music; the source is a mode that survives new queries and filter resets,
+ and Music disables sort/upload-date/length. Pushing a channel or playlist ends presentation first
+ and, if search was active, waits for the dismissal to finish (iOS 26 drops a push issued during
+ it) while restoring the submitted text if SwiftUI clears it during that transition. Channels and playlists still push normally from their result rows. Results include
   videos, channels, and playlists. iPhone and iPad retain native
   `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
   native search collapses awkwardly there. Search stays an ordinary peer tab—never assign

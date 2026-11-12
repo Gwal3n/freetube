@@ -31,6 +31,12 @@ struct HomeScreen: View {
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
 
+    private var showsSearchFilter: Bool {
+        // Keep the control available for type/sort filters even when the current page has no
+        // videos (e.g. Channels-only results).
+        searchModel.results != nil && !searchModel.isEditingNewQuery
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
@@ -45,15 +51,24 @@ struct HomeScreen: View {
                     onRunSearch: { query in
                         Task { await runSearch(query: query) }
                     },
-                    onOpenDestination: openDestination,
-                    onCustomUploaded: { customRange = .uploaded },
-                    onCustomLength: { customRange = .length },
-                    onCustomViews: { customRange = .views }
+                    onOpenDestination: openDestination
                 )
             }
             .contentShape(Rectangle())
             .navigationTitle("Search")
             .toolbar {
+                // Same trailing placement as Feed's filter control so the system Liquid Glass
+                // capsule wraps this button with the rest of the navigation chrome.
+                if showsSearchFilter {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SearchVideoFilterMenu(
+                            filters: Bindable(searchModel).videoFilters,
+                            onCustomUploaded: { customRange = .uploaded },
+                            onCustomLength: { customRange = .length },
+                            onCustomViews: { customRange = .views }
+                        )
+                    }
+                }
                 if incognitoEnabled && incognitoHideLibrary {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -142,6 +157,7 @@ struct HomeScreen: View {
     /// End search first, let that transaction settle, then perform the stack mutation.
     private func openDestination(_ destination: AppNavigationRequest.Destination) {
         navigationLog.info("Search destination requested: \(String(describing: destination), privacy: .public)")
+        let wasPresented = isSearchPresented
         if let submitted = searchModel.submittedQuery, !searchModel.isEditingNewQuery {
             endActiveSearch(preserving: submitted)
         } else {
@@ -154,7 +170,12 @@ struct HomeScreen: View {
             for: nil
         )
         Task { @MainActor in
-            await Task.yield()
+            // A push issued while the search dismissal is still animating is dropped on iOS 26.
+            if wasPresented {
+                try? await Task.sleep(for: .milliseconds(350))
+            } else {
+                await Task.yield()
+            }
             guard path.last != destination else {
                 navigationLog.info("Search destination already current")
                 return
@@ -197,14 +218,15 @@ struct HomeScreen: View {
             }
             return
         }
-        // Stock behavior: search stays active after submission, with the query and Cancel button
-        // in the field. Only the keyboard is dismissed (above).
+        // End active search as soon as the query is submitted so the navigation bar (title and
+        // filter) returns and results lay out below it, independent of keyboard notifications.
+        endActiveSearch(preserving: trimmed)
         await searchModel.submit()
     }
 
-    /// Ends native search presentation while keeping `query` in the field, used before pushing a
-    /// destination. SwiftUI may clear the bound text as part of that transition; the guard window
-    /// restores it instead of treating it as the user's clear action. Later clears behave normally.
+    /// Ends native search presentation while keeping `query` in the field. SwiftUI may clear the
+    /// bound text as part of that transition; the guard window restores it instead of treating
+    /// it as the user's clear action. Later clears (native clear button) behave normally.
     private func endActiveSearch(preserving query: String) {
         queryPreservedDuringDismissal = query
         isSearchPresented = false
