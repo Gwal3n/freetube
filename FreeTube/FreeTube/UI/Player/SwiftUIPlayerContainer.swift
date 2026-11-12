@@ -528,16 +528,49 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     || value.predictedEndTranslation.height > 230
                 )
                 if shouldCollapse {
-                    animateCollapse(in: size)
+                    animateCollapse(in: size, releaseVelocity: value.velocity.height)
                 } else {
-                    withAnimation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.08)) {
+                    withAnimation(reduceMotion ? nil : Self.releaseSpring(
+                        velocity: value.velocity.height,
+                        distance: -presentationTranslation,
+                        duration: 0.4, bounce: 0.06
+                    )) {
                         presentationTranslation = 0
                     }
                 }
             }
     }
 
-    private func animateCollapse(in size: CGSize) {
+    /// A spring that starts at the finger's release speed instead of from rest, so a flick
+    /// continues smoothly into the settle. SwiftUI expresses initial velocity relative to the
+    /// animated distance; it is clamped so a tiny remaining distance cannot overshoot wildly.
+    private static func releaseSpring(
+        velocity: CGFloat,
+        distance: CGFloat,
+        duration: Double = 0.42,
+        bounce: Double = 0
+    ) -> Animation {
+        guard abs(distance) > 1 else { return .spring(duration: duration, bounce: bounce) }
+        let relativeVelocity = min(12, max(-12, Double(velocity / distance)))
+        return .interpolatingSpring(duration: duration, bounce: bounce, initialVelocity: relativeVelocity)
+    }
+
+    /// Projects the 2D release velocity onto the path to the resting point; one animation drives
+    /// both axes, so only the component along that path is meaningful.
+    private static func floatingReleaseSpring(
+        from start: CGPoint,
+        to end: CGPoint,
+        velocity: CGSize
+    ) -> Animation {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let distance = (dx * dx + dy * dy).squareRoot()
+        guard distance > 1 else { return .spring(duration: 0.36, bounce: 0.1) }
+        let alongPath = (velocity.width * dx + velocity.height * dy) / distance
+        return releaseSpring(velocity: alongPath, distance: distance, duration: 0.38, bounce: 0.12)
+    }
+
+    private func animateCollapse(in size: CGSize, releaseVelocity: CGFloat = 0) {
         player.chapterListPresented = false
         guard !reduceMotion else {
             player.fullScreenPresented = false
@@ -546,7 +579,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             return
         }
         withAnimation(
-            .spring(duration: 0.42, bounce: 0.08),
+            Self.releaseSpring(
+                velocity: releaseVelocity,
+                distance: collapseTravel(in: size) - presentationTranslation,
+                duration: 0.42
+            ),
             completionCriteria: .logicallyComplete
         ) {
             presentationTranslation = collapseTravel(in: size)
@@ -607,7 +644,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                         : projected.y > size.height + window.height * 0.3
                 )
                 if verticalIntent && (movedBeyondEdge || flickedBeyondEdge) {
-                    dismissFloatingPlayer(in: size, window: window, from: actual)
+                    dismissFloatingPlayer(in: size, window: window, from: actual,
+                                          velocity: value.velocity.height)
                     return
                 }
 
@@ -672,7 +710,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 let nextCorner = FloatingCorner.nearest(
                     to: CGPoint(x: projected.x, y: destinationY), in: size
                 )
-                withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.36, dampingFraction: 0.82)) {
+                let cornerCenter = nextCorner.center(
+                    in: size, window: window,
+                    topInset: PlayerLayoutMetrics.safeAreaInsets.top,
+                    bottomInset: PlayerLayoutMetrics.bottomTabBarClearance
+                )
+                let destination = CGPoint(
+                    x: cornerCenter.x,
+                    y: snapsToCorner ? cornerCenter.y : destinationY
+                )
+                withAnimation(reduceMotion ? nil : Self.floatingReleaseSpring(
+                    from: actual, to: destination, velocity: value.velocity
+                )) {
                     floatingCorner = nextCorner
                     floatingRestingY = snapsToCorner ? nil : destinationY
                     floatingDragTranslation = .zero
@@ -910,14 +959,19 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         }
     }
 
-    private func dismissFloatingPlayer(in size: CGSize, window: CGSize, from actual: CGPoint) {
+    private func dismissFloatingPlayer(
+        in size: CGSize, window: CGSize, from actual: CGPoint, velocity: CGFloat
+    ) {
         floatingActionsSuppressed = true
         let targetY = floatingCorner.isTop ? -window.height : size.height + window.height
         guard !reduceMotion else {
             finishFloatingDismissal()
             return
         }
-        withAnimation(.smooth(duration: 0.2), completionCriteria: .logicallyComplete) {
+        withAnimation(
+            Self.releaseSpring(velocity: velocity, distance: targetY - actual.y, duration: 0.28),
+            completionCriteria: .logicallyComplete
+        ) {
             floatingDismissTranslation = CGSize(
                 width: 0,
                 height: targetY - actual.y

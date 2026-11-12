@@ -121,6 +121,28 @@ final class SearchLoadingTests: XCTestCase {
         XCTAssertFalse(model.didSearchFail)
     }
 
+    func testMusicSourceRoutesToMusicAndSurvivesNewQueries() async {
+        let service = ControlledSearchService()
+        let music = StubMusicSearchService()
+        let model = SearchViewModel(service: service, musicService: music)
+        model.query = "brat"
+        await model.submit()
+
+        let beforeFilters = model.videoFilters
+        model.videoFilters.length = .underFourMinutes
+        model.videoFilters.selectSource(.music)
+        XCTAssertEqual(model.videoFilters.length, .any)
+        model.serverFiltersDidChange(from: beforeFilters)
+        await waitUntil(music.queries == ["brat"])
+        XCTAssertEqual(model.results?.items.map(\.id), ["p:music-brat"])
+
+        model.query = "360"
+        await model.submit()
+        XCTAssertEqual(model.videoFilters.source, .music)
+        XCTAssertEqual(music.queries, ["brat", "360"])
+        XCTAssertEqual(service.searches.count, 1)
+    }
+
     private func waitUntil(
         _ condition: @autoclosure () -> Bool,
         timeout: TimeInterval = 1
@@ -130,6 +152,24 @@ final class SearchLoadingTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertTrue(condition())
+    }
+}
+
+@MainActor
+private final class StubMusicSearchService: MusicSearchServicing {
+    private(set) var queries: [String] = []
+
+    func search(query: String) async throws -> SearchResult {
+        queries.append(query)
+        return SearchResult(
+            items: [
+                .playlist(Playlist(
+                    id: "music-\(query)", title: query, channelID: nil, channelName: nil,
+                    thumbnailURL: nil, videoCount: 0, descriptionText: nil, isOwnedByUser: false
+                ))
+            ],
+            continuationToken: nil
+        )
     }
 }
 

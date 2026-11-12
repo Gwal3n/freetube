@@ -204,7 +204,14 @@ struct SearchNumericRangeSheet: View {
             }
         } label: {
             HStack(spacing: 3) {
-                Text(durationUnit.label)
+                // Sized to the widest unit so the menu button never resizes (and briefly clips
+                // its text) when the selection changes.
+                ZStack(alignment: .trailing) {
+                    ForEach(DurationUnit.allCases) { unit in
+                        Text(unit.label).hidden()
+                    }
+                    Text(durationUnit.label)
+                }
                 Image(systemName: "chevron.down")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.tertiary)
@@ -212,6 +219,7 @@ struct SearchNumericRangeSheet: View {
             .font(.footnote)
             .textCase(nil)
             .foregroundStyle(.secondary)
+            .transaction { $0.animation = nil }
         }
         .accessibilityLabel("Unit")
         .accessibilityValue(durationUnit.label)

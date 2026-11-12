@@ -31,12 +31,6 @@ struct HomeScreen: View {
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
 
-    private var showsSearchFilter: Bool {
-        // Keep the control available for type/sort filters even when the current page has no
-        // videos (e.g. Channels-only results).
-        searchModel.results != nil && !searchModel.isEditingNewQuery
-    }
-
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
@@ -51,24 +45,15 @@ struct HomeScreen: View {
                     onRunSearch: { query in
                         Task { await runSearch(query: query) }
                     },
-                    onOpenDestination: openDestination
+                    onOpenDestination: openDestination,
+                    onCustomUploaded: { customRange = .uploaded },
+                    onCustomLength: { customRange = .length },
+                    onCustomViews: { customRange = .views }
                 )
             }
             .contentShape(Rectangle())
             .navigationTitle("Search")
             .toolbar {
-                // Same trailing placement as Feed's filter control so the system Liquid Glass
-                // capsule wraps this button with the rest of the navigation chrome.
-                if showsSearchFilter {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        SearchVideoFilterMenu(
-                            filters: Bindable(searchModel).videoFilters,
-                            onCustomUploaded: { customRange = .uploaded },
-                            onCustomLength: { customRange = .length },
-                            onCustomViews: { customRange = .views }
-                        )
-                    }
-                }
                 if incognitoEnabled && incognitoHideLibrary {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -125,22 +110,6 @@ struct HomeScreen: View {
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
-                navigationLog.info("Search keyboard shown; presented=\(isSearchPresented, privacy: .public)")
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
-                navigationLog.info("Search keyboard hidden; presented=\(isSearchPresented, privacy: .public)")
-                // `.searchable(isPresented:)` does not always clear its presentation binding when
-                // UIKit dismisses the keyboard interactively. Active presentation hides the
-                // navigation bar (title, filter, and its safe-area inset), so a lingering true
-                // value leaves results under the status bar.
-                guard isSearchPresented else { return }
-                if let submitted = searchModel.submittedQuery, !searchModel.isEditingNewQuery {
-                    endActiveSearch(preserving: submitted)
-                } else {
-                    isSearchPresented = false
-                }
-            }
             .onChange(of: isSearchPresented) { _, isPresented in
                 navigationLog.info("Search presentation changed: \(isPresented, privacy: .public)")
                 if isPresented {
@@ -173,7 +142,11 @@ struct HomeScreen: View {
     /// End search first, let that transaction settle, then perform the stack mutation.
     private func openDestination(_ destination: AppNavigationRequest.Destination) {
         navigationLog.info("Search destination requested: \(String(describing: destination), privacy: .public)")
-        isSearchPresented = false
+        if let submitted = searchModel.submittedQuery, !searchModel.isEditingNewQuery {
+            endActiveSearch(preserving: submitted)
+        } else {
+            isSearchPresented = false
+        }
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
             to: nil,
@@ -224,15 +197,14 @@ struct HomeScreen: View {
             }
             return
         }
-        // End active search as soon as the query is submitted so the navigation bar (title and
-        // filter) returns and results lay out below it, independent of keyboard notifications.
-        endActiveSearch(preserving: trimmed)
+        // Stock behavior: search stays active after submission, with the query and Cancel button
+        // in the field. Only the keyboard is dismissed (above).
         await searchModel.submit()
     }
 
-    /// Ends native search presentation while keeping `query` in the field. SwiftUI may clear the
-    /// bound text as part of that transition; the guard window restores it instead of treating
-    /// it as the user's clear action. Later clears (native clear button) behave normally.
+    /// Ends native search presentation while keeping `query` in the field, used before pushing a
+    /// destination. SwiftUI may clear the bound text as part of that transition; the guard window
+    /// restores it instead of treating it as the user's clear action. Later clears behave normally.
     private func endActiveSearch(preserving query: String) {
         queryPreservedDuringDismissal = query
         isSearchPresented = false

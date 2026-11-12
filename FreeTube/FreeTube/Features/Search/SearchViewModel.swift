@@ -31,6 +31,7 @@ final class SearchViewModel {
     var videoFilters = SearchVideoFilters()
 
     private let service: any SearchServicing
+    private let musicService: any MusicSearchServicing
     private let videoService: any VideoServicing
     private let preferences = UserPreferences()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "SearchViewModel")
@@ -48,9 +49,11 @@ final class SearchViewModel {
 
     init(
         service: any SearchServicing = SearchService(),
+        musicService: any MusicSearchServicing = MusicSearchService(),
         videoService: any VideoServicing = VideoService()
     ) {
         self.service = service
+        self.musicService = musicService
         self.videoService = videoService
     }
 
@@ -178,11 +181,11 @@ final class SearchViewModel {
     }
 
     /// Called from Search UI when `videoFilters` changes. Local-only edits are ignored; a changed
-    /// InnerTube `params` blob re-runs the current query without clearing the list.
+    /// source or InnerTube `params` blob re-runs the current query without clearing the list.
     /// Requires mounted results so submit/clear resets (which nil out `results` first) do not
     /// schedule a redundant search.
     func serverFiltersDidChange(from oldValue: SearchVideoFilters) {
-        guard oldValue.serverParams != videoFilters.serverParams else { return }
+        guard oldValue.serverRequestKey != videoFilters.serverRequestKey else { return }
         guard submittedQuery != nil, results != nil, !isEditingNewQuery else { return }
         Task { await reloadForServerFilters() }
     }
@@ -194,6 +197,7 @@ final class SearchViewModel {
         searchGeneration &+= 1
         let generation = searchGeneration
         let paramsSnapshot = videoFilters.serverParams
+        let requestSnapshot = videoFilters.serverRequestKey
         errorState = nil
         paginationFailed = false
         didSearchFail = false
@@ -206,7 +210,7 @@ final class SearchViewModel {
                 params: paramsSnapshot
             )
             guard searchGeneration == generation,
-                  videoFilters.serverParams == paramsSnapshot else { return }
+                  videoFilters.serverRequestKey == requestSnapshot else { return }
             results = refreshed
             resultsRevision &+= 1
         } catch {
@@ -223,6 +227,10 @@ final class SearchViewModel {
         generation: Int,
         params: String? = nil
     ) async throws -> SearchResult {
+        if videoFilters.source == .music {
+            applyServerMirroredLocally = true
+            return try await musicService.search(query: query)
+        }
         let resolvedParams = params ?? videoFilters.serverParams
         guard let resolvedParams else {
             applyServerMirroredLocally = true
@@ -246,7 +254,7 @@ final class SearchViewModel {
     }
 
     private func resetFilters() {
-        videoFilters = SearchVideoFilters()
+        videoFilters = videoFilters.resettingFilters()
         applyServerMirroredLocally = true
     }
 

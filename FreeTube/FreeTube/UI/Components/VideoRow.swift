@@ -199,7 +199,7 @@ struct VideoRow: View {
                     }
                     Button(action: openVideo) {
                         channelName
-                            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(ResponsiveButtonStyle())

@@ -233,6 +233,22 @@ struct SearchVideoFilters: Equatable {
         }
     }
 
+    /// Which catalog to search. Music results carry no upload dates and usually no durations,
+    /// and the Music endpoint takes no sort/filter params, so those categories are disabled.
+    enum Source: String, CaseIterable, Identifiable {
+        case youtube, music
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .youtube: "YouTube"
+            case .music: "YouTube Music"
+            }
+        }
+    }
+
+    var source: Source = .youtube
     var sort: Sort = .relevance
     var resultType: ResultType = .any
     var watch: Watch = .all
@@ -242,6 +258,28 @@ struct SearchVideoFilters: Equatable {
     var customUploadedRange: DateRange? = nil
     var customLengthRange: NumericRange? = nil
     var customViewsRange: NumericRange? = nil
+
+    /// Default filters for the same source. The source is a search mode, not a narrowing filter,
+    /// so it is excluded from `isActive` and survives resets and new queries.
+    func resettingFilters() -> SearchVideoFilters {
+        var filters = SearchVideoFilters()
+        filters.source = source
+        return filters
+    }
+
+    /// Music results have no upload dates or sort params and mostly lack durations, so those
+    /// constraints are cleared rather than silently hiding every Music result.
+    mutating func selectSource(_ newSource: Source) {
+        source = newSource
+        guard newSource == .music else { return }
+        sort = .relevance
+        uploaded = .anytime
+        length = .any
+    }
+
+    var supportsServerConstraints: Bool {
+        source == .youtube
+    }
 
     var isActive: Bool {
         sort != .relevance
@@ -257,8 +295,14 @@ struct SearchVideoFilters: Equatable {
         serverParams != nil
     }
 
+    /// Everything that selects the remote request: catalog plus InnerTube `params`.
+    var serverRequestKey: String {
+        "\(source.rawValue)|\(serverParams ?? "")"
+    }
+
     /// InnerTube `params` blob, or `nil` when the request should stay an unfiltered query.
     var serverParams: String? {
+        guard source == .youtube else { return nil }
         let uploadedForServer = resultType.supportsVideoConstraints ? uploaded : .anytime
         let lengthForServer = resultType.supportsVideoConstraints ? length : .any
         return SearchParamsEncoder.encode(

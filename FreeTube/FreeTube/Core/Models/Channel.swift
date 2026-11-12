@@ -30,4 +30,18 @@ struct Channel: Identifiable, Hashable, Sendable {
             descriptionText: descriptionText
         )
     }
+
+    func withSubscribed(_ subscribed: Bool) -> Channel {
+        Channel(
+            id: id,
+            name: name,
+            handle: handle,
+            thumbnailURL: thumbnailURL,
+            bannerURL: bannerURL,
+            subscriberCount: subscriberCount,
+            videoCount: videoCount,
+            isSubscribed: subscribed,
+            descriptionText: descriptionText
+        )
+    }
 }

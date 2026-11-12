@@ -30,18 +30,22 @@ final class ChannelViewModel {
     private let service: any ChannelServicing
     private let localSubscriptions: LocalSubscriptionStore
     private let writer: PersistenceWriter
-    @ObservationIgnored private var initialLoadTask: Task<Void, Never>?
+    private let cache: ChannelDetailsCache
+    // Observed so pagination availability updates when background revalidation finishes.
+    private var initialLoadTask: Task<Void, Never>?
 
     init(
         channelID: String,
         service: any ChannelServicing = ChannelService(),
         localSubscriptions: LocalSubscriptionStore = .shared,
-        writer: PersistenceWriter = .shared
+        writer: PersistenceWriter = .shared,
+        cache: ChannelDetailsCache = .shared
     ) {
         self.channelID = channelID
         self.service = service
         self.localSubscriptions = localSubscriptions
         self.writer = writer
+        self.cache = cache
     }
 
     func load() async {
@@ -102,6 +106,14 @@ final class ChannelViewModel {
             isLoading = false
             initialLoadTask = nil
         }
+        if details == nil, let cached = cache.details(for: channelID) {
+            // Show the recently opened page immediately; the request below revalidates it and
+            // restores the service's continuation state for pagination.
+            let subscribed = localSubscriptions.subscriptions.contains { $0.id == channelID }
+            details = cached.replacingChannel(cached.channel.withSubscribed(subscribed))
+            videoTabs[.newest] = details?.videos
+            isLoading = false
+        }
         do {
             var loadedDetails = try await service.fetchChannel(id: channelID)
             if loadedDetails.channel.thumbnailURL == nil,
@@ -112,6 +124,7 @@ final class ChannelViewModel {
             }
             details = loadedDetails
             videoTabs[.newest] = loadedDetails.videos
+            cache.store(loadedDetails, for: channelID)
             if let channel = details?.channel, channel.isSubscribed {
                 // An imported CSV has no artwork. Refresh its stored display metadata the first
                 // time the user visits the channel, without changing subscription state.
@@ -125,6 +138,12 @@ final class ChannelViewModel {
             initialLoadFailed = details == nil
             errorState = ErrorState(from: error)
         }
+    }
+
+    /// Continuations need the service state that only a completed request restores, so a page
+    /// shown from `ChannelDetailsCache` cannot paginate until revalidation finishes.
+    private var isRevalidating: Bool {
+        initialLoadTask != nil
     }
 
     private func hydrateAvatarIfNeeded() async {
@@ -164,7 +183,7 @@ final class ChannelViewModel {
 
     /// True when YouTubeKit still has a continuation token for the underlying content tab.
     func canLoadMore(for tab: Tab) -> Bool {
-        guard let details else { return false }
+        guard let details, !isRevalidating else { return false }
         if isLoadingMore[tab] == true { return false }
         switch tab {
         case .allVideos:

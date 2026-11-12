@@ -18,7 +18,7 @@ final class ChannelLoadingTests: XCTestCase {
         let service = ChannelLoadingFixture()
         service.allowSuccess()
         service.holdRequests = true
-        let model = ChannelViewModel(channelID: "test-channel", service: service)
+        let model = ChannelViewModel(channelID: "test-channel", service: service, cache: ChannelDetailsCache())
         let appearance = Task { await model.load() }
         await service.waitForRequest()
         appearance.cancel()
@@ -39,7 +39,7 @@ final class ChannelLoadingTests: XCTestCase {
 
     func testFailureRemainsRecoverableAfterToastDismissal() async {
         let service = ChannelLoadingFixture()
-        let model = ChannelViewModel(channelID: "test-channel", service: service)
+        let model = ChannelViewModel(channelID: "test-channel", service: service, cache: ChannelDetailsCache())
         await model.load()
         XCTAssertTrue(model.initialLoadFailed)
         XCTAssertFalse(model.isLoading)
@@ -58,7 +58,7 @@ final class ChannelLoadingTests: XCTestCase {
     func testCancellationIsNotPresentedAsFailure() async {
         let service = ChannelLoadingFixture()
         service.cancelRequests()
-        let model = ChannelViewModel(channelID: "test-channel", service: service)
+        let model = ChannelViewModel(channelID: "test-channel", service: service, cache: ChannelDetailsCache())
         await model.load()
         XCTAssertFalse(model.initialLoadFailed)
         XCTAssertFalse(model.isLoading)
@@ -73,7 +73,7 @@ final class ChannelLoadingTests: XCTestCase {
     func testPullRefreshKeepsPreviouslyLoadedChannelOnFailure() async {
         let service = ChannelLoadingFixture()
         service.allowSuccess()
-        let model = ChannelViewModel(channelID: "test-channel", service: service)
+        let model = ChannelViewModel(channelID: "test-channel", service: service, cache: ChannelDetailsCache())
         await model.load()
         XCTAssertEqual(model.details?.channel.id, "test-channel")
 
@@ -84,6 +84,48 @@ final class ChannelLoadingTests: XCTestCase {
         XCTAssertNotNil(model.errorState)
         XCTAssertFalse(model.isRefreshing)
         XCTAssertEqual(service.requestCount, 2)
+    }
+
+    func testReopenedChannelShowsCachedPageWhileRevalidationFails() async {
+        let cache = ChannelDetailsCache()
+        let service = ChannelLoadingFixture()
+        service.allowSuccess()
+        let first = ChannelViewModel(channelID: "test-channel", service: service, cache: cache)
+        await first.load()
+
+        service.failRequests()
+        let reopened = ChannelViewModel(channelID: "test-channel", service: service, cache: cache)
+        await reopened.load()
+
+        XCTAssertEqual(reopened.details?.channel.id, "test-channel")
+        XCTAssertFalse(reopened.initialLoadFailed)
+        XCTAssertFalse(reopened.isLoading)
+        XCTAssertEqual(service.requestCount, 2)
+    }
+
+    func testChannelCacheEvictsLeastRecentlyUsedAndExpiredEntries() {
+        let cache = ChannelDetailsCache(capacity: 2, lifetime: 60)
+        let start = Date(timeIntervalSince1970: 0)
+        cache.store(Self.details(id: "a"), for: "a", now: start)
+        cache.store(Self.details(id: "b"), for: "b", now: start)
+        XCTAssertNotNil(cache.details(for: "a", now: start))
+        cache.store(Self.details(id: "c"), for: "c", now: start)
+
+        XCTAssertNil(cache.details(for: "b", now: start))
+        XCTAssertNotNil(cache.details(for: "a", now: start))
+        XCTAssertNil(cache.details(for: "c", now: start.addingTimeInterval(61)))
+    }
+
+    private static func details(id: String) -> ChannelDetails {
+        ChannelDetails(
+            channel: Channel(id: id, name: id, handle: nil, thumbnailURL: nil,
+                             bannerURL: nil, subscriberCount: nil, videoCount: nil,
+                             isSubscribed: false, descriptionText: nil),
+            videos: ChannelTab(items: [], continuationToken: nil),
+            shorts: ChannelTab(items: [], continuationToken: nil),
+            directs: ChannelTab(items: [], continuationToken: nil),
+            playlists: ChannelTab(items: [], continuationToken: nil)
+        )
     }
 }
 
