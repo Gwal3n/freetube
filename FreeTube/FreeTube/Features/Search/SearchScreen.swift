@@ -44,6 +44,10 @@ struct SearchContent: View {
     @State private var blocklist = VideoBlocklist.shared
     @State private var lastFilteredPrefetch: FilterPageKey?
     @State private var showingClearSearchHistoryConfirmation = false
+    @State private var visibleRecentChannelCount = Self.recentChannelPageSize
+    @AppStorage(RecentHistoryLimits.searchKey) private var recentSearchLimit = RecentHistoryLimits.defaultSearchLimit
+    /// Recent channels start with this many rows; More reveals the same number again.
+    private static let recentChannelPageSize = 3
     private let navigationLog = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
     /// Recently entered search queries, newest first. Tapping one re-runs the search.
@@ -422,79 +426,75 @@ struct SearchContent: View {
 
     @ViewBuilder
     private var historyList: some View {
+        // Headings are ordinary rows rather than Section headers, which a plain List pins.
         List {
-            if !recentChannels.isEmpty {
-                Section {
-                    ForEach(recentChannels) { entry in
-                        NavigationLink {
-                            ChannelScreen(channelID: entry.id)
-                        } label: {
-                            ChannelRow(channel: entry.channel)
-                        }
-                        .mediaListRow()
+            let channels = recentChannels
+            if !channels.isEmpty {
+                historyHeading("Recent channels", clearLabel: "Clear recent channels") {
+                    recentChannelsJSON = "[]"
+                    visibleRecentChannelCount = Self.recentChannelPageSize
+                }
+                ForEach(Array(channels.prefix(visibleRecentChannelCount))) { entry in
+                    NavigationLink {
+                        ChannelScreen(channelID: entry.id)
+                    } label: {
+                        ChannelRow(channel: entry.channel)
                     }
-                    .onDelete { offsets in
-                        var entries = recentChannels
-                        entries.remove(atOffsets: offsets)
-                        if let json = RecentChannel.json(from: entries) {
-                            recentChannelsJSON = json
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Recent channels")
-                        Spacer()
-                        Button("Clear") { recentChannelsJSON = "[]" }
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .textCase(nil)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .accessibilityLabel("Clear recent channels")
+                    .mediaListRow()
+                }
+                .onDelete { offsets in
+                    var entries = channels
+                    entries.remove(atOffsets: offsets)
+                    if let json = RecentChannel.json(from: entries) {
+                        recentChannelsJSON = json
                     }
                 }
+                if channels.count > visibleRecentChannelCount {
+                    Button {
+                        visibleRecentChannelCount += Self.recentChannelPageSize
+                    } label: {
+                        Text("More")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.tint)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .accessibilityLabel("Show more recent channels")
+                }
             }
-            if !history.isEmpty {
-                Section {
-                    ForEach(history) { entry in
-                        Button {
-                            if isSearching || MacIntegration.isRunningOnMac {
-                                model.query = entry.query
-                                onRunSearch(entry.query)
-                                dismissKeyboard()
-                            } else {
-                                // Running from the inactive screen would show results outside the
-                                // active search; fill the field instead and submit from there.
-                                onEditQuery(entry.query)
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .foregroundStyle(.secondary)
-                                Text(entry.query)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
+            let searches = Array(history.prefix(recentSearchLimit))
+            if !searches.isEmpty {
+                historyHeading("Recent searches", clearLabel: "Clear recent searches") {
+                    showingClearSearchHistoryConfirmation = true
+                }
+                ForEach(searches) { entry in
+                    Button {
+                        if isSearching || MacIntegration.isRunningOnMac {
+                            model.query = entry.query
+                            onRunSearch(entry.query)
+                            dismissKeyboard()
+                        } else {
+                            // Running from the inactive screen would show results outside the
+                            // active search; fill the field instead and submit from there.
+                            onEditQuery(entry.query)
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundStyle(.secondary)
+                            Text(entry.query)
+                                .foregroundStyle(.primary)
+                            Spacer()
                         }
                     }
-                    .onDelete { offsets in
-                        for index in offsets {
-                            modelContext.delete(history[index])
-                        }
-                        try? modelContext.save()
+                }
+                .onDelete { offsets in
+                    for index in offsets {
+                        modelContext.delete(searches[index])
                     }
-                } header: {
-                    HStack {
-                        Text("Recent searches")
-                        Spacer()
-                        Button("Clear") {
-                            showingClearSearchHistoryConfirmation = true
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                        .textCase(nil)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .accessibilityLabel("Clear recent searches")
-                    }
+                    try? modelContext.save()
                 }
             }
         }
@@ -577,6 +577,30 @@ struct SearchContent: View {
         .transaction { $0.animation = nil }
         .accessibilityLabel("Result type")
         .accessibilityValue(model.videoFilters.resultType.title)
+    }
+
+    /// A scrolling section heading with a trailing Clear action.
+    private func historyHeading(
+        _ title: LocalizedStringKey,
+        clearLabel: LocalizedStringKey,
+        onClear: @escaping () -> Void
+    ) -> some View {
+        HStack {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button("Clear", action: onClear)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .buttonStyle(.plain)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel(clearLabel)
+        }
+        .padding(.top, 8)
+        .listRowSeparator(.hidden)
+        .deleteDisabled(true)
     }
 
     private var recentChannels: [RecentChannel] {

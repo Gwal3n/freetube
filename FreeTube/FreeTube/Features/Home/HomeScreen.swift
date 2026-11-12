@@ -169,6 +169,15 @@ struct HomeScreen: View {
             } else {
                 modelContext.insert(SearchHistoryEntry(query: trimmed))
             }
+            let limit = RecentHistoryLimits.searchLimit()
+            let newestFirst = FetchDescriptor<SearchHistoryEntry>(
+                sortBy: [SortDescriptor(\.searchedAt, order: .reverse)]
+            )
+            if let entries = try? modelContext.fetch(newestFirst), entries.count > limit {
+                for entry in entries.dropFirst(limit) {
+                    modelContext.delete(entry)
+                }
+            }
             try? modelContext.save()
         }
         if let directVideo = searchModel.directVideo(from: trimmed) {

@@ -450,7 +450,11 @@ and a rejected strategy is excluded before requesting the next candidate.
 - **Search is search-only and follows stock iOS search.** It must not request or render a
  home/trending/discovery feed. The field uses `.navigationBarDrawer(displayMode: .always)`.
  Recent channels and recent searches show whether or not search is active (the clean empty
- state appears only when both are empty). Inactive, a recent search opens the field with that
+ state appears only when both are empty). Their headings are ordinary scrolling rows, never
+ pinned Section headers. Channels show three at a time with a More row revealing three more.
+ Privacy settings set how many of each to keep by typing any value from 1 to 500 in a
+ number-entry alert (the same pattern as the custom seek interval)
+ (`RecentHistoryLimits`; defaults 20 searches, 12 channels); saving trims older entries and display honors a lowered limit immediately. Inactive, a recent search opens the field with that
  query filled in and its suggestions showing, ready to submit; it never runs from the inactive
  screen, because that would show results outside the active search. Active, a recent search runs
  immediately. Live suggestions appear while typing. A keyboard/suggestion/history submission swaps the content to results in place and

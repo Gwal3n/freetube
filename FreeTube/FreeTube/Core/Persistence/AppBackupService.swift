@@ -171,7 +171,7 @@ final class AppBackupService {
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "playerPanelSectionOrder",
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
-        "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "saveWatchHistory", "seekPreviewStyle", "showHoldSpeedPill", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
+        "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "recentSearchLimit", "recentChannelLimit", "saveWatchHistory", "seekPreviewStyle", "showHoldSpeedPill", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "pinCommentsHeading", "pinUpNextHeading", "pinQueueHeading", "showDescription", "showFeedChannelAvatars", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
         "showCommentAuthorPhotos", "openCommentAuthorChannels", "openFeedChannelsOnTap", "openUpNextChannelsOnTap",
         "showContinueWatchingMenu", "showHistoryProgressBars", "watchProgressColorMode", "watchProgressCustomHex", "finishedVideoIndicator", "transportButtonMode", "transportSeekSeconds", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",

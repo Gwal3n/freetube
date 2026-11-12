@@ -10,15 +10,15 @@ final class RecentChannelTests: XCTestCase {
                           handle: nil, thumbnailURL: nil)
         }
         let oldJSON = try XCTUnwrap(String(data: JSONEncoder().encode(channels), encoding: .utf8))
-        var visible = RecentChannel.entries(from: oldJSON)
+        var visible = RecentChannel.entries(from: oldJSON, limit: 3)
         XCTAssertEqual(visible.map(\.id), ["channel-1", "channel-2", "channel-3"])
-        let limitedJSON = try XCTUnwrap(RecentChannel.json(from: channels))
+        let limitedJSON = try XCTUnwrap(RecentChannel.json(from: channels, limit: 3))
         XCTAssertEqual(try JSONDecoder().decode([RecentChannel].self,
                                                 from: XCTUnwrap(limitedJSON.data(using: .utf8))).count, 3)
 
         visible.remove(at: 1)
-        let updatedJSON = try XCTUnwrap(RecentChannel.json(from: visible))
-        XCTAssertEqual(RecentChannel.entries(from: updatedJSON).map(\.id),
+        let updatedJSON = try XCTUnwrap(RecentChannel.json(from: visible, limit: 3))
+        XCTAssertEqual(RecentChannel.entries(from: updatedJSON, limit: 3).map(\.id),
                        ["channel-1", "channel-3"])
     }
 
