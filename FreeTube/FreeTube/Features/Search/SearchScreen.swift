@@ -529,18 +529,19 @@ struct SearchContent: View {
                     onCustomLength: onCustomLength,
                     onCustomViews: onCustomViews
                 )
+                .padding(.trailing, 4.33)
             }
             .frame(height: 44)
             Text("Search")
                 .font(.largeTitle.bold())
                 .accessibilityAddTraits(.isHeader)
                 .padding(.leading, 4)
-                .padding(.top, 18)
+                .padding(.top, 16.67)
             resultTypePicker
-                .padding(.top, 22)
+                .padding(.top, 26.33)
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 7)
+        .padding(.bottom, 16)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
     }

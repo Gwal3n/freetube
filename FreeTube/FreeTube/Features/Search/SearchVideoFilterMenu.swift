@@ -106,7 +106,7 @@ struct SearchVideoFilterMenu: View {
             // Fixed frame with the dot as an overlay: the label never changes size, so the List
             // row does not re-measure when filters or the source change.
             Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .font(.body.weight(.semibold))
+                .font(.system(size: 26.5))
                 .foregroundStyle(.tint)
                 .frame(width: 44, height: 44)
                 .modifier(FilterButtonBackground())
