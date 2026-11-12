@@ -7,9 +7,13 @@ struct PlaybackSettingsScreen: View {
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("playbackSpeedChoices") private var savedPlaybackSpeedsRaw = ""
     @AppStorage("customPlaybackSpeeds") private var legacyCustomPlaybackSpeedsRaw = ""
-    @AppStorage("showHoldSpeedPill") private var showHoldSpeedPill = true
+    @AppStorage(HoldSpeedIndicatorStyle.storageKey) private var holdSpeedIndicatorStyleRaw = HoldSpeedIndicatorStyle.storedDefault
+    @AppStorage(HoldSpeedIndicatorStyle.autoHideKey) private var holdSpeedIndicatorAutoHide = false
+    @AppStorage(HoldSpeedIndicatorStyle.hideDelayKey) private var holdSpeedIndicatorHideDelay = HoldSpeedIndicatorStyle.defaultHideDelay
     @State private var showingHoldSpeedEditor = false
     @State private var holdSpeedText = ""
+    @State private var showingHideDelayEditor = false
+    @State private var hideDelayText = ""
 
     var body: some View {
         Form {
@@ -70,9 +74,35 @@ struct PlaybackSettingsScreen: View {
                 .disabled(!model.holdForSpeedEnabled)
                 .settingsSearchRow("Hold speed")
                 if model.holdForSpeedEnabled {
-                    Toggle("Show hold-speed pill", isOn: $showHoldSpeedPill)
-                        .tint(settingsToggleTint)
-                        .settingsSearchRow("Show hold-speed pill")
+                    Picker("Speed indicator", selection: $holdSpeedIndicatorStyleRaw) {
+                        ForEach(HoldSpeedIndicatorStyle.allCases) { style in
+                            Text(style.title).tag(style.rawValue)
+                        }
+                    }
+                    .settingsSearchRow("Speed indicator")
+                    if holdSpeedIndicatorStyleRaw != HoldSpeedIndicatorStyle.none.rawValue {
+                        Toggle("Hide speed indicator", isOn: $holdSpeedIndicatorAutoHide)
+                            .tint(settingsToggleTint)
+                            .settingsSearchRow("Hide speed indicator")
+                        if holdSpeedIndicatorAutoHide {
+                            Button {
+                                hideDelayText = holdSpeedIndicatorHideDelay
+                                    .formatted(.number.precision(.fractionLength(0...1)))
+                                showingHideDelayEditor = true
+                            } label: {
+                                LabeledContent("Hide after") {
+                                    Text(verbatim: Measurement(value: holdSpeedIndicatorHideDelay, unit: UnitDuration.seconds)
+                                        .formatted(.measurement(
+                                            width: .abbreviated,
+                                            numberFormatStyle: .number.precision(.fractionLength(0...1))
+                                        )))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .tint(.primary)
+                            .settingsSearchRow("Hide after")
+                        }
+                    }
                 }
                 Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     .tint(settingsToggleTint)
@@ -106,6 +136,25 @@ struct PlaybackSettingsScreen: View {
         } message: {
             Text("Enter 0.25× to 5×, with up to two decimal places.")
         }
+        .alert("Hide after", isPresented: $showingHideDelayEditor) {
+            TextField("Seconds", text: $hideDelayText)
+                .keyboardType(.decimalPad)
+            Button("Save") {
+                if let delay = parsedHideDelay { holdSpeedIndicatorHideDelay = delay }
+            }
+            .disabled(parsedHideDelay == nil)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter 0.5 to 10 seconds.")
+        }
+    }
+
+    /// Accepts the device's decimal separator; one decimal place is kept.
+    private var parsedHideDelay: Double? {
+        let text = hideDelayText.trimmingCharacters(in: .whitespaces)
+        guard let value = try? Double(text, format: .number),
+              HoldSpeedIndicatorStyle.hideDelayRange.contains(value) else { return nil }
+        return (value * 10).rounded() / 10
     }
 
     private var defaultPlaybackRates: [Double] {

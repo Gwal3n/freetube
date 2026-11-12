@@ -49,6 +49,7 @@ struct FullScreenPlayer: View {
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var isFrameStepping = false
     @State private var isHoldingForSpeed = false
+    @State private var holdSpeedIndicatorExpired = false
     @State private var panelScrollOffset: CGFloat = 0
     @State private var panelViewportHeight: CGFloat = 0
     @State private var commentsHeadingBottom: CGFloat = 0
@@ -92,7 +93,9 @@ struct FullScreenPlayer: View {
     @AppStorage("holdForSpeedEnabled") private var holdForSpeedEnabled = true
     @AppStorage("centerTapPlayPauseEnabled") private var centerTapPlayPauseEnabled = false
     @AppStorage("holdSpeedRate") private var holdSpeedRate = 2.0
-    @AppStorage("showHoldSpeedPill") private var showHoldSpeedPill = true
+    @AppStorage(HoldSpeedIndicatorStyle.storageKey) private var holdSpeedIndicatorStyleRaw = HoldSpeedIndicatorStyle.storedDefault
+    @AppStorage(HoldSpeedIndicatorStyle.autoHideKey) private var holdSpeedIndicatorAutoHide = false
+    @AppStorage(HoldSpeedIndicatorStyle.hideDelayKey) private var holdSpeedIndicatorHideDelay = HoldSpeedIndicatorStyle.defaultHideDelay
     @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
     @AppStorage("doubleTapSeekSeconds") private var doubleTapSeekSeconds = 10
     @AppStorage("playerTopControlOrder") private var playerTopControlOrderRaw = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
@@ -262,8 +265,8 @@ struct FullScreenPlayer: View {
                         anchor: .bottom
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
-                    if !isFloating, let badgeText = gestureBadgeText {
-                        PlayerGestureBadge(text: badgeText)
+                    if !isFloating, let badge = gestureBadge {
+                        PlayerGestureBadge(text: badge.text, isPlain: badge.isPlain)
                             .position(
                                 x: controlFrame.midX,
                                 y: controlFrame.minY + max(26, controlFrame.height * 0.10)
@@ -344,6 +347,15 @@ struct FullScreenPlayer: View {
                     )
                 }
                 .onDisappear { controlsVisibility.cancelAutoHide() }
+                .task(id: isHoldingForSpeed) {
+                    holdSpeedIndicatorExpired = false
+                    guard isHoldingForSpeed, holdSpeedIndicatorAutoHide else { return }
+                    let delay = min(max(holdSpeedIndicatorHideDelay, HoldSpeedIndicatorStyle.hideDelayRange.lowerBound),
+                                    HoldSpeedIndicatorStyle.hideDelayRange.upperBound)
+                    try? await Task.sleep(for: .seconds(delay))
+                    guard !Task.isCancelled else { return }
+                    holdSpeedIndicatorExpired = true
+                }
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     isFrameStepping = false
                     isHoldingForSpeed = false
@@ -764,11 +776,15 @@ struct FullScreenPlayer: View {
         .zIndex(3)
     }
 
-    private var gestureBadgeText: String? {
+    /// Hold-speed feedback follows its chosen style and optional auto-hide; seek feedback always
+    /// uses the pill.
+    private var gestureBadge: (text: String, isPlain: Bool)? {
         if isHoldingForSpeed {
-            return showHoldSpeedPill ? PlaybackSpeedPresets.label(player.effectivePlaybackRate) : nil
+            let style = HoldSpeedIndicatorStyle(rawValue: holdSpeedIndicatorStyleRaw) ?? .pill
+            guard style != .none, !holdSpeedIndicatorExpired else { return nil }
+            return (PlaybackSpeedPresets.label(player.effectivePlaybackRate), style == .text)
         }
-        return gestureSeekFeedback
+        return gestureSeekFeedback.map { ($0, false) }
     }
 
     // MARK: - Lower section

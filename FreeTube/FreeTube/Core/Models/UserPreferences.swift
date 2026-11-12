@@ -126,7 +126,9 @@ struct UserPreferences {
     @AppStorage("holdForSpeedEnabled") var holdForSpeedEnabled: Bool = true
     @AppStorage("centerTapPlayPauseEnabled") var centerTapPlayPauseEnabled: Bool = false
     @AppStorage("holdSpeedRate") var holdSpeedRate: Double = 2.0
-    @AppStorage("showHoldSpeedPill") var showHoldSpeedPill: Bool = true
+    @AppStorage(HoldSpeedIndicatorStyle.storageKey) var holdSpeedIndicatorStyleRaw: String = HoldSpeedIndicatorStyle.storedDefault
+    @AppStorage(HoldSpeedIndicatorStyle.autoHideKey) var holdSpeedIndicatorAutoHide: Bool = false
+    @AppStorage(HoldSpeedIndicatorStyle.hideDelayKey) var holdSpeedIndicatorHideDelay: Double = HoldSpeedIndicatorStyle.defaultHideDelay
     @AppStorage("playerScrubberColorMode") var playerScrubberColorModeRaw: String = PlayerScrubberColorMode.standard.rawValue
     @AppStorage("playerScrubberCustomHex") var playerScrubberCustomHex: String = "#FF0000"
     @AppStorage("sponsorBlockColorOverridesJSON") var sponsorBlockColorOverridesJSON: String = "{}"

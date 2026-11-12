@@ -97,9 +97,19 @@ enum SettingsSearchIndex {
             case .player where displayTitle == String(localized: "Custom scrubber color")
                 && UserPreferences().playerScrubberColorModeRaw != PlayerScrubberColorMode.custom.rawValue:
                 return String(localized: "Scrubber color")
-            case .playback where displayTitle == String(localized: "Show hold-speed pill")
-                && !UserPreferences().holdForSpeedEnabled:
+            case .playback where [
+                String(localized: "Speed indicator"),
+                String(localized: "Hide speed indicator"),
+                String(localized: "Hide after")
+            ].contains(displayTitle) && !UserPreferences().holdForSpeedEnabled:
                 return String(localized: "Hold for speed")
+            case .playback where (displayTitle == String(localized: "Hide speed indicator")
+                || displayTitle == String(localized: "Hide after"))
+                && UserPreferences().holdSpeedIndicatorStyleRaw == HoldSpeedIndicatorStyle.none.rawValue:
+                return String(localized: "Speed indicator")
+            case .playback where displayTitle == String(localized: "Hide after")
+                && !UserPreferences().holdSpeedIndicatorAutoHide:
+                return String(localized: "Hide speed indicator")
             case .captions where displayTitle == String(localized: "Captions"):
                 return String(localized: "Dark caption background")
             case .player where (displayTitle == String(localized: "Left side")
@@ -167,7 +177,7 @@ enum SettingsSearchIndex {
     // at runtime. SwiftUI views do not expose a reliable searchable control hierarchy.
     private static let groups: [Group] = [
         Group(destination: .playback, titles: [
-            "Playback", "Default playback quality", "Cellular streaming limit", "Sleep timer durations", "Hold for speed", "Hold speed", "Show hold-speed pill",
+            "Playback", "Default playback quality", "Cellular streaming limit", "Sleep timer durations", "Hold for speed", "Hold speed", "Speed indicator", "Hide speed indicator", "Hide after",
             "Autoplay next video", "Allow audio from other apps", "Resume after interruptions"
         ]),
         Group(destination: .player, titles: [
