@@ -106,7 +106,7 @@ struct SearchVideoFilterMenu: View {
             // Fixed frame with the dot as an overlay: the label never changes size, so the List
             // row does not re-measure when filters or the source change.
             Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .font(.system(size: 26.5))
+                .font(.system(size: 22))
                 .foregroundStyle(.tint)
                 .frame(width: 44, height: 44)
                 .modifier(FilterButtonBackground())
@@ -127,12 +127,15 @@ struct SearchVideoFilterMenu: View {
 }
 
 /// The same Liquid Glass circle the system draws around Feed's toolbar filter on iOS 26; earlier
-/// systems show a plain icon there, so this does too.
+/// systems show a plain icon there, so this does too. Bare glass in a List row renders darker
+/// than the navigation bar's, so a faint white fill brings it to the toolbar button's tone.
 @available(iOS 17.0, *)
 private struct FilterButtonBackground: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: Circle())
+            content
+                .background(Circle().fill(.white.opacity(0.025)))
+                .glassEffect(.regular.interactive(), in: Circle())
         } else {
             content
         }
