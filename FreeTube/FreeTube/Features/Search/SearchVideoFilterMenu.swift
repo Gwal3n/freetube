@@ -103,22 +103,19 @@ struct SearchVideoFilterMenu: View {
             }
             .disabled(!filters.isNarrowedBeyondType)
         } label: {
-            // Fixed frame with the dot as an overlay: the label never changes size, so the List
-            // row does not re-measure when filters or the source change.
+            // A fixed square that fits either symbol keeps the button from resizing when the
+            // source changes, so the List row never re-measures.
             Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .font(.system(size: 22))
-                .foregroundStyle(.tint)
-                .frame(width: 44, height: 44)
-                .modifier(FilterButtonBackground())
-                .overlay(alignment: .topTrailing) {
-                    if filters.isNarrowedBeyondType {
-                        Circle()
-                            .fill(.tint)
-                            .frame(width: 7, height: 7)
-                            .offset(x: -6, y: 6)
-                    }
-                }
-                .contentShape(Circle())
+                .frame(width: 24, height: 24)
+        }
+        .modifier(FilterButtonStyle())
+        .overlay(alignment: .topTrailing) {
+            if filters.isNarrowedBeyondType {
+                Circle()
+                    .fill(.tint)
+                    .frame(width: 7, height: 7)
+                    .allowsHitTesting(false)
+            }
         }
         .transaction { $0.animation = nil }
         .accessibilityLabel("Filter search videos")
@@ -126,18 +123,20 @@ struct SearchVideoFilterMenu: View {
     }
 }
 
-/// The same Liquid Glass circle the system draws around Feed's toolbar filter on iOS 26; earlier
-/// systems show a plain icon there, so this does too. Bare glass in a List row renders darker
-/// than the navigation bar's, so a faint white fill brings it to the toolbar button's tone.
+/// The system's native glass circular button on iOS 26, like Feed's toolbar filter; earlier
+/// systems show a plain icon there, so this does too.
 @available(iOS 17.0, *)
-private struct FilterButtonBackground: ViewModifier {
+private struct FilterButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .background(Circle().fill(.white.opacity(0.025)))
-                .glassEffect(.regular.interactive(), in: Circle())
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
         } else {
             content
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
     }
 }
