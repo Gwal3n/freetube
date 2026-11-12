@@ -20,9 +20,13 @@ struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
     let onOpenDestination: (AppNavigationRequest.Destination) -> Void
+    let onCustomUploaded: () -> Void
+    let onCustomLength: () -> Void
+    let onCustomViews: () -> Void
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismissSearch) private var dismissSearch
+    @Environment(\.isSearching) private var isSearching
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
@@ -62,8 +66,11 @@ struct SearchContent: View {
                     }
                     .buttonStyle(.bordered)
                 }
-            } else if (!history.isEmpty || !recentChannels.isEmpty)
+            } else if (isSearching || MacIntegration.isRunningOnMac)
+                        && (!history.isEmpty || !recentChannels.isEmpty)
                         && !(incognitoEnabled && incognitoSkipSearchHistory) {
+                // As in system apps, recent searches belong to the active field, so every search
+                // starts from (and its results stay in) the same active presentation.
                 historyList
             } else {
                 ContentUnavailableView(
@@ -96,11 +103,18 @@ struct SearchContent: View {
             includes($0, now: now, status: watchStatus(for: $0))
         }
         if results.items.isEmpty {
-            ContentUnavailableView(
-                "No Results",
-                systemImage: "magnifyingglass",
-                description: Text("No results were found for “\(model.submittedQuery ?? model.query)”.")
-            )
+            ContentUnavailableView {
+                Label("No Results", systemImage: "magnifyingglass")
+            } description: {
+                Text("No results were found for “\(model.submittedQuery ?? model.query)”.")
+            } actions: {
+                if model.videoFilters.isActive {
+                    Button("Reset Filters") {
+                        model.videoFilters = model.videoFilters.resettingFilters()
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
         } else if unblockedItems.isEmpty && results.continuationToken == nil {
             ContentUnavailableView(
                 "No Unblocked Results",
@@ -109,6 +123,8 @@ struct SearchContent: View {
             )
         } else {
             List {
+                filterRow
+
                 if visibleItems.isEmpty {
                     VStack(spacing: 8) {
                         Group {
@@ -492,6 +508,22 @@ struct SearchContent: View {
         }
     }
 
+    /// The filter is the first row of the results, so it scrolls away with them. Active search
+    /// hides navigation-bar items, and a pinned bar over the List fought its scroll edge.
+    private var filterRow: some View {
+        HStack {
+            SearchVideoFilterMenu(
+                filters: $model.videoFilters,
+                onCustomUploaded: onCustomUploaded,
+                onCustomLength: onCustomLength,
+                onCustomViews: onCustomViews
+            )
+            Spacer(minLength: 0)
+        }
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+        .listRowSeparator(.hidden)
+    }
+
     private var recentChannels: [RecentChannel] {
         RecentChannel.entries(from: recentChannelsJSON)
     }
@@ -561,8 +593,7 @@ struct ConditionalSearchable: ViewModifier {
 
     func body(content: Content) -> some View {
         if enabled {
-            // Always visible, so ending presentation after submission keeps the query on screen
-            // with an ordinary navigation bar instead of hiding the field on scroll.
+            // Always visible below the title, so the inactive screen never hides the field on scroll.
             content.searchable(
                 text: $text,
                 isPresented: $isPresented,

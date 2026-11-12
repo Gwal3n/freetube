@@ -18,8 +18,6 @@ struct HomeScreen: View {
     @State private var searchModel = SearchViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var isSearchPresented = false
-    /// Submitted query to restore if ending native search presentation clears the field text.
-    @State private var queryPreservedDuringDismissal: String?
     @State private var customRange: CustomRange?
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
@@ -30,12 +28,6 @@ struct HomeScreen: View {
     /// Recent search queries — same store the previous Search tab used. Stays here so the
     /// host can do the upsert in `runSearch` (the field's submit fires on this view).
     @Query(sort: \SearchHistoryEntry.searchedAt, order: .reverse) private var history: [SearchHistoryEntry]
-
-    private var showsSearchFilter: Bool {
-        // Keep the control available for type/sort filters even when the current page has no
-        // videos (e.g. Channels-only results).
-        searchModel.results != nil && !searchModel.isEditingNewQuery
-    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -51,24 +43,15 @@ struct HomeScreen: View {
                     onRunSearch: { query in
                         Task { await runSearch(query: query) }
                     },
-                    onOpenDestination: openDestination
+                    onOpenDestination: openDestination,
+                    onCustomUploaded: { customRange = .uploaded },
+                    onCustomLength: { customRange = .length },
+                    onCustomViews: { customRange = .views }
                 )
             }
             .contentShape(Rectangle())
             .navigationTitle("Search")
             .toolbar {
-                // Same trailing placement as Feed's filter control so the system Liquid Glass
-                // capsule wraps this button with the rest of the navigation chrome.
-                if showsSearchFilter {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        SearchVideoFilterMenu(
-                            filters: Bindable(searchModel).videoFilters,
-                            onCustomUploaded: { customRange = .uploaded },
-                            onCustomLength: { customRange = .length },
-                            onCustomViews: { customRange = .views }
-                        )
-                    }
-                }
                 if incognitoEnabled && incognitoHideLibrary {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -125,31 +108,15 @@ struct HomeScreen: View {
             .onSubmit(of: .search) {
                 Task { await runSearch() }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
-                // Reopening the field over results and dismissing the keyboard without editing
-                // returns to the same closed state that submission produces. An edited query keeps
-                // search open so its suggestions stay available.
-                guard isSearchPresented,
-                      let submitted = searchModel.submittedQuery,
-                      !searchModel.isEditingNewQuery else { return }
-                endActiveSearch(preserving: submitted)
-            }
             .onChange(of: isSearchPresented) { _, isPresented in
                 navigationLog.info("Search presentation changed: \(isPresented, privacy: .public)")
-                if isPresented {
-                    queryPreservedDuringDismissal = nil
-                }
             }
             .onChange(of: path) { oldPath, newPath in
                 navigationLog.info("Search path changed: \(oldPath.count, privacy: .public) → \(newPath.count, privacy: .public)")
             }
-            // Clearing the field returns to recent searches (or the clean empty state).
+            // Clearing the field, or Cancel (which clears it), returns to recent searches.
             .onChange(of: searchModel.query) { _, newValue in
                 guard newValue.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                if let preserved = queryPreservedDuringDismissal {
-                    searchModel.query = preserved
-                    return
-                }
                 searchModel.clearResults()
             }
             .onChange(of: navigationRouter.search?.id, initial: true) { _, _ in
@@ -161,37 +128,22 @@ struct HomeScreen: View {
         }
     }
 
-    /// Native searchable owns a presentation layer above the navigation stack. Pushing while
-    /// that layer is active can make iOS 26 reopen/focus the field and discard the destination.
-    /// End search first, let that transaction settle, then perform the stack mutation.
+    /// Pushes over the active search, as system apps do; going back returns to the same query and
+    /// results. Only the keyboard is resigned.
     private func openDestination(_ destination: AppNavigationRequest.Destination) {
         navigationLog.info("Search destination requested: \(String(describing: destination), privacy: .public)")
-        let wasPresented = isSearchPresented
-        if let submitted = searchModel.submittedQuery, !searchModel.isEditingNewQuery {
-            endActiveSearch(preserving: submitted)
-        } else {
-            isSearchPresented = false
-        }
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
             to: nil,
             from: nil,
             for: nil
         )
-        Task { @MainActor in
-            // A push issued while the search dismissal is still animating is dropped on iOS 26.
-            if wasPresented {
-                try? await Task.sleep(for: .milliseconds(350))
-            } else {
-                await Task.yield()
-            }
-            guard path.last != destination else {
-                navigationLog.info("Search destination already current")
-                return
-            }
-            path.append(destination)
-            navigationLog.info("Search destination appended; path count=\(path.count, privacy: .public)")
+        guard path.last != destination else {
+            navigationLog.info("Search destination already current")
+            return
         }
+        path.append(destination)
+        navigationLog.info("Search destination appended; path count=\(path.count, privacy: .public)")
     }
 
     /// Persists the trimmed query, then either opens a recognized YouTube URL or performs search.
@@ -227,38 +179,10 @@ struct HomeScreen: View {
             }
             return
         }
-        // End active search as soon as the query is submitted so the navigation bar (title and
-        // filter) returns and results lay out below it, independent of keyboard notifications.
-        endActiveSearch(preserving: trimmed)
+        // Stock search: results replace the content while search stays active, with the query
+        // and Cancel in the field. Every search starts from the active field (recent searches
+        // only appear there), so results always appear in this one state.
         await searchModel.submit()
-    }
-
-    /// Ends native search presentation while keeping `query` in the field. SwiftUI may clear the
-    /// bound text as part of that transition; the guard window restores it instead of treating
-    /// it as the user's clear action. Later clears (native clear button) behave normally.
-    private func endActiveSearch(preserving query: String) {
-        let wasPresented = isSearchPresented
-        queryPreservedDuringDismissal = query
-        isSearchPresented = false
-        Task { @MainActor in
-            if wasPresented {
-                // UIKit can blank the native field at the end of the dismissal without reporting
-                // it, leaving the binding correct but the bar empty. Re-sending the value after
-                // the animation makes the closed bar show the query, as when a recent search is
-                // chosen without opening the field; the guard restores it within the same update.
-                try? await Task.sleep(for: .milliseconds(450))
-                guard queryPreservedDuringDismissal == query,
-                      !isSearchPresented,
-                      searchModel.query == query else { return }
-                searchModel.query = ""
-                try? await Task.sleep(for: .milliseconds(150))
-            } else {
-                try? await Task.sleep(for: .milliseconds(600))
-            }
-            if queryPreservedDuringDismissal == query {
-                queryPreservedDuringDismissal = nil
-            }
-        }
     }
 
 }

@@ -447,33 +447,24 @@ and a rejected strategy is excluded before requesting the next candidate.
   border. Do not use a visual offset here: it makes the bottom of long comment lists unreachable.
   Cached MoreVideoInfos metadata may replace
   direct-URL placeholder titles/uploader details without restarting playback.
-- **Search is search-only.** Its root contains local recent searches or the clean empty state; it
-  must not request or render a home/trending/discovery feed. Native search presents suggestions,
-  and a successful keyboard/suggestion/history submission swaps the root content to results in
-  place—the same native search bar and query remain mounted, with no results-page push animation.
-  The native clear button in the search field—or a swipe from the leading screen edge—clears that
- result/query state and reveals recent searches; do not add a separate Back button. The field uses
- `.navigationBarDrawer(displayMode: .always)`, and submission ends presentation while preserving
- the query, so results sit under an ordinary navigation bar with the field and the toolbar filter
- visible. Keeping search active over results was tried and made the large title show through
- faded and the list stick in its top bounce. The filter's Source option switches between YouTube
- (default) and YouTube Music; the source is a mode that survives new queries and filter resets,
- and Music disables sort/upload-date/length. Pushing a channel or playlist ends presentation first
- and, if search was active, waits for the dismissal to finish (iOS 26 drops a push issued during
- it) while restoring the submitted text if SwiftUI clears it during that transition. Channels and playlists still push normally from their result rows. Results include
-  videos, channels, and playlists. iPhone and iPad retain native
-  `.searchable` (including the system Liquid Glass treatment); Mac uses an inline field because
-  native search collapses awkwardly there. Search stays an ordinary peer tab—never assign
-  `TabRole.search`, which detaches it visually on iOS 26. Re-selecting the ordinary tab increments a
-  selection-binding activation token that drives `.searchable(isPresented:)`; it returns from any
-  pushed destination and focuses the field without clearing the current query or results. The live
-  field value and last submitted query are tracked separately, so editing a displayed query reveals
-  its live suggestions rather than leaving stale results in front. Results always appear in one
-  state: search closed, title and filter visible, and the submitted query shown in the closed
-  bar. Ending an active presentation can blank the native field without updating the binding, so
-  `endActiveSearch` re-sends the query once the dismissal finishes. Keyboard disappearance ends
-  presentation only when the field still holds the submitted query; an edited query stays open
-  with its suggestions.
+- **Search is search-only and follows stock iOS search.** It must not request or render a
+ home/trending/discovery feed. The field uses `.navigationBarDrawer(displayMode: .always)`.
+ Inactive, the screen shows only the clean empty state. Activating the field shows recent
+ searches and recent channels (gated on `isSearching`, as in system apps), then live suggestions
+ while typing. A keyboard/suggestion/history submission swaps the content to results in place and
+ search stays active—query and Cancel in the field, keyboard dismissed. Every search therefore
+ starts from, and its results stay in, that one active state; never force `isPresented` or end
+ presentation to change it. Cancel or the field's clear button empties the query and clears the
+ results. Channels and playlists push over the active search (only the keyboard is resigned), and
+ going back returns to the same query and results. Active search hides navigation-bar items, so
+ the filter is a capsule in the first results row that scrolls away with the list; do not pin it
+ over the List or move it to the toolbar. Its Source option switches between YouTube (default)
+ and YouTube Music; the source is a mode that survives new queries and filter resets, and Music
+ disables sort/upload-date/length. Results include videos, channels, and playlists. Mac uses an
+ inline field because native search collapses awkwardly there. Search stays an ordinary peer
+ tab—never assign `TabRole.search`, which detaches it visually on iOS 26. The live field value
+ and last submitted query are tracked separately, so editing a displayed query reveals its live
+ suggestions rather than leaving stale results in front.
   No UIKit tab gesture observer is
   installed. Selecting a suggestion or history entry passes that row's query explicitly
   to the search submission before resigning keyboard focus; never rely on a later read of field state.

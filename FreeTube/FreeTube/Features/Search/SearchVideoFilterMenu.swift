@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Hybrid search filters, styled like `FeedFilterMenu` for toolbar placement. The icon becomes a
-/// music note while YouTube Music is the search source.
+/// Hybrid search filters, shown as a capsule in the first row of search results. The label reads
+/// YouTube Music while that is the search source.
 /// Sort / type / upload / length presets go to YouTube when possible; watch history, views, and
 /// custom ranges stay local. Category rows that currently constrain results show a checkmark.
 @available(iOS 17.0, *)
@@ -112,15 +112,25 @@ struct SearchVideoFilterMenu: View {
             }
             .disabled(!filters.isActive)
         } label: {
-            Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .overlay(alignment: .topTrailing) {
-                    if filters.isActive {
-                        Circle()
-                            .fill(.primary)
-                            .frame(width: 5, height: 5)
-                            .offset(x: 4, y: -4)
-                    }
+            HStack(spacing: 6) {
+                Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
+                if filters.source == .music {
+                    Text(verbatim: "YouTube Music")
+                } else {
+                    Text("Filters")
                 }
+                if filters.isActive {
+                    Circle()
+                        .fill(.tint)
+                        .frame(width: 6, height: 6)
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color(.secondarySystemFill), in: Capsule())
+            .contentShape(Capsule())
         }
         .accessibilityLabel("Filter search videos")
         .accessibilityValue(filters.isActive ? "On" : "Off")
