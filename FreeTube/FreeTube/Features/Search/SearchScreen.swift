@@ -535,12 +535,12 @@ struct SearchContent: View {
                 .font(.largeTitle.bold())
                 .accessibilityAddTraits(.isHeader)
                 .padding(.leading, 4)
-                .padding(.top, 10)
+                .padding(.top, 18)
             resultTypePicker
-                .padding(.top, 14)
+                .padding(.top, 22)
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 14)
+        .padding(.bottom, 7)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
     }
