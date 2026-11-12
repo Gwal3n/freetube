@@ -293,11 +293,17 @@ struct SearchNumericRangeSheet: View {
                     upper = max(Self.nearestStopIndex(value, in: newStops), lower)
                 }
 
-                durationUnit = newUnit
-                lowerIndex = lower
-                upperIndex = upper
-                minimumText = Self.grouped(minimum)
-                maximumText = maximumDisplay.map(Self.grouped) ?? ""
+                // The menu delivers its selection inside an animated transaction; the unit swap
+                // should land instantly rather than sliding the thumbs and labels.
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    durationUnit = newUnit
+                    lowerIndex = lower
+                    upperIndex = upper
+                    minimumText = Self.grouped(minimum)
+                    maximumText = maximumDisplay.map(Self.grouped) ?? ""
+                }
             }
         )
     }

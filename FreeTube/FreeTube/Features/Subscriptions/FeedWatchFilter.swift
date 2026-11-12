@@ -1,7 +1,7 @@
 import Foundation
 
 @available(iOS 17.0, *)
-enum FeedWatchFilter: String, CaseIterable, Identifiable {
+enum FeedWatchFilter: String, CaseIterable, Identifiable, Codable {
     case all, hideWatched, hidePartial, onlyPartial, onlyFinished
 
     var id: String { rawValue }

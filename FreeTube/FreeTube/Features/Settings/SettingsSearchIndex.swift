@@ -189,7 +189,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .browsing, titles: [
             "Browsing", "Show search suggestions", "Load more search results automatically",
-            "Large video thumbnails", "Show channel avatars", "Open feed channels from name or avatar", "Load more feed videos automatically", "Mix suggested videos into Feed", "Suggestion density", "Mark new uploads", "Space out related uploads",
+            "Large video thumbnails", "Show channel avatars", "Open feed channels from name or avatar", "Show filter button", "Load more feed videos automatically", "Mix suggested videos into Feed", "Suggestion density", "Mark new uploads", "Space out related uploads",
             "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
             "Refresh interval", "Update feed view counts", "View count batch interval"
         ]),

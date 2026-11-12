@@ -274,6 +274,11 @@ and a rejected strategy is excluded before requesting the next candidate.
   Feed is visible; it updates only existing cached counts in place, leaving row order and upload
   estimates unchanged. Pull-to-refresh on a channel reloads that channel alone and refreshes its
   local feed entries when subscribed.
+ Feed's filter menu mirrors Search's structure (Watch history, Upload date, Length, Views
+ submenus; Reset disabled until something is set). `FeedVideoFilter` keeps Feed's watch-status
+ choices but reuses Search's upload/length/view presets, matching, and range sheets; it is saved
+ as one JSON preference and migrates the older separate watch/duration keys. A Browsing setting
+ hides the toolbar icon without clearing filters already applied.
 - **Loading feedback reflects real work.** Search and public-playlist pagination share a stable
   `MediaPaginationFooter`; after failure, preserve loaded rows and offer explicit retry instead
   of silently repeating lookahead requests. Search continuations and errors are generation-guarded

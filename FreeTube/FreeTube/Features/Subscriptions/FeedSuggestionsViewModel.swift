@@ -49,10 +49,8 @@ final class FeedSuggestionsViewModel {
         density: Int,
         enabled: Bool,
         canFetch: Bool,
-        watchFilter: FeedWatchFilter,
-        durationFilter: FeedDurationFilter,
-        minimumMinutes: Int,
-        maximumMinutes: Int
+        filter: FeedVideoFilter,
+        now: Date
     ) async {
         guard enabled, density > 0 else {
             clear()
@@ -97,18 +95,16 @@ final class FeedSuggestionsViewModel {
             guard !video.id.isEmpty,
                   seen.insert(video.id).inserted,
                   !VideoBlocklist.shared.blocks(video),
-                  durationFilter.includes(video.duration,
-                                          minimumMinutes: minimumMinutes,
-                                          maximumMinutes: maximumMinutes) else { return false }
+                  filter.includesMetadata(video, now: now) else { return false }
             return true
         }
         guard !eligible.isEmpty else { return }
-        let candidatesToCheck = watchFilter == .all
+        let candidatesToCheck = filter.watch == .all
             ? Array(eligible.prefix(min(target, anchorPool.count)))
             : eligible
         let summary = await writer.watchHistorySummary(videoIDs: candidatesToCheck.map(\.id))
         guard !Task.isCancelled, context == expectedContext else { return }
-        let filtered = candidatesToCheck.filter { watchFilter.includes(summary.statuses[$0.id]) }
+        let filtered = candidatesToCheck.filter { filter.watch.includes(summary.statuses[$0.id]) }
         let anchors = Array(anchorPool.shuffled().prefix(min(target, filtered.count)))
         var updatedVideos = videosByAnchor
         for (anchor, video) in zip(anchors, filtered) {

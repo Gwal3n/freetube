@@ -28,10 +28,7 @@ struct SubscriptionFeedScreen: View {
     @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
     @AppStorage("openFeedChannelsOnTap") private var openFeedChannelsOnTap = false
     @AppStorage("showNewSubscriptionUploads") private var showNewSubscriptionUploads = true
-    @AppStorage("feedWatchFilter") private var watchFilterRaw = FeedWatchFilter.all.rawValue
-    @AppStorage("feedDurationFilter") private var durationFilterRaw = FeedDurationFilter.all.rawValue
-    @AppStorage("feedCustomDurationMinimumMinutes") private var customMinimumMinutes = 0
-    @AppStorage("feedCustomDurationMaximumMinutes") private var customMaximumMinutes = 60
+    @AppStorage("showFeedFilterButton") private var showFeedFilterButton = true
     @AppStorage("automaticFeedRefreshEnabled") private var automaticFeedRefreshEnabled = false
     @AppStorage("automaticFeedRefreshInterval") private var automaticFeedRefreshIntervalRaw = FeedRefreshInterval.everySixHours.rawValue
     @AppStorage("automaticFeedViewCountsEnabled") private var automaticFeedViewCountsEnabled = false
@@ -46,8 +43,8 @@ struct SubscriptionFeedScreen: View {
     @State private var currentDate = Date.now
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
-    @State private var isCustomDurationPresented = false
-    @State private var isWatchFilterPresented = false
+    @State private var feedFilter = FeedVideoFilter.load()
+    @State private var feedFilterCustomRange: FeedFilterMenu.CustomRange?
     @State private var lastFilteredPrefetchKey: String?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 
@@ -57,7 +54,7 @@ struct SubscriptionFeedScreen: View {
             let visibleVideos = filteredVideos
             let displayRows = mixedRows(from: visibleVideos)
             let filteredLookaheadIDs = Set(visibleVideos.suffix(5).map(\.id))
-            let filtersAreActive = watchFilter != .all || durationFilter != .all || blocklist.rules.isActive
+            let filtersAreActive = feedFilter.isActive || blocklist.rules.isActive
             let pageKey = automaticLoadKey
             List {
                 if !groups.groups.isEmpty || model.showsRefreshProgress || model.lastRefreshAt != nil {
@@ -123,7 +120,7 @@ struct SubscriptionFeedScreen: View {
                     MediaPaginationFooter(isLoading: model.isLoadingMore) {
                         Task {
                             await model.loadMore()
-                            if watchFilter != .all || durationFilter != .all || blocklist.rules.isActive {
+                            if feedFilter.isActive || blocklist.rules.isActive {
                                 await fillFilteredFeed()
                             }
                         }
@@ -148,13 +145,12 @@ struct SubscriptionFeedScreen: View {
                         groupMenuActions
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    FeedFilterMenu(
-                        watchFilterRaw: $watchFilterRaw,
-                        durationFilterRaw: $durationFilterRaw,
-                        isWatchFilterPresented: $isWatchFilterPresented,
-                        isCustomDurationPresented: $isCustomDurationPresented
-                    )
+                if showFeedFilterButton {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        FeedFilterMenu(filter: $feedFilter) { range in
+                            feedFilterCustomRange = range
+                        }
+                    }
                 }
             }
             .navigationDestination(for: AppNavigationRequest.Destination.self) { destination in
@@ -166,16 +162,26 @@ struct SubscriptionFeedScreen: View {
                 case .localPlaylist(let id): LocalPlaylistScreen(playlistID: id)
                 }
             }
-            .sheet(isPresented: $isCustomDurationPresented) {
-                FeedDurationRangeSheet(
-                    minimumMinutes: customMinimumMinutes,
-                    maximumMinutes: customMaximumMinutes
-                ) { minimum, maximum in
-                    customMinimumMinutes = minimum
-                    customMaximumMinutes = maximum
-                    durationFilterRaw = FeedDurationFilter.custom.rawValue
+            .sheet(item: $feedFilterCustomRange) { range in
+                switch range {
+                case .uploaded:
+                    SearchDateRangeSheet(range: feedFilter.customUploadedRange) { selected in
+                        feedFilter.customUploadedRange = selected
+                        feedFilter.uploaded = .custom
+                    }
+                case .length:
+                    SearchNumericRangeSheet(kind: .duration, range: feedFilter.customLengthRange) { selected in
+                        feedFilter.customLengthRange = selected
+                        feedFilter.length = .custom
+                    }
+                case .views:
+                    SearchNumericRangeSheet(kind: .views, range: feedFilter.customViewsRange) { selected in
+                        feedFilter.customViewsRange = selected
+                        feedFilter.views = .custom
+                    }
                 }
             }
+            .onChange(of: feedFilter) { _, filter in filter.save() }
             .refreshable { await model.refresh() }
             .task(id: filteredFillKey) { await fillFilteredFeed() }
             .task(id: suggestionTaskKey) {
@@ -188,10 +194,8 @@ struct SubscriptionFeedScreen: View {
                         && !(incognitoEnabled && incognitoHideFeed),
                     canFetch: selectedTab == .feed && scenePhase == .active
                         && !model.isRefreshing && !player.fullScreenPresented && path.isEmpty,
-                    watchFilter: watchFilter,
-                    durationFilter: durationFilter,
-                    minimumMinutes: customMinimumMinutes,
-                    maximumMinutes: customMaximumMinutes
+                    filter: feedFilter,
+                    now: currentDate
                 )
             }
             .onChange(of: filteredFillKey) { _, _ in lastFilteredPrefetchKey = nil }
@@ -241,8 +245,7 @@ struct SubscriptionFeedScreen: View {
                         Text("Try changing the Feed filters.")
                     } actions: {
                         Button("Reset Filters") {
-                            watchFilterRaw = FeedWatchFilter.all.rawValue
-                            durationFilterRaw = FeedDurationFilter.all.rawValue
+                            feedFilter = FeedVideoFilter()
                         }
                     }
                 }
@@ -288,7 +291,7 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var automaticLoadKey: String {
-        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
+        "\(model.selectedGroupID?.uuidString ?? "all"):\(model.videos.count):\(feedFilterKey):\(blocklist.revision)"
     }
 
     private var feedOrderingKey: String {
@@ -296,7 +299,7 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var suggestionContextKey: String {
-        "\(model.firstPageRevision):\(model.lastRefreshAt?.timeIntervalSince1970 ?? 0):\(model.selectedGroupID?.uuidString ?? "all"):\(feedSuggestionDensity):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
+        "\(model.firstPageRevision):\(model.lastRefreshAt?.timeIntervalSince1970 ?? 0):\(model.selectedGroupID?.uuidString ?? "all"):\(feedSuggestionDensity):\(feedFilterKey):\(blocklist.revision)"
     }
 
     private var suggestionTaskKey: String {
@@ -304,31 +307,21 @@ struct SubscriptionFeedScreen: View {
     }
 
     private var filteredFillKey: String {
-        "\(model.firstPageRevision):\(watchFilterRaw):\(durationFilterRaw):\(customMinimumMinutes):\(customMaximumMinutes):\(blocklist.revision)"
+        "\(model.firstPageRevision):\(feedFilterKey):\(blocklist.revision)"
     }
 
-    private var watchFilter: FeedWatchFilter {
-        FeedWatchFilter(rawValue: watchFilterRaw) ?? .all
-    }
-
-    private var durationFilter: FeedDurationFilter {
-        FeedDurationFilter(rawValue: durationFilterRaw) ?? .all
+    /// Distinguishes filter selections in task identities; changes only when the filter does.
+    private var feedFilterKey: String {
+        String(describing: feedFilter)
     }
 
     private var filteredVideos: [Video] {
-        let selectedWatch = watchFilter
-        let selectedDuration = durationFilter
-        guard selectedWatch != .all || selectedDuration != .all || blocklist.rules.isActive else {
-            return model.videos
-        }
+        let filter = feedFilter
+        guard filter.isActive || blocklist.rules.isActive else { return model.videos }
+        let now = currentDate
         return model.videos.filter { video in
             !blocklist.blocks(video)
-                && selectedWatch.includes(model.watchStatuses[video.id])
-                && selectedDuration.includes(
-                    video.duration,
-                    minimumMinutes: customMinimumMinutes,
-                    maximumMinutes: customMaximumMinutes
-                )
+                && filter.includes(video, status: model.watchStatuses[video.id], now: now)
         }
     }
 
@@ -344,10 +337,11 @@ struct SubscriptionFeedScreen: View {
             rows.append(DisplayRow(video: video, isSuggested: false))
             guard let suggested = suggestionsModel.videosByAnchor[video.id],
                   !blocklist.blocks(suggested),
-                  watchFilter.includes(suggestionsModel.watchStatuses[suggested.id]),
-                  durationFilter.includes(suggested.duration,
-                                          minimumMinutes: customMinimumMinutes,
-                                          maximumMinutes: customMaximumMinutes) else { continue }
+                  feedFilter.includes(
+                      suggested,
+                      status: suggestionsModel.watchStatuses[suggested.id],
+                      now: currentDate
+                  ) else { continue }
             rows.append(DisplayRow(video: suggested, isSuggested: true))
         }
         return rows
@@ -361,12 +355,9 @@ struct SubscriptionFeedScreen: View {
     /// show a useful first screen. Stop after a bounded batch; explicit Load more can continue it.
     private func fillFilteredFeed() async {
         guard autoLoadMoreFeedItems else { return }
-        let selectedWatch = watchFilter
-        let selectedDuration = durationFilter
-        let minimum = customMinimumMinutes
-        let maximum = customMaximumMinutes
+        let selectedFilter = feedFilter
         let blockingRevision = blocklist.revision
-        guard selectedWatch != .all || selectedDuration != .all || blocklist.rules.isActive else { return }
+        guard selectedFilter.isActive || blocklist.rules.isActive else { return }
         let revision = model.firstPageRevision
         let targetCount = 12
         let maximumPages = 10
@@ -378,20 +369,13 @@ struct SubscriptionFeedScreen: View {
             }
             guard !Task.isCancelled,
                   model.firstPageRevision == revision,
-                  watchFilter == selectedWatch,
-                  durationFilter == selectedDuration,
-                  customMinimumMinutes == minimum,
-                  customMaximumMinutes == maximum,
+                  feedFilter == selectedFilter,
                   blocklist.revision == blockingRevision,
                   model.canLoadMore else { return }
+            let now = currentDate
             let visibleCount = model.videos.filter { video in
                 !blocklist.blocks(video)
-                    && selectedWatch.includes(model.watchStatuses[video.id])
-                    && selectedDuration.includes(
-                        video.duration,
-                        minimumMinutes: minimum,
-                        maximumMinutes: maximum
-                    )
+                    && selectedFilter.includes(video, status: model.watchStatuses[video.id], now: now)
             }.count
             if visibleCount >= targetCount { return }
 

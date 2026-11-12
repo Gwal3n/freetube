@@ -1,66 +1,85 @@
 import SwiftUI
 
-/// Feed filter controls; the screen owns the selected values and popover presentation.
+/// Feed filter controls, structured like Search's filter menu: one submenu per category, a
+/// checkmark on narrowed categories, and Reset disabled until something is set. The screen owns
+/// the custom-range sheets.
 @available(iOS 17.0, *)
 struct FeedFilterMenu: View {
-    @Binding var watchFilterRaw: String
-    @Binding var durationFilterRaw: String
-    @Binding var isWatchFilterPresented: Bool
-    @Binding var isCustomDurationPresented: Bool
-
-    private var watchFilter: FeedWatchFilter {
-        FeedWatchFilter(rawValue: watchFilterRaw) ?? .all
+    enum CustomRange: String, Identifiable {
+        case uploaded, length, views
+        var id: String { rawValue }
     }
 
-    private var durationFilter: FeedDurationFilter {
-        FeedDurationFilter(rawValue: durationFilterRaw) ?? .all
-    }
+    @Binding var filter: FeedVideoFilter
+    var onCustomRange: (CustomRange) -> Void
 
     var body: some View {
         Menu {
-            Button {
-                isWatchFilterPresented = true
-            } label: {
-                if watchFilter == .all {
-                    Text("Watch status")
-                } else {
-                    Label("Watch status", systemImage: "checkmark")
-                }
-            }
             Menu {
-                ForEach(FeedDurationFilter.allCases) { option in
+                ForEach(FeedWatchFilter.allCases) { option in
                     Button {
-                        if option == .custom {
-                            isCustomDurationPresented = true
-                        } else {
-                            durationFilterRaw = option.rawValue
-                        }
+                        filter.watch = option
                     } label: {
-                        if durationFilter == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
+                        optionLabel(option.title, selected: filter.watch == option)
                     }
                 }
             } label: {
-                if durationFilter == .all {
-                    Text("Duration")
-                } else {
-                    Label("Duration", systemImage: "checkmark")
-                }
+                categoryLabel("Watch history", active: filter.watch != .all)
             }
-            if watchFilter != .all || durationFilter != .all {
-                Divider()
-                Button("Reset Filters") {
-                    watchFilterRaw = FeedWatchFilter.all.rawValue
-                    durationFilterRaw = FeedDurationFilter.all.rawValue
+            Menu {
+                ForEach(SearchVideoFilters.Uploaded.allCases) { option in
+                    Button {
+                        if option == .custom {
+                            onCustomRange(.uploaded)
+                        } else {
+                            filter.uploaded = option
+                        }
+                    } label: {
+                        optionLabel(option.title, selected: filter.uploaded == option)
+                    }
                 }
+            } label: {
+                categoryLabel("Upload date", active: filter.uploaded != .anytime)
             }
+            Menu {
+                ForEach(SearchVideoFilters.Length.allCases) { option in
+                    Button {
+                        if option == .custom {
+                            onCustomRange(.length)
+                        } else {
+                            filter.length = option
+                        }
+                    } label: {
+                        optionLabel(option.title, selected: filter.length == option)
+                    }
+                }
+            } label: {
+                categoryLabel("Length", active: filter.length != .any)
+            }
+            Menu {
+                ForEach(SearchVideoFilters.Views.allCases) { option in
+                    Button {
+                        if option == .custom {
+                            onCustomRange(.views)
+                        } else {
+                            filter.views = option
+                        }
+                    } label: {
+                        optionLabel(option.title, selected: filter.views == option)
+                    }
+                }
+            } label: {
+                categoryLabel("Views", active: filter.views != .any)
+            }
+            Divider()
+            Button("Reset Filters") {
+                filter = FeedVideoFilter()
+            }
+            .disabled(!filter.isActive)
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
                 .overlay(alignment: .topTrailing) {
-                    if watchFilter != .all || durationFilter != .all {
+                    if filter.isActive {
                         Circle()
                             .fill(.primary)
                             .frame(width: 5, height: 5)
@@ -68,42 +87,26 @@ struct FeedFilterMenu: View {
                     }
                 }
         }
+        .transaction { $0.animation = nil }
         .accessibilityLabel("Feed filters")
-        .accessibilityValue(watchFilter == .all && durationFilter == .all ? "Off" : "On")
-        .popover(isPresented: $isWatchFilterPresented, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Watch status")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                ForEach(FeedWatchFilter.allCases) { option in
-                    Button {
-                        watchFilterRaw = option.rawValue
-                        isWatchFilterPresented = false
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text(option.title)
-                            Spacer(minLength: 8)
-                            if watchFilter == option {
-                                Image(systemName: "checkmark")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                        }
-                        .foregroundStyle(.primary)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    if option != FeedWatchFilter.allCases.last {
-                        Divider().padding(.leading, 16)
-                    }
-                }
-            }
-            .frame(width: 270)
-            .padding(.bottom, 6)
-            .presentationCompactAdaptation(.popover)
+        .accessibilityValue(filter.isActive ? "On" : "Off")
+    }
+
+    @ViewBuilder
+    private func categoryLabel(_ title: LocalizedStringKey, active: Bool) -> some View {
+        if active {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
+    }
+
+    @ViewBuilder
+    private func optionLabel(_ title: String, selected: Bool) -> some View {
+        if selected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
         }
     }
 }

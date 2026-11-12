@@ -6,6 +6,7 @@ struct BrowsingSettingsScreen: View {
     @AppStorage("autoLoadMoreSearchItems") private var autoLoadMoreSearchItems = true
     @AppStorage("autoLoadMoreFeedItems") private var autoLoadMoreFeedItems = true
     @AppStorage("openFeedChannelsOnTap") private var openFeedChannelsOnTap = false
+    @AppStorage("showFeedFilterButton") private var showFeedFilterButton = true
     @AppStorage("feedSuggestionsEnabled") private var feedSuggestionsEnabled = false
     @AppStorage("feedSuggestionDensity") private var feedSuggestionDensity = 10
     let model: SettingsViewModel
@@ -40,6 +41,9 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Open feed channels from name or avatar", isOn: $openFeedChannelsOnTap)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Open feed channels from name or avatar")
+                Toggle("Show filter button", isOn: $showFeedFilterButton)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Show filter button")
                 Toggle("Load more feed videos automatically", isOn: $autoLoadMoreFeedItems)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Load more feed videos automatically")

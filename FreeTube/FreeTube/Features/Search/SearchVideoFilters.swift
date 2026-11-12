@@ -4,7 +4,7 @@ import Foundation
 /// watch-history / view-count / custom ranges stay local. When the server path falls back to a
 /// plain query, the mirrored upload/length presets are applied locally instead.
 struct SearchVideoFilters: Equatable {
-    struct NumericRange: Equatable {
+    struct NumericRange: Equatable, Codable {
         let minimum: Int
         /// Nil means no upper limit.
         let maximum: Int?
@@ -14,7 +14,7 @@ struct SearchVideoFilters: Equatable {
         }
     }
 
-    struct DateRange: Equatable {
+    struct DateRange: Equatable, Codable {
         let firstDay: Date
         let lastDay: Date
 
