@@ -37,17 +37,6 @@ struct SearchVideoFilterMenu: View {
             }
             .disabled(!filters.supportsServerConstraints)
             Menu {
-                ForEach(SearchVideoFilters.ResultType.allCases) { option in
-                    Button {
-                        filters.resultType = option
-                    } label: {
-                        optionLabel(option.title, selected: filters.resultType == option)
-                    }
-                }
-            } label: {
-                categoryLabel("Type", active: filters.resultType != .any)
-            }
-            Menu {
                 ForEach(SearchVideoFilters.Watch.allCases) { option in
                     Button {
                         filters.watch = option
@@ -108,9 +97,11 @@ struct SearchVideoFilterMenu: View {
             .disabled(!filters.resultType.supportsVideoConstraints)
             Divider()
             Button("Reset Filters") {
-                filters = filters.resettingFilters()
+                var reset = filters.resettingFilters()
+                reset.resultType = filters.resultType
+                filters = reset
             }
-            .disabled(!filters.isActive)
+            .disabled(!filters.isNarrowedBeyondType)
         } label: {
             // Fixed frame with the dot as an overlay: the label never changes size, so the List
             // row does not re-measure when filters or the source change.
@@ -119,7 +110,7 @@ struct SearchVideoFilterMenu: View {
                 .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
                 .overlay(alignment: .topTrailing) {
-                    if filters.isActive {
+                    if filters.isNarrowedBeyondType {
                         Circle()
                             .fill(.tint)
                             .frame(width: 7, height: 7)
@@ -130,7 +121,7 @@ struct SearchVideoFilterMenu: View {
         }
         .transaction { $0.animation = nil }
         .accessibilityLabel("Filter search videos")
-        .accessibilityValue(filters.isActive ? "On" : "Off")
+        .accessibilityValue(filters.isNarrowedBeyondType ? "On" : "Off")
     }
 }
 

@@ -60,7 +60,7 @@ struct SearchVideoFilters: Equatable {
 
         var title: String {
             switch self {
-            case .any: "Any type"
+            case .any: "All results"
             case .video: "Videos"
             case .channel: "Channels"
             case .playlist: "Playlists"
@@ -279,6 +279,14 @@ struct SearchVideoFilters: Equatable {
 
     var supportsServerConstraints: Bool {
         source == .youtube
+    }
+
+    /// Whether anything other than the result type narrows results. The type has its own picker
+    /// beneath the Search title, so the filter menu's indicator and reset ignore it.
+    var isNarrowedBeyondType: Bool {
+        var withoutType = self
+        withoutType.resultType = .any
+        return withoutType.isActive
     }
 
     var isActive: Bool {

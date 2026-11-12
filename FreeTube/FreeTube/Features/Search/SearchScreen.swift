@@ -520,9 +520,12 @@ struct SearchContent: View {
         // Matches the system large title: 34 pt bold, 16 pt margins, in a 52 pt row with a little
         // breathing room above and before the first result.
         HStack(alignment: .center) {
-            Text("Search")
-                .font(.largeTitle.bold())
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Search")
+                    .font(.largeTitle.bold())
+                    .accessibilityAddTraits(.isHeader)
+                resultTypePicker
+            }
             Spacer(minLength: 8)
             SearchVideoFilterMenu(
                 filters: $model.videoFilters,
@@ -538,6 +541,40 @@ struct SearchContent: View {
         .padding(.bottom, 10)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
+    }
+
+    /// A quiet subtitle beneath the Search title, styled like Feed's group picker. The label sits
+    /// in a full-width leading frame, so a longer choice never resizes the header row.
+    private var resultTypePicker: some View {
+        Menu {
+            ForEach(SearchVideoFilters.ResultType.allCases) { option in
+                Button {
+                    model.videoFilters.resultType = option
+                } label: {
+                    if model.videoFilters.resultType == option {
+                        Label(option.title, systemImage: "checkmark")
+                    } else {
+                        Text(option.title)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(model.videoFilters.resultType.title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .transaction { $0.animation = nil }
+        .accessibilityLabel("Result type")
+        .accessibilityValue(model.videoFilters.resultType.title)
     }
 
     private var recentChannels: [RecentChannel] {
