@@ -461,8 +461,9 @@ and a rejected strategy is excluded before requesting the next candidate.
  going back returns to the same query and results. Active search hides navigation-bar items, so
  the first results row is a custom "Search" title with a Feed-style result-type subtitle menu
  (All results / Videos / Channels / Playlists; type is not repeated in the filter menu, whose
- dot and reset ignore it) and a trailing fixed-size filter icon, spaced like
- the native large title (no divider), and it scrolls away with the list; do not pin it over the List or move it to
+ dot and reset ignore it) and a fixed-size glass filter button laid out
+ like Feed's native bar (a 44 pt top row holding the button, then the large title and
+ subtitle, no divider), and it scrolls away with the list; do not pin it over the List or move it to
  the toolbar. The filter label must not change size (the active dot is an overlay), because a
  resizing Menu label re-measures the List row and stutters. Its Source option switches between YouTube (default)
  and YouTube Music; the source is a mode that survives new queries and filter resets, and Music

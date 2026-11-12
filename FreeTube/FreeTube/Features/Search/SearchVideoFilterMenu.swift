@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Hybrid search filters, shown as a plain icon trailing the results header. The icon becomes a
-/// music note while YouTube Music is the search source.
+/// Hybrid search filters, shown as a glass circle at the top trailing edge of the results header
+/// like Feed's toolbar filter. The icon becomes a music note while YouTube Music is the source.
 /// Sort / type / upload / length presets go to YouTube when possible; watch history, views, and
 /// custom ranges stay local. Category rows that currently constrain results show a checkmark.
 @available(iOS 17.0, *)
@@ -106,22 +106,36 @@ struct SearchVideoFilterMenu: View {
             // Fixed frame with the dot as an overlay: the label never changes size, so the List
             // row does not re-measure when filters or the source change.
             Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.primary)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.tint)
                 .frame(width: 44, height: 44)
+                .modifier(FilterButtonBackground())
                 .overlay(alignment: .topTrailing) {
                     if filters.isNarrowedBeyondType {
                         Circle()
                             .fill(.tint)
                             .frame(width: 7, height: 7)
-                            .offset(x: -8, y: 9)
+                            .offset(x: -6, y: 6)
                     }
                 }
-                .contentShape(Rectangle())
+                .contentShape(Circle())
         }
         .transaction { $0.animation = nil }
         .accessibilityLabel("Filter search videos")
         .accessibilityValue(filters.isNarrowedBeyondType ? "On" : "Off")
+    }
+}
+
+/// The same Liquid Glass circle the system draws around Feed's toolbar filter on iOS 26; earlier
+/// systems show a plain icon there, so this does too.
+@available(iOS 17.0, *)
+private struct FilterButtonBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            content
+        }
     }
 }
 

@@ -405,6 +405,7 @@ struct SearchContent: View {
             ScrollView {
                 SearchSuggestionList(
                     suggestions: model.suggestions,
+                    typedText: model.query,
                     onSelect: { suggestion in
                         model.query = suggestion.text
                         onRunSearch(suggestion.text)
@@ -517,28 +518,29 @@ struct SearchContent: View {
     /// title and trailing filter. It is the first List row and scrolls away with the results; a
     /// bar pinned over the List fought its scroll edge.
     private var resultsHeader: some View {
-        // Matches the system large title: 34 pt bold, 16 pt margins, in a 52 pt row with a little
-        // breathing room above and before the first result.
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Search")
-                    .font(.largeTitle.bold())
-                    .accessibilityAddTraits(.isHeader)
-                resultTypePicker
+        // Mirrors Feed's native layout: a 44 pt toolbar row holding the trailing glass filter
+        // button, the 34 pt bold large title below it, then the subtitle picker with the same gaps.
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Spacer(minLength: 0)
+                SearchVideoFilterMenu(
+                    filters: $model.videoFilters,
+                    onCustomUploaded: onCustomUploaded,
+                    onCustomLength: onCustomLength,
+                    onCustomViews: onCustomViews
+                )
             }
-            Spacer(minLength: 8)
-            SearchVideoFilterMenu(
-                filters: $model.videoFilters,
-                onCustomUploaded: onCustomUploaded,
-                onCustomLength: onCustomLength,
-                onCustomViews: onCustomViews
-            )
-            .padding(.trailing, -10)
+            .frame(height: 44)
+            Text("Search")
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+                .padding(.leading, 4)
+                .padding(.top, 10)
+            resultTypePicker
+                .padding(.top, 14)
         }
-        .frame(minHeight: 52)
         .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 10)
+        .padding(.bottom, 14)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
     }

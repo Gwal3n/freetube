@@ -3,6 +3,8 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct SearchSuggestionList: View {
     let suggestions: [SearchSuggestion]
+    /// The live field text; its match inside each suggestion is emphasized.
+    let typedText: String
     let onSelect: (SearchSuggestion) -> Void
     let onFill: (SearchSuggestion) -> Void
 
@@ -16,9 +18,8 @@ struct SearchSuggestionList: View {
                         HStack {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(.secondary)
-                            Text(suggestion.text)
+                            Text(highlighted(suggestion.text))
                                 .appFont(.body)
-                                .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                             Spacer(minLength: 8)
                         }
@@ -44,5 +45,21 @@ struct SearchSuggestionList: View {
                     .padding(.leading, 52)
             }
         }
+    }
+
+    /// Apple-style emphasis: the part matching what was typed stays primary, and the rest of
+    /// the suggestion is secondary. Without a match the whole suggestion stays primary.
+    private func highlighted(_ text: String) -> AttributedString {
+        var result = AttributedString(text)
+        let typed = typedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty,
+              let match = result.range(of: typed, options: [.caseInsensitive, .diacriticInsensitive])
+        else {
+            result.foregroundColor = Color.primary
+            return result
+        }
+        result.foregroundColor = Color.secondary
+        result[match].foregroundColor = Color.primary
+        return result
     }
 }
