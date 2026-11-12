@@ -44,6 +44,9 @@ struct ChannelScreen: View {
             if let details = model.details {
                 pager(details)
                 header(details)
+                if pagerState.showsNavigationTitle {
+                    navigationBarBackdrop
+                }
             } else if model.isLoading {
                 ChannelProfilePlaceholder(headerOffset: pagerState.headerOffset)
             } else {
@@ -67,10 +70,9 @@ struct ChannelScreen: View {
         .toolbar {
             channelActionsToolbar
         }
-        // Transparent over the banner, then the same system background as the profile row
-        // once the title appears. This avoids a seam in either light or dark appearance.
-        .toolbarBackground(pagerState.showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
-        .toolbarBackground(MediaStyle.pageBackground, for: .navigationBar)
+        // The system bar stays transparent: iOS 26 renders even a solid toolbar background as gray
+        // glass. `navigationBarBackdrop` paints the opaque page color behind it instead.
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await model.load() }
         .onChange(of: model.details?.channel.id, initial: true) { _, _ in
@@ -89,6 +91,17 @@ struct ChannelScreen: View {
             await model.loadVideos(sort: videoSort)
         }
         .errorToast(Bindable(model).errorState)
+    }
+
+    /// Zero-height view at the top of the safe area whose background extends up through the
+    /// navigation bar and status bar, covering the collapsed header with the same opaque color
+    /// as the pinned tab bar.
+    private var navigationBarBackdrop: some View {
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 0)
+            .background(MediaStyle.pageBackground.ignoresSafeArea(edges: .top))
+            .allowsHitTesting(false)
     }
 
     // MARK: - Pager bridge
