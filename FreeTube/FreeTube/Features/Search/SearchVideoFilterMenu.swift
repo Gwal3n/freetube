@@ -103,43 +103,37 @@ struct SearchVideoFilterMenu: View {
             }
             .disabled(!filters.isNarrowedBeyondType)
         } label: {
-            // The large glass style pads its label by 15 pt per side, so a fixed 14 pt label gives
-            // Feed's 44 pt toolbar circle and never resizes when the symbol changes. The 22 pt
-            // glyph matches the toolbar's and may extend past that label frame.
-            Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                .font(.system(size: 22))
-                .frame(width: 14, height: 14)
-        }
-        .modifier(FilterButtonStyle())
-        .overlay(alignment: .topTrailing) {
-            if filters.isNarrowedBeyondType {
-                Circle()
-                    .fill(.tint)
-                    .frame(width: 7, height: 7)
-                    .allowsHitTesting(false)
+            // Styled like the result-type subtitle opposite it; the accent color and count mark
+            // active filters. The source is a mode rather than a filter, so Music names itself.
+            HStack(spacing: 5) {
+                Text(verbatim: activeFilterCount > 0 ? "\(sourceTitle) · \(activeFilterCount)" : sourceTitle)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
             }
+            .foregroundStyle(activeFilterCount > 0 ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .transaction { $0.animation = nil }
         .accessibilityLabel("Filter search videos")
-        .accessibilityValue(filters.isNarrowedBeyondType ? "On" : "Off")
+        .accessibilityValue(activeFilterCount > 0 ? "\(activeFilterCount) active" : "Off")
     }
-}
 
-/// The system's native glass circular button on iOS 26, like Feed's toolbar filter; earlier
-/// systems show a plain icon there, so this does too.
-@available(iOS 17.0, *)
-private struct FilterButtonStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-        } else {
-            content
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
+    private var sourceTitle: String {
+        filters.source == .music ? String(localized: "YouTube Music") : String(localized: "Filters")
+    }
+
+    /// Narrowing categories in the menu; the source and result type are excluded.
+    private var activeFilterCount: Int {
+        [
+            filters.sort != .relevance,
+            filters.watch != .all,
+            filters.uploaded != .anytime,
+            filters.length != .any,
+            filters.views != .any
+        ].filter { $0 }.count
     }
 }
 

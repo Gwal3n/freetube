@@ -515,30 +515,31 @@ struct SearchContent: View {
     }
 
     /// Active search hides the navigation title and toolbar, so the results begin with their own
-    /// title and trailing filter. It is the first List row and scrolls away with the results; a
-    /// bar pinned over the List fought its scroll edge.
+    /// title, result-type picker, and filter menu. It is the first List row and scrolls away with
+    /// the results; a bar pinned over the List fought its scroll edge.
     private var resultsHeader: some View {
-        // Mirrors Feed's native layout: a 44 pt toolbar row holding the trailing glass filter
-        // button, the 34 pt bold large title below it, then the subtitle picker with the same gaps.
+        // Mirrors Feed's native layout: space for its 44 pt toolbar row, the 34 pt bold large
+        // title, then a subtitle row with the picker leading and the filter where Feed shows its
+        // refresh age.
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Spacer(minLength: 0)
+            Color.clear
+                .frame(height: 44)
+            Text("Search")
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+                .padding(.leading, 4)
+                .padding(.top, 16.67)
+            HStack(spacing: 8) {
+                resultTypePicker
                 SearchVideoFilterMenu(
                     filters: $model.videoFilters,
                     onCustomUploaded: onCustomUploaded,
                     onCustomLength: onCustomLength,
                     onCustomViews: onCustomViews
                 )
-                .padding(.trailing, -0.67)
+                .fixedSize()
             }
-            .frame(height: 44)
-            Text("Search")
-                .font(.largeTitle.bold())
-                .accessibilityAddTraits(.isHeader)
-                .padding(.leading, 4)
-                .padding(.top, 16.67)
-            resultTypePicker
-                .padding(.top, 26.33)
+            .padding(.top, 26.33)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
