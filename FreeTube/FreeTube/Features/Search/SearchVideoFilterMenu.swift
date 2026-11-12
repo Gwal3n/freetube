@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Hybrid search filters, shown as a capsule in the first row of search results. The label reads
-/// YouTube Music while that is the search source.
+/// Hybrid search filters, shown as a plain icon trailing the results header. The icon becomes a
+/// music note while YouTube Music is the search source.
 /// Sort / type / upload / length presets go to YouTube when possible; watch history, views, and
 /// custom ranges stay local. Category rows that currently constrain results show a checkmark.
 @available(iOS 17.0, *)
@@ -112,26 +112,23 @@ struct SearchVideoFilterMenu: View {
             }
             .disabled(!filters.isActive)
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
-                if filters.source == .music {
-                    Text(verbatim: "YouTube Music")
-                } else {
-                    Text("Filters")
+            // Fixed frame with the dot as an overlay: the label never changes size, so the List
+            // row does not re-measure when filters or the source change.
+            Image(systemName: filters.source == .music ? "music.note" : "line.3.horizontal.decrease")
+                .font(.title3.weight(.medium))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .overlay(alignment: .topTrailing) {
+                    if filters.isActive {
+                        Circle()
+                            .fill(.tint)
+                            .frame(width: 7, height: 7)
+                            .offset(x: -8, y: 9)
+                    }
                 }
-                if filters.isActive {
-                    Circle()
-                        .fill(.tint)
-                        .frame(width: 6, height: 6)
-                }
-            }
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color(.secondarySystemFill), in: Capsule())
-            .contentShape(Capsule())
+                .contentShape(Rectangle())
         }
+        .transaction { $0.animation = nil }
         .accessibilityLabel("Filter search videos")
         .accessibilityValue(filters.isActive ? "On" : "Off")
     }

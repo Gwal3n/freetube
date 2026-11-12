@@ -123,7 +123,7 @@ struct SearchContent: View {
             )
         } else {
             List {
-                filterRow
+                resultsHeader
 
                 if visibleItems.isEmpty {
                     VStack(spacing: 8) {
@@ -508,19 +508,30 @@ struct SearchContent: View {
         }
     }
 
-    /// The filter is the first row of the results, so it scrolls away with them. Active search
-    /// hides navigation-bar items, and a pinned bar over the List fought its scroll edge.
-    private var filterRow: some View {
-        HStack {
-            SearchVideoFilterMenu(
-                filters: $model.videoFilters,
-                onCustomUploaded: onCustomUploaded,
-                onCustomLength: onCustomLength,
-                onCustomViews: onCustomViews
-            )
-            Spacer(minLength: 0)
+    /// Active search hides the navigation title and toolbar, so the results begin with their own
+    /// title, trailing filter, and separator. It is the first List row and scrolls away with the
+    /// results; a bar pinned over the List fought its scroll edge.
+    private var resultsHeader: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center) {
+                Text("Search")
+                    .font(.largeTitle.bold())
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                SearchVideoFilterMenu(
+                    filters: $model.videoFilters,
+                    onCustomUploaded: onCustomUploaded,
+                    onCustomLength: onCustomLength,
+                    onCustomViews: onCustomViews
+                )
+                .padding(.trailing, -10)
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 16)
+            .padding(.bottom, 4)
+            Divider()
         }
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+        .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
     }
 
