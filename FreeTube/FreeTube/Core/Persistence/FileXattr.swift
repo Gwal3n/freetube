@@ -1,23 +1,10 @@
 import Foundation
 
-/// Thin Swift wrapper around POSIX extended-attribute syscalls (`setxattr`, `getxattr`,
-/// `removexattr`) defined in `<sys/xattr.h>`. Used by `DownloadsStore` to carry per-file
-/// metadata (title, channel, original URL, thumbnail, …) on the actual `.mp4` on disk —
-/// no SwiftData row needed.
-///
-/// **Why we use `fileSystemRepresentation` not `path`**: POSIX expects a C string of bytes
-/// in the file system's native encoding (NFD-normalised UTF-8 on APFS), not Swift's
-/// Unicode-canonical `String.utf8`. The two diverge for paths with combining characters
-/// (most non-ASCII Unicode). The `fileSystemRepresentation` accessor produces the right
-/// bytes; passing `URL.path` directly would silently miss files with accented names.
+/// POSIX xattr helpers. Always use `fileSystemRepresentation` (not `URL.path`) for APFS paths.
 enum FileXattr {
-    /// Read the value of an extended attribute. Returns nil for "attribute doesn't exist"
-    /// (`ENOATTR`) as well as for any other read failure — the caller treats both the same.
     static func read(key: String, at url: URL) -> Data? {
         url.withUnsafeFileSystemRepresentation { cPath -> Data? in
             guard let cPath else { return nil }
-            // First call: ask for the length only. Second call: read into a buffer of
-            // exactly that size. Two-step pattern recommended by the man page.
             let length = getxattr(cPath, key, nil, 0, 0, 0)
             guard length > 0 else { return nil }
             var data = Data(count: length)

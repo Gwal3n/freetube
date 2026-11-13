@@ -2,24 +2,14 @@ import Foundation
 import OSLog
 import YouTubeKit
 
-/// Holds the single `YouTubeModel` instance the rest of the app talks to. Services depend on this
-/// type for the model handle. Both models are permanently anonymous.
-///
-/// Per CLAUDE.md §6: `YouTubeKit` must not be imported anywhere outside `Core/Networking/`. Domain
-/// types (Video, Channel, …) are mapped from YouTubeKit response types inside the services that
-/// own each response.
+/// Anonymous `YouTubeModel` handle. Keep `YouTubeKit` imports inside `Core/Networking/`.
 nonisolated final class YouTubeKitClient: @unchecked Sendable {
     static let shared = YouTubeKitClient()
 
-    /// Default iOS-client model. Returns HLS manifest URLs when available (great for music videos),
-    /// but its per-format `/videoplayback` URLs are PoT-protected → segment fetches 403.
+    /// iOS client (HLS when available; adaptive URLs may be PoT-protected).
     let model = YouTubeModel()
 
-    /// Alternate model identified as `TVHTML5_SIMPLY_EMBEDDED_PLAYER`. This client is exempt from
-    /// YouTube's Proof-of-Origin-Token enforcement, so its `/videoplayback` URLs play without 403.
-    /// Used as the fallback in `VideoService.fetchInfoViaTVHTML5(id:)` when the iOS client returns
-    /// only PoT-protected adaptive streams. Shares the visitor token from `model` so YouTube treats
-    /// them as the same anonymous session.
+    /// TVHTML5 embed client for PoT-resistant `/videoplayback` URLs.
     let tvHtmlModel = YouTubeModel()
 
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "YouTubeKitClient")
@@ -34,14 +24,9 @@ nonisolated final class YouTubeKitClient: @unchecked Sendable {
         installTVHTML5Overrides()
     }
 
-    /// InnerTube `hl`/`gl` for every WEB request. YouTube auto-translates titles into `hl` and
-    /// localizes by `gl`; YouTubeKit's device-locale default (and VPN exit regions) produced
-    /// translated titles, so requests are always English/US.
+    /// Pin titles to English/US rather than device locale or VPN region.
     private static let requestLocale = "en-US"
 
-    /// Replaces the `.videoInfos` request the default `YouTubeKitClient.tvHtmlModel` would otherwise
-    /// build for the IOS client. Mirrors YouTubeKit's own `getFormatsHeaders()` structure but with
-    /// the `TVHTML5_SIMPLY_EMBEDDED_PLAYER` payload that NewPipe / yt-dlp use to side-step PoT.
     private func installTVHTML5Overrides() {
         let bodyPrefix = #"{"context":{"client":{"clientName":"TVHTML5_SIMPLY_EMBEDDED_PLAYER","clientVersion":"2.0","clientScreen":"EMBED","platform":"TV","hl":"en","gl":"US","clientFormFactor":"UNKNOWN_FORM_FACTOR"},"thirdParty":{"embedUrl":"https://www.youtube.com/"}},"contentCheckOk":true,"racyCheckOk":true,"videoId":""#
         let headers = HeadersList(
@@ -70,17 +55,12 @@ nonisolated final class YouTubeKitClient: @unchecked Sendable {
         tvHtmlModel.customHeaders[.videoInfos] = headers
     }
 
-    /// Drops the anonymous visitor token so the next request fetches a fresh one.
     func clearVisitorData() {
         model.visitorData = ""
         tvHtmlModel.visitorData = ""
     }
 
-
-    /// `VideoInfosResponse` requires a `visitorData` token. YouTubeKit doesn't fetch one for you;
-    /// the canonical way to obtain it (per `YouTubeModel.visitorData` docs) is to run a `SearchResponse`
-    /// first and pull `visitorData` out of the response. We do that once at app bootstrap and stash
-    /// the token on the shared model so subsequent video requests auto-inject it.
+    /// Bootstraps `visitorData` once via a SearchResponse (required by VideoInfosResponse).
     func ensureVisitorData() async {
         guard model.visitorData.isEmpty else { return }
         do {

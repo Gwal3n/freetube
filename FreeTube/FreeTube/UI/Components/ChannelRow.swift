@@ -5,16 +5,10 @@ import Kingfisher
 struct ChannelRow: View {
     let channel: Channel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// Optional tap handler. **Leave nil when wrapping this row inside a `NavigationLink`** —
-    /// the inner `Button` was swallowing the link's tap, which made channel rows in search
-    /// results feel "hard to hit": you had to land precisely on the disclosure indicator area
-    /// instead of anywhere on the row. Mirrors the same pattern PlaylistRow uses.
+    /// Leave nil inside NavigationLink — an inner Button swallows the link tap.
     var onTap: (() -> Void)? = nil
     var trailing: AnyView? = nil
 
-    /// Single secondary line below the channel name. Combines handle (when present) and an
-    /// abbreviated subscriber count ("1.2M subscribers"). Joined by a middle dot so it degrades
-    /// gracefully when either half is missing.
     private var detailLine: String {
         var parts: [String] = []
         if let handle = channel.handle, !handle.isEmpty { parts.append(handle) }

@@ -1,12 +1,6 @@
 import SwiftUI
 
-/// Playlist detail screen. Top-down layout:
-///   1. Large playlist artwork with overlaid actions
-///   2. Title + channel + video-count metadata
-///   3. List of videos
-///
-/// Public YouTube playlists are read-only. Editing and reordering live exclusively in the local
-/// playlist screens, keeping this view independent from account-only mutation endpoints.
+/// Public playlist detail (read-only). Local playlists own editing/reordering.
 @available(iOS 17.0, *)
 struct PlaylistScreen: View {
     @State private var model: PlaylistViewModel

@@ -32,6 +32,13 @@ struct FeedVideoFilter: Equatable, Codable {
 
     private static let storageKey = "feedVideoFilter"
 
+    private static let legacyKeys = [
+        "feedWatchFilter",
+        "feedDurationFilter",
+        "feedCustomDurationMinimumMinutes",
+        "feedCustomDurationMaximumMinutes"
+    ]
+
     /// Reads the saved filter, migrating the earlier separate watch/duration preferences once.
     static func load(_ defaults: UserDefaults = .standard) -> FeedVideoFilter {
         if let data = defaults.data(forKey: storageKey),
@@ -56,12 +63,16 @@ struct FeedVideoFilter: Equatable, Codable {
                 maximum: maximumMinutes > 0 ? maximumMinutes * 60 : nil
             )
         }
+        filter.save(defaults)
         return filter
     }
 
     func save(_ defaults: UserDefaults = .standard) {
         guard let data = try? JSONEncoder().encode(self) else { return }
         defaults.set(data, forKey: Self.storageKey)
+        for key in Self.legacyKeys {
+            defaults.removeObject(forKey: key)
+        }
     }
 }
 

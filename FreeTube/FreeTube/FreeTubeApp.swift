@@ -38,10 +38,7 @@ struct FreeTubeApp: App {
                 // The app and player interface follow the chosen appearance.
                 .preferredColorScheme((AppearanceMode(rawValue: appearanceModeRaw) ?? .dark).colorScheme)
         }
-        // Menu-bar items + keyboard shortcuts. Only meaningful on Mac (via "Designed for
-        // iPad on Mac" — Catalyst would also pick them up if we ever enable it), but
-        // harmless to register everywhere — iPhone shows no menu bar, iPad-with-keyboard
-        // picks up the shortcuts which is a fine bonus. See `MacCommands`.
+        // Mac menu bar / keyboard shortcuts; harmless on iPhone.
         .commands {
             MacCommands(player: appEnvironment.playerStateManager)
         }

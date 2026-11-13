@@ -148,7 +148,7 @@ public class YouTube {
             request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
             request.setValue("en-US,en", forHTTPHeaderField: "accept-language")
             request.httpShouldHandleCookies = false
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, _) = try await HTTP.session.data(for: request)
             _watchHTML = String(data: data, encoding: .utf8) ?? ""
             return _watchHTML!
         }
@@ -164,7 +164,7 @@ public class YouTube {
             request.setValue("en-US,en", forHTTPHeaderField: "accept-language")
             request.setValue("https://www.reddit.com/", forHTTPHeaderField: "Referer")
             request.httpShouldHandleCookies = false
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, _) = try await HTTP.session.data(for: request)
             _embedHTML = String(data: data, encoding: .utf8) ?? ""
             return _embedHTML!
         }
@@ -251,7 +251,7 @@ public class YouTube {
             throw YouTubeKitError.extractError
         }
 
-        let (data, _) = try await URLSession.shared.data(from: jsURL)
+        let (data, _) = try await HTTP.session.data(from: jsURL)
         let js = String(data: data, encoding: .utf8) ?? ""
         let ytcfg = try await Extraction.extractYtCfg(from: watchHTML)
 

@@ -2,34 +2,16 @@ import Foundation
 import OSLog
 import SwiftData
 
-/// Owns the on-disk video cache, coordinates native stream downloads, and surfaces progress so UI can
-/// render a live transfer queue.
-///
-/// **Playback contract (CLAUDE.md §7 amended):**
-/// Explicit downloads call `ensureDownloaded(video:quality:)`. An existing `Documents/<id>.mp4`
-/// returns immediately; otherwise the playback resolver supplies a working HLS manifest and
-/// `NativeHLSDownloadService` materializes it. Successful files receive `DownloadMetadata` xattrs.
-///
-/// **Progress:** the manager exposes observable snapshots read by the Downloads screen and tab
-/// badge. The registry keeps retry and progress internals out of SwiftUI's observation graph.
+/// Explicit downloads, local cache lookup, and observable transfer progress.
 @available(iOS 17.0, *)
 @Observable
 @MainActor
 final class DownloadManager {
     static let shared = DownloadManager()
 
-    /// Live snapshots of every in-flight + recently completed download. Both the Downloads screen
-    /// and the tab-badge model observe this directly via `@Observable`. Previous design used a
-    /// single-consumer `AsyncStream` which silently dropped events for the second subscriber — that
-    /// is why the Downloads tab looked empty while the badge was incrementing.
     private(set) var activeTasks: [DownloadTaskSnapshot] = []
-
-    /// Per-video downloaded progress (0…1). The player observes this so the mini-player and the
-    /// full-screen player can render a progress overlay while a file is being fetched.
     private(set) var progressByVideoID: [String: Double] = [:]
-    /// Per-video human-readable phase label ("video", "audio", "muxing"). Some sources download
-    /// separate streams sequentially under the same id, so we surface which one is currently in-flight to
-    /// avoid the confusing "Downloading 100%" → "Downloading 0%" → "Downloading 100%" sequence.
+    /// Phase label such as "video", "audio", or "muxing".
     private(set) var phaseByVideoID: [String: String] = [:]
 
     /// Retains retry and progress internals without making every byte callback observable.
@@ -156,14 +138,9 @@ final class DownloadManager {
         return try await task.value
     }
 
-    /// Removes the downloaded file (if any) plus its SwiftData row. Safe to call when nothing is on
-    /// disk — just no-ops. The `context` parameter is kept for source compatibility but the actual
-    /// SwiftData delete now goes through the background `PersistenceWriter` so we don't block the
-    /// main thread on the SQL queue.
+    /// Deletes the local file and SwiftData row; `context` retained for call-site compatibility.
     func deleteDownloaded(videoID: String, context: ModelContext) {
         let url = Self.fileURL(for: videoID)
-        // File-system backed: removing the file drops its xattr too. `DownloadsStore` posts
-        // the change notification on our behalf so the Downloads tab refreshes.
         DownloadsStore.shared.delete(at: url)
         log.info("Deleted download \(videoID, privacy: .public)")
     }
@@ -330,11 +307,7 @@ final class DownloadManager {
         snapshotID: String,
         startedAt: Date
     ) async throws -> Bool {
-        // The app already has a fast, proven stream resolver for playback. Prefer that same
-        // source for offline downloads. For ordinary video this is an HLS master manifest;
-        // FFmpeg downloads its media segments and remuxes them into the canonical local MP4.
-        // A progressive/audio-only result follows the exact same path. YouTubeKit direct formats
-        // remain available when the native resolver has no usable source.
+        // Prefer the same native source used for playback; YouTubeKit formats are the fallback.
         do {
             log.info("native-download[\(video.id, privacy: .public)] resolving playback source")
             phaseByVideoID[video.id] = "stream"
@@ -464,14 +437,7 @@ final class DownloadManager {
 
     // MARK: - YouTubeKit / TVHTML5 fallback
 
-    /// Direct-format fallback that runs when the native download cannot produce a usable file. Uses
-    /// `VideoService.fetchInfoViaTVHTML5` (which goes through `YouTubeKitClient.tvHtmlModel`
-    /// — TVHTML5_SIMPLY_EMBEDDED_PLAYER context, the client profile YouTube exempts from PoT
-    /// enforcement) to get fresh stream URLs, then downloads the bytes directly via
-    /// `URLSession`. If only adaptive (video-only + audio-only) streams are available, the
-    /// two pieces are muxed back into a single `.mp4` via the same `FFmpegRunner` we use for
-    /// other download sources. The TVHTML5 client can provide direct URLs when the native
-    /// resolver's candidate could not be downloaded.
+    /// TVHTML5 direct-format fallback; muxes adaptive video+audio when needed.
     private func runYouTubeKitFallback(video: Video, quality: VideoQuality, destination: URL, snapshotID: String) async throws {
         log.info("youtube-kit-download[\(video.id, privacy: .public)] fetching stream info")
         publish(snapshot: DownloadTaskSnapshot(
@@ -707,16 +673,11 @@ final class DownloadManager {
 
     // MARK: - File locations + format selection
 
-    /// Canonical on-disk location for a downloaded video. Files land at the **Documents
-    /// root** so they're visible in the system Files app under "On My iPhone" /
-    /// "On My iPad" (gated by `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`
-    /// in Info.plist). Every video gets a fixed `mp4` extension because the local muxer
-    /// produces an mp4 container.
+    /// Documents/`<videoID>.mp4` — visible in Files via UIFileSharingEnabled.
     static func fileURL(for videoID: String) -> URL {
         downloadsDirectory.appendingPathComponent("\(videoID).mp4")
     }
 
-    /// Use the app's canonical Documents directory for all downloads.
     private static let downloadsDirectory = AppDirectories.documents
 
     // MARK: - Snapshots

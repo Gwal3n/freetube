@@ -1,24 +1,7 @@
 import Foundation
 import OSLog
 
-/// Decodes a channel's Videos tab without going through YouTubeKit's parser. Used as a
-/// fallback when YouTubeKit returns zero items for a tab that actually has videos.
-///
-/// **Why this exists.** `ChannelInfosResponse.Videos.decodeJSONFromTab` and
-/// `decodeContinuation` only walk the legacy `richItemRenderer.content.videoRenderer` shape.
-/// YouTube has been migrating channel surfaces to `lockupViewModel`; YouTubeKit added
-/// lockup fallbacks to Home, Account library, History, MoreVideoInfo, Subscriptions feed —
-/// but missed the channel Videos and Directs tabs. When a channel uses the new shape we'd
-/// see an empty list while the header still reports the correct video count. Subclassing
-/// isn't an option (the affected types are structs and the decoders are static methods),
-/// so we duplicate just enough of the request + decode pipeline to cover the gap, and
-/// keep YouTubeKit as the primary path.
-///
-/// **Continuation handoff.** When the initial fetch uses the fallback path we store the
-/// continuation token on the actor-backed state map. `ChannelService.fetchVideosNextPage`
-/// checks for a stored token before dispatching to YouTubeKit — if present, we route
-/// pagination through our own decoder too. Mixing decoders mid-pagination would dead-end
-/// at the same lockup gap on the very next page.
+/// Channel Videos/Live fallback when YouTubeKit misses `lockupViewModel` tab items.
 @available(iOS 17.0, *)
 final class ChannelVideosFallbackService: Sendable {
     private let session: URLSession
@@ -26,9 +9,9 @@ final class ChannelVideosFallbackService: Sendable {
     private let state = State()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "ChannelVideosFallback")
 
-    init(client: YouTubeKitClient = .shared, session: URLSession = .shared) {
+    init(client: YouTubeKitClient = .shared, session: URLSession? = nil) {
         self.client = client
-        self.session = session
+        self.session = session ?? AnonymousURLSession.make()
     }
 
     /// Per-channel continuation state. Keyed by channelID. Presence in the map also signals
@@ -63,10 +46,7 @@ final class ChannelVideosFallbackService: Sendable {
         sort: ChannelVideoSort = .newest,
         tabPath: String = "videos"
     ) async throws -> ChannelTab<Video> {
-        // YouTube no longer accepts a static params variant for Popular and Oldest. Those values
-        // now select the Videos surface only; the actual sort is represented by a per-response
-        // continuation token in the filter-chip row. Discover that token from the current Videos
-        // response before requesting the selected sort.
+        // Popular/Oldest need a per-response sort token discovered from the Newest Videos surface.
         if sort != .newest {
             let discovery = try await sendBrowse(
                 body: Self.initialBrowseBody(channelID: channelID, params: ChannelVideoSort.newest.requestParameters),
@@ -357,11 +337,7 @@ final class ChannelVideosFallbackService: Sendable {
         let lockupMeta = (json["metadata"] as? [String: Any])?["lockupMetadataViewModel"] as? [String: Any]
         let title = ((lockupMeta?["title"] as? [String: Any])?["content"] as? String) ?? ""
 
-        // metadataRows is an ordered list:
-        //   [0] channel name (with WEB_PAGE_TYPE_CHANNEL link)
-        //   [1] "N views • posted-ago"  (two parts)
-        // We bucket each text into channel name / view count / time-posted based on the link
-        // hint when present; otherwise fall back to "first non-channel = views, last = posted".
+        // Rows: channel (linked) then "views • posted"; fall back to first=views, last=posted.
         let rows = ((lockupMeta?["metadata"] as? [String: Any])?["contentMetadataViewModel"] as? [String: Any])?["metadataRows"] as? [[String: Any]]
         var channelName = ""
         var viewsText: String?

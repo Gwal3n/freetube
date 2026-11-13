@@ -190,11 +190,6 @@ final class SettingsViewModel {
         set { preferences.allowCellularDownloads = newValue }
     }
 
-    var alwaysDownloadBeforePlayback: Bool {
-        get { preferences.alwaysDownloadBeforePlayback }
-        set { preferences.alwaysDownloadBeforePlayback = newValue }
-    }
-
     var autoplayNext: Bool {
         get { preferences.autoplayNext }
         set { preferences.autoplayNext = newValue }

@@ -105,11 +105,7 @@ final class QueueManager {
         rebuildShuffleOrder()
     }
 
-    /// Marks `video` as the current item. If it's already in `items`, updates `currentIndex`. If not,
-    /// the video is appended and becomes current. Lets `PlayerStateManager.load(_:)` keep the queue
-    /// coherent when the user taps a fresh video from search/home, while preserving the queue when
-    /// they navigate via `playNext()` / `playPrevious()` (which both call `load` with a video that's
-    /// already in `items` at the freshly-advanced position).
+    /// Sets current by index if already queued; otherwise appends.
     func setCurrent(_ video: Video) {
         if let idx = items.firstIndex(of: video) {
             currentIndex = idx
@@ -122,9 +118,7 @@ final class QueueManager {
 
     // MARK: - Navigation
 
-    /// Number of distinct items remaining before the queue reaches its physical end. Unlike
-    /// `upcomingItems`, this intentionally ignores repeat wrapping so recommendation replenishment
-    /// still works when repeat-all is enabled.
+    /// Remaining items before the physical end (ignores repeat wrap).
     func availableUpcomingCount(limit: Int) -> Int {
         guard limit > 0, items.indices.contains(currentIndex) else { return 0 }
         if isShuffleOn, let position = shuffleOrder.firstIndex(of: currentIndex) {
@@ -133,10 +127,7 @@ final class QueueManager {
         return min(limit, max(0, items.count - currentIndex - 1))
     }
 
-    /// Peeks at the next `count` videos that would play after the current one, honoring shuffle and
-    /// `.all` wrap-around. Used by the player's prefetch loop so we can warm up the next couple of
-    /// downloads while the current one plays. `.one` repeat returns no upcoming items (it just
-    /// replays the current).
+    /// Next `count` items honoring shuffle and repeat-all; empty under repeat-one.
     func upcomingItems(count: Int) -> [Video] {
         guard count > 0, !items.isEmpty, repeatMode != .one else { return [] }
 

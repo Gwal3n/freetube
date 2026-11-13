@@ -5,13 +5,7 @@ protocol MusicSearchServicing: Sendable {
     func search(query: String) async throws -> SearchResult
 }
 
-/// Anonymous YouTube Music search through the InnerTube `WEB_REMIX` client. YouTubeKit has no
-/// Music search response, so this sends the request directly and maps the mixed result shelf
-/// into the same `SearchHit`s as ordinary search. Music lists some songs and official videos that
-/// ordinary anonymous search omits; playback still goes through the normal resolver.
-///
-/// The mixed response carries no continuation, so results are a single page. Albums and podcasts
-/// have no app destination and are omitted; artists and profiles map to channels.
+/// Anonymous YouTube Music (`WEB_REMIX`) search. Single page; albums/podcasts omitted.
 final class MusicSearchService: MusicSearchServicing {
     private let session: URLSession
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "MusicSearchService")
@@ -19,8 +13,8 @@ final class MusicSearchService: MusicSearchServicing {
     private static let clientVersion = "1.20251015.03.00"
     private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15"
 
-    nonisolated init(session: URLSession = .shared) {
-        self.session = session
+    nonisolated init(session: URLSession? = nil) {
+        self.session = session ?? AnonymousURLSession.make()
     }
 
     /// Searches YouTube Music and returns songs, videos, artists, and playlists in relevance order.

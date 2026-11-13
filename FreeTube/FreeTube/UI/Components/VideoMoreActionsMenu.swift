@@ -2,15 +2,7 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Reusable trailing ellipsis Menu for `Video` items. Used by search results, history,
-/// the playback queue, and anywhere else a video appears in a list. The action definitions are
-/// shared with the native long-press context menu so both entry points remain consistent.
-///
-/// Local-action rules:
-///   - Open in browser, Copy URL: always shown
-///   - Open in… : shown only when the video has a local downloaded file
-///   - Add to playlist: always local
-///   - Remove downloaded file: shown only when the video has a local downloaded file
+/// Trailing ellipsis Menu for video rows; actions match the long-press context menu.
 @available(iOS 17.0, *)
 struct VideoMoreActionsMenu: View {
     let video: Video

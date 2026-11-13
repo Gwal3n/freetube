@@ -1,10 +1,6 @@
 import SwiftUI
 
-/// Narrow observation boundary for playback values that change frequently.
-///
-/// Elapsed time and timeline data are observed only by the nested `PlayerTimelineOverlay`;
-/// this boundary observes infrequent transport changes, not each playback tick. Layout and actions remain
-/// supplied by `FullScreenPlayer`, so this component does not own presentation behavior.
+/// Observes infrequent transport changes; timeline ticks stay in `PlayerTimelineOverlay`.
 @available(iOS 17.0, *)
 struct PlayerTransportOverlay: View {
     @Environment(PlayerStateManager.self) private var player

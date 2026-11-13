@@ -15,21 +15,15 @@ enum Mappers {
     // MARK: - Videos
 
     static func video(from yt: YTVideo) -> Video {
-        // The pinned YouTubeKit timeLengthSeconds parser rejects three-part timestamps such as
-        // "1:02:03", which are common in playlists. Parse its display value here so the badge
-        // and local-playlist length sort use the same reliable duration.
+        // Parse display timeLength — YouTubeKit rejects three-part stamps like "1:02:03".
         let duration = Self.duration(from: yt.timeLength)
-        // YouTubeKit returns an empty thumbnail array for some channel listings (notably Shorts
-        // lockup view models when YouTube changes the JSON path). Falling back to the canonical
-        // CDN URL keyed by videoId guarantees a working image — `hqdefault.jpg` is always served
-        // by YouTube for every public video, including Shorts.
+        // Empty Shorts lockup thumbs → canonical hqdefault CDN URL.
         let thumb = bestThumbnailURL(yt.thumbnails) ?? canonicalThumbnailURL(for: yt.videoId)
         return Video(
             id: yt.videoId,
             title: yt.title ?? "",
             channelID: yt.channel?.channelId ?? "",
-            // Some playlist lockups put a view-count label in the channel slot. Treat that
-            // as missing metadata so playlist mapping can fall back to its real owner.
+            // Playlist lockups sometimes put a view-count label in the channel slot.
             channelName: channelName(from: yt.channel?.name),
             channelThumbnailURL: bestThumbnailURL(yt.channel?.thumbnails ?? []),
             thumbnailURL: thumb,
@@ -117,24 +111,11 @@ enum Mappers {
         )
     }
 
-    /// Parses YouTube's human-readable count strings into an Int. Handles:
-    ///   - subscribers: `"1.2M subscribers"`, `"856K subscribers"`, `"12,345 subscribers"`
-    ///   - views: `"1.2M views"`, `"856 views"`
-    ///   - playlist front-preview annotations: `"5 videos"`, `"1,234 videos"`, `"12 items"`
-    ///   - playlist counts in channel listings: `"45 playlists"`
-    ///   - bare numbers: `"123"`, `"12,345"`
-    ///
-    /// The previous implementation only stripped `subscribers`/`views` and broke on the
-    /// `"5 videos"` form YouTube uses for the library response's history/likes/watchLater
-    /// previews, leaving every count nil → the Library menu rendered "—" instead of a number.
-    /// Now we strip the trailing noun (any common count suffix YouTube emits) regardless of
-    /// what comes after.
+    /// Parses abbreviated count strings (`"1.2M subscribers"`, `"5 videos"`, bare numbers).
+    /// Strip plural suffixes first so `"subscribers"` does not leave a dangling `"s"`.
     static func parseAbbreviatedCount(_ raw: String?) -> Int? {
         guard let raw, !raw.isEmpty else { return nil }
         let lower = raw.lowercased()
-        // Strip every count suffix YouTube is known to emit, plural first to avoid a partial
-        // match leaving an "s" dangling (e.g. "subscribers" → strip whole word, not "subscriber"
-        // first which would leave "s").
         let suffixes = [
             "subscribers", "subscriber",
             "views", "view",

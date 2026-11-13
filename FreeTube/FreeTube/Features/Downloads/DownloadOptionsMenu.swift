@@ -1,9 +1,6 @@
 import SwiftUI
 
-/// Native download menu. Size metadata starts loading only when its first item is shown, so
-/// merely displaying the player does not issue another video-info request. Menus can show a
-/// secondary Text in each button label; available estimates appear there on the next opening if
-/// the request has not finished while the menu is already visible.
+/// Quality menu; size estimates load only when the menu first opens.
 @available(iOS 17.0, *)
 struct DownloadOptionsMenu: View {
     let video: Video

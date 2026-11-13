@@ -10,12 +10,15 @@ protocol NativeStreamServicing: Sendable {
     func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolveProgressive(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolvePaired(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
+    /// Local VISIONOS caption track list without resolving a playable stream.
+    func fetchCaptionTracks(videoID: String) async -> [VideoCaptionTrack]
 
     func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async
 }
 
 extension NativeStreamServicing {
     func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async {}
+    func fetchCaptionTracks(videoID: String) async -> [VideoCaptionTrack] { [] }
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -28,6 +31,12 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
 
     func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async {
         await cache.remove(videoID: videoID, formatID: "native-\(quality.rawValue)")
+    }
+
+    /// Discovers anonymous caption tracks for a downloaded video without starting playback.
+    func fetchCaptionTracks(videoID: String) async -> [VideoCaptionTrack] {
+        let youtube = YouTube(videoID: videoID, methods: [.local])
+        return await sourceCaptionTracks(from: youtube, videoID: videoID)
     }
 
     /// Returns an HLS, progressive video, or audio-only URL suitable for `AVPlayer`.
@@ -101,15 +110,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         let youtube = YouTube(videoID: videoID, methods: [.local])
 
         do {
-            // HLS first, for live and on-demand alike. The fast probe reads `hlsManifestUrl`
-            // from one visionOS player response; the legacy `livestreams` path follows when
-            // necessary. Neither path runs the JavaScriptCore signature/n-parameter solver.
-            //
-            // That solver re-parses the entire ~2.5 MB player.js once per InnerTube client (twice
-            // normally, three times when no progressive format turns up), which measured at ~4s of
-            // the ~5.4s native resolution. In practice its output was then discarded and this very
-            // HLS URL played instead, so the whole pass was dead weight. Audio-only cannot use the
-            // video-bearing master directly; select its separate audio rendition when available.
+            // Prefer HLS without running the JS signature solver. Audio-only needs a separate rendition.
             if !progressiveOnly, quality == .audioOnly,
                let hls = try await hlsManifestURL(from: youtube, videoID: videoID, isLive: video.isLive) {
                 do {
@@ -347,12 +348,7 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         }
     }
 
-    /// Tries a visitor-backed visionOS request before the other clients or full player context.
-    ///
-    /// Returns `nil` instead of throwing when the extractor can't produce one, so a video that
-    /// genuinely has no HLS variant still falls through to progressive selection rather than
-    /// failing the whole resolution. Cancellation is rethrown so a rapid video switch still
-    /// unwinds immediately.
+    /// Visitor-backed visionOS HLS probe; nil falls through to progressive; rethrows cancellation.
     private func hlsManifestURL(from youtube: YouTube, videoID: String, isLive: Bool) async throws -> URL? {
         let visitorStartedAt = Date()
         do {

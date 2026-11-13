@@ -1,12 +1,7 @@
 import Foundation
 import OSLog
 
-/// Downloads a resolved HLS source without a second extraction request.
-///
-/// The service deliberately owns only transport concerns: it parses the master/media playlists,
-/// selects a bounded video rendition and the manifest's default audio rendition, downloads media
-/// segments concurrently to a temporary directory, and performs one serialized FFmpeg remux. It
-/// never persists signed URLs and never holds the complete media in memory.
+/// Downloads a resolved HLS rendition and remuxes segments with FFmpeg.
 @available(iOS 17.0, *)
 nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     typealias ProgressHandler = @Sendable (Double) -> Void
@@ -16,12 +11,11 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     private let session: URLSession
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "NativeHLSDownload")
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        self.session = session ?? AnonymousURLSession.make { $0.urlCache = nil }
     }
 
-    /// A force-quit skips `download`'s defer. Capture only work folders from earlier launches,
-    /// then remove them off-main so large abandoned segment sets cannot delay app startup.
+    /// Removes abandoned temp work dirs left by force-quit mid-download.
     @MainActor static func removeOrphansAtLaunch() {
         guard !orphanCleanupStarted else { return }
         orphanCleanupStarted = true
@@ -318,16 +312,11 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     }
 
     private static func preferredVideo(from renditions: [VideoRendition], maximumHeight: Int) -> VideoRendition? {
-        // AVPlayer filters incompatible variants while streaming a master playlist. Once we pick
-        // and persist one rendition ourselves, that safety net is gone. Restrict downloads to
-        // codecs with broad native iOS support: AVC first, then HEVC. AV1/VP9 can appear as the
-        // highest-bandwidth 1080p rendition but produce a file with valid tracks/duration that
-        // older devices still report as `isPlayable == false`.
+        // Persist only AVC/HEVC — AV1/VP9 can look valid but fail isPlayable on older devices.
         let compatible = renditions.filter { codecPreference($0.codecs) > 0 }
         guard !compatible.isEmpty else { return nil }
         let withinCap = compatible.filter { ($0.height ?? Int.max) <= maximumHeight }
-        // If even the lowest advertised rendition exceeds the requested ceiling, use that
-        // lowest tier rather than jumping to the highest quality in the master playlist.
+        // Prefer within the height cap; otherwise take the lowest advertised tier.
         let candidates: [VideoRendition]
         if withinCap.isEmpty, let lowestHeight = compatible.compactMap(\.height).min() {
             candidates = compatible.filter { $0.height == lowestHeight }

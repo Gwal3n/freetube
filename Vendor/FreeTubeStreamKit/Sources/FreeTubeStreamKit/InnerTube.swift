@@ -147,7 +147,7 @@ class InnerTube {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        let (responseData, _) = try await URLSession.shared.data(for: request)
+        let (responseData, _) = try await HTTP.session.data(for: request)
 
         return try JSONDecoder().decode(T.self, from: responseData)
     }

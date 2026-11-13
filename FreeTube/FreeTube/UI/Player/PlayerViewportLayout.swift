@@ -1,16 +1,9 @@
 import CoreGraphics
 import UIKit
 
-/// Pure geometry policy for the expanded player viewport.
-///
-/// Keeping these calculations outside `FullScreenPlayer` prevents its view body from becoming a
-/// second source of layout rules. The type has no state and deliberately does not own any player
-/// behavior; it only returns the same frames and offsets used by the existing presentation.
+/// Stateless viewport geometry for the expanded player.
 enum PlayerViewportLayout {
-    /// Baseline portrait height. Standard and tall media retain the familiar 16:9 player, while
-    /// genuinely cinematic sources may use their wider native ratio instead of carrying a band
-    /// of empty black canvas. The lower bound avoids impractically thin chrome for malformed or
-    /// extreme presentation sizes.
+    /// Compact height: 16:9 for ordinary/tall media, native ratio for wide sources.
     static func compactSurfaceHeight(
         width: CGFloat,
         presentationSize: CGSize

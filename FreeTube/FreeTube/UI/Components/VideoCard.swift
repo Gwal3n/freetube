@@ -1,11 +1,7 @@
 import SwiftUI
 import Kingfisher
 
-/// Vertical "feed" video card — used in Home, Subscriptions, Channel videos.
-///
-/// Set `showsMoreMenu: true` to render the trailing ellipsis Menu (open in browser, copy URL,
-/// add to playlist, downloads) on the metadata row. The Menu sits as a sibling of
-/// the card's main tap target so its taps don't trigger `onTap`.
+/// Vertical feed video card. `showsMoreMenu` places a sibling ellipsis so taps do not fire `onTap`.
 @available(iOS 17.0, *)
 struct VideoCard: View {
     @Environment(PlayerStateManager.self) private var player

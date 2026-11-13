@@ -9,11 +9,7 @@ struct ChannelAvatarService {
     func fetchAvatar(id: String) async -> URL? {
         guard let channelURL = URL(string: "https://www.youtube.com/channel")?
             .appendingPathComponent(id) else { return nil }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpShouldSetCookies = false
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.timeoutIntervalForRequest = 12
-        let session = URLSession(configuration: configuration)
+        let session = AnonymousURLSession.make { $0.timeoutIntervalForRequest = 12 }
         defer { session.invalidateAndCancel() }
 
         do {

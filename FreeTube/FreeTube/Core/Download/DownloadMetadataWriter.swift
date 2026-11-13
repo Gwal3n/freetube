@@ -30,6 +30,8 @@ final class DownloadMetadataWriter {
 
     private func thumbnailData(url: URL?) async -> Data? {
         guard let url else { return nil }
-        return try? await URLSession.shared.data(from: url).0
+        let session = AnonymousURLSession.make { $0.urlCache = nil }
+        defer { session.invalidateAndCancel() }
+        return try? await session.data(from: url).0
     }
 }

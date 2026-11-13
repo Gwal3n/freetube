@@ -65,10 +65,7 @@ final class PlaylistViewModel {
         }
     }
 
-    /// Public playlists have no server-side query endpoint. Load their remaining pages while a
-    /// search is active, filtering locally as each page arrives. Stopping at the first match leaves
-    /// later matching videos invisible and can make a playlist search appear incomplete.
-    /// The screen owns cancellation when the query changes or disappears.
+    /// Local filter over remaining public-playlist pages while search is active.
     func loadRemainingPagesForSearch(for query: String) async {
         guard !query.isEmpty, details != nil else { return }
         searchSequence &+= 1

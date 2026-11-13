@@ -1,11 +1,7 @@
 import AVFoundation
 import Foundation
 
-/// Prepares an experimental progressive item without replacing or pausing the working HLS item.
-/// The silent, paused probe has no view or audio session; it is detached before the real player
-/// adopts a separate item made from the same asset. An AVPlayerItem itself cannot move between
-/// two AVPlayer instances, even after the probe removes it. Readiness, failure, timeout, and
-/// cancellation share one completion funnel.
+/// Silent progressive probe; never transfer its AVPlayerItem to the visible player — create a new one.
 @available(iOS 17.0, *)
 @MainActor
 final class FastPlaybackPreparation {

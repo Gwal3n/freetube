@@ -22,7 +22,7 @@ struct SubscriptionFeedScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
-    @AppStorage("incognitoHideFeed") private var incognitoHideFeed = true
+    @AppStorage("incognitoHideFeed") private var incognitoHideFeed = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
@@ -44,7 +44,7 @@ struct SubscriptionFeedScreen: View {
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
     @State private var feedFilter = FeedVideoFilter.load()
-    @State private var feedFilterCustomRange: FeedFilterMenu.CustomRange?
+    @State private var feedFilterCustomRange: MediaFilterCustomRange?
     @State private var lastFilteredPrefetchKey: String?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 

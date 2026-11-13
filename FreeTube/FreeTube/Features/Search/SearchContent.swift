@@ -2,19 +2,13 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Renders search results, suggestions, history, and the empty state. `HomeScreen` owns the search
-/// presentation and the history-upsert submit callback.
+/// Search results, suggestions, and history. Presentation lives on `HomeScreen`.
 @available(iOS 17.0, *)
 struct SearchContent: View {
     private struct FilterFillRequest: Equatable {
         let resultsRevision: Int
         let filters: SearchVideoFilters
         let blockingRevision: Int
-    }
-
-    private struct FilterPageKey: Equatable {
-        let request: FilterFillRequest
-        let loadedCount: Int
     }
 
     @Bindable var model: SearchViewModel
@@ -40,10 +34,7 @@ struct SearchContent: View {
     /// chrome. The browsing settings toggles write these same keys.
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
-    @State private var progressByVideoID: [String: Double] = [:]
-    @State private var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
     @State private var blocklist = VideoBlocklist.shared
-    @State private var lastFilteredPrefetch: FilterPageKey?
     @State private var showingClearSearchHistoryConfirmation = false
     @State private var visibleRecentChannelCount = Self.recentChannelPageSize
     @AppStorage(RecentHistoryLimits.searchKey) private var recentSearchLimit = RecentHistoryLimits.defaultSearchLimit
@@ -90,10 +81,10 @@ struct SearchContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: model.submittedQuery) { _, _ in
-            lastFilteredPrefetch = nil
+            model.invalidateFilteredPrefetch()
         }
         .onChange(of: model.videoFilters) { oldValue, _ in
-            lastFilteredPrefetch = nil
+            model.invalidateFilteredPrefetch()
             model.serverFiltersDidChange(from: oldValue)
         }
         .errorToast($model.errorState)
@@ -104,7 +95,7 @@ struct SearchContent: View {
         let now = Date.now
         let unblockedItems = results.items.filter { !isBlocked($0) }
         let visibleItems = unblockedItems.filter {
-            includes($0, now: now, status: watchStatus(for: $0))
+            model.includes($0, now: now, status: model.watchStatus(for: $0))
         }
         if results.items.isEmpty {
             ContentUnavailableView {
@@ -167,16 +158,10 @@ struct SearchContent: View {
                                   !model.isLoading else { return }
                             if model.videoFilters.isActive || blocklist.rules.isActive {
                                 guard visibleItems.count >= 12 else { return }
-                                let key = FilterPageKey(
-                                    request: .init(
-                                        resultsRevision: model.resultsRevision,
-                                        filters: model.videoFilters,
-                                        blockingRevision: blocklist.revision
-                                    ),
-                                    loadedCount: results.items.count
-                                )
-                                guard lastFilteredPrefetch != key else { return }
-                                lastFilteredPrefetch = key
+                                guard model.shouldPrefetchFilteredPage(
+                                    loadedCount: results.items.count,
+                                    blockingRevision: blocklist.revision
+                                ) else { return }
                             }
                             Task {
                                 await model.loadMore()
@@ -215,10 +200,10 @@ struct SearchContent: View {
                 await fillFilteredResults()
             }
             .task(id: progressLookupID(for: results.videos)) {
-                await loadProgress(for: results.videos)
+                await model.loadWatchProgress(for: results.videos)
             }
             .onReceive(NotificationCenter.default.publisher(for: .watchHistoryDidChange)) { _ in
-                Task { await loadProgress(for: results.videos) }
+                Task { await model.loadWatchProgress(for: results.videos) }
             }
         }
     }
@@ -261,10 +246,7 @@ struct SearchContent: View {
         largeVideoThumbnails ? nil : MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize).height
     }
 
-    /// Same density and avatar treatment as the subscription feed, so Search does not look like a
-    /// second, poorer list style. Channel taps route through `onOpenDestination` (which ends the
-    /// searchable session first) instead of a List `NavigationLink`, which is what drew the
-    /// trailing disclosure chevron on every video row.
+    /// Feed-density rows; channel opens via `onOpenDestination` (no List NavigationLink chevron).
     @ViewBuilder
     private func searchVideoRow(_ video: Video) -> some View {
         let openChannel: (() -> Void)? = video.channelID.isEmpty
@@ -287,16 +269,16 @@ struct SearchContent: View {
                 offersPlayNext: true,
                 showsChannelAvatar: showChannelAvatars,
                 onTapChannel: openChannel,
-                playbackProgress: progressByVideoID[video.id],
-                watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil
+                playbackProgress: model.progressByVideoID[video.id],
+                watchStatus: displaysWatchProgress ? model.watchStatusByVideoID[video.id] : nil
             )
         } else {
             VideoRow(
                 video: video,
                 accessory: .actions(offersPlayNext: true),
                 showsChannelAvatar: showChannelAvatars,
-                playbackProgress: progressByVideoID[video.id],
-                watchStatus: displaysWatchProgress ? watchStatusByVideoID[video.id] : nil,
+                playbackProgress: model.progressByVideoID[video.id],
+                watchStatus: displaysWatchProgress ? model.watchStatusByVideoID[video.id] : nil,
                 onOpenChannel: openChannel,
                 onTapChannel: openChannel
             ) {
@@ -314,97 +296,16 @@ struct SearchContent: View {
         }
     }
 
-    private func watchStatus(for hit: SearchHit) -> WatchHistoryStatus? {
-        guard case .video(let video) = hit else { return nil }
-        return watchStatusByVideoID[video.id]
-    }
-
-    private func includes(
-        _ hit: SearchHit,
-        now: Date,
-        status: WatchHistoryStatus?
-    ) -> Bool {
-        let resultType = model.videoFilters.resultType
-        switch hit {
-        case .video(let video):
-            guard resultType == .any || resultType == .video else { return false }
-            guard model.videoFilters.isActive else { return true }
-            return model.videoFilters.includes(
-                video,
-                status: status,
-                now: now,
-                applyServerMirroredLocally: model.applyServerMirroredLocally
-            )
-        case .channel:
-            return resultType == .any || resultType == .channel
-        case .playlist:
-            return resultType == .any || resultType == .playlist
-        }
-    }
-
     private func progressLookupID(for videos: [Video]) -> String {
         "\(showHistoryProgressBars):\(incognitoEnabled):\(incognitoHideWatchProgress):" + videos.map(\.id).joined(separator: ",")
     }
 
-    /// Fill a sparse filtered list without turning a very narrow filter into an unlimited stream
-    /// of YouTube requests. A later explicit Load more starts another bounded batch.
     private func fillFilteredResults() async {
-        guard autoLoadMoreSearchItems else { return }
-        let filters = model.videoFilters
-        let blockingRevision = blocklist.revision
-        guard (filters.isActive || blocklist.rules.isActive),
-              let query = model.submittedQuery else { return }
-        let revision = model.resultsRevision
-        let targetCount = 12
-        let maximumPages = 6
-
-        for _ in 0..<maximumPages {
-            while model.isLoading {
-                do { try await Task.sleep(for: .milliseconds(100)) }
-                catch { return }
-            }
-            guard !Task.isCancelled,
-                  filters == model.videoFilters,
-                  blocklist.revision == blockingRevision,
-                  model.resultsRevision == revision,
-                  model.submittedQuery == query,
-                  !model.isEditingNewQuery,
-                  !model.paginationFailed,
-                  let results = model.results,
-                  let token = results.continuationToken else { return }
-
-            let statuses: [String: WatchHistoryStatus]
-            if filters.watch == .all {
-                statuses = [:]
-            } else {
-                let summary = await PersistenceWriter.shared.watchHistorySummary(
-                    videoIDs: results.videos.map(\.id)
-                )
-                guard !Task.isCancelled, filters == model.videoFilters,
-                      blocklist.revision == blockingRevision,
-                      model.resultsRevision == revision else { return }
-                statuses = summary.statuses
-            }
-            let now = Date.now
-            let visibleCount = results.items.filter { hit in
-                !isBlocked(hit) && includes(hit, now: now, status: {
-                    guard case .video(let video) = hit else { return nil }
-                    return statuses[video.id]
-                }())
-            }.count
-            if visibleCount >= targetCount { return }
-
-            await model.loadMore()
-            guard !Task.isCancelled, model.results?.continuationToken != token else { return }
-        }
-    }
-
-    private func loadProgress(for videos: [Video]) async {
-        let ids = videos.map(\.id)
-        let summary = await PersistenceWriter.shared.watchHistorySummary(videoIDs: ids)
-        guard !Task.isCancelled, model.results?.videos.map(\.id) == ids else { return }
-        watchStatusByVideoID = summary.statuses
-        progressByVideoID = UserPreferences().displaysWatchProgress ? summary.progress : [:]
+        await model.fillFilteredResults(
+            autoLoadMore: autoLoadMoreSearchItems,
+            blockingActive: blocklist.rules.isActive,
+            isBlocked: isBlocked
+        )
     }
 
     @ViewBuilder
@@ -640,59 +541,4 @@ struct SearchContent: View {
         dismissKeyboard()
     }
 
-}
-
-/// Inline field used on Mac, where native `.searchable` collapses to a toolbar button.
-@available(iOS 17.0, *)
-struct MacInlineSearchField: View {
-    @Binding var query: String
-    let onSubmit: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Search", text: $query)
-                .textFieldStyle(.plain)
-                .submitLabel(.search)
-                .onSubmit(onSubmit)
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
-        .background(.quaternary, in: Capsule())
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-}
-
-@available(iOS 17.0, *)
-struct ConditionalSearchable: ViewModifier {
-    @Binding var text: String
-    @Binding var isPresented: Bool
-    let enabled: Bool
-    var prompt: String = "Search"
-
-    func body(content: Content) -> some View {
-        if enabled {
-            // Always visible below the title, so the inactive screen never hides the field on scroll.
-            content.searchable(
-                text: $text,
-                isPresented: $isPresented,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: Text(prompt)
-            )
-        } else {
-            content
-        }
-    }
 }

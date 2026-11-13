@@ -7,15 +7,9 @@ import OSLog
 extension PlayerStateManager {
     // MARK: - Item installation and observation
 
-    /// Swap the player to a new item using the `AVQueuePlayer`-correct pattern. `replaceCurrentItem`
-    /// is documented to be a no-op when the player's internal queue is empty (which is our usual
-    /// state since the playable URL is short-lived and we never preload), so we always tear the
-    /// queue down to nothing first and then insert. Also wires KVO so we hear about decode/auth
-    /// failures the moment they happen (CoreMedia's `CFByteFlume err=-12939` style messages don't
-    /// surface a structured `NSError` otherwise).
+    /// Installs an item via `removeAllItems` + `insert` (`replaceCurrentItem` is a no-op on empty queue).
     func loadItem(_ item: AVPlayerItem, originalAudioLanguageCode: String? = nil) {
-        // Do not log the asset URL or path. Direct YouTube assets contain signed credentials in
-        // both components; the candidate strategy is logged immediately before this method.
+        // Never log asset URLs; signed credentials live in the query string.
         let assetKind = item.asset is AVURLAsset ? "URL" : "composition"
         log.info("loadItem: removeAllItems + insert (assetKind=\(assetKind, privacy: .public))")
         player.removeAllItems()
@@ -302,15 +296,7 @@ extension PlayerStateManager {
             applyQualityCap(to: item)
             itemLoadStartedAt = Date()
             loadItem(item, originalAudioLanguageCode: candidate.originalAudioLanguageCode)
-            // Optimistic start. AVPlayer has no "first frame rendered" signal — only
-            // `.readyToPlay`, which on a warm resolve accounted for ~80% of the tap-to-video
-            // wait. So we stop gating the transport on it: the candidate is still validated
-            // below and still rejected on failure/timeout, but the player is already holding a
-            // play request when readiness lands, so it starts without waiting for us to notice.
-            // This only works because `automaticallyWaitsToMinimizeStalling` is `true` — see the
-            // note in `init`, where turning it off silently discards this call.
-            // Recovery waits to seek before playing, so it stays `.resolving` until ready;
-            // only a normal optimistic start uses `.buffering` here.
+            // Optimistic play before readiness; requires `automaticallyWaitsToMinimizeStalling`.
             loadState = recovery == nil ? .buffering : .resolving
             updateNowPlaying()
             if recovery == nil, autoplay, wantsPlayback {
@@ -398,14 +384,7 @@ extension PlayerStateManager {
                         }
                     }
                 }
-                // Usually redundant — the optimistic `play()` above has either started the item or
-                // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
-                // where a rejected candidate left the transport paused.
-                //
-                // Ask the player, not `isPlaying`. That flag is a prediction written by `play()`
-                // for immediate UI feedback, so after an optimistic start it reads `true` whether
-                // or not AVPlayer honoured the request. Gating this on it means the one situation
-                // that needs a retry is the one situation where the retry is skipped.
+                // Retry only if AVPlayer is still paused after optimistic play / rejected candidates.
                 if wantsPlayback, player.timeControlStatus == .paused { play() }
                 finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
                 reconcilePlaybackRate()
@@ -424,10 +403,6 @@ extension PlayerStateManager {
             guard !Task.isCancelled, playbackSessionID == sessionID,
                   currentVideo?.id == video.id else { return }
             excludedStrategies.insert(candidate.strategy)
-            // The optimistic `play()` left the transport running (rate 1, possibly stalled) on a
-            // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`
-            // and the Now Playing rate don't advertise playback for a rejected candidate while the
-            // next one resolves.
             player.pause()
             isPlaying = false
             player.removeAllItems()
@@ -439,17 +414,9 @@ extension PlayerStateManager {
         log.debug("resolveAndPlay: ended after cancellation or video change for \(video.id, privacy: .public)")
     }
 
-    /// Caps HLS variant selection to the user's preferred quality.
-    ///
-    /// The resolver now hands back a master playlist for most videos rather than a single
-    /// progressive stream, and a master playlist advertises YouTube's whole variant ladder. Without
-    /// a ceiling AVPlayer's ABR logic is free to climb past the user's setting — previously the
-    /// height cap was applied when picking a progressive format, so this keeps that preference
-    /// meaningful. It also shortens time-to-first-frame, since AVPlayer no longer pulls a large
-    /// segment before reporting `.readyToPlay`. `.auto` stays uncapped so ABR can use the full
-    /// ladder, and this is a no-op for progressive and local-file candidates.
     // MARK: - Quality and readiness
 
+    /// Caps HLS ABR via `preferredMaximumResolution`. No-op for progressive/local and `.auto`.
     func applyQualityCap(to item: AVPlayerItem) {
         applyQualityCap(to: item, quality: playbackQuality)
     }

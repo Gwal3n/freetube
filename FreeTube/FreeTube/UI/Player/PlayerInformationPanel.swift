@@ -1,10 +1,6 @@
 import SwiftUI
 
-/// Presentation-only composition for the content below the player viewport.
-///
-/// `FullScreenPlayer` continues to own loading, navigation, download, and playback side effects.
-/// Keeping those decisions in the parent makes this component predictable while preventing the
-/// player orchestrator from also owning the lower panel's visual hierarchy.
+/// Lower-player panel layout; side effects stay in `FullScreenPlayer`.
 @available(iOS 17.0, *)
 struct PlayerInformationPanel<Actions: View>: View {
     @AppStorage("playerPanelSectionOrder") private var storedSectionOrder = PlayerPanelSection.defaultOrder

@@ -154,18 +154,19 @@ final class AppBackupService {
     }
 
     private static let settingKeys: Set<String> = [
-        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appAccentPreset", "appFontPreset",
+        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "appAccentPreset", "appFontPreset",
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "autoLoadMoreFeedItems", "autoLoadMoreSearchItems", "autoLoadMoreComments", "cacheRecentVideoContent", "cellularPlaybackQuality",
-        "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours", "feedSuggestionsEnabled", "feedSuggestionDensity",
+        "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours", "feedSuggestionsEnabled", "feedSuggestionDensity", "feedVideoFilter",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "useAccentTheme", "accentNavigationOnly", "appCustomAccentHex", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
+        "verticalSwipeFullscreen", "verticalSwipeAdjustments",
         "concurrentFragments", "customDoubleTapSeekSeconds", "customPlaybackSpeeds", "playbackSpeedChoices", "sleepTimerMinuteChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "centerTapPlayPauseEnabled", "formattedCaptions",
         "floatingPlayerWidth", "floatingPlayerCorner", "floatingPlayerVerticalFraction",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",
         "com.leshko.freetube.deArrowRandomThumbnails",
         "hiddenPlayerTopControls", "historyRetentionPolicy", "holdForSpeedEnabled", "holdSpeedRate", "horizontalSwipeToSeekEnabled",
         "largeSubscriptionFeedThumbnails",
-        "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
+        "incognitoEnabled", "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
         "logToFile", "playerScrollDiagnosticsEnabled", "manualQueue",
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "playerPanelSectionOrder",
@@ -175,14 +176,14 @@ final class AppBackupService {
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "pinCommentsHeading", "portraitOrientationLock", "pinUpNextHeading", "pinQueueHeading", "showDescription", "showFeedChannelAvatars", "showFeedFilterButton", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
         "showCommentAuthorPhotos", "openCommentAuthorChannels", "openFeedChannelsOnTap", "openUpNextChannelsOnTap",
         "showContinueWatchingMenu", "showHistoryProgressBars", "watchProgressColorMode", "watchProgressCustomHex", "finishedVideoIndicator", "transportButtonMode", "transportSeekSeconds", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
-        "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
+        "sponsorBlockHighlightBehavior", "sponsorBlockInteractionBehavior",
         "sponsorBlockExclusiveAccessBehavior", "sponsorBlockPreviewBehavior",
         "sponsorBlockHookBehavior", "sponsorBlockChapterBehavior",
         "sponsorBlockMusicOfftopicBehavior", "sponsorBlockFillerBehavior",
-        "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
-        "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
+        "sponsorBlockIntroBehavior", "sponsorBlockOutroBehavior",
+        "sponsorBlockSelfPromotionBehavior",
         "sponsorBlockColorOverridesJSON", "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
-        "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize",
+        "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize",
         "showUpNextChannelAvatars"
     ]
 

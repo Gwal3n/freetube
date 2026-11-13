@@ -16,10 +16,7 @@ final class PlaylistService: PlaylistServicing {
         self.client = client
     }
 
-    /// Loads a playlist's header (title, description, owning channel, total view/video counts)
-    /// plus its first page of videos. YouTubeKit expects the playlist ID prefixed with `VL` for
-    /// browse requests; we add it here if the caller passed the bare ID we get from search/channel
-    /// listings.
+    /// Header + first page. Browse IDs need a `VL` prefix when the caller passed a bare ID.
     func fetchPlaylist(id: String) async throws -> PlaylistDetails {
         log.info("Fetching playlist \(id, privacy: .public)")
         let browseID = id.hasPrefix("VL") ? id : "VL" + id

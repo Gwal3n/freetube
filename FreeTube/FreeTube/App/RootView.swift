@@ -1,13 +1,6 @@
 import SwiftUI
 
-/// Top-level tabbed shell. The in-app floating player persists across tabs.
-///
-/// Tab layout is customizable; Search keeps its native system role on iOS 26.
-/// - Feed (latest cached videos from local subscriptions)
-/// - Library (device-local history, subscriptions, and playlists)
-/// - Downloads (saved videos and transfer queue)
-/// - Search (search field, suggestions, results, and local recent searches)
-/// Settings opens from Library's toolbar or an optional dedicated tab.
+/// Root tabs plus the floating player that persists across them.
 @available(iOS 17.0, *)
 struct RootView: View {
     @Environment(PlayerStateManager.self) private var player
