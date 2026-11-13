@@ -2,8 +2,7 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Renders search results, suggestions, history, and the empty state. `HomeScreen` owns the search
-/// presentation and the history-upsert submit callback.
+/// Search results, suggestions, and history. Presentation lives on `HomeScreen`.
 @available(iOS 17.0, *)
 struct SearchContent: View {
     private struct FilterFillRequest: Equatable {
@@ -545,59 +544,4 @@ struct SearchContent: View {
         dismissKeyboard()
     }
 
-}
-
-/// Inline field used on Mac, where native `.searchable` collapses to a toolbar button.
-@available(iOS 17.0, *)
-struct MacInlineSearchField: View {
-    @Binding var query: String
-    let onSubmit: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Search", text: $query)
-                .textFieldStyle(.plain)
-                .submitLabel(.search)
-                .onSubmit(onSubmit)
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
-        .background(.quaternary, in: Capsule())
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-}
-
-@available(iOS 17.0, *)
-struct ConditionalSearchable: ViewModifier {
-    @Binding var text: String
-    @Binding var isPresented: Bool
-    let enabled: Bool
-    var prompt: String = "Search"
-
-    func body(content: Content) -> some View {
-        if enabled {
-            // Always visible below the title, so the inactive screen never hides the field on scroll.
-            content.searchable(
-                text: $text,
-                isPresented: $isPresented,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: Text(prompt)
-            )
-        } else {
-            content
-        }
-    }
 }

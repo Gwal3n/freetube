@@ -1,24 +1,7 @@
 import Foundation
 import OSLog
 
-/// Decodes a channel's Videos tab without going through YouTubeKit's parser. Used as a
-/// fallback when YouTubeKit returns zero items for a tab that actually has videos.
-///
-/// **Why this exists.** `ChannelInfosResponse.Videos.decodeJSONFromTab` and
-/// `decodeContinuation` only walk the legacy `richItemRenderer.content.videoRenderer` shape.
-/// YouTube has been migrating channel surfaces to `lockupViewModel`; YouTubeKit added
-/// lockup fallbacks to Home, Account library, History, MoreVideoInfo, Subscriptions feed —
-/// but missed the channel Videos and Directs tabs. When a channel uses the new shape we'd
-/// see an empty list while the header still reports the correct video count. Subclassing
-/// isn't an option (the affected types are structs and the decoders are static methods),
-/// so we duplicate just enough of the request + decode pipeline to cover the gap, and
-/// keep YouTubeKit as the primary path.
-///
-/// **Continuation handoff.** When the initial fetch uses the fallback path we store the
-/// continuation token on the actor-backed state map. `ChannelService.fetchVideosNextPage`
-/// checks for a stored token before dispatching to YouTubeKit — if present, we route
-/// pagination through our own decoder too. Mixing decoders mid-pagination would dead-end
-/// at the same lockup gap on the very next page.
+/// Channel Videos/Live fallback when YouTubeKit misses `lockupViewModel` tab items.
 @available(iOS 17.0, *)
 final class ChannelVideosFallbackService: Sendable {
     private let session: URLSession

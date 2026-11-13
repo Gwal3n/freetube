@@ -4,28 +4,13 @@ import Observation
 import OSLog
 import UIKit
 
-/// Replaces the SwiftData `DownloadedVideo` query path with a file-system + xattr scan.
-/// **Single source of truth = `Documents/*.{mp4,m4a,mp3,webm,opus}`**; metadata travels
-/// with each file as an extended attribute via `FileXattr`. The Documents root is exposed
-/// to the user in the Files app (Info.plist keys `UIFileSharingEnabled` +
-/// `LSSupportsOpeningDocumentsInPlace`), so they can drag files in/out, AirDrop, etc.
-///
-/// **Reactivity** = `Notification.Name.downloadsDidChange`. After a download lands (native
-/// or URL-fetch) or a file is deleted, the writer posts this notification; this store
-/// listens and re-runs `refresh()`. Since the store is `@Observable`, any view holding it
-/// re-renders when `entries` mutates.
-///
-/// **No reactivity for external file changes** (user deletes via Files.app). The store
-/// only refreshes on app launch and on app-driven mutations. A `DispatchSource` file-system
-/// watcher could be added later if that becomes a real complaint.
+/// File-system + xattr download index for `Documents` media. Refreshes on app mutations.
 @available(iOS 17.0, *)
 @Observable
 @MainActor
 final class DownloadsStore {
     static let shared = DownloadsStore()
 
-    /// Name of the notification any code path posts after touching the Downloads folder.
-    /// Avoids hardcoded strings sprinkled across writers.
     nonisolated static let didChange = Notification.Name("com.leshko.freetube.downloadsDidChange")
 
     /// xattr key holding the serialized `DownloadMetadata` for a file. App-prefixed so

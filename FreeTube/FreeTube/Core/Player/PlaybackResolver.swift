@@ -2,16 +2,7 @@ import AVFoundation
 import Foundation
 import OSLog
 
-/// Stream-first playback resolver. An already-downloaded file remains the fastest and only offline
-/// source. Otherwise the native extractor runs first — it now returns the InnerTube HLS manifest
-/// without any signature deciphering, which makes it both the fastest and the most reliable
-/// candidate. The b5i streaming endpoints follow as a safety net: for ordinary VOD their
-/// `VideoInfosResponse` reports no HLS URL and its formats carry metadata only (upstream documents
-/// that real URLs need `VideoInfosWithDownloadFormatsResponse.deciphersURLs(player:)`), so running
-/// them first was spending ~1.5s per play on candidates that could not be produced. They still earn
-/// their place behind the native resolver for the cases where it comes back empty.
-/// Playback never starts a download as a side effect. Explicit Download actions continue to use
-/// `DownloadManager` directly.
+/// Local file → native HLS/direct → b5i fallback. Never starts a download as a side effect.
 final class PlaybackResolver: PlaybackResolving {
     private let downloads: DownloadManagerLike
     private let nativeStreams: any NativeStreamServicing

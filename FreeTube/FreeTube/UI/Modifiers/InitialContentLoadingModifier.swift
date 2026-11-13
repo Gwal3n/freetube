@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Keeps the native List mounted during its first local read without a placeholder-content
-/// animation wrapper around its navigation environment.
+/// Keeps the native List mounted during its first local read.
 @available(iOS 17.0, *)
 struct InitialContentLoadingModifier: ViewModifier {
     let hasLoaded: Bool
@@ -15,7 +14,10 @@ struct InitialContentLoadingModifier: ViewModifier {
             .accessibilityHidden(!hasLoaded)
             .overlay {
                 if !hasLoaded {
-                    LoadingView()
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 40)
                         .accessibilityLabel("Loading")
                         .allowsHitTesting(false)
                 }

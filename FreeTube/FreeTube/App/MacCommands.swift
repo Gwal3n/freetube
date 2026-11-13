@@ -1,31 +1,8 @@
 import SwiftUI
 
-/// Menu-bar entries and keyboard shortcuts. Attached to the root `WindowGroup` in
-/// `FreeTubeApp` via `.commands { MacCommands(player:) }`.
-///
-/// **Why this exists.** On a Mac (whether via "Designed for iPad on Mac" or a future
-/// Catalyst build) the system mounts an AppKit menu bar over our SwiftUI scene. Without
-/// explicit `Commands`, users get only the OS-provided defaults — no app-level shortcuts.
-/// We add three groups:
-///
-/// 1. **Settings (⌘,)** — `CommandGroup(replacing: .appSettings)` is the standard slot;
-///    we post a notification that opens Settings from Library.
-/// 2. **Navigate menu (⌘1 / ⌘F / ⌘2 / ⌘3)** — quick-jump to tab bar entries. ⌘F is the
-///    standard "find" shortcut everywhere on Mac, so it maps to Search.
-/// 3. **Playback menu (Space, ⌘←/→, ⌘↑/↓)** — transport controls mirroring what
-///    `RemoteCommandCenter` wires for the lock screen on iOS.
-///
-/// **Plumbing.** Tab switches go through `NotificationCenter` because the selected tab
-/// lives inside `RootView` (`@State`), which isn't reachable from a `Scene`-level
-/// `Commands` builder. Player controls call `PlayerStateManager` directly since it's
-/// passed in by reference.
-///
-/// **iPhone/iPad.** `Commands` produces no visible menu bar on iPhone and only adds
-/// keyboard shortcuts on iPad with a hardware keyboard. Harmless to register everywhere.
+/// Mac menu bar and keyboard shortcuts for Settings, tabs, and playback.
 @available(iOS 17.0, *)
 struct MacCommands: Commands {
-    /// Can't use `@Environment` inside a `Commands` struct (it's not a `View`), so the
-    /// player has to be threaded through from `FreeTubeApp`.
     let player: PlayerStateManager
 
     var body: some Commands {

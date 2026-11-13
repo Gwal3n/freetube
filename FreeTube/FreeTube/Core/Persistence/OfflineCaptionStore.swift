@@ -1,9 +1,7 @@
 import Foundation
 import OSLog
 
-/// Text-only caption sidecars in Documents/Captions, associated with downloaded media by video ID.
-/// Signed YouTube URLs are never written to disk. Each native track is separately selectable.
-/// Caption discovery and cue download stay in Networking; this actor only persists local JSON.
+/// Local caption JSON sidecars for downloaded videos. Signed URLs are never persisted.
 actor OfflineCaptionStore {
     static let shared = OfflineCaptionStore()
 

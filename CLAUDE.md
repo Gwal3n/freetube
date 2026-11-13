@@ -93,7 +93,7 @@ FreeTube/
 │   ├── Player/            # FullScreenPlayer, PlayerSurface, DownloadProgressOverlay
 │   ├── Components/        # VideoCard, VideoRow, ChannelRow, CommentRow,
 │   │                      # PlaylistRow, AddToPlaylistSheet, ActivityShareSheet,
-│   │                      # LoadingView
+│   │                      # shared list/row chrome
 │   └── Modifiers/         # ErrorToastModifier
 ├── Resources/
 │   └── Localizable.xcstrings    # en / es / ru / fr / de

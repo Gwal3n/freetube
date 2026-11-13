@@ -4,70 +4,43 @@ import SwiftUI
 /// Lightweight user preferences stored in `UserDefaults` via `@AppStorage`. Use this for primitive flags only;
 /// anything queryable belongs in SwiftData.
 struct UserPreferences {
-    /// Preserve the established 360p playback default. Download quality is migrated once from
-    /// this choice, then stored separately so later playback changes do not affect downloads.
     @AppStorage("preferredQuality") var preferredQualityRaw: String = VideoQuality.p360.rawValue
-    /// Distinct from playback quality. On upgrade, initialize this from the previous shared
-    /// preference so existing playlist downloads keep their chosen quality.
+    /// Migrated once from the old shared quality preference.
     @AppStorage("defaultDownloadQuality") var defaultDownloadQualityRaw: String = VideoQuality.p360.rawValue
-    /// An additional HLS cap only on networks iOS classifies as expensive (usually cellular).
     @AppStorage("cellularPlaybackQuality") var cellularPlaybackQualityRaw: String = VideoQuality.auto.rawValue
     @AppStorage("seekPreviewStyle") var seekPreviewStyleRaw: String = SeekPreviewStyle.compact.rawValue
     @AppStorage("doubleTapSeekSeconds") var doubleTapSeekSeconds: Int = 10
     @AppStorage("resumeAfterAudioInterruption") var resumeAfterAudioInterruption: Bool = true
     @AppStorage("rememberFloatingPlayerPlacement") var rememberFloatingPlayerPlacement: Bool = false
     @AppStorage("floatingPlayerWidth") private var savedFloatingPlayerWidthRaw: Double = 216
-    /// When `true`, downloads (and playback-time fetches, since those use the same path) are
-    /// allowed to run over cellular. Default is `true` — permissive — so a fresh install
-    /// works out of the box on a phone without Wi-Fi. Users who pay per MB can disable this
-    /// and the network gate in `DownloadManager.waitForAllowedNetwork` will throw until
-    /// Wi-Fi comes back. Was previously stored under the `wifiOnlyDownloads` key with the
-    /// opposite meaning (true = blocked on cellular); fresh key here so the default flips
-    /// cleanly for existing installs.
+    /// Replaces the inverted legacy `wifiOnlyDownloads` key.
     @AppStorage("allowCellularDownloads") var allowCellularDownloads: Bool = true
     @AppStorage("autoplayNext") var autoplayNext: Bool = true
-    /// Enables the existing swipe-up entry and swipe-down fullscreen exit. Retained to preserve
-    /// the user's prior on/off choice when adding the fullscreen-only adjustment mode.
     @AppStorage("verticalSwipeFullscreen") var verticalSwipeFullscreen: Bool = true
     @AppStorage("verticalSwipeAdjustments") var verticalSwipeAdjustments: Bool = false
     @AppStorage("leftFullscreenSwipeAction") var leftFullscreenSwipeActionRaw: String = PlayerSwipeAdjustmentAction.brightness.rawValue
     @AppStorage("rightFullscreenSwipeAction") var rightFullscreenSwipeActionRaw: String = PlayerSwipeAdjustmentAction.volume.rawValue
-    /// Shows locally stored resume progress along video thumbnails throughout the app.
     @AppStorage("showHistoryProgressBars") var showHistoryProgressBars: Bool = true
-    /// Stops writing local watch history and playback positions when disabled. Existing entries
-    /// remain available until the user clears them explicitly.
     @AppStorage("saveWatchHistory") var saveWatchHistory: Bool = true
-    /// Optional immediate history entry. The default keeps the existing meaningful-playback threshold.
     @AppStorage("addToHistoryWhenOpened") var addToHistoryWhenOpened: Bool = false
     @AppStorage("historyRetentionPolicy") var historyRetentionPolicyRaw: String = HistoryRetentionPolicy.forever.rawValue
-    /// Removes the local-subscription Feed destination from the tab bar when disabled. Cached
-    /// entries remain on device so restoring the tab is immediate and does not force a refresh.
     @AppStorage("showSubscriptionFeedTab") var showSubscriptionFeedTab: Bool = true
-    /// Uses edge-to-edge 16:9 cards in the local subscription feed instead of compact rows.
     @AppStorage("largeSubscriptionFeedThumbnails") var largeSubscriptionFeedThumbnails: Bool = false
-    /// Keep channel identity visible beside feed metadata in both feed layouts.
     @AppStorage("showFeedChannelAvatars") var showFeedChannelAvatars: Bool = true
     @AppStorage("openFeedChannelsOnTap") var openFeedChannelsOnTap: Bool = false
-    /// Shows a quiet New label for subscription uploads estimated after the previous app visit.
     @AppStorage("showNewSubscriptionUploads") var showNewSubscriptionUploads: Bool = true
-    /// Reorder only nearby feed uploads; the independent gap controls can be zero to disable
-    /// either same-channel or shared-group spacing without turning off the other one.
     @AppStorage("spaceSubscriptionFeedVideos") var spaceSubscriptionFeedVideos: Bool = true
     @AppStorage("feedSuggestionsEnabled") var feedSuggestionsEnabled: Bool = false
     @AppStorage("feedSuggestionDensity") var feedSuggestionDensity: Int = 10
     @AppStorage("feedChannelSpacing") var feedChannelSpacing: Int = 2
     @AppStorage("feedGroupSpacing") var feedGroupSpacing: Int = 2
     @AppStorage("feedSpacingMaximumShiftHours") var feedSpacingMaximumShiftHours: Int = 24
-    /// Opt-in, foreground-only refresh of the local subscription feed.
     @AppStorage("automaticFeedRefreshEnabled") var automaticFeedRefreshEnabled: Bool = false
     @AppStorage("automaticFeedRefreshInterval") var automaticFeedRefreshIntervalRaw: String = FeedRefreshInterval.everySixHours.rawValue
-    /// Separate opt-in, count-only batches that never replace feed rows.
     @AppStorage("automaticFeedViewCountsEnabled") var automaticFeedViewCountsEnabled: Bool = false
     @AppStorage("automaticFeedViewCountInterval") var automaticFeedViewCountIntervalRaw: String = FeedRefreshInterval.hourly.rawValue
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showDescription") var showDescription: Bool = true
-    /// Shows YouTube's comments-entry teaser beneath the collapsed Comments heading. If YouTubeKit
-    /// cannot decode the current teaser shape, the first top-level comment is used as a fallback.
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("featuredCommentsNearPlaybackOnly") var featuredCommentsNearPlaybackOnly: Bool = false
     @AppStorage("showCommentAuthorPhotos") var showCommentAuthorPhotos: Bool = true
@@ -78,7 +51,6 @@ struct UserPreferences {
     @AppStorage("showSearchSuggestions") var showSearchSuggestions: Bool = true
     @AppStorage("saveSearchHistory") var saveSearchHistory: Bool = true
     @AppStorage("saveRecentChannels") var saveRecentChannels: Bool = true
-    /// Incognito keeps existing local data intact while changing what this session records or shows.
     @AppStorage("incognitoEnabled") var incognitoEnabled: Bool = false
     @AppStorage("incognitoSkipSearchHistory") var incognitoSkipSearchHistory: Bool = true
     @AppStorage("incognitoSkipWatchHistory") var incognitoSkipWatchHistory: Bool = true
@@ -87,12 +59,8 @@ struct UserPreferences {
     @AppStorage("incognitoHideFeed") var incognitoHideFeed: Bool = false
     @AppStorage("incognitoHideLibrary") var incognitoHideLibrary: Bool = false
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
-    /// Fetches expanded details and the first comments page only after playback is ready. Further
-    /// comment pages and replies always remain user initiated.
     @AppStorage("prefetchVideoDetails") var prefetchVideoDetails: Bool = true
     @AppStorage("cacheRecentVideoContent") var cacheRecentVideoContent: Bool = true
-    /// Lets FreeTube coexist with audio already playing in another app. The default remains the
-    /// normal primary-media behavior, where activating FreeTube interrupts other non-mixable audio.
     @AppStorage("allowAudioMixing") var allowAudioMixing: Bool = false
     @AppStorage("captionBackgroundEnabled") var captionBackgroundEnabled: Bool = true
     @AppStorage("captionTextScale") var captionTextScale: Double = 1.0
@@ -104,22 +72,12 @@ struct UserPreferences {
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     @AppStorage("playerControlLayout") var playerControlLayoutRaw: String = ""
     @AppStorage("playerMoreMenuDividers") var playerMoreMenuDividersRaw: String = ""
-    /// When true, `LogFileWriter` opens a new file under `Application Support/Logs/` on every app
-    /// launch and directly mirrors rendered `AppLog` entries into it. Useful for
-    /// capturing diagnostic traces from TestFlight / sideload installs where Console.app
-    /// access isn't practical. Defaults off — only a handful of users will ever flip this.
     @AppStorage("logToFile") var logToFile: Bool = false
-    /// Preserve the historical dark appearance unless the user chooses System or Light.
     @AppStorage("appearanceMode") var appearanceModeRaw: String = AppearanceMode.dark.rawValue
     @AppStorage("appAccentPreset") var appAccentPresetRaw: String = AppAccentPreset.classic.rawValue
     @AppStorage("appFontPreset") var appFontPresetRaw: String = AppFontPreset.system.rawValue
-    /// Maximum native HLS fragment concurrency. Higher values fetch more chunks
-    /// in parallel within a single download, cutting wall-clock time. Defaults to 4 — a good
-    /// balance for cellular and consumer Wi-Fi. Values above 8 risk YouTube rate-limiting.
     @AppStorage("concurrentFragments") var concurrentFragments: Int = 4
-    /// Saved default for each newly opened video. The old `playbackRate` key also held every
-    /// player-menu choice, so its value cannot be safely treated as the user's chosen default.
-    /// Starting a distinct key at 1x avoids carrying a stale 3x–5x selection into new videos.
+    /// Distinct from the legacy per-video `playbackRate` key; defaults to 1x.
     @AppStorage("defaultPlaybackRate") var defaultPlaybackRate: Double = 1.0
     @AppStorage("customPlaybackSpeeds") var customPlaybackSpeedsRaw: String = ""
     @AppStorage("holdForSpeedEnabled") var holdForSpeedEnabled: Bool = true
@@ -152,8 +110,6 @@ struct UserPreferences {
     @AppStorage("sponsorBlockChapterBehavior") var sponsorBlockChapterBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
 
     // MARK: - Catalogued screen preferences
-    // Declared here so Settings, backup, and screens share one key list. Views may still bind the
-    // same keys with `@AppStorage` for SwiftUI observation; keep defaults identical.
 
     @AppStorage("useAccentTheme") var useAccentTheme: Bool = false
     @AppStorage("accentNavigationOnly") var accentNavigationOnly: Bool = false

@@ -4,10 +4,7 @@ import OSLog
 import SwiftData
 import UIKit
 
-/// CLAUDE.md §8: single source of truth for playback. Injected via SwiftUI environment.
-/// Mini player and full-screen player both observe this object — neither owns its own `AVPlayer`.
-/// Domain extensions keep transport operations separate; queue, playlist, recommendation, and
-/// SponsorBlock collaborators own their own state and lifetimes.
+/// Single source of truth for playback; injected via the SwiftUI environment.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
@@ -15,19 +12,9 @@ final class PlayerStateManager {
     enum LoadState: Equatable {
         case idle
         case resolving
-        /// A candidate URL is installed in the player and `play()` has already been issued, but
-        /// `AVPlayerItem` hasn't reported `.readyToPlay` yet.
-        ///
-        /// Split out from `.resolving` for the startup-perception pass: both states paint the
-        /// video's thumbnail rather than a spinner, but once we're buffering there is nothing
-        /// left to "prepare" — the mini-player can show the real artwork and channel name
-        /// instead of a placeholder glyph and "Preparing…". Keeping it distinct from
-        /// `.downloading(progress:phase:)` also means the download chrome (percentage label +
-        /// determinate bar) stays reserved for actual file transfers.
+        /// Candidate installed and `play()` issued; waiting for `.readyToPlay`.
         case buffering
-        /// File is being fetched. `progress` is 0…1 when known, nil during a mux phase.
-        /// `phase` labels which stream is in flight ("video", "audio", "stream") so the UI can show
-        /// "Downloading video 42%" instead of two confusing identical bars in a row.
+        /// File transfer. `progress` is 0…1 when known; `phase` is video/audio/stream.
         case downloading(progress: Double?, phase: String?)
         case readyToPlay
         case failed(String)
@@ -36,9 +23,7 @@ final class PlayerStateManager {
     // MARK: - Published state
 
     private(set) var currentVideo: Video?
-    /// Cached artwork for the current video. Populates `MPNowPlayingInfoCenter` (lock-screen +
-    /// Control Center) and `PlayerArtworkBackdrop`, which paints it into the video area for as long
-    /// as AVPlayer has no frame to show. Refreshed when the current video changes.
+    /// Artwork for Now Playing and the player backdrop.
     private(set) var currentArtwork: UIImage?
     var loadState: LoadState = .idle
     var isPlaying: Bool = false
@@ -249,34 +234,14 @@ final class PlayerStateManager {
             self.floatingMiniPlayerWidth = savedWidth.isFinite
                 ? min(420, max(120, CGFloat(savedWidth))) : 216
         }
-        // AVQueuePlayer defaults to `.advance`, which removes the finished item before our
-        // end-of-playback UI can replay or seek it. We manage queue transitions ourselves in the
-        // end observer, so pause on the final frame and retain the item until that decision is
-        // made. This is also what keeps the video surface from turning black at natural end.
+        // Keep the finished item for replay; we advance the queue ourselves.
         player.actionAtItemEnd = .pause
-        // The app is intentionally read-only and currently has no caption picker. AVPlayer can
-        // otherwise auto-select a matching HLS legible track from the device language settings,
-        // making captions appear with no corresponding UI state or way to dismiss them.
+        // Avoid auto-picking HLS captions with no in-app caption UI.
         player.appliesMediaSelectionCriteriaAutomatically = false
-        // Keep the audio track running when the player view goes off-screen (popup minimize, app
-        // backgrounded). Without this, AVPlayer pauses video tracks as soon as their pixel buffer
-        // pipeline is no longer visible, which manifests as "audio cuts out the moment you collapse
-        // the mini-player." Pairs with the `.playback` AVAudioSession configured at launch.
         player.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
-        // Must stay `true`, which is also the default — this is spelled out because setting it
-        // to `false` looks like the obvious way to make the optimistic start in `resolveAndPlay`
-        // start sooner, and it does the exact opposite.
-        //
-        // `resolveAndPlay` calls `play()` the moment a candidate URL is installed, while the item
-        // is still `.unknown`. `AVPlayer.rate` ignores a nonzero rate set before the current item
-        // is ready to play, so the *only* thing that makes that early request survive to readiness
-        // is this property: with `true` the player enters `.waitingToPlayAtSpecifiedRate` and
-        // begins on its own the instant the item is ready. With `false` there is no such holding
-        // state, the request is dropped on the floor, and playback never starts — the video sits
-        // on its thumbnail until the user pauses and plays again.
+        // Required for optimistic `play()` before readiness; `false` drops the rate request.
         player.automaticallyWaitsToMinimizeStalling = true
-        // High rates are validated per item. Do not optimistically start an unknown HLS item at
-        // a persisted 3x–5x rate; it may enter silent, keyframe-only fast-forward playback.
+        // Don't start unknown HLS items at a persisted >2x rate.
         player.defaultRate = Float(effectivePlaybackRate)
         installObservers()
     }
@@ -316,22 +281,7 @@ final class PlayerStateManager {
 
     // MARK: - Public commands
 
-    /// Play a local file already on disk — used by the **Link** tab's completed downloads.
-    ///
-    /// **Why a separate entry point and not `load(video:)`:** the YouTube-shaped resolver in
-    /// `resolveAndPlay` calls `DownloadManager.ensureDownloaded` which keys off `videoID` and
-    /// looks for `Documents/<id>.mp4`. URL-fetched files live under `Documents/<title>.mp4`
-    /// and don't have a YouTube `videoID`, so threading them
-    /// through the normal path could start an unrelated YouTube download.
-    /// This method skips resolution entirely — the file is already there, just play it.
-    ///
-    /// **What we skip vs the normal load path:** watch-history upsert (URL files aren't in
-    /// the YouTube `WatchHistoryEntry` schema), queue recommendation fill (no related-video
-    /// surface for arbitrary URLs), and `ensureDownloaded` (file is on disk).
-    /// **What we keep:** `currentVideo` (synthetic so the mini-player title/subtitle still
-    /// render), `miniPlayerVisible` flipped true so the SwiftUI mini-player appears, NowPlayingCenter
-    /// update for lock-screen artwork, and the standard observe/loadItem flow so errors and
-    /// playback state still surface through the existing UI.
+    /// Plays an on-disk file without YouTube resolution (Link downloads / arbitrary local media).
     func loadLocalFile(at fileURL: URL, title: String, source: String?, thumbnailURL: URL?) {
         log.info("loadLocalFile path=\(fileURL.path, privacy: .public) title=\"\(title, privacy: .public)\"")
         playbackSessionID &+= 1
