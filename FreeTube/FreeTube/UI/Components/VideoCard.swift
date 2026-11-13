@@ -22,8 +22,6 @@ struct VideoCard: View {
     var relativeDateReference: Date? = nil
 
     /// Channel name plus the playback count and relative upload date. Joined by middle dots so
-    /// the line reads naturally and any missing segment is dropped without leaving stray
-    /// separators ("Channel" / "Channel • 1.2M views" / "Channel • 1.2M views • 3 days ago").
     private var metadataLine: String {
         VideoMetadataLine.withChannel(for: video, relativeTo: relativeDateReference)
     }
@@ -51,7 +49,6 @@ struct VideoCard: View {
             // Metadata and its ellipsis remain siblings of the thumbnail's tap target.
             metadataRow(branding: branding)
         }
-        // Include spacing in the List row that the native menu lifts and returns to.
         .padding(.top, MediaStyle.cardTopPadding)
         .padding(.bottom, MediaStyle.cardBottomPadding)
         .loadDeArrowBranding(video: video, model: branding)

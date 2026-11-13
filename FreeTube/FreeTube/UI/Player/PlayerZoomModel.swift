@@ -2,8 +2,6 @@ import Observation
 import SwiftUI
 import UIKit
 
-/// Combines native pinch and two-finger pan samples into one SwiftUI media transform. A single
-/// baseline is retained until both recognizers finish, so lifting one finger never jumps it.
 @available(iOS 17.0, *)
 @MainActor
 @Observable

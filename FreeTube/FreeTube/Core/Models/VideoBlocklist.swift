@@ -1,8 +1,6 @@
 import Foundation
 import Observation
 
-/// Device-local presentation rules. Blocking never removes a subscription, download, history
-/// entry, or playlist item; turning a rule off makes the original content visible again.
 @available(iOS 17.0, *)
 @Observable
 @MainActor

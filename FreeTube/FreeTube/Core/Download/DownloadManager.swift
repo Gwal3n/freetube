@@ -50,7 +50,6 @@ final class DownloadManager {
 
     /// Either returns the existing local file URL, or downloads the video and returns
     /// the freshly-written path. Coalesces parallel callers for the same `videoID`.
-    ///
     func ensureDownloaded(video: Video, quality: VideoQuality) async throws -> URL {
         try Task.checkCancellation()
         log.info("ensureDownloaded(\(video.id, privacy: .public)) — title=\"\(video.title, privacy: .public)\" quality=\(quality.rawValue, privacy: .public)")
@@ -258,7 +257,6 @@ final class DownloadManager {
             return destination
         }
 
-        // Keep the native stream path first, then use the existing YouTubeKit direct formats.
         do {
             log.info("download[\(video.id, privacy: .public)] source=youtubekit")
             try await runYouTubeKitFallback(
@@ -307,7 +305,6 @@ final class DownloadManager {
         snapshotID: String,
         startedAt: Date
     ) async throws -> Bool {
-        // Prefer the same native source used for playback; YouTubeKit formats are the fallback.
         do {
             log.info("native-download[\(video.id, privacy: .public)] resolving playback source")
             phaseByVideoID[video.id] = "stream"

@@ -7,7 +7,6 @@ import SwiftUI
 @MainActor
 final class SettingsViewModel {
     var preferences: UserPreferences
-    /// Stored observable value so the Stepper's trailing count redraws immediately. Writing only
     /// through `@AppStorage` on a nested value persists correctly but does not notify @Observable.
     var upNextInitialCount: Int {
         didSet { preferences.upNextInitialCount = upNextInitialCount }
@@ -322,7 +321,6 @@ final class SettingsViewModel {
 
     // MARK: - Diagnostics
 
-    /// Two-way binding for the "Save logs to file" toggle. Routes through
     /// `LogFileWriter.shared.setEnabled(_:)` so the writer starts/stops in addition to the
     /// persisted flag flipping — otherwise the toggle would change state on disk but
     /// nothing would actually start capturing until the next launch.
@@ -331,8 +329,6 @@ final class SettingsViewModel {
         set { LogFileWriter.shared.setEnabled(newValue) }
     }
 
-    /// Convenience pass-through so the Settings view doesn't need to import the writer
-    /// directly when binding actions to its state.
     var currentLogFileURL: URL? { LogFileWriter.shared.currentLogFileURL }
 
     func clearLogFiles() {

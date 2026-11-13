@@ -3,7 +3,6 @@ import UIKit
 
 /// Stateless viewport geometry for the expanded player.
 enum PlayerViewportLayout {
-    /// Compact height: 16:9 for ordinary/tall media, native ratio for wide sources.
     static func compactSurfaceHeight(
         width: CGFloat,
         presentationSize: CGSize
@@ -27,9 +26,6 @@ enum PlayerViewportLayout {
         // detached from the lower edge of the video.
         if isLandscape { return 28 }
         let aspectHeight = availableSize.width * 9 / 16
-        // Cinematic videos already shrink the surface itself to their native aspect ratio. The
-        // old 16:9 compensation was therefore applied a second time, lifting both the timeline
-        // and the centre transport row away from the visual middle of the picture.
         if availableSize.height < aspectHeight - 1 { return 8 }
         return max(8, aspectHeight - availableSize.height + 16)
     }

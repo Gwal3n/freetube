@@ -6,7 +6,6 @@ import UIKit
 @MainActor
 enum PlayerLayoutMetrics {
     /// The container asks for this clearance on every interactive-drag frame. Keep only a weak
-    /// reference to the native bar; its frame and visibility are still read live below.
     private static weak var cachedTabBar: UITabBar?
 
     static var safeAreaInsets: UIEdgeInsets {

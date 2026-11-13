@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native per-category color controls for SponsorBlock elements visible in the player.
 @available(iOS 17.0, *)
 struct SponsorBlockColorsSettingsScreen: View {
     let model: SettingsViewModel

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Shares its actions and save state with the row's native context menu.
 @available(iOS 17.0, *)
 struct PlaylistMoreActionsMenu: View {
     let playlist: Playlist

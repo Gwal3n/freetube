@@ -2,7 +2,6 @@ import Foundation
 import Observation
 
 /// Owns the low-frequency metadata lifecycle for the expanded player.
-///
 /// Playback state remains in `PlayerStateManager`; this model only coordinates the cached details
 /// request and derives strings consumed by `PlayerInformationPanel`. Keeping it separate prevents
 /// metadata bookkeeping from accumulating in the player view itself.

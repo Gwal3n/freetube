@@ -81,8 +81,6 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsVideoFrameAnalysis = false
         // SwiftUI's `.allowsHitTesting(false)` does not always propagate through a
-        // UIViewControllerRepresentable. Disable the native root in floating mode too, so
-        // only its SwiftUI chrome accepts touches and navigation beneath remains responsive.
         controller.view.isUserInteractionEnabled = isInteractionEnabled
         controller.view.accessibilityElementsHidden = !isInteractionEnabled
         context.coordinator.isZoomEnabled = isZoomEnabled

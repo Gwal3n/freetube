@@ -10,9 +10,7 @@ enum PlayerDownloadPresentationState: Equatable {
 }
 
 /// The compact save/share/download row shown alongside channel metadata.
-///
 /// All mutations are expressed as callbacks so this view remains a lightweight presentation
-/// component rather than acquiring playlist, clipboard, or download-manager responsibilities.
 @available(iOS 17.0, *)
 struct PlayerActionBar: View {
     let video: Video

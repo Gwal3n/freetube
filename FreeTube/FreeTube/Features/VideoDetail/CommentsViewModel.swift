@@ -47,8 +47,6 @@ final class CommentsViewModel {
         }
     }
 
-    /// Keep the native excerpt as a fallback, then use the shared first comments page for
-    /// playback-time matches. The preview setting is opt-in, and expansion reuses this page.
     func loadTeaser(onlyTimed: Bool = false) async {
         guard comments.isEmpty || (!onlyTimed && teaserText == nil) else { return }
         do {

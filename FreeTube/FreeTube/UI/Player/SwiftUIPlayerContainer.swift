@@ -1,7 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Owns the app-wide player presentation without delegating layout or gestures to UIKit.
 /// Playback remains in `PlayerStateManager`; this view moves one video surface between expanded, floating, and
 /// dismissed presentations of that shared state.
 @available(iOS 17.0, *)
@@ -964,8 +963,6 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 }
 
-/// Four predictable resting places leave the window draggable without letting it obscure
-/// the status bar or native tab bar. A drag remains free under the finger until release.
 @available(iOS 17.0, *)
 private enum FloatingCorner: String {
     case topLeading, topTrailing, bottomLeading, bottomTrailing

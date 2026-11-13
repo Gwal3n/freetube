@@ -1,6 +1,5 @@
 import Foundation
 
-/// Playback URL and ancillary metadata obtained from one native player response.
 struct NativeStreamResult: Sendable {
     enum MediaKind: Sendable, Equatable {
         case hls

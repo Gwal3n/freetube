@@ -1,10 +1,5 @@
 import SwiftUI
 
-/// Native context-menu preview shared by compact rows and full-width video cards.
-///
-/// The surrounding blur, lifted-card animation, haptic, menu placement, and interactive
-/// dismissal all come from SwiftUI's `contextMenu(menuItems:preview:)`; this view supplies only
-/// the media content that iOS presents inside that system interaction.
 @available(iOS 17.0, *)
 struct VideoContextPreview: View {
     let video: Video

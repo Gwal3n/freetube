@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native, device-local controls for hiding unwanted public content. Saved data is untouched.
 @available(iOS 17.0, *)
 struct VideoBlockingSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint

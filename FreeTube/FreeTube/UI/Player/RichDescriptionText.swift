@@ -1,9 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// A non-scrolling native text view gives descriptions exact range-selection handles while the
-/// surrounding player panel remains the only scroll owner. Link taps retain the existing chapter
-/// seek and external URL behavior. Updates avoid resetting the selection during player redraws.
 @available(iOS 17.0, *)
 struct RichDescriptionText: UIViewRepresentable {
     @Environment(\.appFontPreset) private var preset

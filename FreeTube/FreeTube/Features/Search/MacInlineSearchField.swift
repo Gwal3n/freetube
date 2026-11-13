@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Inline field used on Mac, where native `.searchable` collapses to a toolbar button.
 @available(iOS 17.0, *)
 struct MacInlineSearchField: View {
     @Binding var query: String

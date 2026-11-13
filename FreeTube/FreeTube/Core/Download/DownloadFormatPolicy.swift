@@ -1,6 +1,5 @@
 import Foundation
 
-/// Chooses usable direct formats when the native stream download cannot finish.
 @available(iOS 17.0, *)
 enum DownloadFormatPolicy {
     /// Highest-resolution progressive format within the user's quality limit.

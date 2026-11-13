@@ -1,7 +1,5 @@
 import Foundation
 
-/// Searchable labels for the existing Settings pages. Results navigate to the owning page;
-/// controls and their state remain owned by those pages rather than duplicated in search.
 enum SettingsSearchIndex {
     enum Destination: String {
         case playback, player, captions, browsing, appearance, libraryData, cache, downloads
@@ -50,7 +48,6 @@ enum SettingsSearchIndex {
         var displayTitle: String { String(localized: title) }
         var id: String { "\(destination.rawValue):\(displayTitle)" }
 
-        /// Picker values and page names point at their owning control instead of a missing row.
         var focusTitle: String? {
             switch destination {
             case .appearance where displayTitle == String(localized: "System")
@@ -181,8 +178,6 @@ enum SettingsSearchIndex {
         let titles: [LocalizedStringResource]
     }
 
-    // The visible control labels are intentionally listed here rather than extracting Form text
-    // at runtime. SwiftUI views do not expose a reliable searchable control hierarchy.
     private static let groups: [Group] = [
         Group(destination: .playback, titles: [
             "Playback", "Default quality", "On cellular", "Sleep timer durations", "Hold to speed up", "Hold speed",

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Scrolls a settings Form to the row selected from Settings search after its push mounts.
 @available(iOS 17.0, *)
 struct SettingsSearchScrollModifier: ViewModifier {
     @Environment(\.settingsSearchTarget) private var searchTarget

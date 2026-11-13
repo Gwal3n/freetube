@@ -8,7 +8,6 @@ struct FallbackDownloadSource: Sendable {
     let client: DownloadClientIdentity
 }
 
-/// Selects usable download sources without owning transfer state or progress reporting.
 @available(iOS 17.0, *)
 @MainActor
 final class DownloadSourceSelector {

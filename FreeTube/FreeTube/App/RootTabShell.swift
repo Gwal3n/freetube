@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// A stable native tab owner independent of playback artwork, presentation, and gesture updates.
 @available(iOS 17.0, *)
 struct RootTabShell: View {
     @Binding var selection: RootView.Tab
@@ -82,7 +81,6 @@ struct RootTabShell: View {
     }
 
     /// iOS 17–25 compatibility. iOS 26 uses the modern `Tab` declarations above for its
-    /// native Liquid Glass tab bar and a separate Search button.
     private var legacyTabShell: some View {
         TabView(selection: $selection) {
             ForEach(visibleOrdinaryTabs, id: \.self) { tab in

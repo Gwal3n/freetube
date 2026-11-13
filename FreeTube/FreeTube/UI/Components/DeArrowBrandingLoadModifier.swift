@@ -1,7 +1,6 @@
 import SwiftUI
 
 /// Runs a visible video's optional DeArrow work without making its row a nested menu source.
-/// List rows own their model so the native context menu attaches to the outer scrolling cell.
 @available(iOS 17.0, *)
 struct DeArrowBrandingLoadModifier: ViewModifier {
     let video: Video

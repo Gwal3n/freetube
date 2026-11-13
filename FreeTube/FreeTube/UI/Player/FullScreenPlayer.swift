@@ -2,7 +2,6 @@ import SwiftUI
 import UIKit
 
 /// Expanded player content hosted by the app's SwiftUI player container. This view renders the
-/// surface, transport controls, metadata, and independently collapsible sections below.
 @available(iOS 17.0, *)
 struct FullScreenPlayer: View {
     private struct PanelScrollSample: Equatable {

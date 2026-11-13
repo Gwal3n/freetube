@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native numeric interval editor shared by the local duration and view-count filters.
 /// One dual-thumb slider snaps to round stops; text fields stay available for exact values.
 /// Duration custom ranges are stored and applied in seconds. The trailing stop is Unlimited.
 @available(iOS 17.0, *)

@@ -2,9 +2,6 @@ import SwiftUI
 import Kingfisher
 
 /// Horizontal compact video row — used in search results, history, library lists.
-///
-/// Its accessory mode deliberately describes the few supported row contexts instead of exposing
-/// independent flags that can form visually invalid combinations.
 @available(iOS 17.0, *)
 struct VideoRow: View {
     enum Accessory {

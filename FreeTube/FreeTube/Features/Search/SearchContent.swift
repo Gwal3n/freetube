@@ -14,7 +14,6 @@ struct SearchContent: View {
     @Bindable var model: SearchViewModel
     let onRunSearch: (String) -> Void
     let onOpenDestination: (AppNavigationRequest.Destination) -> Void
-    /// Opens the native field with this query filled in, ready to submit.
     let onEditQuery: (String) -> Void
     let onCustomUploaded: () -> Void
     let onCustomLength: () -> Void
@@ -259,9 +258,6 @@ struct SearchContent: View {
             VideoCard(
                 video: video,
                 onTap: {
-                    // Playback overlays this screen, so preserve the native search session and its
-                    // results for the user's return. Calling `dismissSearch()` here can clear the
-                    // bound query, which in turn intentionally resets `SearchViewModel.results`.
                     dismissKeyboard()
                     player.load(video)
                 },
@@ -429,9 +425,6 @@ struct SearchContent: View {
     /// title, result-type picker, and filter menu. It is the first List row and scrolls away with
     /// the results; a bar pinned over the List fought its scroll edge.
     private var resultsHeader: some View {
-        // Mirrors Feed's native layout: space for its 44 pt toolbar row, the 34 pt bold large
-        // title, then a subtitle row with the picker leading and the filter where Feed shows its
-        // refresh age.
         VStack(alignment: .leading, spacing: 0) {
             Color.clear
                 .frame(height: 44)

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Keep the compact player's invisible portion from stealing touches from native tab items.
 @available(iOS 17.0, *)
 struct FloatingAboveTabBarHitRegion: Shape {
     let visibleHeight: CGFloat

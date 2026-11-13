@@ -146,8 +146,6 @@ struct ChapterListPanel: View {
             .offset(y: isDraggingListSheet ? -listOverscroll : 0)
         }
         .scrollIndicators(.visible)
-        // Keep the same native rubber-band affordance for short chapter lists. `.basedOnSize`
-        // disables it when the rows do not fill the viewport, making the sheet feel stuck.
         .scrollBounceBehavior(.always, axes: .vertical)
     }
 

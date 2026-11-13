@@ -17,7 +17,6 @@ nonisolated enum SecurityHardening {
     }()
 
     /// Older builds downloaded an executable Python module into Application Support.
-    /// Remove that known file after upgrading to the native-only download pipeline.
     private static func removeLegacyYtDlpModule() {
         guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
         let directory = support.appendingPathComponent("io.github.kewlbear.youtubedl-ios", isDirectory: true)

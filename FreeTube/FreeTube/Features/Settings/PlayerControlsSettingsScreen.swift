@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// Native List editing handles order within each section. A separate row action changes placement,
-/// including moves into empty sections, without making the entire row compete with drag handles.
 @available(iOS 17.0, *)
 struct PlayerControlsSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint

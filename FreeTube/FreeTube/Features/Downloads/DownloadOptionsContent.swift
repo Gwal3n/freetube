@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Quality choices shared by the player download button and native video action menus.
 @available(iOS 17.0, *)
 struct DownloadOptionsContent: View {
     @AppStorage("defaultDownloadQuality") private var defaultDownloadQualityRaw = VideoQuality.p360.rawValue

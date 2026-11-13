@@ -1,7 +1,6 @@
 import SwiftUI
 
 /// Long-running transfer feedback and terminal playback errors over the artwork. Brief startup
-/// waits use the transport overlay's small indicator instead, so this view never duplicates it.
 @available(iOS 17.0, *)
 struct DownloadProgressOverlay: View {
     let state: PlayerStateManager.LoadState

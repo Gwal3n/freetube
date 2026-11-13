@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Keeps the system tab bar while letting people arrange its ordinary destinations.
 @available(iOS 17.0, *)
 struct TabBarSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint

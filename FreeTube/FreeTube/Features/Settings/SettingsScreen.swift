@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// A short, native Settings index. Each destination owns one coherent group of controls.
 @available(iOS 17.0, *)
 struct SettingsScreen: View {
     let onClose: (() -> Void)?

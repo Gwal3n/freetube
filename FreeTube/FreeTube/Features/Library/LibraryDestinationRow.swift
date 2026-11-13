@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Shared label for native value-based navigation rows in the Library root.
 @available(iOS 17.0, *)
 struct LibraryDestinationRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

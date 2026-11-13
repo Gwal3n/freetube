@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Configures local-only privacy behavior. Existing saved data is never deleted by this mode.
 @available(iOS 17.0, *)
 struct IncognitoSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint

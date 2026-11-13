@@ -1,8 +1,6 @@
 import SwiftUI
 
 /// Narrow observation boundary for the chapter panel's playback-position updates.
-///
-/// The chapter list highlights the active chapter from `elapsed`, which changes continuously.
 /// Reading it here prevents those ticks from invalidating the complete expanded-player hierarchy.
 @available(iOS 17.0, *)
 struct PlayerChapterOverlay: View {

@@ -1,8 +1,6 @@
 import SwiftUI
 
 /// Manual queue and recommendations shown below the expanded player's metadata.
-///
-/// The expanded player owns Up Next disclosure and windowing so scrolling cannot reset them.
 /// Playback and queue mutations remain in `PlayerStateManager`.
 @available(iOS 17.0, *)
 struct PlayerQueueSections: View {

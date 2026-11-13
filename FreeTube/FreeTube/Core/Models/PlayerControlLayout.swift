@@ -1,7 +1,6 @@
 import Foundation
 
 /// A single placement for every optional player control. The fixed collapse and transport
-/// buttons are intentionally outside this layout so they can never be hidden by accident.
 struct PlayerControlLayout: Equatable {
     enum Section: String, CaseIterable, Identifiable {
         case onPlayer
@@ -62,7 +61,6 @@ struct PlayerControlLayout: Equatable {
         }
     }
 
-    /// Reorder within one section using the offsets supplied by SwiftUI's native List editing.
     /// Cross-section placement remains a separate, explicit menu action.
     mutating func reorder(in section: Section, fromOffsets offsets: IndexSet, toOffset destination: Int) {
         let current = controls(in: section)

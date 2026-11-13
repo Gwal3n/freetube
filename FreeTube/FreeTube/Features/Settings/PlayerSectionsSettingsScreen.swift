@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native reorder list for the independently collapsible player sections.
 @available(iOS 17.0, *)
 struct PlayerSectionsSettingsScreen: View {
     @AppStorage("playerPanelSectionOrder") private var storedOrder = PlayerPanelSection.defaultOrder

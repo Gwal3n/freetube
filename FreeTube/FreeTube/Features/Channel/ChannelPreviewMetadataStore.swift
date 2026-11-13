@@ -1,8 +1,6 @@
 import Foundation
 import Observation
 
-/// Shares short-lived channel-header lookups between native context-menu previews.
-/// A preview never waits for this request before appearing; it first shows its row metadata.
 @available(iOS 17.0, *)
 @Observable
 @MainActor

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Gives a searched control a stable scroll target and a brief, non-interactive highlight.
 @available(iOS 17.0, *)
 struct SettingsSearchRowModifier: ViewModifier {
     let rowID: String

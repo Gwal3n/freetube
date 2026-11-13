@@ -2,8 +2,6 @@ import CoreGraphics
 import Observation
 
 /// Coordinates the channel's shared collapsing header with each tab's own reading position.
-/// The scroll views remain native SwiftUI views; this model only records their measured offsets
-/// and requests off-screen page alignment before a tab becomes visible.
 @available(iOS 17.0, *)
 @Observable
 @MainActor

@@ -1,6 +1,5 @@
 import Foundation
 
-/// Ordinary tabs can be reordered without replacing the native tab bar.
 /// Search retains the system search role on iOS 26 and is always last elsewhere.
 @available(iOS 17.0, *)
 enum TabBarOrder {

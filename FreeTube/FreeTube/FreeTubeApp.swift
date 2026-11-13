@@ -1,9 +1,6 @@
-//
 //  FreeTubeApp.swift
 //  FreeTube
-//
 //  Created by leshko on 17/5/26.
-//
 
 import SwiftUI
 import SwiftData

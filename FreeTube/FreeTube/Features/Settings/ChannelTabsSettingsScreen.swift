@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Keeps Videos as the stable first page while letting users simplify channel profiles.
 @available(iOS 17.0, *)
 struct ChannelTabsSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint

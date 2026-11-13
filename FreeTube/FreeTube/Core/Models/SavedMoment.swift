@@ -1,7 +1,5 @@
 import Foundation
 
-/// A deliberate, device-local timestamp bookmark. Only public video metadata is stored; signed
-/// playback URLs and caption-track URLs never enter this record or an exported backup.
 struct SavedMoment: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     let video: Video

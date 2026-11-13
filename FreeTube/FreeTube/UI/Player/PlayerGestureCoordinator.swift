@@ -685,8 +685,6 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     /// Delays AVKit's tap-to-toggle-controls recognizer just long enough to determine whether the
-    /// user is double tapping or holding. If one of our recognizers succeeds, the native single tap
-    /// fails and controls stay hidden; an ordinary quick single tap still proceeds normally.
     private func deferNativeSingleTaps(
         in rootView: UIView,
         until customGestures: [UIGestureRecognizer]

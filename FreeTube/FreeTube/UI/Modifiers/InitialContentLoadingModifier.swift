@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Keeps the native List mounted during its first local read.
 @available(iOS 17.0, *)
 struct InitialContentLoadingModifier: ViewModifier {
     let hasLoaded: Bool

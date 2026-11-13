@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Controls the bounded in-memory recent-video cache and explicit disposable-cache removal.
 @available(iOS 17.0, *)
 struct CacheSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint

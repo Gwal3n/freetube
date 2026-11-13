@@ -249,7 +249,6 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
         }
     }
 
-    /// Selects a native-decodable video-only/audio-only pair without downloading or muxing files.
     private func pairedResult(
         from streams: [FreeTubeStreamKit.Stream], youtube: YouTube, videoID: String,
         quality: VideoQuality, cacheKey: String, includeMetadata: Bool, startedAt: Date

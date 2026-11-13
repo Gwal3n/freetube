@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// Lives inside a TabView page, below the native tab bar. The root player still supplies the
-/// interactive surface above the bar; this only fills the portion seen through its glass.
 @available(iOS 17.0, *)
 struct FloatingPlayerUnderlay: View {
     @Environment(PlayerStateManager.self) private var player
@@ -15,7 +13,6 @@ struct FloatingPlayerUnderlay: View {
                     FloatingPlayerVideoLayer(player: player.player)
                     // The root player covers the video with its thumbnail until the first
                     // frame is ready. Mirror that same artwork here so loading does not
-                    // leave a black, cut-off strip behind the native tab bar.
                     PlayerArtworkBackdrop(
                         artwork: player.currentArtwork,
                         state: player.loadState,

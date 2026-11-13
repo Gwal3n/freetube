@@ -48,8 +48,6 @@ struct PlaylistScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let details = model.details {
                     if !isSearching {
-                        // During search, put the matching rows directly beneath the native field
-                        // instead of leaving them below a full-screen artwork header.
                         VStack(alignment: .leading, spacing: 16) {
                             artworkHeader(details)
                             PlaylistMetadataBlock(details: details, isExpanded: $isDetailsExpanded)
@@ -88,8 +86,6 @@ struct PlaylistScreen: View {
         .navigationTitle(isSearching || showsNavigationTitle ? (model.details?.playlist.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search playlist")
-        // Let artwork show through initially, then restore native bar material when the
-        // scrolled-away playlist name becomes the compact navigation title.
         .toolbarBackground(isSearching || showsNavigationTitle ? .visible : .hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -122,7 +118,6 @@ struct PlaylistScreen: View {
     }
 
     /// Reserves the loaded artwork, action row, metadata, and first video rows. Only opacity
-    /// changes while loading, so the eventual content does not appear to slide into place.
     private var playlistPlaceholder: some View {
         VStack(alignment: .leading, spacing: 16) {
             Rectangle()
@@ -200,8 +195,6 @@ struct PlaylistScreen: View {
 
     // MARK: - Glass toolbar
 
-    /// Horizontal row of primary actions on the artwork. Secondary actions live in the native
-    /// navigation toolbar so they remain available after the artwork scrolls away.
     @ViewBuilder
     private func actionToolbar(_ details: PlaylistDetails) -> some View {
         HStack(spacing: 10) {
@@ -225,7 +218,6 @@ struct PlaylistScreen: View {
         .padding(.horizontal)
     }
 
-    /// Native toolbar menu for secondary actions (open in browser / save / copy URL).
     @ViewBuilder
     private func moreMenu(_ details: PlaylistDetails) -> some View {
         Menu {

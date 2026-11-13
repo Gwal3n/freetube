@@ -82,7 +82,6 @@ struct VideoMoreActionsMenu: View {
 
 }
 
-/// One action definition shared by the ellipsis menu and native long-press context menus.
 @available(iOS 17.0, *)
 private struct VideoActionsContent: View {
     let video: Video
@@ -163,8 +162,6 @@ private struct VideoActionsContent: View {
                 let wasExpanded = player.fullScreenPresented
                 if wasExpanded { player.fullScreenPresented = false }
                 Task { @MainActor in
-                    // Let the native Menu finish dismissing before mutating its NavigationStack.
-                    // An expanded player also needs time to reveal the selected tab first.
                     try? await Task.sleep(for: .milliseconds(wasExpanded ? 180 : 100))
                     NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
                 }
@@ -244,8 +241,6 @@ private struct VideoActionsContent: View {
 
 }
 
-/// Native iOS context-menu presentation. SwiftUI owns the long-press recognizer, lift preview,
-/// haptic, interactive cancellation, dismissal, Dynamic Type, and accessibility behavior.
 @available(iOS 17.0, *)
 private struct VideoContextMenuModifier: ViewModifier {
     let video: Video

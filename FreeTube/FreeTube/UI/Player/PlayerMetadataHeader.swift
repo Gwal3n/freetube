@@ -3,9 +3,6 @@ import SwiftUI
 import Kingfisher
 
 /// The presentation-only header shown beneath the player surface.
-///
-/// State ownership and side effects deliberately remain in `FullScreenPlayer`; this view only
-/// gives the title, statistics, channel, and action row one consistent layout.
 @available(iOS 17.0, *)
 struct PlayerMetadataHeader<Actions: View>: View {
     let video: Video

@@ -1,9 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Device-local library following NewPipe's account-free model. Remote channel and playlist
-/// destinations remain available when linked from other parts of the app, but this root owns
-/// only history, saved moments, subscriptions, and playlists persisted on this device.
 @available(iOS 17.0, *)
 struct LibraryScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter

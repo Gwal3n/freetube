@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native date picker for a local, approximate upload-date filter.
 @available(iOS 17.0, *)
 struct SearchDateRangeSheet: View {
     @Environment(\.dismiss) private var dismiss

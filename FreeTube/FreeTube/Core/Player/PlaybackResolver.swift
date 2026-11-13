@@ -176,7 +176,6 @@ private enum PlaybackResolverError: LocalizedError {
     var errorDescription: String? { "This video couldn't be played because no stream was available." }
 }
 
-/// Local-file lookup used by playback. Allows tests to swap a mock without initiating downloads.
 protocol DownloadManagerLike: Sendable {
     func localFile(for videoID: String) -> URL?
 }

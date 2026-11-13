@@ -310,7 +310,6 @@ struct LocalPlaylistScreen: View {
     }
 
     private func visibleVideos(in details: LocalPlaylistDetails) -> [Video] {
-        // Edit mode must retain the source order so native move offsets still map to storage.
         if editingMode != nil { return details.videos }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let orderedVideos = videoSort.ordered(details.videos)

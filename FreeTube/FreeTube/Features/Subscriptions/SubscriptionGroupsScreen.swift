@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native, device-local management for the groups used by the subscription feed.
 @available(iOS 17.0, *)
 struct SubscriptionGroupsScreen: View {
     let isEmbedded: Bool

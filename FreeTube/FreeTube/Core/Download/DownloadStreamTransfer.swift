@@ -2,15 +2,11 @@ import Foundation
 import OSLog
 
 /// Materializes a direct signed media URL. Keeps HTTP behavior and byte-count checks shared by
-/// native and YouTubeKit fallback downloads; the caller owns UI progress and final media checks.
 @available(iOS 17.0, *)
 @MainActor
 final class DownloadStreamTransfer {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "DownloadManager")
 
-    /// Uses a file-backed URLSession task, with bounded parallel ranges for native audio when
-    /// supported. The previous AsyncBytes loop suspended per byte and made audio very slow.
-    ///
     /// - Parameter client: When set, sends that client's User-Agent and a YouTube Referer so
     ///   googlevideo accepts URLs minted by the matching InnerTube client. Omit for native HLS
     ///   segment fetches that already work without an override.

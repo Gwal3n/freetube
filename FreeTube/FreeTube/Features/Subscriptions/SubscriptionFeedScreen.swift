@@ -435,8 +435,6 @@ struct SubscriptionFeedScreen: View {
         }
     }
 
-    /// A feed-only, best-effort marker. YouTube supplies relative upload ages rather than an
-    /// exact timestamp, so rows without an estimated publish date remain unmarked.
     private func isNewSinceLastVisit(_ video: Video) -> Bool {
         guard showNewSubscriptionUploads,
               let previousVisitAt = appVisitState.previousVisitAt,
@@ -482,8 +480,6 @@ struct SubscriptionFeedScreen: View {
         .padding(.vertical, 4)
     }
 
-    /// A quiet subtitle beneath the native large title. It scrolls with the feed; the native
-    /// title menu above remains available after the navigation bar collapses.
     private var groupPicker: some View {
         Menu {
             groupMenuActions

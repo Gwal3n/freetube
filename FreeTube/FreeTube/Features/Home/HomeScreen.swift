@@ -4,9 +4,7 @@ import UIKit
 
 /// **Search** tab. Search suggestions, results, and local recent searches only; it deliberately
 /// performs no home/trending feed request while idle.
-///
 /// Mac uses an inline field because `.searchable` collapses awkwardly there. iPhone and iPad use
-/// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
     @Environment(AppNavigationRouter.self) private var navigationRouter

@@ -131,8 +131,6 @@ final class SearchViewModel {
         progressByVideoID = preferences.displaysWatchProgress ? summary.progress : [:]
     }
 
-    /// Fill a sparse filtered list without turning a very narrow filter into an unlimited stream
-    /// of YouTube requests. A later explicit Load more starts another bounded batch.
     func fillFilteredResults(
         autoLoadMore: Bool,
         blockingActive: Bool,
@@ -184,7 +182,6 @@ final class SearchViewModel {
         }
     }
 
-    /// Records a filtered prefetch key so lookahead does not re-fire for the same page size.
     func shouldPrefetchFilteredPage(loadedCount: Int, blockingRevision: Int) -> Bool {
         let key = FilteredPrefetchKey(
             resultsRevision: resultsRevision,
@@ -272,8 +269,6 @@ final class SearchViewModel {
         }
     }
 
-    /// Refreshes the submitted query without removing the visible List, allowing the native
-    /// pull-to-refresh indicator to remain attached throughout the request.
     func refresh() async {
         guard let submittedQuery else { return }
         searchGeneration &+= 1

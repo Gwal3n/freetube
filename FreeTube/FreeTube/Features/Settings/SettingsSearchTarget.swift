@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The setting selected in search, passed only to the pushed destination.
 @available(iOS 17.0, *)
 struct SettingsSearchTarget: EnvironmentKey {
     static let defaultValue: String? = nil

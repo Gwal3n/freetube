@@ -31,8 +31,6 @@ extension AppFontPreset {
         }
     }
 
-    /// The selectable comment body is UIKit-backed for native text selection. Apply the same
-    /// preset there, with UIKit's Dynamic Type metrics, so it matches surrounding SwiftUI text.
     func uiFont(style: UIFont.TextStyle, size: CGFloat) -> UIFont {
         if self == .system { return .preferredFont(forTextStyle: style) }
         if self == .rounded || self == .serif {
@@ -84,8 +82,6 @@ private extension Font.TextStyle {
 
 // MARK: - Content font modifier
 
-/// One place for content typography. It intentionally does not replace navigation bars, system
-/// menus, transport glyphs, or the player's monospaced timeline numbers.
 @available(iOS 17.0, *)
 private struct AppFontModifier: ViewModifier {
     @Environment(\.appFontPreset) private var preset
