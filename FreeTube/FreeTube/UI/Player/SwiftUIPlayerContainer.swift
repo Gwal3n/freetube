@@ -596,17 +596,28 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     ? -value.translation.height : value.translation.height
                 let outwardVelocity = floatingCorner.isTop
                     ? -value.velocity.height : value.velocity.height
-                let verticalIntent = outwardDrag > 90
-                    && abs(value.translation.height) > abs(value.translation.width) * 1.2
-                let movedBeyondEdge = floatingCorner.isTop
-                    ? actual.y < -window.height * 0.15
-                    : actual.y > size.height + window.height * 0.15
-                let flickedBeyondEdge = outwardVelocity > 900 && (
-                    floatingCorner.isTop
-                        ? projected.y < -window.height * 0.3
-                        : projected.y > size.height + window.height * 0.3
+                // Dismiss once the window is pulled past its resting band, or flicked that way.
+                // The previous edge/velocity bars required ~a full mini-player height of travel
+                // or a very hard fling, which made dismissal feel sticky.
+                let dismissYBounds = floatingYBounds(
+                    in: size,
+                    window: window,
+                    topInset: PlayerLayoutMetrics.safeAreaInsets.top,
+                    bottomInset: PlayerLayoutMetrics.bottomTabBarClearance
                 )
-                if verticalIntent && (movedBeyondEdge || flickedBeyondEdge) {
+                let pastResting = floatingCorner.isTop
+                    ? dismissYBounds.lowerBound - actual.y
+                    : actual.y - dismissYBounds.upperBound
+                let projectedPast = floatingCorner.isTop
+                    ? dismissYBounds.lowerBound - projected.y
+                    : projected.y - dismissYBounds.upperBound
+                let dismissDistance = max(32, window.height * 0.26)
+                let verticalIntent = outwardDrag > 36
+                    && abs(value.translation.height) >= abs(value.translation.width)
+                let draggedOut = pastResting > dismissDistance
+                let flickedOut = outwardVelocity > 480
+                    && (pastResting > 12 || projectedPast > dismissDistance * 0.7)
+                if verticalIntent && (draggedOut || flickedOut) {
                     dismissFloatingPlayer(in: size, window: window, from: actual)
                     return
                 }
