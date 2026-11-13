@@ -205,7 +205,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .subscriptionGroups, titles: ["Manage subscription groups"]),
         Group(destination: .channelTabs, titles: ["Channel tabs"]),
-        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Use accent colors", "Accent navigation bar only", "Accent color", "Custom accent color", "Text font"]),
+        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Use accent colors", "Accent navigation bar only", "Accent color", "Custom accent color", "Text font", "Lock to portrait"]),
         Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Tab order"]),
         Group(destination: .libraryData, titles: [
             "Library & Data", "Save watch history", "Add to history when opened",

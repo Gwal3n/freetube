@@ -9,6 +9,7 @@ struct AppearanceSettingsScreen: View {
     @AppStorage("useAccentTheme") private var useAccentTheme = false
     @AppStorage("accentNavigationOnly") private var accentNavigationOnly = false
     @AppStorage("appCustomAccentHex") private var appCustomAccentHex = "#FF3B30"
+    @AppStorage(OrientationPolicy.lockKey) private var portraitOrientationLock = false
 
     var body: some View {
         Form {
@@ -57,6 +58,16 @@ struct AppearanceSettingsScreen: View {
                 .settingsSearchRow("Text font")
             } footer: {
                 Text("The player interface follows your appearance; the video canvas stays black.")
+            }
+
+            Section {
+                Toggle("Lock to portrait", isOn: $portraitOrientationLock)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Lock to portrait")
+            } header: {
+                Text("Orientation")
+            } footer: {
+                Text("Browsing stays in portrait. The expanded player can still rotate for fullscreen video.")
             }
 
             Section("Navigation") {

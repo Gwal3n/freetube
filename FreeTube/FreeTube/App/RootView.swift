@@ -25,6 +25,7 @@ struct RootView: View {
     @AppStorage("incognitoHideFeed") private var incognitoHideFeed = false
     @AppStorage("incognitoHideLibrary") private var incognitoHideLibrary = false
     @AppStorage("appFontPreset") private var appFontPresetRaw = AppFontPreset.system.rawValue
+    @AppStorage(OrientationPolicy.lockKey) private var portraitOrientationLock = false
     @State private var navigationRouter = AppNavigationRouter()
     @State private var incomingLinkModel = IncomingLinkViewModel()
     @State private var errorPresenter = AppErrorPresenter()
@@ -175,6 +176,12 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenSubscriptionGroups)) { _ in
             rootSheet = .subscriptionGroups
+        }
+        .onChange(of: portraitOrientationLock, initial: true) { _, locked in
+            OrientationPolicy.update(isLocked: locked, playerExpanded: player.fullScreenPresented)
+        }
+        .onChange(of: player.fullScreenPresented, initial: true) { _, expanded in
+            OrientationPolicy.update(isLocked: portraitOrientationLock, playerExpanded: expanded)
         }
         .onChange(of: rootSheet) { previous, current in
             log.info("Root sheet binding: \(previous?.rawValue ?? "none") → \(current?.rawValue ?? "none")")

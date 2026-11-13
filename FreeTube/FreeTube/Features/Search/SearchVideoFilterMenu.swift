@@ -106,9 +106,16 @@ struct SearchVideoFilterMenu: View {
             // Styled like the result-type subtitle opposite it; the accent color and count mark
             // active filters. The source is a mode rather than a filter, so Music names itself.
             HStack(spacing: 5) {
-                Text(verbatim: activeFilterCount > 0 ? "\(sourceTitle) · \(activeFilterCount)" : sourceTitle)
-                    .font(.subheadline)
-                    .lineLimit(1)
+                // Sized to the widest possible label so a source or count change never resizes
+                // the menu label, which briefly clipped the new text until it re-laid out.
+                ZStack(alignment: .trailing) {
+                    ForEach(Self.widestLabels, id: \.self) { label in
+                        Text(verbatim: label).hidden()
+                    }
+                    Text(verbatim: activeFilterCount > 0 ? "\(sourceTitle) · \(activeFilterCount)" : sourceTitle)
+                }
+                .font(.subheadline)
+                .lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.caption2.weight(.semibold))
             }
@@ -119,6 +126,10 @@ struct SearchVideoFilterMenu: View {
         .transaction { $0.animation = nil }
         .accessibilityLabel("Filter search videos")
         .accessibilityValue(activeFilterCount > 0 ? "\(activeFilterCount) active" : "Off")
+    }
+
+    private static var widestLabels: [String] {
+        [String(localized: "Filters"), String(localized: "YouTube Music")].map { "\($0) · 5" }
     }
 
     private var sourceTitle: String {

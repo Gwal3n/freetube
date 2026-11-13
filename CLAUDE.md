@@ -309,6 +309,10 @@ and a rejected strategy is excluded before requesting the next candidate.
   Channel titles still appear after header collapse and Downloads shows its selection count,
   but neither uses a custom `.principal` toolbar host. This hardens the reported path; the IPS
   does not include an application source line proving the precise originating view.
+- **The optional portrait lock never applies to the expanded player.** `OrientationPolicy`
+ feeds the app delegate's supported orientations: portrait-only while browsing with
+ the Appearance lock on, everything while `fullScreenPresented` is true. `RootView` updates it
+ on either change; collapsing the player while sideways returns the interface to portrait.
 - **Tab selection must survive player and system presentations.** `RootTabShell` owns the native
   tab view separately from player rendering. `RootView` holds selection in `@State`; each app
   launch starts on Feed (or Search if Feed is hidden), not the last scene-restored tab. Within
@@ -476,7 +480,10 @@ and a rejected strategy is excluded before requesting the next candidate.
  native bar (an empty 44 pt toolbar-height row, then the large title and subtitle row, no
  divider; offsets were measured against a Feed/Search overlay), and it scrolls away with the
  list; do not pin it over the List or move it to the toolbar. The header row's height must not
- change with filter state, because a re-measured List row stutters. Its Source option switches between YouTube (default)
+ change with filter state, because a re-measured List row stutters; the filter label reserves
+ its widest text so switching to YouTube Music never clips mid-layout. With compact rows,
+ channel and playlist results take the compact video thumbnail height as centered padding,
+ matching video rows without stretching their artwork. Its Source option switches between YouTube (default)
  and YouTube Music; the source is a mode that survives new queries and filter resets, and Music
  disables sort/upload-date/length. Results include videos, channels, and playlists. Mac uses an
  inline field because native search collapses awkwardly there. Search stays an ordinary peer

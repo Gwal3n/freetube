@@ -11,6 +11,7 @@ import SwiftData
 @main
 @available(iOS 17.0, *)
 struct FreeTubeApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appEnvironment = AppEnvironment()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.dark.rawValue
     @AppStorage("useAccentTheme") private var useAccentTheme = false

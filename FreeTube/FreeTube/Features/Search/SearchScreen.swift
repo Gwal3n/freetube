@@ -29,6 +29,7 @@ struct SearchContent: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismissSearch) private var dismissSearch
     @Environment(\.isSearching) private var isSearching
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
@@ -233,6 +234,8 @@ struct SearchContent: View {
                 onOpenDestination(.channel(channel.id))
             } label: {
                 ChannelRow(channel: channel)
+                    .frame(minHeight: mixedResultRowHeight)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ResponsiveButtonStyle())
             .mediaListRow()
@@ -247,8 +250,15 @@ struct SearchContent: View {
                 },
                 showsMoreMenu: true
             )
+            .frame(minHeight: mixedResultRowHeight)
             .accessibilityAddTraits(.isLink)
         }
+    }
+
+    /// Channel and playlist rows take the compact video thumbnail's height, centered, so mixed
+    /// results share one rhythm. Large thumbnail cards are far taller and keep their own rows.
+    private var mixedResultRowHeight: CGFloat? {
+        largeVideoThumbnails ? nil : MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize).height
     }
 
     /// Same density and avatar treatment as the subscription feed, so Search does not look like a
