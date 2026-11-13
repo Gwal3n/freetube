@@ -1,9 +1,6 @@
 import Foundation
 
-/// Reads only the description from the already-fetched watch response. YouTube's command-run
-/// offsets count UTF-16 code units, so NSString ranges preserve exact text/link alignment even
-/// when a description contains emoji or composed characters. A malformed run is skipped while
-/// the surrounding plain text remains visible.
+/// Description from the watch response; command-run offsets are UTF-16 (use NSString ranges).
 nonisolated enum VideoDescriptionExtractor {
     static func extract(from data: Data) -> (text: String, parts: [VideoDescriptionPart])? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

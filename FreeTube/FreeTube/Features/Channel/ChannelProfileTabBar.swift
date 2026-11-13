@@ -12,18 +12,7 @@ struct ChannelProfileTabBar: View {
     @State private var tabFrames: [String: CGRect] = [:]
     private static let tabRowSpace = "channelTabRow"
 
-    /// Tabs sized to their own labels inside a horizontal scroller.
-    ///
-    /// The previous version divided the container width into equal segments through a
-    /// `GeometryReader`. That couples the tab bar to whatever width its ancestors report, so it
-    /// stretched into sparse columns on a wide container and pushed the later tabs off-screen on a
-    /// narrow one — and it inherited any incorrect width from elsewhere in the screen. Intrinsic
-    /// widths inside a scroller can do neither: the labels keep their natural spacing at any size,
-    /// and when they genuinely exceed the width the row scrolls instead of truncating.
-    ///
-    /// The underline is a single view positioned from the measured label frames and interpolated
-    /// by the pager's live scroll offset, so it is wherever the content is at every instant of a
-    /// swipe — including a swipe that gets abandoned and springs back.
+    /// Intrinsic-width tabs in a horizontal scroller; underline tracks pager position.
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
@@ -92,12 +81,7 @@ struct ChannelProfileTabBar: View {
         }
     }
 
-    /// Where the underline sits right now, read straight off the pager's live scroll offset.
-    ///
-    /// Because `pagePosition` is continuous, the underline is wherever the content is: halfway
-    /// through a swipe it sits halfway between the two labels, at the width between theirs, and it
-    /// reverses with the finger if the swipe is abandoned. Nothing here is animated — it doesn't
-    /// need to be, since the value it reads is already following the gesture.
+    /// Continuous underline frame from `pagePosition` (no animation — the offset already tracks the finger).
     private func indicatorFrame(tabs: [ChannelProfileTab]) -> CGRect? {
         guard !tabs.isEmpty else { return nil }
 

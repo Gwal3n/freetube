@@ -1,11 +1,7 @@
 import SwiftUI
 import Kingfisher
 
-/// Playlist list row. Used by search results, channel/library playlist lists.
-///
-/// Set `showsMoreMenu: true` to render a trailing ellipsis Menu next to the row content
-/// (share, open in browser, copy URL, local save). The Menu is a sibling of the tap target so taps
-/// on it don't trigger `onTap` / the surrounding NavigationLink.
+/// Playlist list row. `showsMoreMenu` places a sibling ellipsis so taps do not fire `onTap`.
 @available(iOS 17.0, *)
 struct PlaylistRow: View {
     let playlist: Playlist
@@ -14,9 +10,7 @@ struct PlaylistRow: View {
     @State private var actionsModel = PlaylistActionsModel()
     @State private var resolvedVideoCount: Int?
 
-    /// Optional tap handler. **Leave nil when wrapping this row inside a `NavigationLink`** —
-    /// an inner `Button` swallows the link's tap and pushing never happens. We only attach a
-    /// `Button` when the caller actually provides a handler.
+    /// Leave nil inside NavigationLink — an inner Button swallows the link tap.
     var onTap: (() -> Void)? = nil
 
     var showsMoreMenu: Bool = false

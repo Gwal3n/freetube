@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// The root-owned compact player sits above TabView so expanded playback can cover everything.
-/// Hide only its part behind the native tab bar; the selected tab draws that part beneath the bar
-/// using a passive layer of the same AVPlayer. No second player or item is created.
+/// Masks the floating mini-player behind the tab bar; a passive AVPlayer layer fills the gap.
 @available(iOS 17.0, *)
 struct FloatingTabBarOcclusion: ViewModifier {
     let tabBarTop: CGFloat

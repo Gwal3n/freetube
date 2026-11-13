@@ -1,9 +1,6 @@
 import SwiftUI
 
-/// Dual-thumb track used by `SearchNumericRangeSheet`, styled after the system `UISlider`.
-/// Values are stop indices in `0...maxIndex`; the leading thumb is the lower bound and the
-/// trailing thumb the upper bound. Width is read from the enclosing `GeometryReader` rather than
-/// from the track's own content so a transient out-of-range value can never widen the layout.
+/// Dual-thumb index slider; width comes from the enclosing GeometryReader.
 @available(iOS 17.0, *)
 struct SearchNumericRangeSlider: View {
     private enum Thumb {

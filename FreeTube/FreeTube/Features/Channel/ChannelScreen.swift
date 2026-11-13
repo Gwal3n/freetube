@@ -23,20 +23,7 @@ struct ChannelScreen: View {
         _model = State(wrappedValue: ChannelViewModel(channelID: channelID))
     }
 
-    /// Collapsing header over a horizontal pager — the shape YouTube and X use for profiles.
-    ///
-    /// Each tab owns a real vertical `ScrollView`, and those pages sit in a horizontal
-    /// `ScrollView` with paging scroll-target behaviour. Every gesture on this screen is therefore
-    /// a system scroll gesture, which is the substantive change: the previous custom `DragGesture`
-    /// had to run alongside the rows' own controls, so a sideways swipe could still land as a tap
-    /// on a `NavigationLink` and a slow vertical drag could be read as a long press. A `UIScrollView`
-    /// cancels touches in its subviews once it starts scrolling, so both resolve themselves, and
-    /// the interactive pop gesture at the leading edge keeps working without being fenced off.
-    ///
-    /// The header is not inside any scroll view. It is drawn above the pager and translated up by
-    /// the active page's scroll offset, which is why each page reserves an equal amount of empty
-    /// space at the top: the content and the header move together at exactly 1:1, instead of the
-    /// double movement you get from putting a collapsing header inside the thing that scrolls it.
+    /// Collapsing header above a paged horizontal `ScrollView` of vertical tab lists.
     var body: some View {
         ZStack(alignment: .top) {
             MediaStyle.pageBackground.ignoresSafeArea()
@@ -371,11 +358,7 @@ struct ChannelScreen: View {
 
             if videos.isEmpty,
                (!model.hasLoadedVideos(for: videoSort) || model.isLoadingVideos(for: videoSort)) {
-                // `MediaListPlaceholder` is `List`-backed and a `List` has no intrinsic height, so
-                // it needs a bounded container. The other five call sites are screen roots or
-                // overlays that supply one; this is the only one inside a `ScrollView`, where the
-                // unbounded proposal leaves it laying out at an arbitrary height. Six rows, each a
-                // thumbnail tall plus its row insets.
+                // List has no intrinsic height inside ScrollView — bound to six compact rows.
                 MediaListPlaceholder()
                     .frame(height: 6 * (81 + MediaStyle.listRowInsets.top + MediaStyle.listRowInsets.bottom))
                     .padding(.horizontal, 16)
@@ -555,13 +538,7 @@ struct ChannelScreen: View {
 
 // MARK: - Scroll tracking
 
-/// Reads the pager's live offset and page width from the scroll view itself.
-///
-/// The `GeometryReader` probes these replace live in the *content* of a scroll view, and a probe
-/// placed in the background of a lazy stack is not reliably re-evaluated as that stack scrolls —
-/// which is why the underline sat still under the first tab while the selection moved. Scroll
-/// geometry is reported by the scroll view directly, so there is nothing to miss an update.
-/// Adding the content insets makes the value read zero at rest rather than minus the inset.
+/// Scroll-view geometry for the tab underline (GeometryReader probes miss lazy-stack updates).
 @available(iOS 17.0, *)
 private struct PagerScrollGeometry: ViewModifier {
     let state: ChannelPagerState

@@ -1,9 +1,6 @@
 import Foundation
 
-/// Fetches a known-size progressive media stream in validated independent byte ranges. Some
-/// servers pace one long-lived response close to playback speed; bounded parallel ranges avoid
-/// making audio or video transfers take the full media duration. A server that ignores Range
-/// returns false from the probe, allowing the caller to use its single-request fallback.
+/// Parallel ranged fetch for known-size progressive streams; probe false → single-request fallback.
 @available(iOS 17.0, *)
 nonisolated enum RangedMediaDownloadService {
     private static let probeLength: Int64 = 64 * 1024

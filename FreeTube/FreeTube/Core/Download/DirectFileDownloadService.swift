@@ -1,9 +1,6 @@
 import Foundation
 
-/// File-backed HTTPS transfer shared by native audio-only and direct Link downloads.
-/// `URLSessionDownloadTask` writes to disk in native chunks instead of suspending Swift once per
-/// byte. Each transfer owns its session/delegate, so cancellation and progress cannot leak between
-/// simultaneous downloads. The caller still validates the media before publishing completion.
+/// Per-transfer URLSessionDownloadTask for audio-only / direct files (caller validates).
 @available(iOS 17.0, *)
 nonisolated final class DirectFileDownloadService: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     enum Failure: Error {

@@ -404,10 +404,7 @@ final class FastPlaybackLocalFileService {
         return duration
     }
 
-    /// Check actual compressed samples, not just container headers or a track's advertised range.
-    /// A source with a long empty edit can report a valid duration and pass AVPlayer readiness,
-    /// yet render black after its last video sample. A supplied start checks the whole remaining
-    /// interval so trimming cannot silently discard media between the reference and file end.
+    /// Verify compressed samples near `end` (headers alone can pass readiness then go black).
     private static func containsSamples(
         in asset: AVAsset,
         track: AVAssetTrack,

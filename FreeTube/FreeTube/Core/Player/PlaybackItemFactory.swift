@@ -2,16 +2,13 @@ import Foundation
 import AVFoundation
 import OSLog
 
-/// Turns a resolved source into an AVPlayerItem without installing it in a player.
-/// In particular, a paired source is composed in memory; this reads remote track metadata but
-/// does not save media or signed URLs. Item ownership and validation remain with PlayerStateManager.
+/// Builds an AVPlayerItem from a candidate (in-memory composite for paired tracks); does not install it.
 @available(iOS 17.0, *)
 @MainActor
 struct PlaybackItemFactory {
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "PlaybackItemFactory")
 
-    /// Extensionless remote audio URLs need their actual container type. A selected HLS audio
-    /// rendition is a playlist, not an MP4, so source MIME overrides must travel with candidates.
+    /// Carry MIME overrides for extensionless / HLS audio renditions.
     func makeItem(for candidate: PlaybackCandidate, videoID: String? = nil) async throws -> AVPlayerItem {
         if case .composite(let videoURL, let audioURL) = candidate.source {
             // AVMutableComposition references both remote tracks. It does not mux or persist a

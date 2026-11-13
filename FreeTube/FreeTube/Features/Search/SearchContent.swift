@@ -246,10 +246,7 @@ struct SearchContent: View {
         largeVideoThumbnails ? nil : MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize).height
     }
 
-    /// Same density and avatar treatment as the subscription feed, so Search does not look like a
-    /// second, poorer list style. Channel taps route through `onOpenDestination` (which ends the
-    /// searchable session first) instead of a List `NavigationLink`, which is what drew the
-    /// trailing disclosure chevron on every video row.
+    /// Feed-density rows; channel opens via `onOpenDestination` (no List NavigationLink chevron).
     @ViewBuilder
     private func searchVideoRow(_ video: Video) -> some View {
         let openChannel: (() -> Void)? = video.channelID.isEmpty

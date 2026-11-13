@@ -1,15 +1,7 @@
 import Foundation
 
-/// Builds the InnerTube `params` blob for anonymous YouTube search.
-///
-/// The wire format is a small protobuf used by youtube.com's `sp=` query and by `/youtubei/v1/search`.
-/// Field layout matches the encoding used by NewPipeExtractor / pytubefix:
-/// - field 1: sort (varint)
-/// - field 2: nested filters message (upload date, type, duration, …)
-///
-/// Tokens can change when YouTube revises the schema; callers must tolerate a plain-query fallback.
+/// InnerTube search `params` protobuf (sort + nested filters). Nil when all defaults.
 enum SearchParamsEncoder {
-    /// Returns `nil` when every server-facing choice is the default, so the request can omit `params`.
     static func encode(
         sort: SearchVideoFilters.Sort,
         resultType: SearchVideoFilters.ResultType,

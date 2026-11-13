@@ -16,12 +16,8 @@ final class WatchHistoryEntry {
     var thumbnailURL: URL?
     var watchedAt: Date
     var lastPosition: TimeInterval
-    /// Total duration of the video at the moment `lastPosition` was last written. Stored so we
-    /// can render a progress bar on cards without re-fetching duration from YouTube, and so
-    /// resume-on-tap can skip entries that already reached the end. Default 0 — SwiftData
-    /// lightweight migration fills existing rows with this on first read after the upgrade.
+    /// Cached duration for progress bars / resume; 0 on pre-migration rows.
     var duration: TimeInterval = 0
-    /// Optional for lightweight migration of existing on-device history.
     var playlistID: String? = nil
     var playlistTitle: String? = nil
     var playlistOriginRaw: String? = nil

@@ -2,12 +2,7 @@ import Foundation
 import AVFoundation
 import OSLog
 
-/// Configures `AVAudioSession` for background-capable video playback. Launch configures its
-/// category without claiming audio focus; playback explicitly activates it.
-///
-/// NOTE: For background audio to actually keep working when the app is backgrounded, the project
-/// must also declare the `audio` `UIBackgroundModes` entry in `Info.plist`. Add it via Xcode →
-/// target → Signing & Capabilities → Background Modes → Audio, AirPlay, and Picture in Picture.
+/// Configures `.playback` / `.moviePlayback`. Activate on play; requires the `audio` background mode.
 enum AudioSessionConfigurator {
     private static let log = AppLog(subsystem: "com.leshko.freetube", category: "AudioSession")
 

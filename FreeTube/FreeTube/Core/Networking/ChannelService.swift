@@ -33,25 +33,12 @@ extension ChannelServicing {
     func fetchChannelAvatar(id: String) async -> URL? { nil }
 }
 
-/// Wraps `YouTubeKit.ChannelInfosResponse` and its per-tab subtypes.
-///
-/// **Flow:** `fetchChannel(id:)` sends one base request → response includes the channel header
-/// (name, handle, avatar, banner, subscriber count, description) AND the default tab's payload
-/// (usually `videos`). For the other tabs we issue per-tab fetches via the response's
-/// `getChannelContentThrowing(forType:)` helper, which YouTubeKit short-circuits to a per-tab
-/// browse endpoint.
-///
-/// **Pagination:** the original `ChannelInfosResponse` instance is cached in an internal actor
-/// keyed by channelID — YouTubeKit's continuation API (`getChannelContentContinuationThrowing`)
-/// is a method on the response, not a free function, so we have to keep the instance alive across
-/// "load more" calls. The cache is cleared when `fetchChannel` reloads the same channelID.
+/// Channel header + tabs via YouTubeKit; caches the response instance for continuations.
 final class ChannelService: ChannelServicing {
     private let client: YouTubeKitClient
     private let videosFallback: ChannelVideosFallbackService
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "ChannelService")
 
-    /// Caches the live `ChannelInfosResponse` per channel so continuation calls can hit it. Actor
-    /// isolation keeps reads/writes safe across concurrent pagination requests.
     private actor ResponseCache {
         private var cache: [String: ChannelInfosResponse] = [:]
         func get(_ id: String) -> ChannelInfosResponse? { cache[id] }
@@ -79,10 +66,7 @@ final class ChannelService: ChannelServicing {
 
         let channel = mapChannel(from: response, channelID: id)
 
-        // Issue all four tab fetches concurrently. Each helper short-circuits when the base
-        // response already contains the tab's data; otherwise it sends an extra browse request
-        // for just that tab. The returned `merged` response carries all four tabs' data and
-        // continuation tokens, which we hand to the cache so pagination can reuse it.
+        // Concurrent secondary tabs; merge into the cached response for pagination tokens.
         async let videosResult = fetchSecondaryTab(response: response, type: .videos, channelID: id)
         async let shortsResult = fetchSecondaryTab(response: response, type: .shorts, channelID: id)
         async let directsResult = fetchSecondaryTab(response: response, type: .directs, channelID: id)
@@ -311,13 +295,7 @@ final class ChannelService: ChannelServicing {
         )
     }
 
-    /// Pulls a tab's items out of `channelContentStore`, mapping each `YTVideo` to our domain
-    /// `Video`. Returns an empty `ChannelTab` if YouTubeKit hasn't populated that tab — or if the
-    /// stored value isn't a `ListableChannelContent` (only listable subtypes expose `.items`).
-    ///
-    /// Backfills `channelName` and `channelID` from the response header onto each video. Shorts
-    /// in particular are decoded via `decodeShortFromLockupJSON`, which doesn't carry channel info
-    /// — without this backfill every shorts row would show an empty channel name.
+    /// Maps tab items to `Video`, backfilling channel name/ID (Shorts lockups omit them).
     private func extractVideoTab(from response: ChannelInfosResponse, type: ChannelInfosResponse.RequestTypes) -> ChannelTab<Video> {
         guard let content = response.channelContentStore[type] as? (any ListableChannelContent) else {
             log.notice("[channel] extractVideoTab \(String(describing: type), privacy: .public) — store entry missing or not ListableChannelContent")
@@ -345,9 +323,6 @@ final class ChannelService: ChannelServicing {
                 isShort: type == .shorts
             )
         }
-        // Trace decode rate so we can spot future YouTubeKit decoder gaps (e.g. when YouTube
-        // rolls out a new renderer that drops items silently — same class of bug as the
-        // missing lockupViewModel fallback in Videos/Directs tabs).
         if content.items.count != videos.count {
             log.notice("[channel] extractVideoTab \(String(describing: type), privacy: .public) — raw=\(content.items.count, privacy: .public) decoded=\(videos.count, privacy: .public) (some items dropped)")
         }
@@ -364,10 +339,7 @@ final class ChannelService: ChannelServicing {
         return ChannelTab(items: playlists, continuationToken: continuation)
     }
 
-    /// One unified entry point for the four secondary tab fetches. Returns the tab data as a
-    /// `ChannelTab<Video>` (callers reading playlists ignore this) PLUS the `source` response
-    /// that produced it — we need the latter to merge back into the cached response so
-    /// pagination tokens for ALL tabs are in one place.
+    /// Secondary tab fetch plus the response to merge into the cache.
     private struct SecondaryFetchResult {
         let videoTab: ChannelTab<Video>
         let source: ChannelInfosResponse
@@ -383,12 +355,7 @@ final class ChannelService: ChannelServicing {
         if response.channelContentStore[type] != nil {
             primary = SecondaryFetchResult(videoTab: extractVideoTab(from: response, type: type), source: response, didFail: false)
         } else {
-            // For some channels the base response doesn't include tab links with their `params`
-            // payload (e.g. when YouTube serves only a Home tab in the initial browse). YouTubeKit's
-            // `getChannelContent` requires `requestParams[type]` and otherwise errors with
-            // "Something between returnType or params haven't been added". We inject YouTube's
-            // well-known per-tab params strings so the request can still go through — these are
-            // global constants in YouTube's protocol, not per-channel values.
+            // Inject well-known tab params when the base browse response omitted them.
             var mutable = response
             if mutable.requestParams[type] == nil, let fallback = Self.fallbackTabParams[type] {
                 mutable.requestParams[type] = fallback
@@ -402,11 +369,7 @@ final class ChannelService: ChannelServicing {
             }
         }
 
-        // **Fallback path.** YouTubeKit's Videos/Directs tab decoder only walks the legacy
-        // `videoRenderer` shape. When YouTube serves a channel's tab as `lockupViewModel`,
-        // YouTubeKit silently produces zero items. Our own decoder (§ChannelVideosFallbackService)
-        // covers both shapes. Keep the Live continuation under its own key so it cannot replace
-        // the Videos tab's pagination state for the same channel.
+        // lockupViewModel tabs decode empty in YouTubeKit — fall back; keep Live continuation separate.
         if (type == .videos || type == .directs),
            primary.videoTab.items.isEmpty,
            let params = Self.fallbackTabParams[type] {

@@ -163,16 +163,9 @@ final class PlayerStateManager {
     let preferences: UserPreferences
     let log = AppLog(subsystem: "com.leshko.freetube", category: "PlayerStateManager")
 
-    /// Sticky "this queue accepts recommendations" intent. Set to `true` whenever the user loads
-    /// a standalone video and `false` for curated Play all / Shuffle all batches. Drives:
-    ///   1. The per-load `fillQueueWithRecommendations` call in `resolveAndPlay`.
-    ///   2. The auto-advance dead-end recovery in `playNext()` — when the queue runs out and
-    ///      repeat is off, we fire a fresh recs fetch using the queue's last item as a seed,
-    ///      then advance once new items land. Each standalone load replaces the old queue, so
-    ///      these refills never retain previously played videos.
+    /// False for curated Play all / Shuffle all; true for standalone loads that auto-fill Up Next.
     var queueAcceptsRecommendations = true
 
-    /// Separate from recommendations so Previous/Next can revisit explicit selections.
     var playbackHistory = PlayerPlaybackHistory()
     private let watchHistory = PlayerWatchHistoryTracker()
 
@@ -186,11 +179,9 @@ final class PlayerStateManager {
     @ObservationIgnored let observations = PlayerObservationStore()
     weak var acceptedStreamItem: AVPlayerItem?
     var acceptedStreamStrategy: PlaybackStrategy?
-    /// One post-start resolver pass per video. A second terminal failure is shown to the user
-    /// instead of repeatedly rebuilding the player on an unusable network/source.
+    /// One post-start recovery pass per video.
     var didAttemptPlaybackRecovery = false
-    /// Explicit transport intent survives AVPlayer autonomously pausing a failed item. `isPlaying`
-    /// is an observation/prediction for chrome and may already be false when failure KVO arrives.
+    /// Transport intent; survives AVPlayer pausing a failed item independently of `isPlaying`.
     var wantsPlayback = false
 
     var itemLoadStartedAt: Date?
@@ -356,17 +347,7 @@ final class PlayerStateManager {
         play()
     }
 
-    /// Loads a video for playback and opens the expanded player for direct selections.
-    ///
-    /// - Parameter skipRecommendations: when `true`, suppresses the post-play "fill queue with
-    ///   YouTube recommendations" call. Pass this from explicit batch actions that already
-    ///   populated a curated queue — playlist's Play all / Shuffle all — so the user's queue
-    ///   stays exactly what they chose. Default is `false` so single-video taps from Home /
-    ///   Search / Mini-player still get the YouTube-app-style autoplay chain.
-    /// - Parameter expandPlayer: when `true`, opens the popup immediately. Automatic queue
-    ///   transitions pass `false` so a user who collapsed the player is not pulled back into it.
-    /// - Parameter preservePlaylistPosition: plays a manual-queue item between playlist videos
-    ///   without adding it to the playlist or advancing the playlist's current position.
+    /// Loads a video. Pass `skipRecommendations` for curated queues; `expandPlayer: false` for auto-advance.
     func load(
         _ video: Video,
         autoplay: Bool = true,
@@ -466,10 +447,7 @@ final class PlayerStateManager {
         )
         presentPlayer(for: video.id, expanded: expandPlayer)
         loadState = .resolving
-        // Wipe transport state from the previous video so a stray time-observer tick during the
-        // transition (the periodic callback can fire AFTER currentVideo flips but BEFORE the new
-        // AVPlayerItem is installed) doesn't carry the old item's elapsed/duration into a save —
-        // that's what showed phantom progress bars on cells the user never played.
+        // Clear transport before the new item installs so a late tick cannot save phantom progress.
         elapsed = 0
         duration = 0
         observations.clearLoadedTimeRanges()
@@ -804,14 +782,7 @@ final class PlayerStateManager {
 
     func finishPlaybackSetup(video: Video, skipRecommendations: Bool) {
         log.info("resolveAndPlay: finished happy-path for \(video.id, privacy: .public)")
-        // Fire-and-forget queue fill — uses YouTube's `/next` (WEB) endpoint, independent of the
-        // resolver's `/player` (IOS) endpoint, so it can't interfere with playback that's already
-        // running. Failures are logged but never surface to the user; queue stays as-is on error.
-        //
-        // Suppressed only when the caller explicitly asks (playlist's Play all / Shuffle all).
-        // Every other entry point — single video taps from Home/Search/Mini-player, queue-row
-        // taps, Next/Previous, and even tapping an individual playlist video — gets the
-        // autoplay-style recommendation fill, so the player keeps advancing past the seed.
+        // Recommendation fill via /next; skip only for Play all / Shuffle all.
         if !skipRecommendations || activePlaylist != nil {
             scheduleRecommendationFill(for: video)
         }
@@ -906,13 +877,7 @@ final class PlayerStateManager {
         updateNowPlaying()
     }
 
-    /// Resolves an artwork image for the given video and stores it in `currentArtwork`. Tries three
-    /// sources in order:
-    ///  1. Kingfisher's in-memory cache for the video's `thumbnailURL` (synchronous → no flicker).
-    ///  2. `DownloadsStore`'s xattr-stored compressed thumbnail (for videos played from the Downloads tab,
-    ///     where the constructed `Video` has `thumbnailURL == nil`).
-    ///  3. Async network/disk fetch through Kingfisher.
-    /// Clears artwork immediately so the previous video's preview doesn't linger on the lock screen.
+    /// Updates `currentArtwork` from cache, DownloadsStore xattr, then Kingfisher network.
     private func refreshArtwork(for video: Video) {
         currentArtwork = nil
         let immediate = PlayerArtworkResolver.immediateArtwork(for: video)

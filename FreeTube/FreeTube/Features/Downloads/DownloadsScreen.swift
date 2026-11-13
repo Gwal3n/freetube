@@ -475,10 +475,7 @@ struct DownloadsScreen: View {
         } label: {
             Label("Save to Files", systemImage: "folder")
         }
-        // System "Open in…" share sheet for the downloaded mp4 — opens UIActivityViewController
-        // with the local file URL so the user can send it to VLC, Files, AirDrop, etc. We use
-        // a Button + sheet rather than `ShareLink` because the latter is unreliable for
-        // `file://` URLs inside a `Menu` (it sometimes serializes them as plain text).
+        // ShareLink is unreliable for file:// URLs inside Menu — use Button + sheet.
         Button {
             shareFileURL = item.fileURL
         } label: {

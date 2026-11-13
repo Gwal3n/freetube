@@ -46,10 +46,7 @@ final class ChannelVideosFallbackService: Sendable {
         sort: ChannelVideoSort = .newest,
         tabPath: String = "videos"
     ) async throws -> ChannelTab<Video> {
-        // YouTube no longer accepts a static params variant for Popular and Oldest. Those values
-        // now select the Videos surface only; the actual sort is represented by a per-response
-        // continuation token in the filter-chip row. Discover that token from the current Videos
-        // response before requesting the selected sort.
+        // Popular/Oldest need a per-response sort token discovered from the Newest Videos surface.
         if sort != .newest {
             let discovery = try await sendBrowse(
                 body: Self.initialBrowseBody(channelID: channelID, params: ChannelVideoSort.newest.requestParameters),
@@ -340,11 +337,7 @@ final class ChannelVideosFallbackService: Sendable {
         let lockupMeta = (json["metadata"] as? [String: Any])?["lockupMetadataViewModel"] as? [String: Any]
         let title = ((lockupMeta?["title"] as? [String: Any])?["content"] as? String) ?? ""
 
-        // metadataRows is an ordered list:
-        //   [0] channel name (with WEB_PAGE_TYPE_CHANNEL link)
-        //   [1] "N views • posted-ago"  (two parts)
-        // We bucket each text into channel name / view count / time-posted based on the link
-        // hint when present; otherwise fall back to "first non-channel = views, last = posted".
+        // Rows: channel (linked) then "views • posted"; fall back to first=views, last=posted.
         let rows = ((lockupMeta?["metadata"] as? [String: Any])?["contentMetadataViewModel"] as? [String: Any])?["metadataRows"] as? [[String: Any]]
         var channelName = ""
         var viewsText: String?

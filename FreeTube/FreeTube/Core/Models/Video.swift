@@ -11,10 +11,7 @@ struct Video: Identifiable, Hashable, Sendable, Codable {
     let duration: TimeInterval?
     let viewCount: Int?
     let publishedAt: Date?
-    /// Human-readable "N days ago" string from YouTube's `timePosted` field. We keep this as a
-    /// separate display-ready string because YouTube only returns relative phrasing here
-    /// ("3 days ago" / "2 months ago" / "1 year ago"). The subscription feed additionally
-    /// derives an approximate date at refresh time so cached ages can advance on screen.
+    /// Relative age from YouTube (`"3 days ago"`); feed also derives an absolute date at refresh.
     let publishedRelative: String?
     let descriptionSnippet: String?
     let isLive: Bool

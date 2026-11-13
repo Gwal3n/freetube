@@ -52,10 +52,7 @@ final class DownloadMediaFinalizer {
         }
     }
 
-    /// Remux DASH video and audio without re-encoding. AVFoundation can misread timestamps in
-    /// YouTube's fragmented MP4 tracks and produce an incorrect duration when it exports them.
-    /// FFmpeg rewrites the container timestamps, and FFmpegRunner serializes access to its
-    /// process-wide C state because concurrent runs can crash during the fast-start pass.
+    /// Remux DASH A/V via FFmpegRunner (AVFoundation misreads fragmented MP4 timestamps).
     func mux(video: URL, audio: URL, destination: URL) async throws {
         log.info("mux via ffmpeg: video=\(video.lastPathComponent, privacy: .public) audio=\(audio.lastPathComponent, privacy: .public)")
         try? FileManager.default.removeItem(at: destination)

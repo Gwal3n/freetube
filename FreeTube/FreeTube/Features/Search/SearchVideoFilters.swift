@@ -321,10 +321,7 @@ struct SearchVideoFilters: Equatable {
         )
     }
 
-    /// - Parameter applyServerMirroredLocally: When `false`, upload/length presets that were already
-    ///   sent to YouTube are not re-applied on the client (missing metadata would over-filter).
-    ///   Set `true` after a plain-query fallback so those presets still take effect locally.
-    ///   Defaults to `true` for local-only callers such as playlist filtering.
+    /// `applyServerMirroredLocally: false` skips re-applying upload/length already sent to YouTube.
     func includes(
         _ video: Video,
         status: WatchHistoryStatus?,

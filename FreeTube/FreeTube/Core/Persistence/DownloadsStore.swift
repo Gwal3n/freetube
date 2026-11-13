@@ -49,15 +49,7 @@ final class DownloadsStore {
         refresh()
     }
 
-    /// One-shot migration of any `Documents/Downloads/` files left over from before we
-    /// flattened the layout. Moves every file inside up to the Documents root and removes
-    /// the empty `Downloads/` subdirectory. Idempotent — second launch finds no legacy
-    /// folder and is a no-op.
-    ///
-    /// **Runs synchronously on init** because it's a few `rename(2)` syscalls (same
-    /// filesystem = inode pointer swap, no actual byte copying) and the scan that follows
-    /// needs the files in their final location to surface them. Even with hundreds of
-    /// files this is ~1ms.
+    /// Moves legacy `Documents/Downloads/` files up to Documents root (idempotent, sync on init).
     private nonisolated static func migrateLegacyDownloadsFolder() {
         let docs = downloadsDirectory()
         let legacy = docs.appendingPathComponent("Downloads", isDirectory: true)
@@ -80,15 +72,7 @@ final class DownloadsStore {
 
     // MARK: - Read
 
-    /// Kicks off an asynchronous scan of the Documents root. The directory listing,
-    /// per-file `attributesOfItem`, and per-file xattr reads all run on a detached
-    /// `.utility` task — never on the main thread. Result lands back via assignment to
-    /// `entries`, which triggers SwiftUI to re-render any observing view.
-    ///
-    /// **Cancellation:** if another `refresh()` arrives before this one finishes (e.g.
-    /// rapid `didChange` posts during a Download All batch), we cancel the previous task
-    /// so only the latest scan's result lands in `entries`. Otherwise late completions
-    /// would race and the final state could reflect an older directory snapshot.
+    /// Scans Documents off-main; cancels any in-flight scan so only the latest result lands.
     func refresh() {
         scanTask?.cancel()
         isScanning = true
@@ -104,9 +88,7 @@ final class DownloadsStore {
         }
     }
 
-    /// Pure file-system scan + xattr decode. `nonisolated static` so it can run from any
-    /// thread (the detached scan task in particular). Returns the sorted entry list.
-    /// Newest first by `downloadedAt` if metadata is present, else by file mtime.
+    /// Sorted filesystem scan + xattr decode (newest first).
     private nonisolated static func scanDirectory() -> [DownloadEntry] {
         let dir = downloadsDirectory()
         let fileURLs = (try? FileManager.default.contentsOfDirectory(
@@ -118,15 +100,10 @@ final class DownloadsStore {
         return mediaURLs.compactMap(makeEntry(from:)).sorted { $0.sortDate > $1.sortDate }
     }
 
-    /// Returns the compressed JPEG thumbnail bytes for a given videoID (or nil).
-    /// Used by `RootView` to populate the mini-player image when playing a locally-saved
-    /// download whose `Video.thumbnailURL` was nil.
     func thumbnail(forVideoID videoID: String) -> Data? {
         entries.first { $0.metadata?.videoID == videoID }?.metadata?.thumbnailData
     }
 
-    /// Direct lookup by file URL — useful when a caller already has a path and wants the
-    /// associated metadata without scanning the list.
     func metadata(at fileURL: URL) -> DownloadMetadata? {
         if let cached = entries.first(where: { $0.fileURL == fileURL }) {
             return cached.metadata
@@ -136,17 +113,7 @@ final class DownloadsStore {
 
     // MARK: - Write
 
-    /// Encode + write the metadata xattr to the file, then notify. The caller is
-    /// responsible for having already moved the bytes to `fileURL`. **All heavy work
-    /// happens on a detached `.utility` task** so the calling actor (typically main, via
-    /// `DownloadManager.persistDownloaded`) isn't
-    /// blocked by:
-    ///   - JPEG decode + downscale + re-encode for the thumbnail (`UIGraphicsImageRenderer`
-    ///     is documented thread-safe since iOS 10)
-    ///   - `AVURLAsset` duration probe (file header read; ~few KB)
-    ///   - PropertyList encode + `setxattr(2)` syscall
-    /// Suspends the caller without blocking the main actor; the `didChange` notification posts
-    /// once the xattr has been attempted, triggering the DownloadsStore refresh.
+    /// Writes metadata xattr off-main (thumbnail compress + duration probe), then posts `didChange`.
     func write(
         videoID: String,
         title: String,
@@ -227,22 +194,12 @@ final class DownloadsStore {
 
     // MARK: - Internals
 
-    /// The directory we scan for downloads. **Documents root** — exposed to the user via
-    /// the Files app (see Info.plist `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`).
-    /// Other app data (including the SwiftData store) lives in
-    /// `Application Support/`, not Documents, so the user only sees their media files.
+    /// Documents root (Files app sharing); SwiftData lives under Application Support.
     nonisolated static func downloadsDirectory() -> URL {
         AppDirectories.documents
     }
 
-    /// Reads file attributes + xattr metadata for one file. Returns nil only when basic
-    /// stat fails (file vanished mid-scan). Metadata missing → `entry.metadata == nil`,
-    /// which the UI treats as an "orphan" row with filename-as-title.
-    ///
-    /// **Duration resolution**: prefer the value baked into the xattr (new downloads carry
-    /// it; saves a disk read). Fall back to an `AVURLAsset` header read for orphans and
-    /// older files. Both paths run on whatever thread is calling — always the scan's
-    /// detached `.utility` task in practice — never on main.
+    /// Stat + xattr for one file; duration from xattr or AVURLAsset. Nil only if the file vanished.
     private nonisolated static func makeEntry(from url: URL) -> DownloadEntry? {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
@@ -263,9 +220,7 @@ final class DownloadsStore {
         return try? PropertyListDecoder().decode(DownloadMetadata.self, from: blob)
     }
 
-    /// One-shot synchronous `AVURLAsset.duration` read. Deprecated API but appropriate here:
-    /// the file is local mp4, the call only walks the moov atom (a few KB of header), and
-    /// it's invoked from detached `.utility` tasks (scan + write) — never on main.
+    /// Local-file duration via AVURLAsset; call only off-main.
     nonisolated static func readDuration(at url: URL) -> TimeInterval? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let asset = AVURLAsset(url: url)
@@ -273,9 +228,6 @@ final class DownloadsStore {
         return (seconds.isFinite && seconds > 0) ? seconds : nil
     }
 
-    /// Downscale + JPEG-compress the source thumbnail so it fits comfortably in an xattr
-    /// value. Target ~10 KB at `thumbnailMaxWidth`. Returns nil if the input isn't a
-    /// decodable image (rare but defensive).
     private nonisolated static func compressedThumbnail(_ raw: Data) -> Data? {
         guard let image = UIImage(data: raw) else { return nil }
         let maxW = thumbnailMaxWidth
@@ -287,24 +239,17 @@ final class DownloadsStore {
     }
 }
 
-/// One row from the filesystem scan. `metadata == nil` means the file has no xattr we
-/// recognise — surface it as an "orphan" with sensible defaults (filename-as-title).
+/// Filesystem scan row. Missing metadata → orphan (filename as title).
 @available(iOS 17.0, *)
 struct DownloadEntry: Identifiable, Sendable {
     let fileURL: URL
     let metadata: DownloadMetadata?
     let fileSize: Int64
     let modifiedAt: Date
-    /// Playback duration (seconds). Pre-resolved off-main during the scan — either from
-    /// the file's xattr metadata (new downloads bake it in at write time) or via a
-    /// one-shot `AVURLAsset` header read for orphans / older files. Either way, by the
-    /// time SwiftUI renders a row, this is already a cached `TimeInterval` — no sync
-    /// `AVURLAsset` calls during list body evaluation.
+    /// Pre-resolved off-main; never probe AVURLAsset from a SwiftUI body.
     let duration: TimeInterval?
 
     var id: String { fileURL.path }
-    /// Canonical YouTube files use their video ID as the filename. This fallback covers the
-    /// short interval before the asynchronous metadata xattr has been written.
     var videoID: String { metadata?.videoID ?? fileURL.deletingPathExtension().lastPathComponent }
 
     /// Date used for the newest-first sort. Prefer metadata when available (matches the

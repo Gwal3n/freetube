@@ -119,13 +119,6 @@ struct FullScreenPlayer: View {
     }
 
     var body: some View {
-        // One continuous appearance-aware canvas sits behind the video and lower details.
-        // The media surface itself remains black, keeping letterboxing and white controls legible.
-        //
-        // The outer GeometryReader provides a stable viewport for both the display-correct
-        // expanded ratio and the compact baseline (16:9 for ordinary/tall media, native ratio for
-        // wide media). Their difference becomes the first part of the lower panel's scroll range,
-        // allowing a tall player to behave as a collapsible header.
         GeometryReader { proxy in
             let controlLayout = playerControlLayout
             let isFloating = !player.fullScreenPresented
@@ -153,15 +146,7 @@ struct FullScreenPlayer: View {
             let captionBottomPadding = viewport.captionBottomPadding
             ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
-                // Pinning the ZStack to width × width*9/16 keeps the surface a stable height
-                // across .resolving → .downloading → .readyToPlay (the underlying
-                // AVPlayerViewController has zero intrinsic size while loading; the explicit
-                // frame here is what stops the layout from jumping when the user taps a queue
-                // item).
-                // Layer order is load-bearing. `AVPlayerViewController` paints an opaque black
-                // background, so the thumbnail has to sit *above* `PlayerSurface` to be visible at
-                // all — it hides itself once `loadState` reaches `.readyToPlay`. The artwork view
-                // owns that crossfade so load-state changes cannot animate player geometry.
+                // Fixed 16:9 frame while loading; artwork must sit above opaque PlayerSurface.
                 ZStack {
                     Color.black
                     ZStack {
@@ -276,10 +261,7 @@ struct FullScreenPlayer: View {
                     }
                     Color.black
                         .opacity(!isFloating && showsPlayerControls ? 0.28 : 0)
-                        // Dim the stable player surface rather than AVPlayer's presentation rect.
-                        // The latter changes from unknown/full-size to the decoded aspect ratio
-                        // as a new item becomes ready, which made non-16:9 videos flash unevenly.
-                        // Letterbox pixels are already black, so covering them has no visible cost.
+                        // Dim the fixed surface, not AVPlayer's presentation rect (avoids aspect flash).
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
                     if player.fullScreenPresented,
@@ -638,11 +620,7 @@ struct FullScreenPlayer: View {
             player.portraitPlayerFullscreenActive = false
         }
 
-        // Make the VStack fill the GeometryReader's bounds. Without this, the VStack only
-        // claims the natural content height (video + panel intrinsic
-        // height) and the `.background { thinMaterial }` doesn't extend below that. On
-        // smaller-than-content windows (Mac shrunk) this is invisible; on larger ones
-        // (Mac maximized) you'd see an unfilled gap below the panel.
+        // Fill the GeometryReader so thinMaterial extends below the panel content.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }

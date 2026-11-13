@@ -384,14 +384,7 @@ extension PlayerStateManager {
                         }
                     }
                 }
-                // Usually redundant — the optimistic `play()` above has either started the item or
-                // parked the player in `.waitingToPlayAtSpecifiedRate`, and this covers the case
-                // where a rejected candidate left the transport paused.
-                //
-                // Ask the player, not `isPlaying`. That flag is a prediction written by `play()`
-                // for immediate UI feedback, so after an optimistic start it reads `true` whether
-                // or not AVPlayer honoured the request. Gating this on it means the one situation
-                // that needs a retry is the one situation where the retry is skipped.
+                // Retry only if AVPlayer is still paused after optimistic play / rejected candidates.
                 if wantsPlayback, player.timeControlStatus == .paused { play() }
                 finishPlaybackSetup(video: video, skipRecommendations: skipRecommendations)
                 reconcilePlaybackRate()
@@ -410,10 +403,6 @@ extension PlayerStateManager {
             guard !Task.isCancelled, playbackSessionID == sessionID,
                   currentVideo?.id == video.id else { return }
             excludedStrategies.insert(candidate.strategy)
-            // The optimistic `play()` left the transport running (rate 1, possibly stalled) on a
-            // stream we're now abandoning. Stop it *before* tearing the queue down so `isPlaying`
-            // and the Now Playing rate don't advertise playback for a rejected candidate while the
-            // next one resolves.
             player.pause()
             isPlaying = false
             player.removeAllItems()
@@ -425,17 +414,9 @@ extension PlayerStateManager {
         log.debug("resolveAndPlay: ended after cancellation or video change for \(video.id, privacy: .public)")
     }
 
-    /// Caps HLS variant selection to the user's preferred quality.
-    ///
-    /// The resolver now hands back a master playlist for most videos rather than a single
-    /// progressive stream, and a master playlist advertises YouTube's whole variant ladder. Without
-    /// a ceiling AVPlayer's ABR logic is free to climb past the user's setting — previously the
-    /// height cap was applied when picking a progressive format, so this keeps that preference
-    /// meaningful. It also shortens time-to-first-frame, since AVPlayer no longer pulls a large
-    /// segment before reporting `.readyToPlay`. `.auto` stays uncapped so ABR can use the full
-    /// ladder, and this is a no-op for progressive and local-file candidates.
     // MARK: - Quality and readiness
 
+    /// Caps HLS ABR via `preferredMaximumResolution`. No-op for progressive/local and `.auto`.
     func applyQualityCap(to item: AVPlayerItem) {
         applyQualityCap(to: item, quality: playbackQuality)
     }

@@ -1,38 +1,15 @@
 import Foundation
 
-/// Serialized payload written as a single extended attribute on each downloaded file.
-/// Replaces the SwiftData `DownloadedVideo` row — the file system is now the source of
-/// truth, and any tool that reads the xattr can reconstruct the row.
-///
-/// **Encoding**: binary property list. Smaller and faster to decode than JSON, and
-/// `Date`/`Data` round-trip without manual coding keys.
-///
-/// **What's NOT stored here**: the file URL itself and the file size are recoverable from
-/// the file system at read time, so we don't duplicate them in the xattr — saves bytes
-/// and avoids drift when the file is moved.
+/// Binary-plist xattr payload for a downloaded media file (URL/size come from the filesystem).
 struct DownloadMetadata: Codable, Sendable {
-    /// YouTube videoID for YouTube downloads; the pasted URL string for legacy Link items.
-    /// Whatever uniquely identifies the *source* (filename can't, because URL items
-    /// sanitise the title into the filename).
     let videoID: String
     let title: String
-    /// "YouTube channel name" for YouTube, or the extractor name ("Instagram", "Vimeo")
-    /// for legacy Link items. Shown as the row subtitle in the Downloads list.
     let channelName: String
-    /// `"youtube"` for new YouTube files; older files may still carry `"ytdl"`.
-    /// Legacy Link downloads use `"url-fetch"`.
+    /// `"youtube"`, legacy `"ytdl"`, or `"url-fetch"`.
     let formatID: String
     let downloadedAt: Date
-    /// Original pasted URL for legacy Link items; `nil` for YouTube (the canonical URL is
-    /// recoverable from videoID). Drives the "Open in browser" target.
     let originalURL: String?
-    /// Compressed JPEG bytes of the source thumbnail, ~10KB. Inline so the file is fully
-    /// self-describing — no sidecar `.thumb.jpg` files cluttering the directory.
-    /// `nil` when the source extractor didn't provide a thumbnail or the fetch failed.
     let thumbnailData: Data?
-    /// Playback duration in seconds. Read once from `AVURLAsset` at write time (on a
-    /// background task) and baked in — saves the Downloads list from doing an `AVAsset`
-    /// header read per row on every body re-evaluation, which was the dominant source of
-    /// scroll lag with large libraries.
+    /// Baked at write time so list bodies never probe AVURLAsset.
     let duration: TimeInterval?
 }

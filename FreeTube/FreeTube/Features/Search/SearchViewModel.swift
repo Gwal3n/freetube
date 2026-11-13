@@ -294,10 +294,7 @@ final class SearchViewModel {
         }
     }
 
-    /// Called from Search UI when `videoFilters` changes. Local-only edits are ignored; a changed
-    /// source or InnerTube `params` blob re-runs the current query without clearing the list.
-    /// Requires mounted results so submit/clear resets (which nil out `results` first) do not
-    /// schedule a redundant search.
+    /// Re-runs search when server-backed filters change; ignores local-only edits and empty results.
     func serverFiltersDidChange(from oldValue: SearchVideoFilters) {
         guard oldValue.serverRequestKey != videoFilters.serverRequestKey else { return }
         guard submittedQuery != nil, results != nil, !isEditingNewQuery else { return }

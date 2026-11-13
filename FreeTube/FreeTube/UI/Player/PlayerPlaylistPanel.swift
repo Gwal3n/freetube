@@ -1,10 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Playlist context lives outside the scrolling details feed. The compact control opens a
-/// non-modal browser beneath the video (or beside it in landscape), so playback remains usable.
-/// Rows are lazy but not windowed: every fetched item is available, with continuation pages
-/// requested as the user reaches the end.
+/// Non-modal playlist browser beside/beneath the video; lazy rows with continuation at end.
 @available(iOS 17.0, *)
 struct PlayerPlaylistPanel: View {
     private static let dismissalThreshold: CGFloat = 42
