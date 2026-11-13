@@ -20,11 +20,11 @@ struct FeedFilterMenu: View {
                     Button {
                         filter.watch = option
                     } label: {
-                        optionLabel(option.title, selected: filter.watch == option)
+                        FilterMenuLabels.option(option.title, selected: filter.watch == option)
                     }
                 }
             } label: {
-                categoryLabel("Watch history", active: filter.watch != .all)
+                FilterMenuLabels.category("Watch history", active: filter.watch != .all)
             }
             Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
@@ -35,11 +35,11 @@ struct FeedFilterMenu: View {
                             filter.uploaded = option
                         }
                     } label: {
-                        optionLabel(option.title, selected: filter.uploaded == option)
+                        FilterMenuLabels.option(option.title, selected: filter.uploaded == option)
                     }
                 }
             } label: {
-                categoryLabel("Upload date", active: filter.uploaded != .anytime)
+                FilterMenuLabels.category("Upload date", active: filter.uploaded != .anytime)
             }
             Menu {
                 ForEach(SearchVideoFilters.Length.allCases) { option in
@@ -50,11 +50,11 @@ struct FeedFilterMenu: View {
                             filter.length = option
                         }
                     } label: {
-                        optionLabel(option.title, selected: filter.length == option)
+                        FilterMenuLabels.option(option.title, selected: filter.length == option)
                     }
                 }
             } label: {
-                categoryLabel("Length", active: filter.length != .any)
+                FilterMenuLabels.category("Length", active: filter.length != .any)
             }
             Menu {
                 ForEach(SearchVideoFilters.Views.allCases) { option in
@@ -65,11 +65,11 @@ struct FeedFilterMenu: View {
                             filter.views = option
                         }
                     } label: {
-                        optionLabel(option.title, selected: filter.views == option)
+                        FilterMenuLabels.option(option.title, selected: filter.views == option)
                     }
                 }
             } label: {
-                categoryLabel("Views", active: filter.views != .any)
+                FilterMenuLabels.category("Views", active: filter.views != .any)
             }
             Divider()
             Button("Reset Filters") {
@@ -90,23 +90,5 @@ struct FeedFilterMenu: View {
         .transaction { $0.animation = nil }
         .accessibilityLabel("Feed filters")
         .accessibilityValue(filter.isActive ? "On" : "Off")
-    }
-
-    @ViewBuilder
-    private func categoryLabel(_ title: LocalizedStringKey, active: Bool) -> some View {
-        if active {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
-    }
-
-    @ViewBuilder
-    private func optionLabel(_ title: String, selected: Bool) -> some View {
-        if selected {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
     }
 }

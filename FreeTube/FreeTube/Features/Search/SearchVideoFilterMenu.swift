@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// Hybrid search filters, shown as a glass circle at the top trailing edge of the results header
-/// like Feed's toolbar filter. The icon becomes a music note while YouTube Music is the source.
-/// Sort / type / upload / length presets go to YouTube when possible; watch history, views, and
-/// custom ranges stay local. Category rows that currently constrain results show a checkmark.
+/// Hybrid search filters as a trailing text menu on the results subtitle row. Sort / upload /
+/// length presets go to YouTube when possible; watch history, views, and custom ranges stay
+/// local. Category rows that currently constrain results show a checkmark.
 @available(iOS 17.0, *)
 struct SearchVideoFilterMenu: View {
     @Binding var filters: SearchVideoFilters
@@ -18,22 +17,22 @@ struct SearchVideoFilterMenu: View {
                     Button {
                         filters.selectSource(option)
                     } label: {
-                        optionLabel(option.title, selected: filters.source == option)
+                        FilterMenuLabels.option(option.title, selected: filters.source == option)
                     }
                 }
             } label: {
-                categoryLabel("Source", active: filters.source != .youtube)
+                FilterMenuLabels.category("Source", active: filters.source != .youtube)
             }
             Menu {
                 ForEach(SearchVideoFilters.Sort.allCases) { option in
                     Button {
                         filters.sort = option
                     } label: {
-                        optionLabel(option.title, selected: filters.sort == option)
+                        FilterMenuLabels.option(option.title, selected: filters.sort == option)
                     }
                 }
             } label: {
-                categoryLabel("Sort by", active: filters.sort != .relevance)
+                FilterMenuLabels.category("Sort by", active: filters.sort != .relevance)
             }
             .disabled(!filters.supportsServerConstraints)
             Menu {
@@ -41,11 +40,11 @@ struct SearchVideoFilterMenu: View {
                     Button {
                         filters.watch = option
                     } label: {
-                        optionLabel(option.title, selected: filters.watch == option)
+                        FilterMenuLabels.option(option.title, selected: filters.watch == option)
                     }
                 }
             } label: {
-                categoryLabel("Watch history", active: filters.watch != .all)
+                FilterMenuLabels.category("Watch history", active: filters.watch != .all)
             }
             Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
@@ -56,11 +55,11 @@ struct SearchVideoFilterMenu: View {
                             filters.uploaded = option
                         }
                     } label: {
-                        optionLabel(option.title, selected: filters.uploaded == option)
+                        FilterMenuLabels.option(option.title, selected: filters.uploaded == option)
                     }
                 }
             } label: {
-                categoryLabel("Upload date", active: filters.uploaded != .anytime)
+                FilterMenuLabels.category("Upload date", active: filters.uploaded != .anytime)
             }
             .disabled(!filters.resultType.supportsVideoConstraints || !filters.supportsServerConstraints)
             Menu {
@@ -72,11 +71,11 @@ struct SearchVideoFilterMenu: View {
                             filters.length = option
                         }
                     } label: {
-                        optionLabel(option.title, selected: filters.length == option)
+                        FilterMenuLabels.option(option.title, selected: filters.length == option)
                     }
                 }
             } label: {
-                categoryLabel("Length", active: filters.length != .any)
+                FilterMenuLabels.category("Length", active: filters.length != .any)
             }
             .disabled(!filters.resultType.supportsVideoConstraints || !filters.supportsServerConstraints)
             Menu {
@@ -88,11 +87,11 @@ struct SearchVideoFilterMenu: View {
                             filters.views = option
                         }
                     } label: {
-                        optionLabel(option.title, selected: filters.views == option)
+                        FilterMenuLabels.option(option.title, selected: filters.views == option)
                     }
                 }
             } label: {
-                categoryLabel("Views", active: filters.views != .any)
+                FilterMenuLabels.category("Views", active: filters.views != .any)
             }
             .disabled(!filters.resultType.supportsVideoConstraints)
             Divider()
@@ -145,26 +144,5 @@ struct SearchVideoFilterMenu: View {
             filters.length != .any,
             filters.views != .any
         ].filter { $0 }.count
-    }
-}
-
-@available(iOS 17.0, *)
-extension SearchVideoFilterMenu {
-    @ViewBuilder
-    private func categoryLabel(_ title: String, active: Bool) -> some View {
-        if active {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
-    }
-
-    @ViewBuilder
-    private func optionLabel(_ title: String, selected: Bool) -> some View {
-        if selected {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
     }
 }

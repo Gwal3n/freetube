@@ -10,12 +10,15 @@ protocol NativeStreamServicing: Sendable {
     func resolve(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolveProgressive(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
     func resolvePaired(video: Video, quality: VideoQuality) async throws -> NativeStreamResult
+    /// Local VISIONOS caption track list without resolving a playable stream.
+    func fetchCaptionTracks(videoID: String) async -> [VideoCaptionTrack]
 
     func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async
 }
 
 extension NativeStreamServicing {
     func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async {}
+    func fetchCaptionTracks(videoID: String) async -> [VideoCaptionTrack] { [] }
 }
 
 final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
@@ -28,6 +31,12 @@ final class NativeStreamService: NativeStreamServicing, @unchecked Sendable {
 
     func invalidateCachedPrimaryStream(videoID: String, quality: VideoQuality) async {
         await cache.remove(videoID: videoID, formatID: "native-\(quality.rawValue)")
+    }
+
+    /// Discovers anonymous caption tracks for a downloaded video without starting playback.
+    func fetchCaptionTracks(videoID: String) async -> [VideoCaptionTrack] {
+        let youtube = YouTube(videoID: videoID, methods: [.local])
+        return await sourceCaptionTracks(from: youtube, videoID: videoID)
     }
 
     /// Returns an HLS, progressive video, or audio-only URL suitable for `AVPlayer`.

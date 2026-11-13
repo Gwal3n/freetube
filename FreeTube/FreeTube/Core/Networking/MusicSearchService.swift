@@ -19,8 +19,15 @@ final class MusicSearchService: MusicSearchServicing {
     private static let clientVersion = "1.20251015.03.00"
     private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15"
 
-    nonisolated init(session: URLSession = .shared) {
-        self.session = session
+    nonisolated init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.httpCookieAcceptPolicy = .never
+            configuration.httpShouldSetCookies = false
+            self.session = URLSession(configuration: configuration)
+        }
     }
 
     /// Searches YouTube Music and returns songs, videos, artists, and playlists in relevance order.

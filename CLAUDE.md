@@ -81,7 +81,7 @@ FreeTube/
 │                          # PlaybackSource, UserPreferences, YouTubeServiceError
 ├── Features/
 │   ├── Home/              # HomeScreen: the Search tab's native searchable host
-│   ├── Search/            # SearchScreen, SearchSuggestionList, SearchViewModel
+│   ├── Search/            # SearchContent, SearchSuggestionList, SearchViewModel
 │   ├── Subscriptions/     # SubscriptionsScreen + ViewModel
 │   ├── Library/           # LibraryScreen, HistoryScreen, SubscribedChannelsScreen, ViewModels
 │   ├── Channel/           # ChannelScreen + ViewModel

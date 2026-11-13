@@ -26,9 +26,16 @@ final class ChannelVideosFallbackService: Sendable {
     private let state = State()
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "ChannelVideosFallback")
 
-    init(client: YouTubeKitClient = .shared, session: URLSession = .shared) {
+    init(client: YouTubeKitClient = .shared, session: URLSession? = nil) {
         self.client = client
-        self.session = session
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.httpCookieAcceptPolicy = .never
+            configuration.httpShouldSetCookies = false
+            self.session = URLSession(configuration: configuration)
+        }
     }
 
     /// Per-channel continuation state. Keyed by channelID. Presence in the map also signals
