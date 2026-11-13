@@ -154,7 +154,7 @@ final class AppBackupService {
     }
 
     private static let settingKeys: Set<String> = [
-        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "alwaysDownloadBeforePlayback", "appAccentPreset", "appFontPreset",
+        "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "appAccentPreset", "appFontPreset",
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "autoLoadMoreFeedItems", "autoLoadMoreSearchItems", "autoLoadMoreComments", "cacheRecentVideoContent", "cellularPlaybackQuality",
         "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours", "feedSuggestionsEnabled", "feedSuggestionDensity",
         "com.leshko.freetube.videoBlocklist.v1",
@@ -175,14 +175,14 @@ final class AppBackupService {
         "showChannelPlaylistsTab", "showChannelShortsTab", "showComments", "pinCommentsHeading", "portraitOrientationLock", "pinUpNextHeading", "pinQueueHeading", "showDescription", "showFeedChannelAvatars", "showFeedFilterButton", "showFeaturedCommentPreview", "featuredCommentsNearPlaybackOnly",
         "showCommentAuthorPhotos", "openCommentAuthorChannels", "openFeedChannelsOnTap", "openUpNextChannelsOnTap",
         "showContinueWatchingMenu", "showHistoryProgressBars", "watchProgressColorMode", "watchProgressCustomHex", "finishedVideoIndicator", "transportButtonMode", "transportSeekSeconds", "showLibraryShelf", "showNewSubscriptionUploads", "showSearchSuggestions", "showSubscriptionFeedTab", "showUpNext", "sponsorBlockEnabled",
-        "sponsorBlockHighlightBehavior", "sponsorBlockInteraction", "sponsorBlockInteractionBehavior",
+        "sponsorBlockHighlightBehavior", "sponsorBlockInteractionBehavior",
         "sponsorBlockExclusiveAccessBehavior", "sponsorBlockPreviewBehavior",
         "sponsorBlockHookBehavior", "sponsorBlockChapterBehavior",
         "sponsorBlockMusicOfftopicBehavior", "sponsorBlockFillerBehavior",
-        "sponsorBlockIntro", "sponsorBlockIntroBehavior", "sponsorBlockOutro",
-        "sponsorBlockOutroBehavior", "sponsorBlockSelfPromotion", "sponsorBlockSelfPromotionBehavior",
+        "sponsorBlockIntroBehavior", "sponsorBlockOutroBehavior",
+        "sponsorBlockSelfPromotionBehavior",
         "sponsorBlockColorOverridesJSON", "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
-        "sponsorBlockSponsor", "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize",
+        "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize",
         "showUpNextChannelAvatars"
     ]
 

@@ -84,7 +84,7 @@ FreeTube/
 │   ├── Search/            # SearchScreen, SearchSuggestionList, SearchViewModel
 │   ├── Subscriptions/     # SubscriptionsScreen + ViewModel
 │   ├── Library/           # LibraryScreen, HistoryScreen, SubscribedChannelsScreen, ViewModels
-│   ├── Channel/           # ChannelScreen, ChannelTabScreen, ViewModel
+│   ├── Channel/           # ChannelScreen + ViewModel
 │   ├── Playlist/          # PlaylistScreen + ViewModel
 │   ├── VideoDetail/       # VideoDetailScreen, CommentsSection, SaveToPlaylistSheet, ViewModels
 │   ├── Downloads/         # DownloadsScreen + ViewModel
@@ -93,7 +93,7 @@ FreeTube/
 │   ├── Player/            # FullScreenPlayer, PlayerSurface, DownloadProgressOverlay
 │   ├── Components/        # VideoCard, VideoRow, ChannelRow, CommentRow,
 │   │                      # PlaylistRow, AddToPlaylistSheet, ActivityShareSheet,
-│   │                      # SectionHeader, LoadingView
+│   │                      # LoadingView
 │   └── Modifiers/         # ErrorToastModifier
 ├── Resources/
 │   └── Localizable.xcstrings    # en / es / ru / fr / de

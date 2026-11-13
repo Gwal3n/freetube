@@ -17,7 +17,6 @@ struct UserPreferences {
     @AppStorage("resumeAfterAudioInterruption") var resumeAfterAudioInterruption: Bool = true
     @AppStorage("rememberFloatingPlayerPlacement") var rememberFloatingPlayerPlacement: Bool = false
     @AppStorage("floatingPlayerWidth") private var savedFloatingPlayerWidthRaw: Double = 216
-    @AppStorage("alwaysDownloadBeforePlayback") var alwaysDownloadBeforePlayback: Bool = false
     /// When `true`, downloads (and playback-time fetches, since those use the same path) are
     /// allowed to run over cellular. Default is `true` — permissive — so a fresh install
     /// works out of the box on a phone without Wi-Fi. Users who pay per MB can disable this
@@ -139,11 +138,6 @@ struct UserPreferences {
     @AppStorage("sponsorBlockEnabled") var sponsorBlockEnabled: Bool = false
     @AppStorage("sponsorBlockMinimumSkipSeconds") var sponsorBlockMinimumSkipSeconds: Double = 0
     @AppStorage("sponsorBlockNoticeSeconds") var sponsorBlockNoticeSeconds: Double = 5
-    @AppStorage("sponsorBlockSponsor") var sponsorBlockSponsor: Bool = true
-    @AppStorage("sponsorBlockSelfPromotion") var sponsorBlockSelfPromotion: Bool = false
-    @AppStorage("sponsorBlockInteraction") var sponsorBlockInteraction: Bool = false
-    @AppStorage("sponsorBlockIntro") var sponsorBlockIntro: Bool = false
-    @AppStorage("sponsorBlockOutro") var sponsorBlockOutro: Bool = false
     @AppStorage("sponsorBlockSponsorBehavior") var sponsorBlockSponsorBehaviorRaw: String = SponsorBlockBehavior.autoSkip.rawValue
     @AppStorage("sponsorBlockSelfPromotionBehavior") var sponsorBlockSelfPromotionBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockExclusiveAccessBehavior") var sponsorBlockExclusiveAccessBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
