@@ -289,7 +289,7 @@ final class DownloadManager {
             try? FileManager.default.removeItem(at: destination)
             if Task.isCancelled { throw CancellationError() }
             log.error("download[\(video.id, privacy: .public)] source=youtubekit failed: \(String(describing: error), privacy: .public)")
-            let failure = YouTubeServiceError.streamExtractionFailed
+            let failure = DownloadFailure.wrapping(error)
             publish(snapshot: DownloadTaskSnapshot(
                 id: snapshotID, videoID: video.id, title: video.title,
                 state: .failed(failure.localizedDescription), createdAt: .now
@@ -437,7 +437,7 @@ final class DownloadManager {
 
     // MARK: - YouTubeKit / TVHTML5 fallback
 
-    /// TVHTML5 direct-format fallback; muxes adaptive video+audio when needed.
+    /// Direct-format fallback; uses a User-Agent matching the client that minted the URLs.
     private func runYouTubeKitFallback(video: Video, quality: VideoQuality, destination: URL, snapshotID: String) async throws {
         log.info("youtube-kit-download[\(video.id, privacy: .public)] fetching stream info")
         publish(snapshot: DownloadTaskSnapshot(
@@ -446,11 +446,12 @@ final class DownloadManager {
         ))
         phaseByVideoID[video.id] = "stream"
 
-        let formats = await sourceSelector.fallbackFormats(videoID: video.id)
-        log.info("youtube-kit-download[\(video.id, privacy: .public)] \(formats.count, privacy: .public) usable formats")
-        guard !formats.isEmpty else {
-            throw YouTubeServiceError.streamExtractionFailed
+        guard let source = await sourceSelector.fallbackSource(videoID: video.id) else {
+            throw DownloadFailure.noFormats
         }
+        let formats = source.formats
+        let client = source.client
+        log.info("youtube-kit-download[\(video.id, privacy: .public)] \(formats.count, privacy: .public) usable formats client=\(String(describing: client), privacy: .public)")
         let maxHeight = DownloadFormatPolicy.targetHeight(for: quality)
 
         try? FileManager.default.removeItem(at: destination)
@@ -459,14 +460,15 @@ final class DownloadManager {
             guard let audioFormat = DownloadFormatPolicy.pickBestAudioOnly(formats: formats),
                   let audioURL = audioFormat.url,
                   audioFormat.mimeType.lowercased().contains("mp4") || audioFormat.mimeType.lowercased().contains("m4a") else {
-                throw YouTubeServiceError.streamExtractionFailed
+                throw DownloadFailure.noFormats
             }
             let audioFile = destination.deletingPathExtension().appendingPathExtension("fallback.audio.m4a")
             defer { try? FileManager.default.removeItem(at: audioFile) }
             phaseByVideoID[video.id] = "audio"
             try await downloadStream(
                 from: audioURL, to: audioFile, videoID: video.id,
-                snapshotID: snapshotID, title: video.title
+                snapshotID: snapshotID, title: video.title,
+                client: client
             )
             try Task.checkCancellation()
             phaseByVideoID[video.id] = "muxing"
@@ -476,29 +478,27 @@ final class DownloadManager {
                 "-movflags", "+faststart", destination.path
             ])
             try Task.checkCancellation()
-            guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
+            guard exit == 0 else { throw DownloadFailure.remuxFailed }
             return
         }
 
-        // **Strategy 1: progressive single-file format.** itag 18 (360p mp4 with both tracks)
-        // ships as a single file, no mux step. Always tried first because it's the simplest
-        // and fastest path when available.
+        // Progressive single-file first (itag 18); otherwise adaptive A/V + remux.
         if let progressive = DownloadFormatPolicy.pickBestProgressive(formats: formats, maxHeight: maxHeight),
            let url = progressive.url {
             log.info("youtube-kit-download[\(video.id, privacy: .public)] progressive height=\(progressive.height ?? 0, privacy: .public)")
-            try await downloadStream(from: url, to: destination, videoID: video.id, snapshotID: snapshotID, title: video.title)
+            try await downloadStream(
+                from: url, to: destination, videoID: video.id,
+                snapshotID: snapshotID, title: video.title, client: client
+            )
             return
         }
 
-        // **Strategy 2: adaptive — separate video-only and audio-only streams.** Required for
-        // anything ≥ 720p (YouTube doesn't ship progressive at those resolutions). Download
-        // both, then mux with ffmpeg `-c copy` so we get a single playable mp4.
         let videoFormat = DownloadFormatPolicy.pickBestVideoOnly(formats: formats, maxHeight: maxHeight)
         let audioFormat = DownloadFormatPolicy.pickBestAudioOnly(formats: formats)
         guard let videoFormat, let videoURL = videoFormat.url,
               let audioFormat, let audioURL = audioFormat.url else {
             log.error("youtube-kit-download[\(video.id, privacy: .public)] no suitable formats found")
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.noFormats
         }
 
         let downloadsDir = destination.deletingLastPathComponent()
@@ -512,9 +512,21 @@ final class DownloadManager {
 
         log.info("youtube-kit-download[\(video.id, privacy: .public)] adaptive video height=\(videoFormat.height ?? 0, privacy: .public)")
         phaseByVideoID[video.id] = "video"
-        try await downloadStream(from: videoURL, to: videoFile, videoID: video.id, snapshotID: snapshotID, title: video.title)
+        try await downloadFallbackMedia(
+            from: videoURL, to: videoFile, videoID: video.id,
+            snapshotID: snapshotID, title: video.title, client: client,
+            alternateURLs: DownloadFormatPolicy.alternateVideoOnlyURLs(
+                formats: formats, maxHeight: maxHeight, excluding: videoURL
+            )
+        )
         phaseByVideoID[video.id] = "audio"
-        try await downloadStream(from: audioURL, to: audioFile, videoID: video.id, snapshotID: snapshotID, title: video.title)
+        try await downloadFallbackMedia(
+            from: audioURL, to: audioFile, videoID: video.id,
+            snapshotID: snapshotID, title: video.title, client: client,
+            alternateURLs: DownloadFormatPolicy.alternateAudioOnlyURLs(
+                formats: formats, excluding: audioURL
+            )
+        )
         phaseByVideoID[video.id] = "muxing"
 
         try await mediaFinalizer.mux(video: videoFile, audio: audioFile, destination: destination)
@@ -527,7 +539,7 @@ final class DownloadManager {
         videoID: String,
         snapshotID: String,
         title: String,
-        sendTVClientUserAgent: Bool = true,
+        client: DownloadClientIdentity? = nil,
         sourceLabel: String = "fallback"
     ) async throws {
         let reportProgress: @Sendable (Int64, Int64) -> Void = { [weak self] written, total in
@@ -551,10 +563,44 @@ final class DownloadManager {
         try await streamTransfer.download(
             from: url,
             to: destination,
-            sendTVClientUserAgent: sendTVClientUserAgent,
+            client: client,
             sourceLabel: sourceLabel,
             onProgress: reportProgress
         )
+    }
+
+    /// Tries the primary URL, then a couple of alternate itags on CDN 403.
+    private func downloadFallbackMedia(
+        from url: URL,
+        to destination: URL,
+        videoID: String,
+        snapshotID: String,
+        title: String,
+        client: DownloadClientIdentity,
+        alternateURLs: [URL]
+    ) async throws {
+        var candidates = [url] + alternateURLs
+        // Cap retries so a blocked video does not walk every itag.
+        if candidates.count > 3 { candidates = Array(candidates.prefix(3)) }
+        var lastError: Error = DownloadFailure.unavailable
+        for (index, candidate) in candidates.enumerated() {
+            do {
+                try await downloadStream(
+                    from: candidate, to: destination, videoID: videoID,
+                    snapshotID: snapshotID, title: title, client: client
+                )
+                return
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let failure as DownloadFailure where failure == .forbidden {
+                lastError = failure
+                log.notice("youtube-kit-download[\(videoID, privacy: .public)] CDN forbidden on attempt \(index + 1, privacy: .public)/\(candidates.count, privacy: .public); trying next format")
+                continue
+            } catch {
+                throw error
+            }
+        }
+        throw lastError
     }
 
     /// Materializes the native source used by playback. HLS, direct MP4, and separate MP4/M4A
@@ -570,9 +616,9 @@ final class DownloadManager {
     ) async throws {
         if source.mediaKind == .paired {
             guard let audioURL = source.audioURL else {
-                throw YouTubeServiceError.streamExtractionFailed
+                throw DownloadFailure.noFormats
             }
-            guard !audioOnly else { throw YouTubeServiceError.streamExtractionFailed }
+            guard !audioOnly else { throw DownloadFailure.noFormats }
             let temporaryVideo = destination.deletingPathExtension().appendingPathExtension("native.video.mp4")
             let temporaryAudio = destination.deletingPathExtension().appendingPathExtension("native.audio.m4a")
             defer {
@@ -583,14 +629,14 @@ final class DownloadManager {
             try await downloadStream(
                 from: source.url, to: temporaryVideo, videoID: video.id,
                 snapshotID: snapshotID, title: video.title,
-                sendTVClientUserAgent: false, sourceLabel: "native-video"
+                sourceLabel: "native-video"
             )
             try Task.checkCancellation()
             phaseByVideoID[video.id] = "audio"
             try await downloadStream(
                 from: audioURL, to: temporaryAudio, videoID: video.id,
                 snapshotID: snapshotID, title: video.title,
-                sendTVClientUserAgent: false, sourceLabel: "native-audio"
+                sourceLabel: "native-audio"
             )
             try Task.checkCancellation()
             phaseByVideoID[video.id] = "muxing"
@@ -601,7 +647,7 @@ final class DownloadManager {
                 "-movflags", "+faststart", destination.path
             ])
             try Task.checkCancellation()
-            guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
+            guard exit == 0 else { throw DownloadFailure.remuxFailed }
             return
         }
 
@@ -616,7 +662,6 @@ final class DownloadManager {
                 videoID: video.id,
                 snapshotID: snapshotID,
                 title: video.title,
-                sendTVClientUserAgent: false,
                 sourceLabel: "native-audio"
             )
             try Task.checkCancellation()
@@ -631,7 +676,7 @@ final class DownloadManager {
                 "-movflags", "+faststart", destination.path
             ])
             try Task.checkCancellation()
-            guard exit == 0 else { throw YouTubeServiceError.streamExtractionFailed }
+            guard exit == 0 else { throw DownloadFailure.remuxFailed }
             return
         }
 
@@ -640,7 +685,7 @@ final class DownloadManager {
             try await downloadStream(
                 from: source.url, to: destination, videoID: video.id,
                 snapshotID: snapshotID, title: video.title,
-                sendTVClientUserAgent: false, sourceLabel: "native-video"
+                sourceLabel: "native-video"
             )
             return
         }

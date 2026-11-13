@@ -19,7 +19,7 @@ final class DownloadMediaFinalizer {
               let size = attributes[.size] as? NSNumber,
               size.int64Value >= Self.minimumFileSize else {
             log.error("download[\(videoID, privacy: .public)] validation: output missing or smaller than \(Self.minimumFileSize, privacy: .public) bytes")
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.validationFailed
         }
 
         let asset = AVURLAsset(url: url)
@@ -37,7 +37,7 @@ final class DownloadMediaFinalizer {
                 : !videoTracks.isEmpty && !audioTracks.isEmpty
             guard playable, seconds.isFinite, seconds > 0, hasExpectedTracks else {
                 log.error("download[\(videoID, privacy: .public)] validation: playable=\(playable, privacy: .public) duration=\(seconds, privacy: .public) videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
-                throw YouTubeServiceError.streamExtractionFailed
+                throw DownloadFailure.validationFailed
             }
             if let videoTrack = videoTracks.first,
                let size = try? await videoTrack.load(.naturalSize),
@@ -46,9 +46,11 @@ final class DownloadMediaFinalizer {
                 log.info("download[\(videoID, privacy: .public)] output video dimensions=\(Int(size.width), privacy: .public)x\(Int(size.height), privacy: .public)")
             }
             log.info("download[\(videoID, privacy: .public)] validation passed: size=\(size.int64Value, privacy: .public) duration=\(seconds, privacy: .public)s videoTracks=\(videoTracks.count, privacy: .public) audioTracks=\(audioTracks.count, privacy: .public)")
+        } catch let failure as DownloadFailure {
+            throw failure
         } catch {
             log.error("download[\(videoID, privacy: .public)] validation could not read asset: \(String(describing: error), privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.validationFailed
         }
     }
 
@@ -72,11 +74,11 @@ final class DownloadMediaFinalizer {
 
         guard exitCode == 0 else {
             log.error("ffmpeg failed exit=\(exitCode, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.remuxFailed
         }
         guard FileManager.default.fileExists(atPath: destination.path) else {
             log.error("ffmpeg returned 0 but output missing at \(destination.path, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.remuxFailed
         }
 
         let asset = AVURLAsset(url: destination)

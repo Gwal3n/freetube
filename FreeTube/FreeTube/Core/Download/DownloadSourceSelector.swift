@@ -1,6 +1,13 @@
 import Foundation
 import OSLog
 
+/// Formats plus the client that produced their signed URLs (CDN requests need a matching UA).
+@available(iOS 17.0, *)
+struct FallbackDownloadSource: Sendable {
+    let formats: [VideoFormat]
+    let client: DownloadClientIdentity
+}
+
 /// Selects usable download sources without owning transfer state or progress reporting.
 @available(iOS 17.0, *)
 @MainActor
@@ -9,14 +16,14 @@ final class DownloadSourceSelector {
 
     /// Prefer TVHTML5's direct URLs, then use YouTubeKit's player-JS format extraction when
     /// cipher-protected URLs leave the first response without usable formats.
-    func fallbackFormats(videoID: String) async -> [VideoFormat] {
+    func fallbackSource(videoID: String) async -> FallbackDownloadSource? {
         let service = VideoService()
         do {
             let info = try await service.fetchInfoViaTVHTML5(id: videoID)
             let usable = info.formats.filter { $0.url != nil }
             if !usable.isEmpty {
                 log.info("[fallback] TVHTML5 returned \(info.formats.count, privacy: .public) formats, \(usable.count, privacy: .public) with URLs")
-                return usable
+                return FallbackDownloadSource(formats: usable, client: .tvHTML5)
             }
             log.notice("[fallback] TVHTML5 returned \(info.formats.count, privacy: .public) formats but 0 with direct URLs (cipher-protected); trying player.js scrape")
         } catch {
@@ -25,11 +32,12 @@ final class DownloadSourceSelector {
         do {
             let result = try await service.fetchInfoWithFormats(id: videoID)
             let usable = result.formats.filter { $0.url != nil }
-            log.info("[fallback] fetchInfoWithFormats returned \(result.formats.count, privacy: .public) formats, \(usable.count, privacy: .public) with URLs")
-            return usable
+            log.info("[fallback] fetchInfoWithFormats returned \(result.formats.count, privacy: .public) formats, \(usable.count, privacy: .public) with URLs client=web")
+            guard !usable.isEmpty else { return nil }
+            return FallbackDownloadSource(formats: usable, client: .web)
         } catch {
             log.error("[fallback] fetchInfoWithFormats failed: \(String(describing: error), privacy: .public)")
-            return []
+            return nil
         }
     }
 

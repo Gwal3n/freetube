@@ -10,18 +10,23 @@ final class DownloadStreamTransfer {
 
     /// Uses a file-backed URLSession task, with bounded parallel ranges for native audio when
     /// supported. The previous AsyncBytes loop suspended per byte and made audio very slow.
+    ///
+    /// - Parameter client: When set, sends that client's User-Agent and a YouTube Referer so
+    ///   googlevideo accepts URLs minted by the matching InnerTube client. Omit for native HLS
+    ///   segment fetches that already work without an override.
     func download(
         from url: URL,
         to destination: URL,
-        sendTVClientUserAgent: Bool,
+        client: DownloadClientIdentity?,
         sourceLabel: String,
         onProgress: @escaping @Sendable (Int64, Int64) -> Void
     ) async throws {
         try? FileManager.default.removeItem(at: destination)
         var request = URLRequest(url: url)
-        if sendTVClientUserAgent {
-            // Use the same agent that minted the TVHTML5 URL. Some CDN requests reject a mismatch.
-            request.setValue("Mozilla/5.0 (PlayStation; PlayStation 4/12.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        if let client {
+            request.setValue(client.userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue("https://www.youtube.com/", forHTTPHeaderField: "Referer")
+            request.setValue("https://www.youtube.com", forHTTPHeaderField: "Origin")
         }
 
         // Googlevideo may omit Content-Length while retaining clen. Use it for progress only;
@@ -58,7 +63,10 @@ final class DownloadStreamTransfer {
         }
         if let http, !(200..<300).contains(http.statusCode) {
             log.error("[\(sourceLabel, privacy: .public)] HTTP \(http.statusCode, privacy: .public) from \(url.host ?? "?", privacy: .public)\(url.path, privacy: .public)")
-            throw YouTubeServiceError.streamExtractionFailed
+            if http.statusCode == 401 || http.statusCode == 403 {
+                throw DownloadFailure.forbidden
+            }
+            throw DownloadFailure.unavailable
         }
         let expected = usedRanges ? (declaredLength ?? -1) : (http?.expectedContentLength ?? -1)
         let written = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
@@ -67,12 +75,12 @@ final class DownloadStreamTransfer {
         guard written >= DownloadMediaFinalizer.minimumFileSize else {
             log.error("[\(sourceLabel, privacy: .public)] refusing undersized stream: wrote=\(written, privacy: .public) bytes")
             try? FileManager.default.removeItem(at: destination)
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.incompleteTransfer
         }
         if expected > 0, written != expected {
             log.error("[\(sourceLabel, privacy: .public)] incomplete stream: wrote=\(written, privacy: .public) expected=\(expected, privacy: .public)")
             try? FileManager.default.removeItem(at: destination)
-            throw YouTubeServiceError.streamExtractionFailed
+            throw DownloadFailure.incompleteTransfer
         }
     }
 }

@@ -237,6 +237,12 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
         }
     }
 
+    static func isMuxFailure(_ error: Error) -> Bool {
+        guard let nativeError = error as? NativeHLSError else { return false }
+        if case .muxFailed = nativeError { return true }
+        return false
+    }
+
     // MARK: - Playlist parsing
 
     private static func parseMaster(_ text: String, baseURL: URL) throws -> MasterPlaylist {
