@@ -184,6 +184,7 @@ struct RootView: View {
             OrientationPolicy.update(isLocked: portraitOrientationLock, playerExpanded: expanded)
         }
         .onChange(of: rootSheet) { previous, current in
+            if current == nil { OrientationPolicy.refresh() }
             log.info("Root sheet binding: \(previous?.rawValue ?? "none") → \(current?.rawValue ?? "none")")
         }
         .onReceive(NotificationCenter.default.publisher(for: .freetubeOpenChannel)) { note in

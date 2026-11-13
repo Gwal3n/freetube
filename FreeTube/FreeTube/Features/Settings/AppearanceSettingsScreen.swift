@@ -60,14 +60,10 @@ struct AppearanceSettingsScreen: View {
                 Text("The player interface follows your appearance; the video canvas stays black.")
             }
 
-            Section {
+            Section("Orientation") {
                 Toggle("Lock to portrait", isOn: $portraitOrientationLock)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Lock to portrait")
-            } header: {
-                Text("Orientation")
-            } footer: {
-                Text("Browsing stays in portrait. The expanded player can still rotate for fullscreen video.")
             }
 
             Section("Navigation") {
