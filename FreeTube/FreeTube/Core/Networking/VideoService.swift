@@ -201,10 +201,7 @@ final class VideoService: VideoServicing {
         if track.url.isFileURL {
             return try await OfflineCaptionStore.shared.cues(at: track.url)
         }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpShouldSetCookies = false
-        configuration.urlCache = nil
-        let session = URLSession(configuration: configuration)
+        let session = AnonymousURLSession.make { $0.urlCache = nil }
         defer { session.invalidateAndCancel() }
 
         for format in ["json3", "ttml"] {

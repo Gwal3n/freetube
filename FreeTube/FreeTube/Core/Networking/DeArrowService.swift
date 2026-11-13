@@ -83,16 +83,10 @@ actor DeArrowService {
     }
 
     init(session: URLSession? = nil) {
-        if let session {
-            self.session = session
-        } else {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.httpShouldSetCookies = false
-            configuration.httpCookieStorage = nil
-            configuration.httpMaximumConnectionsPerHost = 3
-            configuration.timeoutIntervalForRequest = 15
-            configuration.timeoutIntervalForResource = 20
-            self.session = URLSession(configuration: configuration)
+        self.session = session ?? AnonymousURLSession.make {
+            $0.httpMaximumConnectionsPerHost = 3
+            $0.timeoutIntervalForRequest = 15
+            $0.timeoutIntervalForResource = 20
         }
     }
 

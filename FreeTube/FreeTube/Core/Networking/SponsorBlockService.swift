@@ -46,14 +46,7 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
     private let cache = NSCache<NSString, CacheEntry>()
 
     init(session: URLSession? = nil) {
-        if let session {
-            self.session = session
-        } else {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.httpCookieAcceptPolicy = .never
-            configuration.httpShouldSetCookies = false
-            self.session = URLSession(configuration: configuration)
-        }
+        self.session = session ?? AnonymousURLSession.make()
         cache.countLimit = 64
     }
 

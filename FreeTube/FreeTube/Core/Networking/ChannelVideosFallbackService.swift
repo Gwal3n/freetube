@@ -28,14 +28,7 @@ final class ChannelVideosFallbackService: Sendable {
 
     init(client: YouTubeKitClient = .shared, session: URLSession? = nil) {
         self.client = client
-        if let session {
-            self.session = session
-        } else {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.httpCookieAcceptPolicy = .never
-            configuration.httpShouldSetCookies = false
-            self.session = URLSession(configuration: configuration)
-        }
+        self.session = session ?? AnonymousURLSession.make()
     }
 
     /// Per-channel continuation state. Keyed by channelID. Presence in the map also signals
