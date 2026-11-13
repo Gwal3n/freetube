@@ -22,7 +22,7 @@ struct PlayerControlsSettingsScreen: View {
         .listStyle(.insetGrouped)
         .tint(Color.primary)
         .environment(\.editMode, $editMode)
-        .navigationTitle("Customize controls")
+        .navigationTitle("Top controls")
         .navigationBarTitleDisplayMode(.inline)
     }
 

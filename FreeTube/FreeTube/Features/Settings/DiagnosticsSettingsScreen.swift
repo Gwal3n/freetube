@@ -16,9 +16,6 @@ struct DiagnosticsSettingsScreen: View {
                 Toggle("Save logs to file", isOn: Bindable(model).logToFile)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Save logs to file")
-                Toggle("Measure player scrolling", isOn: $playerScrollDiagnosticsEnabled)
-                    .tint(settingsToggleTint)
-                    .settingsSearchRow("Measure player scrolling")
                 if model.logToFile, let url = logWriter.currentLogFileURL {
                     LabeledContent("Current log") {
                         Text(url.lastPathComponent)
@@ -50,8 +47,16 @@ struct DiagnosticsSettingsScreen: View {
                 }
                 .disabled(LogFileWriter.allLogFiles().isEmpty)
                 .settingsSearchRow("Clear all logs")
-            } footer: {
-                Text("Saving logs creates a new file at launch for troubleshooting. Logs may contain video IDs, titles, file paths, and error details. Review a log before sharing it. Scroll measurements summarize update gaps after each swipe; they are not video FPS.")
+            } header: {
+                Text("Logs")
+            }
+
+            Section {
+                Toggle("Log player scroll timing", isOn: $playerScrollDiagnosticsEnabled)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Log player scroll timing")
+            } header: {
+                Text("Player")
             }
         }
         .scrollToSearchedSetting()
@@ -74,8 +79,6 @@ struct DiagnosticsSettingsScreen: View {
                 model.clearLogFiles()
             }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes every saved diagnostic log. If \"Save logs to file\" is on, a fresh log file will be opened for new entries.")
         }
     }
 }

@@ -6,6 +6,7 @@ struct CacheSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
+    @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @State private var showingClearAllConfirmation = false
     @State private var isClearing = false
     @State private var isMeasuringDiskUsage = true
@@ -18,8 +19,10 @@ struct CacheSettingsScreen: View {
                 Toggle("Cache recent video details", isOn: $cacheRecentVideoContent)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Cache recent video details")
-            } footer: {
-                Text("Keeps details and the first comments page for up to 12 recently opened videos in memory. Nothing is saved to disk. Turning this off also stops detail prefetching.")
+                Toggle("Prefetch details and comments", isOn: $prefetchVideoDetails)
+                    .tint(settingsToggleTint)
+                    .disabled(!cacheRecentVideoContent)
+                    .settingsSearchRow("Prefetch details and comments")
             }
 
             Section {
@@ -35,8 +38,6 @@ struct CacheSettingsScreen: View {
                     }
                 }
                 .settingsSearchRow("Storage used")
-            } footer: {
-                Text("Includes cached images and HTTP responses on disk. Recent video details and stream links are held only in memory.")
             }
 
             Section {
@@ -51,8 +52,6 @@ struct CacheSettingsScreen: View {
                 }
                 .disabled(isClearing)
                 .settingsSearchRow("Clear all temporary caches")
-            } footer: {
-                Text("Clears thumbnails, recent video details, and short-lived stream and community results. Downloads, playlists, subscriptions, and history remain intact. Images may reload afterward.")
             }
 
             if isClearing {
@@ -83,8 +82,6 @@ struct CacheSettingsScreen: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Downloads and personal data will not be removed.")
         }
     }
 

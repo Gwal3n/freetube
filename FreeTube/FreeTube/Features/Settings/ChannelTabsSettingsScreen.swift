@@ -20,8 +20,6 @@ struct ChannelTabsSettingsScreen: View {
                     .tint(settingsToggleTint)
                 Toggle("About", isOn: $showAbout)
                     .tint(settingsToggleTint)
-            } footer: {
-                Text("The Videos tab is always first. Tabs unavailable on a channel stay hidden regardless of these settings.")
             }
         }
         .scrollToSearchedSetting()

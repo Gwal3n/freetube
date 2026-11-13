@@ -8,15 +8,15 @@ struct CaptionsSettingsScreen: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Dark caption background", isOn: Bindable(model).captionBackgroundEnabled)
+                Toggle("Dark background", isOn: Bindable(model).captionBackgroundEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Dark caption background")
-                Toggle("Use source formatting", isOn: Bindable(model).formattedCaptions)
+                    .settingsSearchRow("Dark background")
+                Toggle("Keep original formatting", isOn: Bindable(model).formattedCaptions)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Use source formatting")
+                    .settingsSearchRow("Keep original formatting")
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Caption text size")
+                        Text("Text size")
                         Spacer()
                         Text(verbatim: "\(Int((model.captionTextScale * 100).rounded()))%")
                             .monospacedDigit()
@@ -24,9 +24,9 @@ struct CaptionsSettingsScreen: View {
                     }
                     Slider(value: Bindable(model).captionTextScale, in: 0.8...1.5, step: 0.1)
                         .tint(.blue)
-                        .accessibilityLabel("Caption text size")
+                        .accessibilityLabel("Text size")
                 }
-                .settingsSearchRow("Caption text size")
+                .settingsSearchRow("Text size")
             }
         }
         .scrollToSearchedSetting()

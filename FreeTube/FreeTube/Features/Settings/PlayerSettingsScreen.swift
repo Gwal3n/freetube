@@ -4,18 +4,14 @@ import SwiftUI
 struct PlayerSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
     let model: SettingsViewModel
-    @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
     @AppStorage("horizontalSwipeToSeekEnabled") private var horizontalSwipeToSeekEnabled = true
     @AppStorage("centerTapPlayPauseEnabled") private var centerTapPlayPauseEnabled = false
     @AppStorage("showPlayerSaveButton") private var showPlayerSaveButton = true
     @AppStorage("showPlayerShareButton") private var showPlayerShareButton = true
     @AppStorage("showPlayerDownloadButton") private var showPlayerDownloadButton = true
     @AppStorage("customDoubleTapSeekSeconds") private var customDoubleTapSeekSeconds = 20
-    @AppStorage("watchProgressColorMode") private var watchProgressColorMode = WatchIndicatorStyle.ColorMode.red.rawValue
-    @AppStorage("watchProgressCustomHex") private var watchProgressCustomHex = "#FF0000"
     @AppStorage("playerScrubberColorMode") private var playerScrubberColorMode = PlayerScrubberColorMode.standard.rawValue
     @AppStorage("playerScrubberCustomHex") private var playerScrubberCustomHex = "#FF0000"
-    @AppStorage("finishedVideoIndicator") private var finishedVideoIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
     @AppStorage("upNextRowSize") private var upNextRowSize = UpNextRowSize.compact.rawValue
@@ -33,12 +29,12 @@ struct PlayerSettingsScreen: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Tap center to play or pause", isOn: $centerTapPlayPauseEnabled)
+                Toggle("Tap video to play or pause", isOn: $centerTapPlayPauseEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Tap center to play or pause")
-                Toggle("Swipe horizontally to seek", isOn: $horizontalSwipeToSeekEnabled)
+                    .settingsSearchRow("Tap video to play or pause")
+                Toggle("Swipe to seek", isOn: $horizontalSwipeToSeekEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Swipe horizontally to seek")
+                    .settingsSearchRow("Swipe to seek")
                 Picker("Double-tap seek", selection: seekIntervalSelection) {
                     Text("Off").tag(0)
                     ForEach(presetSeekIntervals, id: \.self) { seconds in
@@ -66,7 +62,7 @@ struct PlayerSettingsScreen: View {
                 .settingsSearchRow("Seek preview")
                 Picker("Vertical swipe in fullscreen", selection: Bindable(model).playerVerticalSwipeAction) {
                     Text("Exit fullscreen").tag(PlayerVerticalSwipeAction.fullscreen)
-                    Text("Adjust brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
+                    Text("Brightness and volume").tag(PlayerVerticalSwipeAction.adjustPlayback)
                     Text("Off").tag(PlayerVerticalSwipeAction.off)
                 }
                 .settingsSearchRow("Vertical swipe in fullscreen")
@@ -86,29 +82,45 @@ struct PlayerSettingsScreen: View {
                 }
             } header: {
                 Text("Gestures")
-            } footer: {
-                if model.playerVerticalSwipeAction == .adjustPlayback {
-                    Text("Volume swipes adjust FreeTube playback, not the iPhone's system volume.")
-                }
             }
 
             Section {
-                Toggle("Save", isOn: $showPlayerSaveButton)
+                Picker("Transport buttons", selection: $transportButtonMode) {
+                    Text("Previous / next video").tag("videos")
+                    Text("Seek backward / forward").tag("seek")
+                    Text("Off").tag("off")
+                }
+                .settingsSearchRow("Transport buttons")
+                if transportButtonMode == "seek" {
+                    Stepper(value: $transportSeekSeconds, in: 1...120) {
+                        LabeledContent("Seek amount") {
+                            Text("\(transportSeekSeconds) seconds")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsSearchRow("Seek amount")
+                }
+                NavigationLink {
+                    PlayerControlsSettingsScreen(model: model)
+                } label: {
+                    Label("Top controls layout", systemImage: "slider.horizontal.3")
+                }
+                .settingsSearchRow("Top controls layout")
+                Toggle("Show Save button", isOn: $showPlayerSaveButton)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Save button")
-                Toggle("Share", isOn: $showPlayerShareButton)
+                    .settingsSearchRow("Show Save button")
+                Toggle("Show Share button", isOn: $showPlayerShareButton)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Share button")
-                Toggle("Download", isOn: $showPlayerDownloadButton)
+                    .settingsSearchRow("Show Share button")
+                Toggle("Show Download button", isOn: $showPlayerDownloadButton)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Download button")
+                    .settingsSearchRow("Show Download button")
             } header: {
-                Text("Buttons below video")
-            } footer: {
-                Text("These switches hide shortcuts below the video without removing saved items or downloads.")
+                Text("Controls")
             }
 
-            Section("Playback timeline") {
+            Section {
                 Picker("Scrubber color", selection: $playerScrubberColorMode) {
                     Text("Default red").tag(PlayerScrubberColorMode.standard.rawValue)
                     Text("Custom").tag(PlayerScrubberColorMode.custom.rawValue)
@@ -121,51 +133,19 @@ struct PlayerSettingsScreen: View {
                     ), supportsOpacity: false)
                     .settingsSearchRow("Custom scrubber color")
                 }
+            } header: {
+                Text("Timeline")
             }
 
             Section {
-                Toggle("Remember floating player placement", isOn: Bindable(model).rememberFloatingPlayerPlacement)
+                Toggle("Remember mini player position", isOn: Bindable(model).rememberFloatingPlayerPlacement)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Remember floating player placement")
-                Toggle("Show watch progress bars", isOn: Bindable(model).showHistoryProgressBars)
-                    .tint(settingsToggleTint)
-                    .settingsSearchRow("Show watch progress bars")
-                if model.showHistoryProgressBars {
-                    Picker("Watch progress color", selection: $watchProgressColorMode) {
-                        Text("Red").tag(WatchIndicatorStyle.ColorMode.red.rawValue)
-                        Text("Accent color").tag(WatchIndicatorStyle.ColorMode.accent.rawValue)
-                        Text("Custom").tag(WatchIndicatorStyle.ColorMode.custom.rawValue)
-                    }
-                    .settingsSearchRow("Watch progress color")
-                    if watchProgressColorMode == WatchIndicatorStyle.ColorMode.custom.rawValue {
-                        ColorPicker("Custom progress color", selection: Binding(
-                            get: { WatchIndicatorStyle.color(hex: watchProgressCustomHex) ?? .red },
-                            set: { watchProgressCustomHex = WatchIndicatorStyle.hex(color: $0) }
-                        ), supportsOpacity: false)
-                    }
-                    Picker("Fully watched videos", selection: $finishedVideoIndicator) {
-                        Text("Full progress bar").tag(WatchIndicatorStyle.FinishedMode.fullBar.rawValue)
-                        Text("Checkmark").tag(WatchIndicatorStyle.FinishedMode.checkmark.rawValue)
-                        Text("No indicator").tag(WatchIndicatorStyle.FinishedMode.none.rawValue)
-                    }
-                    .settingsSearchRow("Fully watched videos")
-                }
-                Picker("Transport buttons", selection: $transportButtonMode) {
-                    Text("Previous and next video").tag("videos")
-                    Text("Seek backward and forward").tag("seek")
-                    Text("Off").tag("off")
-                }
-                .settingsSearchRow("Transport buttons")
-                if transportButtonMode == "seek" {
-                    Stepper(value: $transportSeekSeconds, in: 1...120) {
-                        LabeledContent("Seek button interval") {
-                            Text("\(transportSeekSeconds) seconds")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsSearchRow("Seek button interval")
-                }
+                    .settingsSearchRow("Remember mini player position")
+            } header: {
+                Text("Mini player")
+            }
+
+            Section {
                 Toggle("Show description", isOn: Bindable(model).showDescription)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show description")
@@ -173,21 +153,21 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show comments")
                 if model.showComments {
-                    Toggle("Keep comments heading visible", isOn: $pinCommentsHeading)
+                    Toggle("Pin Comments heading", isOn: $pinCommentsHeading)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Keep comments heading visible")
-                    Toggle("Load more comments automatically", isOn: $autoLoadMoreComments)
+                        .settingsSearchRow("Pin Comments heading")
+                    Toggle("Load more as you scroll", isOn: $autoLoadMoreComments)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Load more comments automatically")
+                        .settingsSearchRow("Load more as you scroll")
                     Toggle("Show commenter photos", isOn: Bindable(model).showCommentAuthorPhotos)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Show commenter photos")
-                    Toggle("Open commenter channels", isOn: Bindable(model).openCommentAuthorChannels)
+                    Toggle("Tap commenter to open channel", isOn: Bindable(model).openCommentAuthorChannels)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Open commenter channels")
+                        .settingsSearchRow("Tap commenter to open channel")
                     Picker("Featured comment preview", selection: featuredCommentSelection) {
                         Text("Off").tag("off")
-                        Text("Only near playback time").tag("timed")
+                        Text("Near playback time").tag("timed")
                         Text("Always").tag("always")
                     }
                     .settingsSearchRow("Featured comment preview")
@@ -196,51 +176,41 @@ struct PlayerSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show Up Next")
                 if model.showUpNext {
-                    Toggle("Keep Up Next heading visible", isOn: $pinUpNextHeading)
+                    Toggle("Pin Up Next heading", isOn: $pinUpNextHeading)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Keep Up Next heading visible")
-                    Toggle("Show channel avatars in Up Next", isOn: $showUpNextChannelAvatars)
+                        .settingsSearchRow("Pin Up Next heading")
+                    Toggle("Show channel avatars", isOn: $showUpNextChannelAvatars)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Show channel avatars in Up Next")
-                    Toggle("Open Up Next channels from name or avatar", isOn: $openUpNextChannelsOnTap)
+                        .settingsSearchRow("Show channel avatars")
+                    Toggle("Tap channel to open", isOn: $openUpNextChannelsOnTap)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Open Up Next channels from name or avatar")
-                    Picker("Up Next video size", selection: $upNextRowSize) {
+                        .settingsSearchRow("Tap channel to open")
+                    Picker("Thumbnail size", selection: $upNextRowSize) {
                         ForEach(UpNextRowSize.allCases) { size in
                             Text(size.title).tag(size.rawValue)
                         }
                     }
-                    .settingsSearchRow("Up Next video size")
+                    .settingsSearchRow("Thumbnail size")
                     Stepper(value: Bindable(model).upNextInitialCount, in: 3...15) {
-                        LabeledContent("Initial Up Next videos") {
+                        LabeledContent("Videos shown at first") {
                             Text("\(model.upNextInitialCount)")
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .settingsSearchRow("Initial Up Next videos")
+                    .settingsSearchRow("Videos shown at first")
                 }
-                Toggle("Keep queue heading visible", isOn: $pinQueueHeading)
+                Toggle("Pin Queue heading", isOn: $pinQueueHeading)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Keep queue heading visible")
+                    .settingsSearchRow("Pin Queue heading")
                 NavigationLink {
                     PlayerSectionsSettingsScreen()
                 } label: {
-                    Label("Rearrange sections", systemImage: "line.3.horizontal")
+                    Label("Reorder sections", systemImage: "line.3.horizontal")
                 }
-                .settingsSearchRow("Rearrange sections")
-                Toggle("Prefetch details and comments", isOn: Bindable(model).prefetchVideoDetails)
-                    .tint(settingsToggleTint)
-                    .disabled(!cacheRecentVideoContent)
-                    .settingsSearchRow("Prefetch details and comments")
-                NavigationLink {
-                    PlayerControlsSettingsScreen(model: model)
-                } label: {
-                    Label("Customize controls", systemImage: "slider.horizontal.3")
-                }
-                .settingsSearchRow("Customize controls")
+                .settingsSearchRow("Reorder sections")
             } header: {
-                Text("Content & controls")
+                Text("Details panel")
             }
         }
         .scrollToSearchedSetting()

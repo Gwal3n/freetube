@@ -24,8 +24,6 @@ struct CustomPlaybackSpeedsScreen: View {
                     }
                 }
                 .settingsSearchRow("Default playback speed")
-            } footer: {
-                Text("Used when a new video opens. Player menu changes affect only the current video.")
             }
             Section {
                 ForEach(savedRates, id: \.self) { rate in
@@ -36,8 +34,6 @@ struct CustomPlaybackSpeedsScreen: View {
             } header: {
                 Text("Available speeds")
                     .settingsSearchRow("Available speeds")
-            } footer: {
-                Text("Swipe left to remove a speed. 1× cannot be removed.")
             }
         }
         .scrollToSearchedSetting()

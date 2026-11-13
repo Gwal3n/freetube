@@ -38,21 +38,22 @@ struct PrivacySettingsScreen: View {
                 }
                 .settingsSearchRow("Blocked content")
             }
+
             Section {
                 Toggle("Save recent searches", isOn: $saveSearchHistory)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Save recent searches")
-                limitRow("Recent searches to keep", value: recentSearchLimit, limit: .searches)
+                limitRow("Searches to keep", value: recentSearchLimit, limit: .searches)
                     .disabled(!saveSearchHistory)
-                    .settingsSearchRow("Recent searches to keep")
+                    .settingsSearchRow("Searches to keep")
                 Toggle("Save recent channels", isOn: $saveRecentChannels)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Save recent channels")
-                limitRow("Recent channels to keep", value: recentChannelLimit, limit: .channels)
+                limitRow("Channels to keep", value: recentChannelLimit, limit: .channels)
                     .disabled(!saveRecentChannels)
-                    .settingsSearchRow("Recent channels to keep")
-            } footer: {
-                Text("Turning either off stops saving new entries. Existing entries remain until you clear them in Search. Lowering a limit hides older entries right away and removes them the next time one is saved.")
+                    .settingsSearchRow("Channels to keep")
+            } header: {
+                Text("Recent history")
             }
         }
         .scrollToSearchedSetting()
@@ -60,8 +61,8 @@ struct PrivacySettingsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .alert(
             editedLimit == .channels
-                ? LocalizedStringKey("Recent channels to keep")
-                : LocalizedStringKey("Recent searches to keep"),
+                ? LocalizedStringKey("Channels to keep")
+                : LocalizedStringKey("Searches to keep"),
             isPresented: Binding(
                 get: { editedLimit != nil },
                 set: { if !$0 { editedLimit = nil } }

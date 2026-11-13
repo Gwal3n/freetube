@@ -23,17 +23,17 @@ struct LibraryDataSettingsScreen: View {
                 Toggle("Save watch history", isOn: Bindable(model).saveWatchHistory)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Save watch history")
-                Toggle("Add to history when opened", isOn: Bindable(model).addToHistoryWhenOpened)
+                Toggle("Add when a video opens", isOn: Bindable(model).addToHistoryWhenOpened)
                     .tint(settingsToggleTint)
                     .disabled(!model.saveWatchHistory)
-                    .settingsSearchRow("Add to history when opened")
-                Picker("Keep watch history", selection: Bindable(model).historyRetentionPolicy) {
+                    .settingsSearchRow("Add when a video opens")
+                Picker("Keep history for", selection: Bindable(model).historyRetentionPolicy) {
                     ForEach(HistoryRetentionPolicy.allCases) { policy in
                         Text(policy.title).tag(policy)
                     }
                 }
                 .disabled(!model.saveWatchHistory)
-                .settingsSearchRow("Keep watch history")
+                .settingsSearchRow("Keep history for")
                 Button(role: .destructive) {
                     clearTarget = .progress
                 } label: {
@@ -48,18 +48,16 @@ struct LibraryDataSettingsScreen: View {
                 .settingsSearchRow("Clear Watch History")
             } header: {
                 Text("Watch history")
-            } footer: {
-                Text("Turning this off stops recording history and playback positions. Existing history stays on this device until you clear it.")
             }
 
-            Section("Library") {
-                Toggle("Continue Watching in Library", isOn: Bindable(model).showContinueWatchingMenu)
+            Section {
+                Toggle("Show Continue Watching", isOn: Bindable(model).showContinueWatchingMenu)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Continue Watching in Library")
-                Toggle("Library video shelf", isOn: Bindable(model).showLibraryShelf)
+                    .settingsSearchRow("Show Continue Watching")
+                Toggle("Show video shelf", isOn: Bindable(model).showLibraryShelf)
                     .tint(settingsToggleTint)
                     .disabled(!model.saveWatchHistory)
-                    .settingsSearchRow("Library video shelf")
+                    .settingsSearchRow("Show video shelf")
                 if model.showLibraryShelf && model.saveWatchHistory {
                     Picker("Shelf content", selection: Bindable(model).libraryShelfContent) {
                         ForEach(LibraryShelfContent.allCases) { content in
@@ -68,13 +66,15 @@ struct LibraryDataSettingsScreen: View {
                     }
                     .settingsSearchRow("Shelf content")
                     Stepper(value: Bindable(model).recentLibraryVideoCount, in: 3...12) {
-                        LabeledContent("Shelf videos") {
+                        LabeledContent("Videos on shelf") {
                             Text("\(model.recentLibraryVideoCount)")
                                 .monospacedDigit()
                         }
                     }
-                    .settingsSearchRow("Shelf videos")
+                    .settingsSearchRow("Videos on shelf")
                 }
+            } header: {
+                Text("Library")
             }
         }
         .scrollToSearchedSetting()
@@ -98,12 +98,6 @@ struct LibraryDataSettingsScreen: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            if clearTarget == .progress {
-                Text("Saved playback positions and progress bars will be removed. Your watch history will stay on this device.")
-            } else {
-                Text("This removes watch history stored by FreeTube on this device.")
-            }
         }
     }
 }

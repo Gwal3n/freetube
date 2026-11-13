@@ -20,15 +20,15 @@ enum SettingsSearchIndex {
             case .cache: return String(localized: "Cache")
             case .downloads: return String(localized: "Downloads")
             case .privacy: return String(localized: "Privacy")
-            case .community: return String(localized: "Community enhancements")
+            case .community: return String(localized: "SponsorBlock & DeArrow")
             case .diagnostics: return String(localized: "Diagnostics")
             case .about: return String(localized: "About")
             case .playbackSpeeds:
                 return String(localized: "Playback") + " › " + String(localized: "Playback speeds")
             case .playerControls:
-                return String(localized: "Player") + " › " + String(localized: "Customize controls")
+                return String(localized: "Player") + " › " + String(localized: "Top controls layout")
             case .subscriptionGroups:
-                return String(localized: "Browsing") + " › " + String(localized: "Manage subscription groups")
+                return String(localized: "Browsing") + " › " + String(localized: "Subscription groups")
             case .channelTabs:
                 return String(localized: "Browsing") + " › " + String(localized: "Channel tabs")
             case .tabBar:
@@ -56,11 +56,11 @@ enum SettingsSearchIndex {
             case .appearance where displayTitle == String(localized: "System")
                 || displayTitle == String(localized: "Light")
                 || displayTitle == String(localized: "Dark"):
-                return String(localized: "Appearance")
+                return String(localized: "Theme")
             case .appearance where displayTitle == String(localized: "Accent color"):
                 return UserDefaults.standard.bool(forKey: "useAccentTheme")
                     ? String(localized: "Accent color") : String(localized: "Use accent colors")
-            case .appearance where displayTitle == String(localized: "Accent navigation bar only")
+            case .appearance where displayTitle == String(localized: "Navigation bars only")
                 && !UserDefaults.standard.bool(forKey: "useAccentTheme"):
                 return String(localized: "Use accent colors")
             case .appearance where displayTitle == String(localized: "Custom accent color"):
@@ -74,7 +74,7 @@ enum SettingsSearchIndex {
             case .libraryData where displayTitle == String(localized: "Library & Data"):
                 return String(localized: "Save watch history")
             case .downloads where displayTitle == String(localized: "Downloads"):
-                return String(localized: "Default download quality")
+                return String(localized: "Default quality")
             case .privacy where displayTitle == String(localized: "Privacy"):
                 return String(localized: "Incognito")
             case .diagnostics where displayTitle == String(localized: "Diagnostics"):
@@ -85,13 +85,14 @@ enum SettingsSearchIndex {
                 return String(localized: "Export All Settings and Data")
             case .playbackSpeeds where displayTitle == String(localized: "Playback speeds"):
                 return String(localized: "Default playback speed")
-            case .playerControls where displayTitle == String(localized: "Customize controls"):
+            case .playerControls where displayTitle == String(localized: "Top controls layout")
+                || displayTitle == String(localized: "Customize controls"):
                 return String(localized: "On player")
             case .playback where displayTitle == String(localized: "Playback"):
-                return String(localized: "Default playback quality")
+                return String(localized: "Default quality")
             case .player where displayTitle == String(localized: "Player"):
                 return String(localized: "Double-tap seek")
-            case .player where displayTitle == String(localized: "Seek button interval")
+            case .player where displayTitle == String(localized: "Seek amount")
                 && UserDefaults.standard.string(forKey: "transportButtonMode") != "seek":
                 return String(localized: "Transport buttons")
             case .player where displayTitle == String(localized: "Custom scrubber color")
@@ -99,19 +100,19 @@ enum SettingsSearchIndex {
                 return String(localized: "Scrubber color")
             case .playback where [
                 String(localized: "Speed indicator"),
-                String(localized: "Hide speed indicator"),
+                String(localized: "Auto-hide indicator"),
                 String(localized: "Hide after")
             ].contains(displayTitle) && !UserPreferences().holdForSpeedEnabled:
-                return String(localized: "Hold for speed")
-            case .playback where (displayTitle == String(localized: "Hide speed indicator")
+                return String(localized: "Hold to speed up")
+            case .playback where (displayTitle == String(localized: "Auto-hide indicator")
                 || displayTitle == String(localized: "Hide after"))
                 && UserPreferences().holdSpeedIndicatorStyleRaw == HoldSpeedIndicatorStyle.none.rawValue:
                 return String(localized: "Speed indicator")
             case .playback where displayTitle == String(localized: "Hide after")
                 && !UserPreferences().holdSpeedIndicatorAutoHide:
-                return String(localized: "Hide speed indicator")
+                return String(localized: "Auto-hide indicator")
             case .captions where displayTitle == String(localized: "Captions"):
-                return String(localized: "Dark caption background")
+                return String(localized: "Dark background")
             case .player where (displayTitle == String(localized: "Left side")
                 || displayTitle == String(localized: "Right side"))
                 && UserPreferences().playerVerticalSwipeAction != .adjustPlayback:
@@ -120,46 +121,53 @@ enum SettingsSearchIndex {
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
             case .player where (displayTitle == String(localized: "Show commenter photos")
-                || displayTitle == String(localized: "Open commenter channels"))
+                || displayTitle == String(localized: "Tap commenter to open channel")
+                || displayTitle == String(localized: "Load more as you scroll")
+                || displayTitle == String(localized: "Pin Comments heading"))
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
-            case .player where (displayTitle == String(localized: "Load more comments automatically")
-                || displayTitle == String(localized: "Keep comments heading visible"))
-                && !UserPreferences().showComments:
-                return String(localized: "Show comments")
-            case .player where displayTitle == String(localized: "Initial Up Next videos")
+            case .player where displayTitle == String(localized: "Videos shown at first")
                 && !UserPreferences().showUpNext:
                 return String(localized: "Show Up Next")
-            case .player where displayTitle == String(localized: "Up Next video size")
+            case .player where displayTitle == String(localized: "Thumbnail size")
                 && !UserPreferences().showUpNext:
                 return String(localized: "Show Up Next")
-            case .player where (displayTitle == String(localized: "Show channel avatars in Up Next")
-                || displayTitle == String(localized: "Open Up Next channels from name or avatar"))
+            case .player where (displayTitle == String(localized: "Show channel avatars")
+                || displayTitle == String(localized: "Tap channel to open")
+                || displayTitle == String(localized: "Pin Up Next heading"))
                 && !UserPreferences().showUpNext:
                 return String(localized: "Show Up Next")
             case .browsing where displayTitle == String(localized: "Refresh interval")
                 && !UserPreferences().automaticFeedRefreshEnabled:
-                return String(localized: "Refresh feed automatically")
-            case .browsing where displayTitle == String(localized: "View count batch interval")
+                return String(localized: "Refresh automatically")
+            case .browsing where displayTitle == String(localized: "View count interval")
                 && !UserPreferences().automaticFeedViewCountsEnabled:
-                return String(localized: "Update feed view counts")
-            case .browsing where (displayTitle == String(localized: "Same channel gap")
-                || displayTitle == String(localized: "Same group gap")
-                || displayTitle == String(localized: "Maximum date shift"))
+                return String(localized: "Refresh view counts")
+            case .browsing where (displayTitle == String(localized: "Gap for same channel")
+                || displayTitle == String(localized: "Gap for same group")
+                || displayTitle == String(localized: "Max time window"))
                 && !UserPreferences().spaceSubscriptionFeedVideos:
-                return String(localized: "Space out related uploads")
+                return String(localized: "Space out related videos")
+            case .browsing where (displayTitle == String(localized: "Progress color")
+                || displayTitle == String(localized: "Custom progress color")
+                || displayTitle == String(localized: "Finished videos"))
+                && !UserPreferences().showHistoryProgressBars:
+                return String(localized: "Show watch progress")
             case .libraryData where (displayTitle == String(localized: "Shelf content")
-                || displayTitle == String(localized: "Shelf videos"))
+                || displayTitle == String(localized: "Videos on shelf"))
                 && (!UserPreferences().showLibraryShelf || !UserPreferences().saveWatchHistory):
-                return String(localized: "Library video shelf")
-            case .community where displayTitle == String(localized: "Random thumbnail when no submission exists")
+                return String(localized: "Show video shelf")
+            case .community where displayTitle == String(localized: "Random frame if none submitted")
                 && !UserPreferences().deArrowThumbnails:
-                return String(localized: "Replace video thumbnails")
+                return String(localized: "Replace thumbnails")
             case .community where displayTitle == String(localized: "Segment colors")
                 && !UserPreferences().sponsorBlockEnabled:
-                return String(localized: "Enable SponsorBlock")
+                return String(localized: "SponsorBlock")
             case .community where displayTitle == String(localized: "SponsorBlock & DeArrow"):
-                return String(localized: "Enable SponsorBlock")
+                return String(localized: "SponsorBlock")
+            case .cache where displayTitle == String(localized: "Prefetch details and comments")
+                && !UserDefaults.standard.bool(forKey: "cacheRecentVideoContent"):
+                return String(localized: "Cache recent video details")
             case .blockedContent where displayTitle == String(localized: "Blocked content"):
                 return String(localized: "Hide Shorts")
             default:
@@ -177,67 +185,82 @@ enum SettingsSearchIndex {
     // at runtime. SwiftUI views do not expose a reliable searchable control hierarchy.
     private static let groups: [Group] = [
         Group(destination: .playback, titles: [
-            "Playback", "Default playback quality", "Cellular streaming limit", "Sleep timer durations", "Hold for speed", "Hold speed", "Speed indicator", "Hide speed indicator", "Hide after",
-            "Autoplay next video", "Allow audio from other apps", "Resume after interruptions"
+            "Playback", "Default quality", "On cellular", "Sleep timer durations", "Hold to speed up", "Hold speed",
+            "Speed indicator", "Auto-hide indicator", "Hide after",
+            "Autoplay next video", "Mix with other audio", "Resume after interruptions"
         ]),
         Group(destination: .player, titles: [
-            "Player", "Tap center to play or pause", "Swipe horizontally to seek", "Double-tap seek", "Seek preview", "Vertical swipe in fullscreen", "Left side", "Right side",
-            "Save button", "Share button", "Download button", "Scrubber color", "Custom scrubber color",
-            "Remember floating player placement", "Show watch progress bars", "Watch progress color", "Fully watched videos", "Transport buttons", "Seek button interval", "Show description",
-            "Show comments", "Keep comments heading visible", "Load more comments automatically", "Show commenter photos", "Open commenter channels", "Featured comment preview", "Show Up Next",
-            "Initial Up Next videos", "Up Next video size", "Show channel avatars in Up Next", "Open Up Next channels from name or avatar", "Rearrange sections", "Prefetch details and comments"
+            "Player", "Tap video to play or pause", "Swipe to seek", "Double-tap seek", "Seek preview",
+            "Vertical swipe in fullscreen", "Left side", "Right side",
+            "Show Save button", "Show Share button", "Show Download button", "Scrubber color", "Custom scrubber color",
+            "Remember mini player position", "Transport buttons", "Seek amount", "Show description",
+            "Show comments", "Pin Comments heading", "Load more as you scroll", "Show commenter photos",
+            "Tap commenter to open channel", "Featured comment preview", "Show Up Next",
+            "Pin Up Next heading", "Show channel avatars", "Tap channel to open", "Thumbnail size",
+            "Videos shown at first", "Pin Queue heading", "Reorder sections", "Top controls layout"
         ]),
         Group(destination: .captions, titles: [
-            "Captions", "Dark caption background", "Use source formatting", "Caption text size"
+            "Captions", "Dark background", "Keep original formatting", "Text size"
         ]),
         Group(destination: .playbackSpeeds, titles: [
             "Playback speeds", "Default playback speed", "Available speeds"
         ]),
         Group(destination: .playerControls, titles: [
-            "Customize controls", "On player", "More menu", "Hidden",
+            "Top controls layout", "On player", "More menu", "Hidden",
             "More menu separators", "Fine seeking", "Quality", "Playback details", "Captions"
         ]),
         Group(destination: .browsing, titles: [
-            "Browsing", "Show search suggestions", "Load more search results automatically",
-            "Large video thumbnails", "Show channel avatars", "Open feed channels from name or avatar", "Show filter button", "Load more feed videos automatically", "Mix suggested videos into Feed", "Suggestion density", "Mark new uploads", "Space out related uploads",
-            "Same channel gap", "Same group gap", "Maximum date shift", "Refresh feed automatically",
-            "Refresh interval", "Update feed view counts", "View count batch interval"
+            "Browsing", "Show search suggestions", "Load more as you scroll",
+            "Large thumbnails", "Show channel avatars", "Show watch progress", "Progress color",
+            "Custom progress color", "Finished videos", "Tap channel to open", "Show filter button",
+            "Load more videos as you scroll", "Include suggested videos", "Suggestion density",
+            "Mark new uploads", "Space out related videos",
+            "Gap for same channel", "Gap for same group", "Max time window", "Refresh automatically",
+            "Refresh interval", "Refresh view counts", "View count interval"
         ]),
-        Group(destination: .subscriptionGroups, titles: ["Manage subscription groups"]),
+        Group(destination: .subscriptionGroups, titles: ["Subscription groups"]),
         Group(destination: .channelTabs, titles: ["Channel tabs"]),
-        Group(destination: .appearance, titles: ["Appearance", "System", "Light", "Dark", "Use accent colors", "Accent navigation bar only", "Accent color", "Custom accent color", "Text font", "Lock to portrait"]),
-        Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Tab order"]),
+        Group(destination: .appearance, titles: [
+            "Appearance", "Theme", "System", "Light", "Dark", "Use accent colors", "Navigation bars only",
+            "Accent color", "Custom accent color", "Text font", "Lock portrait while browsing"
+        ]),
+        Group(destination: .tabBar, titles: ["Tab Bar", "Show tab names", "Visible tabs & order"]),
         Group(destination: .libraryData, titles: [
-            "Library & Data", "Save watch history", "Add to history when opened",
-            "Keep watch history", "Clear Watch Progress", "Clear Watch History", "Continue Watching in Library",
-            "Library video shelf", "Shelf content", "Shelf videos"
+            "Library & Data", "Save watch history", "Add when a video opens",
+            "Keep history for", "Clear Watch Progress", "Clear Watch History", "Show Continue Watching",
+            "Show video shelf", "Shelf content", "Videos on shelf"
         ]),
         Group(destination: .cache, titles: [
-            "Cache", "Cache recent video details", "Storage used", "Clear recent video cache",
-            "Clear all temporary caches"
+            "Cache", "Cache recent video details", "Prefetch details and comments", "Storage used",
+            "Clear recent video cache", "Clear all temporary caches"
         ]),
         Group(destination: .importExport, titles: [
             "Import & Export", "Export All Settings and Data", "Import Full Backup",
             "Export Subscriptions CSV", "Import Subscriptions CSV", "Export Local Playlists",
             "Import Playlist Archive", "Import Playlist CSV Files"
         ]),
-        Group(destination: .downloads, titles: ["Downloads", "Default download quality", "Allow cellular data", "Parallel fragments"]),
-        Group(destination: .privacy, titles: ["Privacy", "Save recent searches", "Recent searches to keep", "Save recent channels", "Recent channels to keep"]),
+        Group(destination: .downloads, titles: [
+            "Downloads", "Default quality", "Allow cellular downloads", "Simultaneous connections"
+        ]),
+        Group(destination: .privacy, titles: [
+            "Privacy", "Save recent searches", "Searches to keep", "Save recent channels", "Channels to keep"
+        ]),
         Group(destination: .incognito, titles: [
             "Incognito", "Don't save searches", "Don't save watch history",
-            "Don't save watch progress", "Hide watch progress", "Hide Feed tab", "Hide Library tab"
+            "Don't save watch progress", "Hide watch progress bars", "Hide Feed tab", "Hide Library tab"
         ]),
         Group(destination: .blockedContent, titles: ["Blocked content", "Hide Shorts", "Blocked keywords", "Blocked channels"]),
         Group(destination: .community, titles: [
-            "SponsorBlock & DeArrow", "Enable SponsorBlock", "Segment colors", "Minimum segment length",
-            "Skip notice duration", "Replace video titles", "Replace video thumbnails",
-            "Random thumbnail when no submission exists", "Sponsors", "Self-promotion",
+            "SponsorBlock & DeArrow", "SponsorBlock", "Segment colors", "Minimum length to auto-skip",
+            "Undo banner duration", "Replace titles", "Replace thumbnails",
+            "Random frame if none submitted", "Sponsors", "Self-promotion",
             "Exclusive access", "Interaction reminders", "Intros", "Outros", "Previews",
             "Hooks and greetings", "Non-music sections", "Filler", "Highlights",
             "Community chapters"
         ]),
         Group(destination: .diagnostics, titles: [
-            "Diagnostics", "Save logs to file", "Measure player scrolling", "Share latest log…", "Show log folder", "Clear all logs"
+            "Diagnostics", "Save logs to file", "Log player scroll timing", "Share latest log…",
+            "Show log folder", "Clear all logs"
         ]),
         Group(destination: .about, titles: ["About"])
     ]

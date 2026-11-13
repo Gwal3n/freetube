@@ -14,19 +14,19 @@ struct AppearanceSettingsScreen: View {
     var body: some View {
         Form {
             Section {
-                Picker("Appearance", selection: $appearanceModeRaw) {
+                Picker("Theme", selection: $appearanceModeRaw) {
                     Text("System").tag(AppearanceMode.system.rawValue)
                     Text("Light").tag(AppearanceMode.light.rawValue)
                     Text("Dark").tag(AppearanceMode.dark.rawValue)
                 }
-                .settingsSearchRow("Appearance")
+                .settingsSearchRow("Theme")
                 Toggle("Use accent colors", isOn: $useAccentTheme)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Use accent colors")
                 if useAccentTheme {
-                    Toggle("Accent navigation bar only", isOn: $accentNavigationOnly)
+                    Toggle("Navigation bars only", isOn: $accentNavigationOnly)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Accent navigation bar only")
+                        .settingsSearchRow("Navigation bars only")
                     Picker("Accent color", selection: $appAccentPresetRaw) {
                         ForEach(AppAccentPreset.allCases) { preset in
                             HStack(spacing: 12) {
@@ -56,17 +56,19 @@ struct AppearanceSettingsScreen: View {
                     }
                 }
                 .settingsSearchRow("Text font")
-            } footer: {
-                Text("The player interface follows your appearance; the video canvas stays black.")
+            } header: {
+                Text("Look")
             }
 
-            Section("Orientation") {
-                Toggle("Lock to portrait", isOn: $portraitOrientationLock)
+            Section {
+                Toggle("Lock portrait while browsing", isOn: $portraitOrientationLock)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Lock to portrait")
+                    .settingsSearchRow("Lock portrait while browsing")
+            } header: {
+                Text("Orientation")
             }
 
-            Section("Navigation") {
+            Section("Tabs") {
                 NavigationLink {
                     TabBarSettingsScreen()
                 } label: {

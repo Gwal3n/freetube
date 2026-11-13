@@ -18,8 +18,6 @@ struct CustomSleepTimersScreen: View {
                         .deleteDisabled(savedMinutes.count == 1)
                 }
                 .onDelete(perform: deleteDurations)
-            } footer: {
-                Text("Swipe left to remove a duration. At least one remains available. You can also enter a custom duration in the player.")
             }
         }
         .navigationTitle("Sleep timer durations")

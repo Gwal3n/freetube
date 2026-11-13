@@ -102,8 +102,6 @@ struct ImportDataScreen: View {
                 .settingsSearchRow("Import Full Backup")
             } header: {
                 Text("Full Backup")
-            } footer: {
-                Text("Includes settings, subscriptions, playlists with resolved video information, watch and search history, and saved items. Account credentials, downloads, logs, and temporary caches are excluded.")
             }
 
             Section {
@@ -124,8 +122,6 @@ struct ImportDataScreen: View {
                 .settingsSearchRow("Import Subscriptions CSV")
             } header: {
                 Text("Subscriptions")
-            } footer: {
-                Text("Exports the same CSV format accepted by the subscriptions importer.")
             }
 
             Section {
@@ -152,8 +148,6 @@ struct ImportDataScreen: View {
                 .settingsSearchRow("Import Playlist CSV Files")
             } header: {
                 Text("Playlists")
-            } footer: {
-                Text("Playlist archives keep titles, order, and saved video information without changing other app data. CSV imports create personal playlists and fetch missing video information later.")
             }
 
             if let activeOperation {
@@ -223,8 +217,6 @@ struct ImportDataScreen: View {
                 Task { await restorePendingBackup() }
             }
             Button("Cancel", role: .cancel) { pendingBackup = nil }
-        } message: {
-            Text("Current settings, subscriptions, playlists, history, and saved items will be replaced by the backup.")
         }
     }
 

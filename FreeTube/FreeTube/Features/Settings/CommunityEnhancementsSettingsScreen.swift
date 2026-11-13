@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Native settings for the two optional, anonymous community enhancements.
 @available(iOS 17.0, *)
 struct CommunityEnhancementsSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
@@ -9,13 +8,11 @@ struct CommunityEnhancementsSettingsScreen: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Enable SponsorBlock", isOn: $model.sponsorBlockEnabled)
+                Toggle("SponsorBlock", isOn: $model.sponsorBlockEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Enable SponsorBlock")
+                    .settingsSearchRow("SponsorBlock")
             } header: {
                 Text("SponsorBlock")
-            } footer: {
-                Text("Segment information is fetched in the background and never delays video playback. Skip activity is not reported.")
             }
 
             Section {
@@ -30,8 +27,6 @@ struct CommunityEnhancementsSettingsScreen: View {
             } header: {
                 Text("Categories")
                     .settingsSearchRow("Categories")
-            } footer: {
-                Text("Show only marks skip segments on the timeline. Community chapters appear in the chapter list, and full-video labels mark the whole timeline. Ask offers to jump to a highlight.")
             }
             .disabled(!model.sponsorBlockEnabled)
 
@@ -47,7 +42,7 @@ struct CommunityEnhancementsSettingsScreen: View {
 
             Section("Skipping") {
                 Stepper(value: $model.sponsorBlockMinimumSkipSeconds, in: 0...30, step: 1) {
-                    LabeledContent("Minimum segment length") {
+                    LabeledContent("Minimum length to auto-skip") {
                         if model.sponsorBlockMinimumSkipSeconds == 0 {
                             Text("Any length")
                                 .foregroundStyle(.secondary)
@@ -57,37 +52,35 @@ struct CommunityEnhancementsSettingsScreen: View {
                         }
                     }
                 }
-                .settingsSearchRow("Minimum segment length")
+                .settingsSearchRow("Minimum length to auto-skip")
                 Stepper(value: $model.sponsorBlockNoticeSeconds, in: 1...15, step: 1) {
-                    LabeledContent("Skip notice duration") {
+                    LabeledContent("Undo banner duration") {
                         Text("\(Int(model.sponsorBlockNoticeSeconds)) seconds")
                             .foregroundStyle(.secondary)
                     }
                 }
-                .settingsSearchRow("Skip notice duration")
+                .settingsSearchRow("Undo banner duration")
             }
             .disabled(!model.sponsorBlockEnabled)
 
             Section {
-                Toggle("Replace video titles", isOn: $model.deArrowTitles)
+                Toggle("Replace titles", isOn: $model.deArrowTitles)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Replace video titles")
-                Toggle("Replace video thumbnails", isOn: $model.deArrowThumbnails)
+                    .settingsSearchRow("Replace titles")
+                Toggle("Replace thumbnails", isOn: $model.deArrowThumbnails)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Replace video thumbnails")
+                    .settingsSearchRow("Replace thumbnails")
                 if model.deArrowThumbnails {
-                    Toggle("Random thumbnail when no submission exists", isOn: $model.deArrowRandomThumbnails)
-                    .tint(settingsToggleTint)
-                        .settingsSearchRow("Random thumbnail when no submission exists")
+                    Toggle("Random frame if none submitted", isOn: $model.deArrowRandomThumbnails)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Random frame if none submitted")
                 }
             } header: {
                 Text(verbatim: "DeArrow")
-            } footer: {
-                Text("Use community titles and video frames to reduce clickbait. If no thumbnail has been submitted, a stable random frame can be requested instead. Tap the small switch on a video to see its original title and thumbnail. Originals stay saved on this device. Enabling this sends anonymous requests to DeArrow; thumbnail requests include the video ID. If the service is unavailable, the originals remain visible.")
             }
         }
         .scrollToSearchedSetting()
-        .navigationTitle("Community enhancements")
+        .navigationTitle("SponsorBlock & DeArrow")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

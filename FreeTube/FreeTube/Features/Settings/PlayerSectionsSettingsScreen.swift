@@ -21,8 +21,6 @@ struct PlayerSectionsSettingsScreen: View {
                     reordered.move(fromOffsets: offsets, toOffset: destination)
                     storedOrder = PlayerPanelSection.storedValue(for: reordered)
                 }
-            } footer: {
-                Text("Hidden sections keep their position and reappear here when available.")
             }
         }
         .environment(\.editMode, .constant(.active))

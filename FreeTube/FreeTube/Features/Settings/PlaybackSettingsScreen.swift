@@ -18,22 +18,27 @@ struct PlaybackSettingsScreen: View {
     var body: some View {
         Form {
             Section {
-                Picker("Default playback quality", selection: Bindable(model).preferredQuality) {
+                Picker("Default quality", selection: Bindable(model).preferredQuality) {
                     ForEach(VideoQuality.allCases) { quality in
                         Text(quality.displayName).tag(quality)
                     }
                 }
-                .settingsSearchRow("Default playback quality")
-                Picker("Cellular streaming limit", selection: Bindable(model).cellularPlaybackQuality) {
-                    Text("No extra limit").tag(VideoQuality.auto)
+                .settingsSearchRow("Default quality")
+                Picker("On cellular", selection: Bindable(model).cellularPlaybackQuality) {
+                    Text("Same as Wi‑Fi").tag(VideoQuality.auto)
                     ForEach(VideoQuality.allCases.filter { $0 != .auto && $0 != .audioOnly }) { quality in
                         Text("Up to \(quality.displayName)").tag(quality)
                     }
                 }
-                .settingsSearchRow("Cellular streaming limit")
+                .settingsSearchRow("On cellular")
                 .onChange(of: model.cellularPlaybackQuality) { _, _ in
                     player.refreshPlaybackQualityLimits()
                 }
+            } header: {
+                Text("Quality")
+            }
+
+            Section {
                 NavigationLink {
                     CustomPlaybackSpeedsScreen(defaultPlaybackRate: Bindable(model).defaultPlaybackRate)
                 } label: {
@@ -53,15 +58,9 @@ struct PlaybackSettingsScreen: View {
                         model.defaultPlaybackRate = 1
                     }
                 }
-                NavigationLink {
-                    CustomSleepTimersScreen()
-                } label: {
-                    Label("Sleep timer durations", systemImage: "moon.zzz")
-                }
-                .settingsSearchRow("Sleep timer durations")
-                Toggle("Hold for speed", isOn: Bindable(model).holdForSpeedEnabled)
+                Toggle("Hold to speed up", isOn: Bindable(model).holdForSpeedEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Hold for speed")
+                    .settingsSearchRow("Hold to speed up")
                 Button {
                     holdSpeedText = model.holdSpeedRate.formatted(.number.precision(.fractionLength(0...2)))
                     showingHoldSpeedEditor = true
@@ -81,9 +80,9 @@ struct PlaybackSettingsScreen: View {
                     }
                     .settingsSearchRow("Speed indicator")
                     if holdSpeedIndicatorStyleRaw != HoldSpeedIndicatorStyle.none.rawValue {
-                        Toggle("Hide speed indicator", isOn: $holdSpeedIndicatorAutoHide)
+                        Toggle("Auto-hide indicator", isOn: $holdSpeedIndicatorAutoHide)
                             .tint(settingsToggleTint)
-                            .settingsSearchRow("Hide speed indicator")
+                            .settingsSearchRow("Auto-hide indicator")
                         if holdSpeedIndicatorAutoHide {
                             Button {
                                 hideDelayText = holdSpeedIndicatorHideDelay
@@ -104,21 +103,34 @@ struct PlaybackSettingsScreen: View {
                         }
                     }
                 }
+            } header: {
+                Text("Speed")
+            }
+
+            Section {
+                NavigationLink {
+                    CustomSleepTimersScreen()
+                } label: {
+                    Label("Sleep timer durations", systemImage: "moon.zzz")
+                }
+                .settingsSearchRow("Sleep timer durations")
+            } header: {
+                Text("Sleep timer")
+            }
+
+            Section {
                 Toggle("Autoplay next video", isOn: Bindable(model).autoplayNext)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Autoplay next video")
-                Toggle("Allow audio from other apps", isOn: Bindable(model).allowAudioMixing)
+                Toggle("Mix with other audio", isOn: Bindable(model).allowAudioMixing)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Allow audio from other apps")
+                    .settingsSearchRow("Mix with other audio")
                 Toggle("Resume after interruptions", isOn: Bindable(model).resumeAfterAudioInterruption)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Resume after interruptions")
             } header: {
-                Text("Video & audio")
-            } footer: {
-                Text("Quality is a maximum for adaptive streams, not a guaranteed resolution. The cellular limit applies to HLS on expensive networks; fixed-quality and downloaded files keep their encoded resolution. Allowing other audio may leave another app in control of Lock Screen playback.")
+                Text("Behavior")
             }
-
         }
         .scrollToSearchedSetting()
         .navigationTitle("Playback")

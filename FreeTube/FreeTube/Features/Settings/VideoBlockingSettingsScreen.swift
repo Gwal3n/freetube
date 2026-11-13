@@ -16,9 +16,7 @@ struct VideoBlockingSettingsScreen: View {
                     set: { blocklist.hideShorts = $0 }
                 ))
                     .tint(settingsToggleTint)
-                .settingsSearchRow("Hide Shorts")
-            } footer: {
-                Text("Shorts are hidden where YouTube identifies a video as a Short.")
+                    .settingsSearchRow("Hide Shorts")
             }
 
             Section {
@@ -43,8 +41,6 @@ struct VideoBlockingSettingsScreen: View {
                 }
             } header: {
                 Text("Blocked keywords")
-            } footer: {
-                Text("Matches words or phrases anywhere in a video or playlist title, ignoring case.")
             }
 
             Section {
@@ -76,8 +72,6 @@ struct VideoBlockingSettingsScreen: View {
                 }
             } header: {
                 Text("Blocked channels")
-            } footer: {
-                Text("Enter an exact channel name, channel ID, or YouTube /channel/ link. You can also block a channel from its page. Swipe a rule left to remove it.")
             }
         }
         .scrollToSearchedSetting()

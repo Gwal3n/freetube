@@ -16,8 +16,6 @@ struct AboutSettingsScreen: View {
                         .font(.body.monospaced())
                         .textSelection(.enabled)
                 }
-            } footer: {
-                Text("An account-free YouTube client. Playback and downloads may break when YouTube changes its internal APIs.")
             }
 
             Section("Source") {

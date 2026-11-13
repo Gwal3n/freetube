@@ -14,7 +14,7 @@ struct SettingsScreen: View {
         NavigationStack {
             Form {
                 if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Section {
+                    Section("Watching") {
                         settingsLink("Playback", systemImage: "play.circle") {
                             PlaybackSettingsScreen(model: model)
                         }
@@ -29,13 +29,16 @@ struct SettingsScreen: View {
                         }
                     }
 
-                    Section {
+                    Section("Interface") {
                         settingsLink("Browsing", systemImage: "rectangle.stack") {
                             BrowsingSettingsScreen(model: model)
                         }
                         settingsLink("Appearance", systemImage: "paintbrush") {
                             AppearanceSettingsScreen(model: model)
                         }
+                    }
+
+                    Section("Your data") {
                         settingsLink("Library & Data", systemImage: "books.vertical") {
                             LibraryDataSettingsScreen(model: model)
                         }
@@ -45,18 +48,15 @@ struct SettingsScreen: View {
                         settingsLink("Import & Export", systemImage: "square.and.arrow.up.on.square") {
                             ImportDataScreen()
                         }
-                    }
-
-                    Section {
                         settingsLink("Privacy", systemImage: "hand.raised") {
                             PrivacySettingsScreen()
                         }
-                        settingsLink("SponsorBlock & DeArrow", systemImage: "sparkles") {
-                            CommunityEnhancementsSettingsScreen(model: model)
-                        }
                     }
 
                     Section {
+                        settingsLink("SponsorBlock & DeArrow", systemImage: "sparkles") {
+                            CommunityEnhancementsSettingsScreen(model: model)
+                        }
                         settingsLink("Diagnostics", systemImage: "stethoscope") {
                             DiagnosticsSettingsScreen(model: model)
                         }

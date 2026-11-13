@@ -9,6 +9,9 @@ struct BrowsingSettingsScreen: View {
     @AppStorage("showFeedFilterButton") private var showFeedFilterButton = true
     @AppStorage("feedSuggestionsEnabled") private var feedSuggestionsEnabled = false
     @AppStorage("feedSuggestionDensity") private var feedSuggestionDensity = 10
+    @AppStorage("watchProgressColorMode") private var watchProgressColorMode = WatchIndicatorStyle.ColorMode.red.rawValue
+    @AppStorage("watchProgressCustomHex") private var watchProgressCustomHex = "#FF0000"
+    @AppStorage("finishedVideoIndicator") private var finishedVideoIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
     let model: SettingsViewModel
 
     var body: some View {
@@ -17,39 +20,61 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Show search suggestions", isOn: Bindable(model).showSearchSuggestions)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show search suggestions")
-                Toggle("Load more search results automatically", isOn: $autoLoadMoreSearchItems)
+                Toggle("Load more as you scroll", isOn: $autoLoadMoreSearchItems)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Load more search results automatically")
+                    .settingsSearchRow("Load more as you scroll")
             } header: {
                 Text("Search")
             }
 
             Section {
-                Toggle("Large video thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
+                Toggle("Large thumbnails", isOn: Bindable(model).largeSubscriptionFeedThumbnails)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Large video thumbnails")
+                    .settingsSearchRow("Large thumbnails")
                 Toggle("Show channel avatars", isOn: Bindable(model).showFeedChannelAvatars)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show channel avatars")
+                Toggle("Show watch progress", isOn: Bindable(model).showHistoryProgressBars)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Show watch progress")
+                if model.showHistoryProgressBars {
+                    Picker("Progress color", selection: $watchProgressColorMode) {
+                        Text("Red").tag(WatchIndicatorStyle.ColorMode.red.rawValue)
+                        Text("Accent color").tag(WatchIndicatorStyle.ColorMode.accent.rawValue)
+                        Text("Custom").tag(WatchIndicatorStyle.ColorMode.custom.rawValue)
+                    }
+                    .settingsSearchRow("Progress color")
+                    if watchProgressColorMode == WatchIndicatorStyle.ColorMode.custom.rawValue {
+                        ColorPicker("Custom progress color", selection: Binding(
+                            get: { WatchIndicatorStyle.color(hex: watchProgressCustomHex) ?? .red },
+                            set: { watchProgressCustomHex = WatchIndicatorStyle.hex(color: $0) }
+                        ), supportsOpacity: false)
+                        .settingsSearchRow("Custom progress color")
+                    }
+                    Picker("Finished videos", selection: $finishedVideoIndicator) {
+                        Text("Full progress bar").tag(WatchIndicatorStyle.FinishedMode.fullBar.rawValue)
+                        Text("Checkmark").tag(WatchIndicatorStyle.FinishedMode.checkmark.rawValue)
+                        Text("No indicator").tag(WatchIndicatorStyle.FinishedMode.none.rawValue)
+                    }
+                    .settingsSearchRow("Finished videos")
+                }
             } header: {
-                Text("Video lists")
-            } footer: {
-                Text("Applies to Feed and Search results.")
+                Text("Lists")
             }
 
             Section {
-                Toggle("Open feed channels from name or avatar", isOn: $openFeedChannelsOnTap)
+                Toggle("Tap channel to open", isOn: $openFeedChannelsOnTap)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Open feed channels from name or avatar")
+                    .settingsSearchRow("Tap channel to open")
                 Toggle("Show filter button", isOn: $showFeedFilterButton)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show filter button")
-                Toggle("Load more feed videos automatically", isOn: $autoLoadMoreFeedItems)
+                Toggle("Load more videos as you scroll", isOn: $autoLoadMoreFeedItems)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Load more feed videos automatically")
-                Toggle("Mix suggested videos into Feed", isOn: $feedSuggestionsEnabled)
+                    .settingsSearchRow("Load more videos as you scroll")
+                Toggle("Include suggested videos", isOn: $feedSuggestionsEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Mix suggested videos into Feed")
+                    .settingsSearchRow("Include suggested videos")
                 if feedSuggestionsEnabled {
                     VStack(alignment: .leading, spacing: 8) {
                         LabeledContent("Suggestion density") {
@@ -68,12 +93,12 @@ struct BrowsingSettingsScreen: View {
                 Toggle("Mark new uploads", isOn: Bindable(model).showNewSubscriptionUploads)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Mark new uploads")
-                Toggle("Space out related uploads", isOn: Bindable(model).spaceSubscriptionFeedVideos)
+                Toggle("Space out related videos", isOn: Bindable(model).spaceSubscriptionFeedVideos)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Space out related uploads")
+                    .settingsSearchRow("Space out related videos")
                 if model.spaceSubscriptionFeedVideos {
                     Stepper(value: Bindable(model).feedChannelSpacing, in: 0...5) {
-                        LabeledContent("Same channel gap") {
+                        LabeledContent("Gap for same channel") {
                             if model.feedChannelSpacing == 0 {
                                 Text("Off").foregroundStyle(.secondary)
                             } else {
@@ -81,9 +106,9 @@ struct BrowsingSettingsScreen: View {
                             }
                         }
                     }
-                    .settingsSearchRow("Same channel gap")
+                    .settingsSearchRow("Gap for same channel")
                     Stepper(value: Bindable(model).feedGroupSpacing, in: 0...5) {
-                        LabeledContent("Same group gap") {
+                        LabeledContent("Gap for same group") {
                             if model.feedGroupSpacing == 0 {
                                 Text("Off").foregroundStyle(.secondary)
                             } else {
@@ -91,17 +116,22 @@ struct BrowsingSettingsScreen: View {
                             }
                         }
                     }
-                    .settingsSearchRow("Same group gap")
-                    Picker("Maximum date shift", selection: Bindable(model).feedSpacingMaximumShiftHours) {
+                    .settingsSearchRow("Gap for same group")
+                    Picker("Max time window", selection: Bindable(model).feedSpacingMaximumShiftHours) {
                         Text("6 hours").tag(6)
                         Text("24 hours").tag(24)
                         Text("3 days").tag(72)
                     }
-                    .settingsSearchRow("Maximum date shift")
+                    .settingsSearchRow("Max time window")
                 }
-                Toggle("Refresh feed automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
+            } header: {
+                Text("Feed")
+            }
+
+            Section {
+                Toggle("Refresh automatically", isOn: Bindable(model).automaticFeedRefreshEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Refresh feed automatically")
+                    .settingsSearchRow("Refresh automatically")
                 if model.automaticFeedRefreshEnabled {
                     Picker("Refresh interval", selection: Bindable(model).automaticFeedRefreshInterval) {
                         ForEach(FeedRefreshInterval.allCases) { interval in
@@ -115,11 +145,11 @@ struct BrowsingSettingsScreen: View {
                     }
                     .settingsSearchRow("Refresh interval")
                 }
-                Toggle("Update feed view counts", isOn: Bindable(model).automaticFeedViewCountsEnabled)
+                Toggle("Refresh view counts", isOn: Bindable(model).automaticFeedViewCountsEnabled)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Update feed view counts")
+                    .settingsSearchRow("Refresh view counts")
                 if model.automaticFeedViewCountsEnabled {
-                    Picker("View count batch interval", selection: Bindable(model).automaticFeedViewCountInterval) {
+                    Picker("View count interval", selection: Bindable(model).automaticFeedViewCountInterval) {
                         ForEach(FeedRefreshInterval.allCases) { interval in
                             switch interval {
                             case .hourly: Text("Every hour").tag(interval)
@@ -129,21 +159,19 @@ struct BrowsingSettingsScreen: View {
                             }
                         }
                     }
-                    .settingsSearchRow("View count batch interval")
+                    .settingsSearchRow("View count interval")
                 }
             } header: {
-                Text("Feed")
-            } footer: {
-                Text("Spacing puts the selected number of videos between related uploads when possible. It only moves uploads within the chosen time range. Suggested videos appear only in All subscriptions. Automatic updates run only while Feed is selected and the app is active. View counts update four channels per interval without reloading the feed.")
+                Text("Automatic updates")
             }
 
             Section("Channels") {
                 NavigationLink {
                     SubscriptionGroupsScreen(isEmbedded: true)
                 } label: {
-                    Label("Manage subscription groups", systemImage: "square.stack.3d.up")
+                    Label("Subscription groups", systemImage: "square.stack.3d.up")
                 }
-                .settingsSearchRow("Manage subscription groups")
+                .settingsSearchRow("Subscription groups")
                 NavigationLink {
                     ChannelTabsSettingsScreen()
                 } label: {

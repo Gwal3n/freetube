@@ -18,11 +18,9 @@ struct IncognitoSettingsScreen: View {
                 Toggle("Incognito", isOn: $enabled)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Incognito")
-            } footer: {
-                Text("Incognito changes only future activity while it is on. It does not delete existing data or hide network activity from YouTube or your internet provider.")
             }
 
-            Section("While Incognito Is On") {
+            Section("While on") {
                 Toggle("Don't save searches", isOn: $skipSearchHistory)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Don't save searches")
@@ -32,9 +30,9 @@ struct IncognitoSettingsScreen: View {
                 Toggle("Don't save watch progress", isOn: $skipWatchProgress)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Don't save watch progress")
-                Toggle("Hide watch progress", isOn: $hideWatchProgress)
+                Toggle("Hide watch progress bars", isOn: $hideWatchProgress)
                     .tint(settingsToggleTint)
-                    .settingsSearchRow("Hide watch progress")
+                    .settingsSearchRow("Hide watch progress bars")
             }
 
             Section {
@@ -46,8 +44,6 @@ struct IncognitoSettingsScreen: View {
                     .settingsSearchRow("Hide Library tab")
             } header: {
                 Text("Tabs")
-            } footer: {
-                Text("Downloads and Search remain available. If Library is hidden, Settings can be opened from Search.")
             }
         }
         .scrollToSearchedSetting()

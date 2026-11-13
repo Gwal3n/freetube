@@ -3,7 +3,7 @@ import XCTest
 
 final class SettingsSearchIndexTests: XCTestCase {
     func testSearchFindsTopLevelAndNestedSettings() {
-        let holdSpeed = SettingsSearchIndex.results(matching: String(localized: "Hold for speed"))
+        let holdSpeed = SettingsSearchIndex.results(matching: String(localized: "Hold to speed up"))
         XCTAssertTrue(holdSpeed.contains { $0.destination == .playback })
 
         let defaultSpeed = SettingsSearchIndex.results(matching: String(localized: "Default playback speed"))
@@ -16,8 +16,12 @@ final class SettingsSearchIndexTests: XCTestCase {
             .contains { $0.destination == .player })
         XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Resume after interruptions"))
             .contains { $0.destination == .playback })
-        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Remember floating player placement"))
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Remember mini player position"))
             .contains { $0.destination == .player })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Show watch progress"))
+            .contains { $0.destination == .browsing })
+        XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Prefetch details and comments"))
+            .contains { $0.destination == .cache })
         XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Accent color"))
             .contains { $0.destination == .appearance })
         XCTAssertTrue(SettingsSearchIndex.results(matching: String(localized: "Left side"))

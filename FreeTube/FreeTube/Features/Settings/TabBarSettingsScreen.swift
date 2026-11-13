@@ -23,8 +23,6 @@ struct TabBarSettingsScreen: View {
                 Toggle("Show tab names", isOn: $showTabBarLabels)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show tab names")
-            } footer: {
-                Text("Icons remain accessible by name when labels are hidden.")
             }
 
             Section {
@@ -43,10 +41,8 @@ struct TabBarSettingsScreen: View {
                     .tint(settingsToggleTint)
                 .moveDisabled(true)
             } header: {
-                Text("Tab order")
-                    .settingsSearchRow("Tab order")
-            } footer: {
-                Text("Drag the handles to reorder tabs. Search keeps its native system position. Settings remains available when Library is hidden.")
+                Text("Visible tabs & order")
+                    .settingsSearchRow("Visible tabs & order")
             }
         }
         .scrollToSearchedSetting()
