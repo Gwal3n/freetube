@@ -16,8 +16,8 @@ nonisolated final class NativeHLSDownloadService: @unchecked Sendable {
     private let session: URLSession
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "NativeHLSDownload")
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        self.session = session ?? AnonymousURLSession.make { $0.urlCache = nil }
     }
 
     /// A force-quit skips `download`'s defer. Capture only work folders from earlier launches,

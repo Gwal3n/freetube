@@ -24,11 +24,7 @@ nonisolated enum RangedMediaDownloadService {
         guard totalBytes > probeLength else { return false }
         try Task.checkCancellation()
 
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        let session = URLSession(configuration: configuration)
+        let session = AnonymousURLSession.make { $0.urlCache = nil }
         defer { session.invalidateAndCancel() }
 
         let probeEnd = min(totalBytes - 1, probeLength - 1)

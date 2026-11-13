@@ -98,7 +98,9 @@ struct PlaybackItemFactory {
         request.httpShouldHandleCookies = false
         request.timeoutInterval = 5
         do {
-            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+            let session = AnonymousURLSession.make { $0.urlCache = nil }
+            defer { session.invalidateAndCancel() }
+            let (bytes, response) = try await session.bytes(for: request)
             var iterator = bytes.makeAsyncIterator()
             let firstByte = try await iterator.next()
             let http = response as? HTTPURLResponse

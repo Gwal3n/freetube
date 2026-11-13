@@ -2,14 +2,20 @@ import Foundation
 
 /// Shared factory for cookie-free ephemeral `URLSession`s used by anonymous networking.
 enum AnonymousURLSession {
-    static func make(
+    static func configuration(
         configure: ((URLSessionConfiguration) -> Void)? = nil
-    ) -> URLSession {
+    ) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieAcceptPolicy = .never
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configure?(configuration)
-        return URLSession(configuration: configuration)
+        return configuration
+    }
+
+    static func make(
+        configure: ((URLSessionConfiguration) -> Void)? = nil
+    ) -> URLSession {
+        URLSession(configuration: configuration(configure: configure))
     }
 }

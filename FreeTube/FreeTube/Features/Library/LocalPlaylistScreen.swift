@@ -497,11 +497,7 @@ struct LocalPlaylistScreen: View {
                     }
                 }
             } label: {
-                if videoSort == .custom {
-                    Text("Sort by")
-                } else {
-                    Label("Sort by", systemImage: "checkmark")
-                }
+                FilterMenuLabels.category("Sort by", active: videoSort != .custom)
             }
             Divider()
             Menu {
@@ -511,11 +507,7 @@ struct LocalPlaylistScreen: View {
                     }
                 }
             } label: {
-                if videoFilters.watch == .all {
-                    Text("Watch history")
-                } else {
-                    Label("Watch history", systemImage: "checkmark")
-                }
+                FilterMenuLabels.category("Watch history", active: videoFilters.watch != .all)
             }
             Menu {
                 ForEach(SearchVideoFilters.Uploaded.allCases) { option in
@@ -523,16 +515,11 @@ struct LocalPlaylistScreen: View {
                         if option == .custom { customRange = .uploaded }
                         else { videoFilters.uploaded = option }
                     } label: {
-                        if videoFilters.uploaded == option { Label(option.title, systemImage: "checkmark") }
-                        else { Text(option.title) }
+                        FilterMenuLabels.option(option.title, selected: videoFilters.uploaded == option)
                     }
                 }
             } label: {
-                if videoFilters.uploaded == .anytime {
-                    Text("Upload date")
-                } else {
-                    Label("Upload date", systemImage: "checkmark")
-                }
+                FilterMenuLabels.category("Upload date", active: videoFilters.uploaded != .anytime)
             }
             Menu {
                 ForEach(SearchVideoFilters.Length.allCases) { option in
@@ -540,16 +527,11 @@ struct LocalPlaylistScreen: View {
                         if option == .custom { customRange = .length }
                         else { videoFilters.length = option }
                     } label: {
-                        if videoFilters.length == option { Label(option.title, systemImage: "checkmark") }
-                        else { Text(option.title) }
+                        FilterMenuLabels.option(option.title, selected: videoFilters.length == option)
                     }
                 }
             } label: {
-                if videoFilters.length == .any {
-                    Text("Length")
-                } else {
-                    Label("Length", systemImage: "checkmark")
-                }
+                FilterMenuLabels.category("Length", active: videoFilters.length != .any)
             }
             Menu {
                 ForEach(SearchVideoFilters.Views.allCases) { option in
@@ -557,16 +539,11 @@ struct LocalPlaylistScreen: View {
                         if option == .custom { customRange = .views }
                         else { videoFilters.views = option }
                     } label: {
-                        if videoFilters.views == option { Label(option.title, systemImage: "checkmark") }
-                        else { Text(option.title) }
+                        FilterMenuLabels.option(option.title, selected: videoFilters.views == option)
                     }
                 }
             } label: {
-                if videoFilters.views == .any {
-                    Text("Views")
-                } else {
-                    Label("Views", systemImage: "checkmark")
-                }
+                FilterMenuLabels.category("Views", active: videoFilters.views != .any)
             }
             Divider()
             Button("Reset Filters") {

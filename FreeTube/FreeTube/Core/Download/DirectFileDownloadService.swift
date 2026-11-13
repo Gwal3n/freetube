@@ -53,10 +53,7 @@ nonisolated final class DirectFileDownloadService: NSObject, URLSessionDownloadD
 
     private func run(request: URLRequest) async throws -> HTTPURLResponse {
         // Signed stream URLs must not enter a persistent URL cache or cookie store.
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
+        let configuration = AnonymousURLSession.configuration { $0.urlCache = nil }
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
         let task = session.downloadTask(with: request)
         do {
