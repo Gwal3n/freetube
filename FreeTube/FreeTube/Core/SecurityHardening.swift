@@ -12,6 +12,7 @@ nonisolated enum SecurityHardening {
         removeLegacyAccountCredentials()
         removeLegacyYtDlpModule()
         migrateLegacyDiagnostics()
+        scrubLegacySignedDownloadURLs()
         return true
     }()
 
@@ -93,5 +94,76 @@ nonisolated enum SecurityHardening {
         value += url.path
         if url.query != nil { value += "?…" }
         return value
+    }
+
+    /// Prefer domain/code over `String(describing:)` — NSError userInfo can embed signed URLs.
+    static func redactedForLog(_ error: Error) -> String {
+        let nsError = error as NSError
+        var parts = ["domain=\(nsError.domain) code=\(nsError.code)"]
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            parts.append("underlying=\(underlying.domain)/\(underlying.code)")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    /// Defense-in-depth for mirrored file logs: strip query strings from any http(s) URL.
+    static func sanitizeLogMessage(_ message: String) -> String {
+        guard message.contains("://") || message.contains("?") else { return message }
+        guard let regex = urlRegex else { return message }
+        let nsMessage = message as NSString
+        let full = NSRange(location: 0, length: nsMessage.length)
+        let matches = regex.matches(in: message, options: [], range: full)
+        guard !matches.isEmpty else { return message }
+
+        var result = message
+        for match in matches.reversed() {
+            guard let range = Range(match.range, in: result) else { continue }
+            let raw = String(result[range])
+            if let url = URL(string: raw) {
+                result.replaceSubrange(range, with: redactedForLog(url))
+            } else if let queryIndex = raw.firstIndex(of: "?") {
+                result.replaceSubrange(range, with: String(raw[..<queryIndex]) + "?…")
+            }
+        }
+        return result
+    }
+
+    /// Signed stream / googlevideo URLs must not remain in download xattrs.
+    static func isSensitiveMediaURLString(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard let url = URL(string: trimmed), let host = url.host?.lowercased() else {
+            // Malformed values are safer cleared than left on disk.
+            return true
+        }
+        if host.contains("googlevideo.com") { return true }
+        if url.path.lowercased().contains("videoplayback") { return true }
+        let query = url.query?.lowercased() ?? ""
+        if query.contains("signature=") || query.contains("sig=") { return true }
+        if query.contains("expire=") && query.contains("ip=") { return true }
+        return false
+    }
+
+    private static let urlRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"https?://[^\s\]\)\"'<>]+"#,
+        options: [.caseInsensitive]
+    )
+
+    private static let scrubSignedURLDefaultsKey = "com.leshko.freetube.scrubbedLegacySignedDownloadURLs.v1"
+
+    /// One-shot: clear signed stream URLs left in download metadata by older builds.
+    private static func scrubLegacySignedDownloadURLs() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: scrubSignedURLDefaultsKey) else { return }
+        defaults.set(true, forKey: scrubSignedURLDefaultsKey)
+        Task.detached(priority: .utility) {
+            guard #available(iOS 17.0, *) else { return }
+            let scrubbed = DownloadsStore.scrubSensitiveOriginalURLsOffMain()
+            if scrubbed > 0 {
+                await MainActor.run {
+                    NotificationCenter.default.post(name: DownloadsStore.didChange, object: nil)
+                }
+            }
+        }
     }
 }

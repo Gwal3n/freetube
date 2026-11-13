@@ -33,8 +33,9 @@ final class LogFileWriter {
     nonisolated static func record(category: String, level: String, message: String) {
         // Avoid allocating a Task for every ordinary app log when file diagnostics are off.
         guard UserDefaults.standard.bool(forKey: "logToFile") else { return }
+        let sanitized = SecurityHardening.sanitizeLogMessage(message)
         Task { @MainActor in
-            shared.append(category: category, level: level, message: message)
+            shared.append(category: category, level: level, message: sanitized)
         }
     }
 

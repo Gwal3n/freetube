@@ -31,6 +31,13 @@ public struct AppLogMessage: ExpressibleByStringLiteral, ExpressibleByStringInte
             case .private: output.append("<private>")
             }
         }
+        /// Prefer domain/code over `String(describing:)` so signed URLs in userInfo never render.
+        public mutating func appendInterpolation(_ error: Error, privacy: AppLogPrivacy = .public) {
+            switch privacy {
+            case .public: output.append(SecurityHardening.redactedForLog(error))
+            case .private: output.append("<private>")
+            }
+        }
     }
 }
 
@@ -67,6 +74,10 @@ public struct AppLog: Sendable {
     }
 
     private func mirror(_ message: AppLogMessage, level: String) {
-        LogFileWriter.record(category: category, level: level, message: message.text)
+        LogFileWriter.record(
+            category: category,
+            level: level,
+            message: SecurityHardening.sanitizeLogMessage(message.text)
+        )
     }
 }

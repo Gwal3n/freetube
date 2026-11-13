@@ -237,6 +237,44 @@ final class DownloadsStore {
         let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
         return resized.jpegData(compressionQuality: thumbnailJpegQuality)
     }
+
+    /// Rewrites xattrs that still store signed stream URLs from older builds. Returns the
+    /// number of files updated. Safe to call off-main; posts `didChange` via the caller.
+    nonisolated static func scrubSensitiveOriginalURLsOffMain() -> Int {
+        let dir = downloadsDirectory()
+        let fileURLs = (try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        let media = fileURLs.filter {
+            ["mp4", "m4a", "mp3", "webm", "opus"].contains($0.pathExtension.lowercased())
+        }
+        var scrubbed = 0
+        for fileURL in media {
+            guard let metadata = readMetadata(at: fileURL),
+                  let original = metadata.originalURL,
+                  SecurityHardening.isSensitiveMediaURLString(original) else { continue }
+            let cleaned = DownloadMetadata(
+                videoID: metadata.videoID,
+                title: metadata.title,
+                channelName: metadata.channelName,
+                formatID: metadata.formatID,
+                downloadedAt: metadata.downloadedAt,
+                originalURL: nil,
+                thumbnailData: metadata.thumbnailData,
+                duration: metadata.duration
+            )
+            do {
+                let blob = try PropertyListEncoder().encode(cleaned)
+                try FileXattr.write(blob, key: metadataXattrKey, at: fileURL)
+                scrubbed += 1
+            } catch {
+                continue
+            }
+        }
+        return scrubbed
+    }
 }
 
 /// Filesystem scan row. Missing metadata → orphan (filename as title).
