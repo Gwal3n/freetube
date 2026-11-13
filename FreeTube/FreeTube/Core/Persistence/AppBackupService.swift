@@ -165,7 +165,7 @@ final class AppBackupService {
         "com.leshko.freetube.deArrowRandomThumbnails",
         "hiddenPlayerTopControls", "historyRetentionPolicy", "holdForSpeedEnabled", "holdSpeedRate", "horizontalSwipeToSeekEnabled",
         "largeSubscriptionFeedThumbnails",
-        "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
+        "incognitoEnabled", "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
         "logToFile", "playerScrollDiagnosticsEnabled", "manualQueue",
         "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "playerPanelSectionOrder",

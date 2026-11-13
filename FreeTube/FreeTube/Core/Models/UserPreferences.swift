@@ -151,6 +151,52 @@ struct UserPreferences {
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
     @AppStorage("sponsorBlockChapterBehavior") var sponsorBlockChapterBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
 
+    // MARK: - Catalogued screen preferences
+    // Declared here so Settings, backup, and screens share one key list. Views may still bind the
+    // same keys with `@AppStorage` for SwiftUI observation; keep defaults identical.
+
+    @AppStorage("useAccentTheme") var useAccentTheme: Bool = false
+    @AppStorage("accentNavigationOnly") var accentNavigationOnly: Bool = false
+    @AppStorage("appCustomAccentHex") var appCustomAccentHex: String = "#FF3B30"
+    @AppStorage(OrientationPolicy.lockKey) var portraitOrientationLock: Bool = false
+    @AppStorage("showFeedFilterButton") var showFeedFilterButton: Bool = true
+    @AppStorage("autoLoadMoreFeedItems") var autoLoadMoreFeedItems: Bool = true
+    @AppStorage("autoLoadMoreSearchItems") var autoLoadMoreSearchItems: Bool = true
+    @AppStorage("autoLoadMoreComments") var autoLoadMoreComments: Bool = true
+    @AppStorage("showLibraryTab") var showLibraryTab: Bool = true
+    @AppStorage("showDownloadsTab") var showDownloadsTab: Bool = true
+    @AppStorage("showSearchTab") var showSearchTab: Bool = true
+    @AppStorage("showSettingsTab") var showSettingsTab: Bool = true
+    @AppStorage("showTabBarLabels") var showTabBarLabels: Bool = true
+    @AppStorage("tabBarOrder") var tabBarOrderRaw: String = "feed,library,downloads,settings"
+    @AppStorage("showChannelAboutTab") var showChannelAboutTab: Bool = true
+    @AppStorage("showChannelLiveTab") var showChannelLiveTab: Bool = true
+    @AppStorage("showChannelPlaylistsTab") var showChannelPlaylistsTab: Bool = true
+    @AppStorage("showChannelShortsTab") var showChannelShortsTab: Bool = true
+    @AppStorage("showPlayerDownloadButton") var showPlayerDownloadButton: Bool = true
+    @AppStorage("showPlayerSaveButton") var showPlayerSaveButton: Bool = true
+    @AppStorage("showPlayerShareButton") var showPlayerShareButton: Bool = true
+    @AppStorage("pinCommentsHeading") var pinCommentsHeading: Bool = false
+    @AppStorage("pinUpNextHeading") var pinUpNextHeading: Bool = false
+    @AppStorage("pinQueueHeading") var pinQueueHeading: Bool = false
+    @AppStorage("playerScrollDiagnosticsEnabled") var playerScrollDiagnosticsEnabled: Bool = false
+    @AppStorage("horizontalSwipeToSeekEnabled") var horizontalSwipeToSeekEnabled: Bool = true
+    @AppStorage("customDoubleTapSeekSeconds") var customDoubleTapSeekSeconds: Int = 20
+    @AppStorage("transportButtonMode") var transportButtonModeRaw: String = ""
+    @AppStorage("transportSeekSeconds") var transportSeekSeconds: Int = 10
+    @AppStorage("upNextRowSize") var upNextRowSizeRaw: String = UpNextRowSize.compact.rawValue
+    @AppStorage("playerPanelSectionOrder") var playerPanelSectionOrderRaw: String = ""
+    @AppStorage("playbackSpeedChoices") var playbackSpeedChoicesRaw: String = ""
+    @AppStorage("sleepTimerMinuteChoices") var sleepTimerMinuteChoicesRaw: String = ""
+    @AppStorage("watchProgressColorMode") var watchProgressColorModeRaw: String = ""
+    @AppStorage("watchProgressCustomHex") var watchProgressCustomHex: String = "#FF0000"
+    @AppStorage("finishedVideoIndicator") var finishedVideoIndicatorRaw: String = ""
+    @AppStorage("floatingPlayerCorner") var floatingPlayerCornerRaw: String = "bottomTrailing"
+    @AppStorage("floatingPlayerVerticalFraction") var floatingPlayerVerticalFraction: Double = 1
+    @AppStorage("recentChannelsJSON") var recentChannelsJSON: String = "[]"
+    @AppStorage(RecentHistoryLimits.searchKey) var recentSearchLimit: Int = RecentHistoryLimits.defaultSearchLimit
+    @AppStorage(RecentHistoryLimits.channelKey) var recentChannelLimit: Int = RecentHistoryLimits.defaultChannelLimit
+
     init() {
         let defaults = UserDefaults.standard
         // Channel visits previously followed the search-history switch. Preserve an existing

@@ -29,6 +29,10 @@ final class SearchViewModel {
     /// or results are cleared. Changing server-backed fields re-runs the search via
     /// `serverFiltersDidChange(from:)`.
     var videoFilters = SearchVideoFilters()
+    /// Local watch history for the current result page. Owned here so filter fill and row chrome
+    /// share one PersistenceWriter pass instead of living in the view.
+    private(set) var progressByVideoID: [String: Double] = [:]
+    private(set) var watchStatusByVideoID: [String: WatchHistoryStatus] = [:]
 
     private let service: any SearchServicing
     private let musicService: any MusicSearchServicing
@@ -38,6 +42,8 @@ final class SearchViewModel {
 
     private var autocompleteTask: Task<Void, Never>?
     private var searchGeneration = 0
+    /// Dedupes filtered-page prefetch after an explicit Load more / lookahead.
+    private var lastFilteredPrefetch: FilteredPrefetchKey?
 
     /// True while the field contains a new query that has not produced the visible result set.
     /// SearchContent uses this to show live suggestions instead of stale results.
@@ -85,8 +91,114 @@ final class SearchViewModel {
         didSearchFail = false
         paginationFailed = false
         errorState = nil
+        progressByVideoID = [:]
+        watchStatusByVideoID = [:]
+        lastFilteredPrefetch = nil
         resetFilters()
         autocompleteTask?.cancel()
+    }
+
+    /// Whether a hit survives the current result-type / video filters. Blocking stays call-site owned.
+    func includes(_ hit: SearchHit, now: Date = .now, status: WatchHistoryStatus?) -> Bool {
+        let resultType = videoFilters.resultType
+        switch hit {
+        case .video(let video):
+            guard resultType == .any || resultType == .video else { return false }
+            guard videoFilters.isActive else { return true }
+            return videoFilters.includes(
+                video,
+                status: status,
+                now: now,
+                applyServerMirroredLocally: applyServerMirroredLocally
+            )
+        case .channel:
+            return resultType == .any || resultType == .channel
+        case .playlist:
+            return resultType == .any || resultType == .playlist
+        }
+    }
+
+    func watchStatus(for hit: SearchHit) -> WatchHistoryStatus? {
+        guard case .video(let video) = hit else { return nil }
+        return watchStatusByVideoID[video.id]
+    }
+
+    func loadWatchProgress(for videos: [Video]) async {
+        let ids = videos.map(\.id)
+        let summary = await PersistenceWriter.shared.watchHistorySummary(videoIDs: ids)
+        guard !Task.isCancelled, results?.videos.map(\.id) == ids else { return }
+        watchStatusByVideoID = summary.statuses
+        progressByVideoID = preferences.displaysWatchProgress ? summary.progress : [:]
+    }
+
+    /// Fill a sparse filtered list without turning a very narrow filter into an unlimited stream
+    /// of YouTube requests. A later explicit Load more starts another bounded batch.
+    func fillFilteredResults(
+        autoLoadMore: Bool,
+        blockingActive: Bool,
+        isBlocked: @escaping (SearchHit) -> Bool
+    ) async {
+        guard autoLoadMore else { return }
+        let filters = videoFilters
+        guard filters.isActive || blockingActive, let query = submittedQuery else { return }
+        let revision = resultsRevision
+        let targetCount = 12
+        let maximumPages = 6
+
+        for _ in 0..<maximumPages {
+            while isLoading {
+                do { try await Task.sleep(for: .milliseconds(100)) }
+                catch { return }
+            }
+            guard !Task.isCancelled,
+                  filters == videoFilters,
+                  resultsRevision == revision,
+                  submittedQuery == query,
+                  !isEditingNewQuery,
+                  !paginationFailed,
+                  let current = results,
+                  let token = current.continuationToken else { return }
+
+            let statuses: [String: WatchHistoryStatus]
+            if filters.watch == .all {
+                statuses = [:]
+            } else {
+                let summary = await PersistenceWriter.shared.watchHistorySummary(
+                    videoIDs: current.videos.map(\.id)
+                )
+                guard !Task.isCancelled, filters == videoFilters,
+                      resultsRevision == revision else { return }
+                statuses = summary.statuses
+            }
+            let now = Date.now
+            let visibleCount = current.items.filter { hit in
+                !isBlocked(hit) && includes(hit, now: now, status: {
+                    guard case .video(let video) = hit else { return nil }
+                    return statuses[video.id]
+                }())
+            }.count
+            if visibleCount >= targetCount { return }
+
+            await loadMore()
+            guard !Task.isCancelled, results?.continuationToken != token else { return }
+        }
+    }
+
+    /// Records a filtered prefetch key so lookahead does not re-fire for the same page size.
+    func shouldPrefetchFilteredPage(loadedCount: Int, blockingRevision: Int) -> Bool {
+        let key = FilteredPrefetchKey(
+            resultsRevision: resultsRevision,
+            filters: videoFilters,
+            blockingRevision: blockingRevision,
+            loadedCount: loadedCount
+        )
+        guard lastFilteredPrefetch != key else { return false }
+        lastFilteredPrefetch = key
+        return true
+    }
+
+    func invalidateFilteredPrefetch() {
+        lastFilteredPrefetch = nil
     }
 
     func submit() async {
@@ -102,6 +214,8 @@ final class SearchViewModel {
         autocompleteTask?.cancel()
         suggestions = []
         results = nil
+        progressByVideoID = [:]
+        watchStatusByVideoID = [:]
         errorState = nil
         didSearchFail = false
         paginationFailed = false
@@ -256,6 +370,7 @@ final class SearchViewModel {
     private func resetFilters() {
         videoFilters = videoFilters.resettingFilters()
         applyServerMirroredLocally = true
+        lastFilteredPrefetch = nil
     }
 
     private func scheduleAutocomplete() {
@@ -291,4 +406,12 @@ final class SearchViewModel {
             log.debug("Autocomplete failed: \(String(describing: error), privacy: .public)")
         }
     }
+}
+
+@available(iOS 17.0, *)
+private struct FilteredPrefetchKey: Equatable {
+    let resultsRevision: Int
+    let filters: SearchVideoFilters
+    let blockingRevision: Int
+    let loadedCount: Int
 }

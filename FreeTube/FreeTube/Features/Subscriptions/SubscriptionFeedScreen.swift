@@ -22,7 +22,7 @@ struct SubscriptionFeedScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
-    @AppStorage("incognitoHideFeed") private var incognitoHideFeed = true
+    @AppStorage("incognitoHideFeed") private var incognitoHideFeed = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
     @AppStorage("largeSubscriptionFeedThumbnails") private var largeVideoThumbnails = false
     @AppStorage("showFeedChannelAvatars") private var showChannelAvatars = true
