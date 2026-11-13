@@ -9,16 +9,11 @@ import UIKit
 /// native `.searchable`, preserving the system Liquid Glass presentation.
 @available(iOS 17.0, *)
 struct HomeScreen: View {
-    private enum CustomRange: String, Identifiable {
-        case uploaded, length, views
-        var id: String { rawValue }
-    }
-
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var searchModel = SearchViewModel()
     @State private var path: [AppNavigationRequest.Destination] = []
     @State private var isSearchPresented = false
-    @State private var customRange: CustomRange?
+    @State private var customRange: MediaFilterCustomRange?
     @Environment(\.modelContext) private var modelContext
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared checkmark styling for Feed and Search filter category/option rows.
+/// Shared checkmark styling and active-dot badge for Feed, Search, and local-playlist filter menus.
 @available(iOS 17.0, *)
 enum FilterMenuLabels {
     @ViewBuilder
@@ -18,6 +18,16 @@ enum FilterMenuLabels {
             Label(title, systemImage: "checkmark")
         } else {
             Text(title)
+        }
+    }
+
+    /// Trailing badge on the filter toolbar glyph when any category is narrowed.
+    @ViewBuilder
+    static func activeDot(isActive: Bool, color: Color = .primary) -> some View {
+        if isActive {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
         }
     }
 }

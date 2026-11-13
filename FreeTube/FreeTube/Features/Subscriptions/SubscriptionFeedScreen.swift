@@ -44,7 +44,7 @@ struct SubscriptionFeedScreen: View {
     @State private var lastAutomaticLoadKey: String?
     @State private var failedChannelsExpanded = false
     @State private var feedFilter = FeedVideoFilter.load()
-    @State private var feedFilterCustomRange: FeedFilterMenu.CustomRange?
+    @State private var feedFilterCustomRange: MediaFilterCustomRange?
     @State private var lastFilteredPrefetchKey: String?
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
 

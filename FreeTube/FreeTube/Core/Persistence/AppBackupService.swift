@@ -156,9 +156,10 @@ final class AppBackupService {
     private static let settingKeys: Set<String> = [
         "addToHistoryWhenOpened", "allowAudioMixing", "allowCellularDownloads", "appAccentPreset", "appFontPreset",
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "autoLoadMoreFeedItems", "autoLoadMoreSearchItems", "autoLoadMoreComments", "cacheRecentVideoContent", "cellularPlaybackQuality",
-        "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours", "feedSuggestionsEnabled", "feedSuggestionDensity",
+        "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours", "feedSuggestionsEnabled", "feedSuggestionDensity", "feedVideoFilter",
         "com.leshko.freetube.videoBlocklist.v1",
         "appearanceMode", "useAccentTheme", "accentNavigationOnly", "appCustomAccentHex", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "captionBackgroundEnabled", "captionTextScale",
+        "verticalSwipeFullscreen", "verticalSwipeAdjustments",
         "concurrentFragments", "customDoubleTapSeekSeconds", "customPlaybackSpeeds", "playbackSpeedChoices", "sleepTimerMinuteChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "centerTapPlayPauseEnabled", "formattedCaptions",
         "floatingPlayerWidth", "floatingPlayerCorner", "floatingPlayerVerticalFraction",
         "com.leshko.freetube.deArrowTitles", "com.leshko.freetube.deArrowThumbnails",

@@ -32,6 +32,9 @@ final class FeedVideoFilterTests: XCTestCase {
         XCTAssertEqual(filter.length, .fourToTwentyMinutes)
         XCTAssertEqual(filter.uploaded, .anytime)
         XCTAssertEqual(filter.views, .any)
+        XCTAssertNotNil(defaults.data(forKey: "feedVideoFilter"))
+        XCTAssertNil(defaults.object(forKey: "feedWatchFilter"))
+        XCTAssertNil(defaults.object(forKey: "feedDurationFilter"))
     }
 
     func testLoadMigratesCustomDurationMinutesToSeconds() {
@@ -45,6 +48,8 @@ final class FeedVideoFilterTests: XCTestCase {
         let filter = FeedVideoFilter.load(defaults)
         XCTAssertEqual(filter.length, .custom)
         XCTAssertEqual(filter.customLengthRange, .init(minimum: 300, maximum: 1_200))
+        XCTAssertNil(defaults.object(forKey: "feedCustomDurationMinimumMinutes"))
+        XCTAssertNil(defaults.object(forKey: "feedCustomDurationMaximumMinutes"))
     }
 
     func testIncludesCombinesWatchAndSharedMetadataPresets() {

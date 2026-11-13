@@ -8,12 +8,6 @@ struct LocalPlaylistScreen: View {
         case playlist
     }
 
-    private enum CustomRange: String, Identifiable {
-        case uploaded, length, views
-
-        var id: String { rawValue }
-    }
-
     let playlistID: String
     @State private var details: LocalPlaylistDetails?
     @State private var blocklist = VideoBlocklist.shared
@@ -43,7 +37,7 @@ struct LocalPlaylistScreen: View {
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoHideWatchProgress") private var incognitoHideWatchProgress = true
-    @State private var customRange: CustomRange?
+    @State private var customRange: MediaFilterCustomRange?
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let service = LocalPlaylistService()
@@ -556,10 +550,11 @@ struct LocalPlaylistScreen: View {
                 .foregroundStyle(showsNavigationTitle || !searchText.isEmpty ? Color.primary : Color.white)
                 .frame(width: 44, height: 44)
                 .overlay(alignment: .topTrailing) {
-                    if videoFilters.isActive || videoSort != .custom {
-                        Circle().fill(showsNavigationTitle || !searchText.isEmpty ? Color.primary : Color.white)
-                            .frame(width: 5, height: 5).padding(8)
-                    }
+                    FilterMenuLabels.activeDot(
+                        isActive: videoFilters.isActive || videoSort != .custom,
+                        color: showsNavigationTitle || !searchText.isEmpty ? .primary : .white
+                    )
+                    .padding(8)
                 }
                 .contentShape(Rectangle())
         }

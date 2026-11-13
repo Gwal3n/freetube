@@ -5,13 +5,8 @@ import SwiftUI
 /// the custom-range sheets.
 @available(iOS 17.0, *)
 struct FeedFilterMenu: View {
-    enum CustomRange: String, Identifiable {
-        case uploaded, length, views
-        var id: String { rawValue }
-    }
-
     @Binding var filter: FeedVideoFilter
-    var onCustomRange: (CustomRange) -> Void
+    var onCustomRange: (MediaFilterCustomRange) -> Void
 
     var body: some View {
         Menu {
@@ -79,12 +74,8 @@ struct FeedFilterMenu: View {
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
                 .overlay(alignment: .topTrailing) {
-                    if filter.isActive {
-                        Circle()
-                            .fill(.primary)
-                            .frame(width: 5, height: 5)
-                            .offset(x: 4, y: -4)
-                    }
+                    FilterMenuLabels.activeDot(isActive: filter.isActive)
+                        .offset(x: 4, y: -4)
                 }
         }
         .transaction { $0.animation = nil }
