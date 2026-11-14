@@ -103,7 +103,7 @@ struct LocalSubscriptionsScreen: View {
             }
         }
         .confirmationDialog(
-            "Remove all subscriptions?"
+            "Remove all subscriptions?",
             isPresented: $showingClearConfirmation,
             titleVisibility: .visible
         ) {
