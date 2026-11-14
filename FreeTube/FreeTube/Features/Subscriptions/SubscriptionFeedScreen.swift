@@ -204,7 +204,7 @@ struct SubscriptionFeedScreen: View {
                     ContentUnavailableView(
                         "No subscriptions",
                         systemImage: "rectangle.stack.person.crop",
-                        description: Text("Channels you subscribe to locally will appear here.")
+                        description: Text("Channels you subscribe to will appear here.")
                     )
                 } else if model.hasLoaded && model.videos.isEmpty && model.didLastRefreshCompletelyFail {
                     ContentUnavailableView {

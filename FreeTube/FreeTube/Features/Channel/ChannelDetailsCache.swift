@@ -1,8 +1,5 @@
 import Foundation
 
-/// Session-only memory cache of recently opened channel pages. Reopening a channel shows the
-/// cached page immediately while `ChannelViewModel` revalidates it in the background.
-/// Holds only display metadata and continuation tokens; nothing is persisted.
 @available(iOS 17.0, *)
 @MainActor
 final class ChannelDetailsCache {
@@ -16,7 +13,6 @@ final class ChannelDetailsCache {
     private let capacity: Int
     private let lifetime: TimeInterval
     private var entries: [String: Entry] = [:]
-    /// Least recently used first.
     private var order: [String] = []
 
     init(capacity: Int = 20, lifetime: TimeInterval = 30 * 60) {
@@ -25,6 +21,7 @@ final class ChannelDetailsCache {
     }
 
     func details(for channelID: String, now: Date = .now) -> ChannelDetails? {
+        guard UserPreferences().cacheRecentChannelContent else { return nil }
         guard let entry = entries[channelID] else { return nil }
         guard now.timeIntervalSince(entry.storedAt) < lifetime else {
             remove(channelID)
@@ -35,11 +32,17 @@ final class ChannelDetailsCache {
     }
 
     func store(_ details: ChannelDetails, for channelID: String, now: Date = .now) {
+        guard UserPreferences().cacheRecentChannelContent else { return }
         entries[channelID] = Entry(details: details, storedAt: now)
         touch(channelID)
         while order.count > capacity, let oldest = order.first {
             remove(oldest)
         }
+    }
+
+    func clear() {
+        entries.removeAll()
+        order.removeAll()
     }
 
     private func touch(_ channelID: String) {

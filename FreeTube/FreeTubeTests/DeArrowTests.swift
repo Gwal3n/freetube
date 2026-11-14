@@ -42,8 +42,8 @@ final class DeArrowTests: XCTestCase {
         let first = time(.empty, fallback: true)
         XCTAssertEqual(first, time(.empty, fallback: true))
         XCTAssertNotNil(first)
-        XCTAssertGreaterThanOrEqual(first ?? 0, 5)
-        XCTAssertLessThanOrEqual(first ?? 100, 85)
+        XCTAssertGreaterThanOrEqual(first ?? -1, 0)
+        XCTAssertLessThanOrEqual(first ?? 100, 90)
         XCTAssertNil(time(.empty, fallback: false))
     }
 
@@ -61,15 +61,21 @@ final class DeArrowTests: XCTestCase {
         XCTAssertEqual(time(value) ?? 0, 9, accuracy: 0.0001)
     }
 
-    func testRandomFallbackDoesNotGuessDurationOrGenerateLiveFrames() {
+    func testRandomFallbackDoesNotGuessDurationAndUsesLiveZero() {
         XCTAssertNil(DeArrowService.Payload.empty.thumbnailTime(
             videoID: "dQw4w9WgXcQ", duration: nil, randomFallback: true, isLive: false
         ))
         XCTAssertNil(DeArrowService.Payload.empty.thumbnailTime(
             videoID: "dQw4w9WgXcQ", duration: .infinity, randomFallback: true, isLive: false
         ))
+        XCTAssertEqual(
+            DeArrowService.Payload.empty.thumbnailTime(
+                videoID: "dQw4w9WgXcQ", duration: 100, randomFallback: true, isLive: true
+            ),
+            0
+        )
         XCTAssertNil(DeArrowService.Payload.empty.thumbnailTime(
-            videoID: "dQw4w9WgXcQ", duration: 100, randomFallback: true, isLive: true
+            videoID: "dQw4w9WgXcQ", duration: 100, randomFallback: false, isLive: true
         ))
     }
 

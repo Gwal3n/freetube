@@ -233,8 +233,8 @@ enum SettingsSearchIndex {
             "Show video shelf", "Shelf content", "Videos on shelf"
         ]),
         Group(destination: .cache, titles: [
-            "Cache", "Cache recent video details", "Prefetch details and comments", "Storage used",
-            "Clear recent video cache", "Clear all temporary caches"
+            "Cache", "Cache recent video details", "Prefetch details and comments", "Cache recent channels",
+            "Storage used", "Clear recent video cache", "Clear recent channel cache", "Clear all temporary caches"
         ]),
         Group(destination: .importExport, titles: [
             "Import & Export", "Export All Settings and Data", "Import Full Backup",

@@ -5,6 +5,7 @@ struct CacheSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("cacheRecentVideoContent") private var cacheRecentVideoContent = true
+    @AppStorage("cacheRecentChannelContent") private var cacheRecentChannelContent = true
     @AppStorage("prefetchVideoDetails") private var prefetchVideoDetails = true
     @State private var showingClearAllConfirmation = false
     @State private var isClearing = false
@@ -22,6 +23,9 @@ struct CacheSettingsScreen: View {
                     .tint(settingsToggleTint)
                     .disabled(!cacheRecentVideoContent)
                     .settingsSearchRow("Prefetch details and comments")
+                Toggle("Cache recent channels", isOn: $cacheRecentChannelContent)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Cache recent channels")
             }
 
             Section {
@@ -45,6 +49,11 @@ struct CacheSettingsScreen: View {
                     resultMessage = String(localized: "Recent video cache cleared")
                 }
                 .settingsSearchRow("Clear recent video cache")
+                Button("Clear recent channel cache") {
+                    TemporaryCacheService.clearRecentChannelContent()
+                    resultMessage = String(localized: "Recent channel cache cleared")
+                }
+                .settingsSearchRow("Clear recent channel cache")
 
                 Button("Clear all temporary caches", role: .destructive) {
                     showingClearAllConfirmation = true
@@ -65,6 +74,9 @@ struct CacheSettingsScreen: View {
         .task { await refreshDiskUsage() }
         .onChange(of: cacheRecentVideoContent) { _, enabled in
             if !enabled { TemporaryCacheService.clearRecentVideoContent() }
+        }
+        .onChange(of: cacheRecentChannelContent) { _, enabled in
+            if !enabled { TemporaryCacheService.clearRecentChannelContent() }
         }
         .confirmationDialog(
             "Clear all temporary caches?",

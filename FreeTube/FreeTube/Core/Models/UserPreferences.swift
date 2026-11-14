@@ -62,6 +62,7 @@ struct UserPreferences {
     @AppStorage("upNextInitialCount") var upNextInitialCount: Int = 5
     @AppStorage("prefetchVideoDetails") var prefetchVideoDetails: Bool = true
     @AppStorage("cacheRecentVideoContent") var cacheRecentVideoContent: Bool = true
+    @AppStorage("cacheRecentChannelContent") var cacheRecentChannelContent: Bool = true
     @AppStorage("allowAudioMixing") var allowAudioMixing: Bool = false
     @AppStorage("captionBackgroundEnabled") var captionBackgroundEnabled: Bool = true
     @AppStorage("captionTextScale") var captionTextScale: Double = 1.0

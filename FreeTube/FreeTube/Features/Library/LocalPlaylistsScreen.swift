@@ -105,7 +105,7 @@ struct LocalPlaylistsScreen: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the selected playlists and their locally saved entries.")
+            Text("This removes the selected playlists and their saved entries.")
         }
         .confirmationDialog(
             "Delete playlist?",

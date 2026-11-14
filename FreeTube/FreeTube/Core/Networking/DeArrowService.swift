@@ -50,19 +50,21 @@ actor DeArrowService {
                       time.isFinite, time >= 0 else { return nil }
                 return time
             }
-            guard randomFallback, !isLive else { return nil }
+            // Match the DeArrow extension: live falls back to t=0; otherwise use the
+            // server's randomTime (or a stable per-video substitute), clamped below 90%.
+            if isLive { return randomFallback ? 0 : nil }
+            guard randomFallback else { return nil }
             let length = videoDuration.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? duration
             guard let length, length.isFinite, length > 0 else { return nil }
-            let fraction: Double
+            var fraction: Double
             if let randomTime, randomTime.isFinite, randomTime >= 0, randomTime <= 1 {
-                fraction = randomTime > 0.9 ? randomTime - 0.9 : randomTime
+                fraction = randomTime
             } else {
-                // Stable per video: scrolling/reopening must not choose another frame or flood
-                // the generation server with timestamps. Stay away from intros and end credits.
                 let digest = SHA256.hash(data: Data(videoID.utf8))
                 let seed = digest.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
-                fraction = 0.05 + Double(seed) / Double(UInt32.max) * 0.8
+                fraction = Double(seed) / Double(UInt32.max)
             }
+            if fraction > 0.9 { fraction -= 0.9 }
             return fraction * length
         }
     }

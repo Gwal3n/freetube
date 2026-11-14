@@ -15,8 +15,13 @@ enum TemporaryCacheService {
         VideoContentPrefetchStore.shared.clearCache()
     }
 
+    static func clearRecentChannelContent() {
+        ChannelDetailsCache.shared.clear()
+    }
+
     static func clearAll(player: PlayerStateManager) async {
         clearRecentVideoContent()
+        clearRecentChannelContent()
         player.clearSponsorBlockCache()
         await StreamURLCache.shared.purge()
         await DeArrowService.shared.clearCache()

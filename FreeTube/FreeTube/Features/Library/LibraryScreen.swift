@@ -128,7 +128,7 @@ struct LibraryScreen: View {
 
     @ViewBuilder
     private var localHistorySection: some View {
-        Section("On this device") {
+        Section {
             NavigationLink {
                 LocalHistoryScreen()
                     .onAppear { log.info("Library history destination appeared") }
