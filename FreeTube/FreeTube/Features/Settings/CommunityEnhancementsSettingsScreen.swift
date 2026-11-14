@@ -31,12 +31,24 @@ struct CommunityEnhancementsSettingsScreen: View {
             .disabled(!model.sponsorBlockEnabled)
 
             Section {
+                Toggle("Full-video label on thumbnail", isOn: $model.sponsorBlockShowFullVideoThumbnailBadge)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Full-video label on thumbnail")
+                Toggle("Full-video label under seek bar", isOn: $model.sponsorBlockShowFullVideoSeekStripe)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Full-video label under seek bar")
                 NavigationLink {
                     SponsorBlockColorsSettingsScreen(model: model)
                 } label: {
                     Label("Segment colors", systemImage: "paintpalette")
                 }
                 .settingsSearchRow("Segment colors")
+                NavigationLink {
+                    SponsorBlockWhitelistSettingsScreen()
+                } label: {
+                    Label("Channel whitelist", systemImage: "person.badge.shield.checkmark")
+                }
+                .settingsSearchRow("Channel whitelist")
             }
             .disabled(!model.sponsorBlockEnabled)
 

@@ -30,6 +30,29 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
         }
     }
 
+    /// Official SponsorBlock category wording shown when a full-video label is tapped.
+    var officialDescription: String? {
+        switch self {
+        case .sponsor:
+            return String(localized: "Paid advertisement of a product or service, including free products received for promotion, affiliate links, giveaways from a third party, and segues into a YouTube ad. Used as a full-video label when the sponsor is too tightly integrated to skip cleanly.")
+        case .exclusiveAccess:
+            return String(localized: "Unpaid promotion of a product, service, or place the creator has exclusive access to through a brand deal or partnership. No paid promotion or affiliate links. Full-video label only.")
+        case .selfPromotion:
+            return String(localized: "Unpaid or self promotion, such as merchandise, donations, crowdfunding, or free shout-outs for channels, causes, websites, or products the creator likes.")
+        default:
+            return nil
+        }
+    }
+
+    var fullVideoThumbnailSystemImage: String? {
+        switch self {
+        case .sponsor: return "dollarsign.circle.fill"
+        case .exclusiveAccess: return "star.circle.fill"
+        case .selfPromotion: return "megaphone.fill"
+        default: return nil
+        }
+    }
+
     var displayName: String {
         switch self {
         case .sponsor: return String(localized: "Sponsors")

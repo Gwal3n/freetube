@@ -16,6 +16,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let actions: Actions
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
+    @State private var showingFullVideoDescription = false
 
     init(
         video: Video,
@@ -103,6 +104,14 @@ struct PlayerMetadataHeader<Actions: View>: View {
                 }
             }
             .padding(.horizontal)
+            .alert(
+                fullVideoLabel?.fullVideoLabelName ?? String(localized: "Full video label"),
+                isPresented: $showingFullVideoDescription
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(fullVideoLabel?.officialDescription ?? "")
+            }
         }
     }
 
@@ -116,16 +125,23 @@ struct PlayerMetadataHeader<Actions: View>: View {
     @ViewBuilder
     private var fullVideoBadge: some View {
         if let fullVideoLabel, let name = fullVideoLabel.fullVideoLabelName {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(fullVideoLabelColor(fullVideoLabel))
-                    .frame(width: 6, height: 6)
-                Text(name)
-                    .appFont(.caption2, weight: .medium)
-                    .foregroundStyle(.secondary)
+            Button {
+                showingFullVideoDescription = true
+            } label: {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(fullVideoLabelColor(fullVideoLabel))
+                        .frame(width: 6, height: 6)
+                    Text(name)
+                        .appFont(.caption2, weight: .medium)
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                .contentShape(Rectangle())
             }
-            .fixedSize(horizontal: true, vertical: false)
+            .buttonStyle(.plain)
             .accessibilityLabel("Full video label: \(name)")
+            .accessibilityHint("Shows the SponsorBlock description")
         }
     }
 

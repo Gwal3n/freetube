@@ -749,6 +749,40 @@
         }
       }
     },
+    "Add channel" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanal hinzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add channel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir canal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une chaîne"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить канал"
+          }
+        }
+      }
+    },
     "Add channels from your subscriptions." : {
       "localizations" : {
         "de" : {
@@ -2279,6 +2313,40 @@
         }
       }
     },
+    "Channel whitelist" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanal-Whitelist"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel whitelist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista blanca de canales"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste blanche de chaînes"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Белый список каналов"
+          }
+        }
+      }
+    },
     "Channels" : {
       "localizations" : {
         "de" : {
@@ -2343,6 +2411,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Каналы и видео, которые вы смотрели"
+          }
+        }
+      }
+    },
+    "Channels on this list skip SponsorBlock entirely." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanäle auf dieser Liste überspringen SponsorBlock vollständig."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channels on this list skip SponsorBlock entirely."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los canales de esta lista omiten SponsorBlock por completo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les chaînes de cette liste ignorent complètement SponsorBlock."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для каналов из этого списка SponsorBlock полностью отключён."
           }
         }
       }
@@ -3057,6 +3159,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Главы сообщества"
+          }
+        }
+      }
+    },
+    "Community Chapters" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community-Kapitel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community Chapters"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capítulos de la comunidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chapitres de la communauté"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Общественные главы"
           }
         }
       }
@@ -6389,6 +6525,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Полная полоса прогресса"
+          }
+        }
+      }
+    },
+    "Full-video label on thumbnail" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganzvideo-Label auf Vorschaubild"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full-video label on thumbnail"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Etiqueta de vídeo completo en la miniatura"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Libellé vidéo entière sur la vignette"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Метка всего видео на миниатюре"
+          }
+        }
+      }
+    },
+    "Full-video label under seek bar" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganzvideo-Label unter der Suchleiste"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full-video label under seek bar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Etiqueta de vídeo completo bajo la barra de búsqueda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Libellé vidéo entière sous la barre de lecture"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Метка всего видео под полосой перемотки"
           }
         }
       }
@@ -10707,6 +10911,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Аутро"
+          }
+        }
+      }
+    },
+    "Paid advertisement of a product or service, including free products received for promotion, affiliate links, giveaways from a third party, and segues into a YouTube ad. Used as a full-video label when the sponsor is too tightly integrated to skip cleanly." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bezahlte Werbung für ein Produkt oder eine Dienstleistung, einschließlich kostenloser Werbeprodukte, Affiliate-Links, Gewinnspielen Dritter und Übergängen zu einer YouTube-Anzeige. Als Ganzvideo-Label, wenn der Sponsor zu eng verwoben ist, um sauber übersprungen zu werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paid advertisement of a product or service, including free products received for promotion, affiliate links, giveaways from a third party, and segues into a YouTube ad. Used as a full-video label when the sponsor is too tightly integrated to skip cleanly."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publicidad de pago de un producto o servicio, incluidos productos gratuitos recibidos para promoción, enlaces de afiliados, sorteos de terceros y transiciones a un anuncio de YouTube. Se usa como etiqueta de vídeo completo cuando el patrocinio está demasiado integrado para omitirlo limpiamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publicité payante d’un produit ou service, y compris les produits gratuits reçus pour promotion, les liens d’affiliation, les cadeaux d’un tiers et les transitions vers une pub YouTube. Utilisée comme libellé de vidéo entière lorsque le sponsor est trop intégré pour être ignoré proprement."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Платная реклама продукта или услуги, включая бесплатные продукты для продвижения, партнёрские ссылки, розыгрыши от третьих лиц и переходы к рекламе YouTube. Используется как метка всего видео, когда спонсорство слишком тесно вплетено, чтобы его аккуратно пропустить."
           }
         }
       }
@@ -15369,6 +15607,40 @@
         }
       }
     },
+    "Shows the SponsorBlock description" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt die SponsorBlock-Beschreibung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the SponsorBlock description"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra la descripción de SponsorBlock"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche la description SponsorBlock"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывает описание SponsorBlock"
+          }
+        }
+      }
+    },
     "Shuffle" : {
       "localizations" : {
         "de" : {
@@ -17783,6 +18055,74 @@
         }
       }
     },
+    "Unpaid or self promotion, such as merchandise, donations, crowdfunding, or free shout-outs for channels, causes, websites, or products the creator likes." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbezahlte oder Eigenwerbung wie Merchandise, Spenden, Crowdfunding oder kostenlose Erwähnungen von Kanälen, Anliegen, Websites oder Produkten, die dem Creator gefallen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpaid or self promotion, such as merchandise, donations, crowdfunding, or free shout-outs for channels, causes, websites, or products the creator likes."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autopromoción o promoción no pagada, como merchandising, donaciones, crowdfunding o menciones gratuitas a canales, causas, sitios web o productos que le gustan al creador."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-promotion ou promotion non payée : merchandising, dons, crowdfunding ou mentions gratuites de chaînes, causes, sites ou produits aimés par le créateur."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Неоплачиваемое или самопродвижение: мерч, донаты, краудфандинг или бесплатные упоминания каналов, проектов, сайтов или продуктов, которые нравятся автору."
+          }
+        }
+      }
+    },
+    "Unpaid promotion of a product, service, or place the creator has exclusive access to through a brand deal or partnership. No paid promotion or affiliate links. Full-video label only." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbezahlte Bewerbung eines Produkts, einer Dienstleistung oder eines Ortes, zu dem der Creator durch einen Markendeal exklusiven Zugang hat. Keine bezahlte Werbung oder Affiliate-Links. Nur Ganzvideo-Label."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpaid promotion of a product, service, or place the creator has exclusive access to through a brand deal or partnership. No paid promotion or affiliate links. Full-video label only."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Promoción no pagada de un producto, servicio o lugar al que el creador tiene acceso exclusivo por un acuerdo de marca o asociación. Sin promoción pagada ni enlaces de afiliados. Solo etiqueta de vídeo completo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Promotion non payée d’un produit, service ou lieu auquel le créateur a un accès exclusif via un partenariat. Sans promotion payante ni liens d’affiliation. Libellé de vidéo entière uniquement."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Неоплачиваемое продвижение продукта, услуги или места, к которому у автора есть эксклюзивный доступ по брендовому соглашению или партнёрству. Без платной рекламы и партнёрских ссылок. Только метка всего видео."
+          }
+        }
+      }
+    },
     "Up next" : {
       "localizations" : {
         "de" : {
@@ -17983,6 +18323,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Использовать акцентные цвета"
+          }
+        }
+      }
+    },
+    "Useful for channels whose segments you never want applied." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nützlich für Kanäle, deren Segmente du nie anwenden möchtest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Useful for channels whose segments you never want applied."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Útil para canales cuyos segmentos no quieres aplicar nunca."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utile pour les chaînes dont vous ne voulez jamais appliquer les segments."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полезно для каналов, чьи сегменты вы не хотите применять."
           }
         }
       }

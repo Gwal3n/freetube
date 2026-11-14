@@ -5,6 +5,7 @@ struct SponsorBlockTimeline: View {
     @AppStorage("playerScrubberColorMode") private var scrubberColorModeRaw = PlayerScrubberColorMode.standard.rawValue
     @AppStorage("playerScrubberCustomHex") private var scrubberCustomHex = "#FF0000"
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
+    @AppStorage("sponsorBlockShowFullVideoSeekStripe") private var showFullVideoSeekStripe = false
 
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
@@ -24,7 +25,8 @@ struct SponsorBlockTimeline: View {
 
     private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
     private var currentChapter: VideoChapter? {
-        chapters.last { $0.startTime <= displayedTime }
+        // Match chapter-list highlighting: tolerate brief AVPlayer undershoot after a seek.
+        chapters.last { $0.startTime <= displayedTime + 0.35 }
     }
     private var fullVideoLabel: SponsorBlockCategory? {
         SponsorBlockSegment.primaryFullVideoLabel(in: segments)
@@ -95,7 +97,7 @@ struct SponsorBlockTimeline: View {
 
                     // Full-video labels are annotations, never a seek target. Keep their slim
                     // stripe below the progress track so the playback position stays clear.
-                    if let fullVideoLabel {
+                    if showFullVideoSeekStripe, let fullVideoLabel {
                         Capsule()
                             .fill(sponsorColors.color(for: fullVideoLabel))
                             .frame(width: width, height: 2)

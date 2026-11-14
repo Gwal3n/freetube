@@ -6,6 +6,9 @@ import Kingfisher
 @available(iOS 17.0, *)
 struct ChapterListPanel: View {
     private static let dismissalThreshold: CGFloat = 42
+    /// AVPlayer can settle a few hundred ms before a requested chapter start; keep highlighting
+    /// the tapped chapter through that undershoot instead of flashing the previous row.
+    private static let chapterHighlightTolerance: TimeInterval = 0.35
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appAccentPreset") private var appAccentPresetRaw = AppAccentPreset.classic.rawValue
@@ -21,6 +24,9 @@ struct ChapterListPanel: View {
 
     let chapters: [VideoChapter]
     let elapsed: TimeInterval
+    let usesCommunityChapters: Bool
+    let storyboard: VideoStoryboard?
+    let duration: TimeInterval
     let isLandscape: Bool
     @Binding var expansionProgress: CGFloat
     let expansionTravel: CGFloat
@@ -35,9 +41,14 @@ struct ChapterListPanel: View {
     @State private var headerDragStartExpansion: CGFloat?
     @State private var suppressChapterSelection = false
     @State private var selectionSuppressionGeneration = 0
+    @State private var pinnedChapterID: VideoChapter.ID?
+
+    private var naturalChapterID: VideoChapter.ID? {
+        chapters.last { $0.startTime <= elapsed + Self.chapterHighlightTolerance }?.id
+    }
 
     private var currentChapterID: VideoChapter.ID? {
-        chapters.last { $0.startTime <= elapsed }?.id
+        pinnedChapterID ?? naturalChapterID
     }
 
     var body: some View {
@@ -53,7 +64,7 @@ struct ChapterListPanel: View {
                 }
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Chapters")
+                        Text(usesCommunityChapters ? "Community Chapters" : "Chapters")
                             .font(.headline)
                         Text("\(chapters.count) in this video")
                             .font(.caption)
@@ -98,6 +109,12 @@ struct ChapterListPanel: View {
         // earlier leaves the material parked in place and reveals a gray rectangle instead of the
         // underlying player feed.
         .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
+        .onChange(of: elapsed) { _, newValue in
+            reconcilePinnedChapter(with: newValue)
+        }
+        .onChange(of: chapters.map(\.id)) { _, _ in
+            pinnedChapterID = nil
+        }
     }
 
     @ViewBuilder
@@ -131,6 +148,7 @@ struct ChapterListPanel: View {
                         // gesture is handing off to sheet dismissal. Never interpret that release
                         // as a request to seek.
                         guard !suppressChapterSelection else { return }
+                        pinnedChapterID = chapter.id
                         onSeek(chapter.startTime)
                     } label: {
                         chapterRow(chapter)
@@ -251,20 +269,29 @@ struct ChapterListPanel: View {
             }
     }
 
+    private func reconcilePinnedChapter(with time: TimeInterval) {
+        guard let pinnedChapterID,
+              let chapter = chapters.first(where: { $0.id == pinnedChapterID }) else { return }
+        let nextStart = chapters.first { $0.startTime > chapter.startTime }?.startTime ?? .infinity
+        if time >= nextStart {
+            self.pinnedChapterID = nil
+            return
+        }
+        // Drop the pin only after a clear reverse seek away from this chapter.
+        if time + Self.chapterHighlightTolerance < chapter.startTime {
+            self.pinnedChapterID = nil
+        }
+    }
+
     private func chapterRow(_ chapter: VideoChapter) -> some View {
         let isCurrent = chapter.id == currentChapterID
+        let thumbSize = CGSize(
+            width: isLandscape ? 112 : 128,
+            height: isLandscape ? 63 : 72
+        )
         return HStack(spacing: 12) {
-            KFImage(chapter.thumbnailURL)
-                .thumbnail(size: CGSize(width: 128, height: 72)) {
-                    ZStack {
-                        Color.primary.opacity(0.08)
-                        Image(systemName: "play.rectangle")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .resizable()
-                .scaledToFill()
-                .frame(width: isLandscape ? 112 : 128, height: isLandscape ? 63 : 72)
+            chapterThumbnail(chapter, size: thumbSize)
+                .frame(width: thumbSize.width, height: thumbSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(alignment: .bottomTrailing) {
                     Text(chapter.timeDescription ?? format(chapter.startTime))
@@ -293,6 +320,35 @@ struct ChapterListPanel: View {
         .padding(.vertical, 7)
         .background(isCurrent ? accentColor.opacity(0.10) : Color.clear)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func chapterThumbnail(_ chapter: VideoChapter, size: CGSize) -> some View {
+        if let url = chapter.thumbnailURL {
+            KFImage(url)
+                .thumbnail(size: CGSize(width: 128, height: 72)) {
+                    chapterThumbnailPlaceholder
+                }
+                .resizable()
+                .scaledToFill()
+        } else if let storyboard {
+            StoryboardChapterThumbnail(
+                storyboard: storyboard,
+                time: chapter.startTime,
+                duration: duration,
+                size: size
+            )
+        } else {
+            chapterThumbnailPlaceholder
+        }
+    }
+
+    private var chapterThumbnailPlaceholder: some View {
+        ZStack {
+            Color.primary.opacity(0.08)
+            Image(systemName: "play.rectangle")
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func format(_ value: TimeInterval) -> String {

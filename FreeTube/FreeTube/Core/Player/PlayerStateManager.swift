@@ -74,6 +74,8 @@ final class PlayerStateManager {
     var sponsorBlockSegments: [SponsorBlockSegment] { sponsorBlockCoordinator.segments }
     var chapters: [VideoChapter] = []
     var youtubeChapters: [VideoChapter] = []
+    /// True when displayed chapters come from SponsorBlock community submissions.
+    var usesCommunityChapters = false
     var storyboard: VideoStoryboard?
     /// Source tracks from the accepted playback response; signed URLs remain memory-only.
     var captionTracks: [VideoCaptionTrack] = []

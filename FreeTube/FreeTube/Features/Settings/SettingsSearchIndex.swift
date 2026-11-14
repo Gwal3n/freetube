@@ -253,7 +253,9 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .blockedContent, titles: ["Blocked content", "Hide Shorts", "Blocked keywords", "Blocked channels"]),
         Group(destination: .community, titles: [
-            "SponsorBlock & DeArrow", "SponsorBlock", "Segment colors", "Minimum length to auto-skip",
+            "SponsorBlock & DeArrow", "SponsorBlock", "Segment colors", "Channel whitelist",
+            "Full-video label on thumbnail", "Full-video label under seek bar",
+            "Minimum length to auto-skip",
             "Undo banner duration", "Replace titles", "Replace thumbnails",
             "Random frame if none submitted", "Show original toggle", "Sponsors", "Self-promotion",
             "Exclusive access", "Interaction reminders", "Intros", "Outros", "Previews",

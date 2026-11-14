@@ -29,6 +29,10 @@ extension PlayerStateManager {
 
     func loadSponsorBlockSegments(for videoID: String) {
         guard preferences.sponsorBlockEnabled else { return }
+        if preferences.isSponsorBlockWhitelisted(channelID: currentVideo?.channelID) {
+            clearSponsorBlockState()
+            return
+        }
         let categories = preferences.sponsorBlockCategories
         guard !categories.isEmpty else { return }
         sponsorBlockCoordinator.loadSegments(
@@ -124,6 +128,8 @@ extension PlayerStateManager {
 
     func clearSponsorBlockState() {
         sponsorBlockCoordinator.clear(on: player)
+        usesCommunityChapters = false
+        updateDisplayedChapters()
     }
 
     // MARK: - Chapters
@@ -131,6 +137,7 @@ extension PlayerStateManager {
     func clearChapterState() {
         youtubeChapters = []
         sponsorBlockCoordinator.clearCommunityChapters()
+        usesCommunityChapters = false
         chapters = []
     }
 
@@ -138,7 +145,8 @@ extension PlayerStateManager {
         // Community chapters are a separate optional source. If none were submitted, retain
         // YouTube chapters; neither source is mixed with the other or used for automatic seeks.
         let communityChapters = sponsorBlockCoordinator.communityChapters
-        chapters = communityChapters.isEmpty ? youtubeChapters : communityChapters
+        usesCommunityChapters = !communityChapters.isEmpty
+        chapters = usesCommunityChapters ? communityChapters : youtubeChapters
     }
 
 }

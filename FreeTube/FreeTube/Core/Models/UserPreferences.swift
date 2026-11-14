@@ -111,6 +111,12 @@ struct UserPreferences {
     @AppStorage("sponsorBlockFillerBehavior") var sponsorBlockFillerBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
     @AppStorage("sponsorBlockChapterBehavior") var sponsorBlockChapterBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
+    /// Corner badge on the player thumbnail for full-video SponsorBlock labels.
+    @AppStorage("sponsorBlockShowFullVideoThumbnailBadge") var sponsorBlockShowFullVideoThumbnailBadge: Bool = true
+    /// Colored stripe under the seek bar for full-video labels. Off by default.
+    @AppStorage("sponsorBlockShowFullVideoSeekStripe") var sponsorBlockShowFullVideoSeekStripe: Bool = false
+    /// Channel IDs that skip SponsorBlock lookups entirely.
+    @AppStorage("sponsorBlockChannelWhitelistJSON") var sponsorBlockChannelWhitelistJSON: String = "[]"
 
     // MARK: - Catalogued screen preferences
 
@@ -314,6 +320,28 @@ struct UserPreferences {
         case .highlight: sponsorBlockHighlightBehaviorRaw = behavior.rawValue
         case .chapter: sponsorBlockChapterBehaviorRaw = behavior.rawValue
         }
+    }
+
+    var sponsorBlockWhitelistedChannelIDs: [String] {
+        get {
+            guard let data = sponsorBlockChannelWhitelistJSON.data(using: .utf8),
+                  let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return ids.filter { !$0.isEmpty }
+        }
+        nonmutating set {
+            let unique = Array(Set(newValue.filter { !$0.isEmpty })).sorted()
+            guard let data = try? JSONEncoder().encode(unique),
+                  let json = String(data: data, encoding: .utf8) else {
+                sponsorBlockChannelWhitelistJSON = "[]"
+                return
+            }
+            sponsorBlockChannelWhitelistJSON = json
+        }
+    }
+
+    func isSponsorBlockWhitelisted(channelID: String?) -> Bool {
+        guard let channelID, !channelID.isEmpty else { return false }
+        return sponsorBlockWhitelistedChannelIDs.contains(channelID)
     }
 
     var appearanceMode: AppearanceMode {

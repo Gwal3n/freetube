@@ -15,7 +15,10 @@ struct PlayerChapterOverlay: View {
     var body: some View {
         ChapterListPanel(
             chapters: player.chapters,
-            elapsed: player.elapsed,
+            elapsed: player.pendingSeekTarget ?? player.elapsed,
+            usesCommunityChapters: player.usesCommunityChapters,
+            storyboard: player.storyboard,
+            duration: player.duration,
             isLandscape: isLandscape,
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
