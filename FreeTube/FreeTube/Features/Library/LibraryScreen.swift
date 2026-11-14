@@ -10,7 +10,6 @@ struct LibraryScreen: View {
     @AppStorage("libraryShelfContent") private var libraryShelfContentRaw = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") private var recentLibraryVideoCount = 5
     @AppStorage("saveWatchHistory") private var saveWatchHistory = true
-    @AppStorage("showDownloadsTab") private var showDownloadsTab = true
     @State private var localHistoryCount: Int?
     @State private var recentVideos: [WatchHistorySnapshot] = []
     @State private var resumableVideos: [WatchHistorySnapshot] = []
@@ -30,6 +29,7 @@ struct LibraryScreen: View {
                 videoShelf(libraryShelfContent.shelfTitle, entries: shelfEntries)
             }
             localHistorySection
+            downloadsSection
         }
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemBackground))
@@ -192,19 +192,23 @@ struct LibraryScreen: View {
                 )
             }
             .tint(Color.primary)
+        }
+    }
 
-            if !showDownloadsTab {
-                NavigationLink {
-                    DownloadsScreen(isEmbedded: true)
-                } label: {
-                    LibraryDestinationRow(
-                        title: "Downloads",
-                        subtitle: countSubtitle(downloads.entries.count, noun: "video"),
-                        systemImage: "arrow.down.circle"
-                    )
-                }
-                .tint(Color.primary)
+    /// Always available here, independent of whether Downloads is also a root tab.
+    @ViewBuilder
+    private var downloadsSection: some View {
+        Section {
+            NavigationLink {
+                DownloadsScreen(isEmbedded: true)
+            } label: {
+                LibraryDestinationRow(
+                    title: "Downloads",
+                    subtitle: countSubtitle(downloads.entries.count, noun: "video"),
+                    systemImage: "arrow.down.circle"
+                )
             }
+            .tint(Color.primary)
         }
     }
 

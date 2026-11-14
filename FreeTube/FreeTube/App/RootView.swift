@@ -213,11 +213,8 @@ struct RootView: View {
     private var tabShell: some View {
         RootTabShell(
             selection: $selectedTab,
-            showsFeed: showsFeed,
-            showsLibrary: showsLibrary,
-            showsDownloads: showDownloadsTab,
-            showsSearch: showSearchTab,
-            showsSettings: showSettingsTab
+            hideFeedForIncognito: incognitoEnabled && incognitoHideFeed,
+            hideLibraryForIncognito: incognitoEnabled && incognitoHideLibrary
         )
     }
 
