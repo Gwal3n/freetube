@@ -183,7 +183,7 @@ final class AppBackupService {
         "sponsorBlockIntroBehavior", "sponsorBlockOutroBehavior",
         "sponsorBlockSelfPromotionBehavior",
         "sponsorBlockColorOverridesJSON", "sponsorBlockMinimumSkipSeconds", "sponsorBlockNoticeSeconds",
-        "sponsorBlockShowFullVideoThumbnailBadge", "sponsorBlockShowFullVideoSeekStripe",
+        "sponsorBlockShowFullVideoSeekStripe",
         "sponsorBlockChannelWhitelistJSON",
         "sponsorBlockSponsorBehavior", "upNextInitialCount", "upNextRowSize",
         "showUpNextChannelAvatars"

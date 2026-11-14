@@ -212,13 +212,6 @@ struct FullScreenPlayer: View {
                             state: player.loadState,
                             isAudioOnly: player.isAudioOnly
                         )
-                        SponsorBlockFullVideoBadge(
-                            category: SponsorBlockSegment.primaryFullVideoLabel(
-                                in: player.sponsorBlockSegments
-                            )
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(10)
                     }
                     .modifier(PlayerZoomModifier(
                         model: zoomModel,

@@ -31,9 +31,6 @@ struct CommunityEnhancementsSettingsScreen: View {
             .disabled(!model.sponsorBlockEnabled)
 
             Section {
-                Toggle("Full-video label on thumbnail", isOn: $model.sponsorBlockShowFullVideoThumbnailBadge)
-                    .tint(settingsToggleTint)
-                    .settingsSearchRow("Full-video label on thumbnail")
                 Toggle("Full-video label under seek bar", isOn: $model.sponsorBlockShowFullVideoSeekStripe)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Full-video label under seek bar")

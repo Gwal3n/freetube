@@ -62,9 +62,6 @@ final class SettingsViewModel {
     var sponsorBlockNoticeSeconds: Double {
         didSet { preferences.sponsorBlockNoticeSeconds = sponsorBlockNoticeSeconds }
     }
-    var sponsorBlockShowFullVideoThumbnailBadge: Bool {
-        didSet { preferences.sponsorBlockShowFullVideoThumbnailBadge = sponsorBlockShowFullVideoThumbnailBadge }
-    }
     var sponsorBlockShowFullVideoSeekStripe: Bool {
         didSet { preferences.sponsorBlockShowFullVideoSeekStripe = sponsorBlockShowFullVideoSeekStripe }
     }
@@ -159,7 +156,6 @@ final class SettingsViewModel {
         self.sponsorBlockEnabled = preferences.sponsorBlockEnabled
         self.sponsorBlockMinimumSkipSeconds = preferences.sponsorBlockMinimumSkipSeconds
         self.sponsorBlockNoticeSeconds = preferences.sponsorBlockNoticeSeconds
-        self.sponsorBlockShowFullVideoThumbnailBadge = preferences.sponsorBlockShowFullVideoThumbnailBadge
         self.sponsorBlockShowFullVideoSeekStripe = preferences.sponsorBlockShowFullVideoSeekStripe
         self.playerControlLayout = preferences.playerControlLayout
         self.playerMoreMenuDividers = preferences.playerMoreMenuDividers

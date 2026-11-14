@@ -44,15 +44,6 @@ enum SponsorBlockCategory: String, CaseIterable, Codable, Hashable, Identifiable
         }
     }
 
-    var fullVideoThumbnailSystemImage: String? {
-        switch self {
-        case .sponsor: return "dollarsign.circle.fill"
-        case .exclusiveAccess: return "star.circle.fill"
-        case .selfPromotion: return "megaphone.fill"
-        default: return nil
-        }
-    }
-
     var displayName: String {
         switch self {
         case .sponsor: return String(localized: "Sponsors")

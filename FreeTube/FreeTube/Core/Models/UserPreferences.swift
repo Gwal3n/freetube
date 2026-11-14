@@ -111,8 +111,6 @@ struct UserPreferences {
     @AppStorage("sponsorBlockFillerBehavior") var sponsorBlockFillerBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
     @AppStorage("sponsorBlockHighlightBehavior") var sponsorBlockHighlightBehaviorRaw: String = SponsorBlockBehavior.ask.rawValue
     @AppStorage("sponsorBlockChapterBehavior") var sponsorBlockChapterBehaviorRaw: String = SponsorBlockBehavior.disabled.rawValue
-    /// Corner badge on the player thumbnail for full-video SponsorBlock labels.
-    @AppStorage("sponsorBlockShowFullVideoThumbnailBadge") var sponsorBlockShowFullVideoThumbnailBadge: Bool = true
     /// Colored stripe under the seek bar for full-video labels. Off by default.
     @AppStorage("sponsorBlockShowFullVideoSeekStripe") var sponsorBlockShowFullVideoSeekStripe: Bool = false
     /// Channel IDs that skip SponsorBlock lookups entirely.

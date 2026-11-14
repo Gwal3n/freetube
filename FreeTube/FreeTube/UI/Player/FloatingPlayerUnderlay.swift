@@ -19,13 +19,6 @@ struct FloatingPlayerUnderlay: View {
                         isAudioOnly: player.isAudioOnly
                     )
                     .frame(width: layout.frameInGlobal.width, height: layout.frameInGlobal.height)
-                    SponsorBlockFullVideoBadge(
-                        category: SponsorBlockSegment.primaryFullVideoLabel(
-                            in: player.sponsorBlockSegments
-                        )
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(6)
                     // Mirror the existing compact chrome below the tab bar so its corner
                     // controls and progress track continue with the video during a drag.
                     // The root-owned chrome remains the only interactive copy.
