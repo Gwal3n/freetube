@@ -149,6 +149,11 @@ struct PlayerSettingsScreen: View {
                 Toggle("Show description", isOn: Bindable(model).showDescription)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show description")
+                if model.showDescription {
+                    Toggle("Collapsed description preview", isOn: Bindable(model).showCollapsedDescriptionPreview)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Collapsed description preview")
+                }
                 Toggle("Show comments", isOn: Bindable(model).showComments)
                     .tint(settingsToggleTint)
                     .settingsSearchRow("Show comments")

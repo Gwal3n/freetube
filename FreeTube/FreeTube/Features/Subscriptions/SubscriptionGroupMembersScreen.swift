@@ -43,7 +43,7 @@ struct SubscriptionGroupMembersScreen: View {
                     ContentUnavailableView(
                         "No channels in this group",
                         systemImage: "person.2.slash",
-                        description: Text("Add channels from your local subscriptions.")
+                        description: Text("Add channels from your subscriptions.")
                     )
                 } else {
                     ForEach(members) { channel in

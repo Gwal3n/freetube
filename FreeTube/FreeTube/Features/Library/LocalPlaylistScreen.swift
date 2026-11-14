@@ -205,7 +205,7 @@ struct LocalPlaylistScreen: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Local ordering, removals, and description edits will be replaced with the current public playlist.")
+            Text("Ordering, removals, and description edits will be replaced with the current public playlist.")
         }
         .confirmationDialog(
             "Remove selected videos?",

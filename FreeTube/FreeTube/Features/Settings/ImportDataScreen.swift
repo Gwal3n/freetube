@@ -49,7 +49,7 @@ struct ImportDataScreen: View {
             case .restoring:
                 "Replacing local data from your backup…"
             case .importingSubscriptions:
-                "Adding channels to Local Subscriptions…"
+                "Adding channels to Subscriptions…"
             case .importingPlaylistArchive:
                 "Restoring playlists with saved video information…"
             case .importingPlaylists(let completed, let total):
@@ -128,10 +128,10 @@ struct ImportDataScreen: View {
                 Button {
                     Task { await exportPlaylists() }
                 } label: {
-                    Label("Export Local Playlists", systemImage: "square.and.arrow.up")
+                    Label("Export Playlists", systemImage: "square.and.arrow.up")
                 }
                 .disabled(isWorking)
-                .settingsSearchRow("Export Local Playlists")
+                .settingsSearchRow("Export Playlists")
                 Button {
                     presentImporter(.playlistArchive)
                 } label: {
@@ -355,7 +355,7 @@ struct ImportDataScreen: View {
             }
             if imported > 0 {
                 let skippedNote = skipped.isEmpty ? "" : " Skipped: \(skipped.joined(separator: ", "))."
-                resultMessage = "Imported \(imported) \(imported == 1 ? "playlist" : "playlists"). Video information will resolve from Local Playlists.\(skippedNote)"
+                resultMessage = "Imported \(imported) \(imported == 1 ? "playlist" : "playlists"). Video information will resolve from Playlists.\(skippedNote)"
                 await LocalPlaylistHydrationCoordinator.shared.startIfNeeded()
             } else if !skipped.isEmpty {
                 errorMessage = "Skipped: \(skipped.joined(separator: ", "))"

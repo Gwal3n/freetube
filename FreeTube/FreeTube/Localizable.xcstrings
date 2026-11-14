@@ -155,6 +155,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter un mot bloqué" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавить запрещённое слово" } }
     } },
+    "Add channels from your subscriptions." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Kanäle aus deinen Abonnements hinzufügen." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Add channels from your subscriptions." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Añade canales de tus suscripciones." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajoutez des chaînes depuis vos abonnements." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавьте каналы из подписок." } }
+    } },
     "Add custom speed" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Eigene Geschwindigkeit hinzufügen" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Add custom speed" } },
@@ -196,6 +203,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadir al abrir un vídeo" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter à l’ouverture d’une vidéo" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавлять при открытии видео" } }
+    } },
+    "Adding channels to Subscriptions…" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Kanäle werden zu Abonnements hinzugefügt…" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Adding channels to Subscriptions…" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadiendo canales a Suscripciones…" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajout des chaînes aux Abonnements…" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавление каналов в Подписки…" } }
     } },
     "Affected channels" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Betroffene Kanäle" } },
@@ -581,6 +595,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Cerrar reproductor a pantalla completa" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fermer le lecteur plein écran" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Закрыть полноэкранный плеер" } }
+    } },
+    "Collapsed description preview" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Vorschau der eingeklappten Beschreibung" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Collapsed description preview" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Vista previa de descripción contraída" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aperçu de la description réduite" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Превью свёрнутого описания" } }
     } },
     "Comments" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Kommentare" } },
@@ -1169,6 +1190,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportar listas locales" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Exporter les playlists locales" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Экспорт локальных плейлистов" } }
+    } },
+    "Export Playlists" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Playlists exportieren" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Playlists" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportar listas" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Exporter les playlists" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Экспорт плейлистов" } }
     } },
     "Export Subscriptions CSV" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Abonnements als CSV exportieren" } },
@@ -1961,6 +1989,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun téléchargement" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет загрузок" } }
     } },
+    "No History" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Kein Verlauf" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "No History" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin historial" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun historique" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет истории" } }
+    } },
     "No indicator" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Kein Indikator" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "No indicator" } },
@@ -2135,6 +2170,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Funciones opcionales y anónimas de SponsorBlock y DeArrow." } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fonctions facultatives et anonymes de SponsorBlock et DeArrow." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Необязательные анонимные функции SponsorBlock и DeArrow." } }
+    } },
+    "Ordering, removals, and description edits will be replaced with the current public playlist." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Reihenfolge, Entfernungen und Beschreibungstexte werden durch die aktuelle öffentliche Playlist ersetzt." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Ordering, removals, and description edits will be replaced with the current public playlist." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "El orden, las eliminaciones y las ediciones de descripción se reemplazarán con la lista pública actual." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’ordre, les suppressions et les modifications de description seront remplacés par la playlist publique actuelle." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Порядок, удаления и правки описания будут заменены текущим публичным плейлистом." } }
     } },
     "Orientation" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Ausrichtung" } },
@@ -2534,6 +2576,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Quitar" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Retirer" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удалить" } }
+    } },
+    "Remove all subscriptions?" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Alle Abonnements entfernen?" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove all subscriptions?" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Eliminar todas las suscripciones?" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer tous les abonnements ?" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удалить все подписки?" } }
     } },
     "Remove downloaded file" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Heruntergeladene Datei entfernen" } },
@@ -3039,6 +3088,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher seulement marque les segments sur la barre. Les chapitres communautaires apparaissent dans la liste et les étiquettes de vidéo entière marquent toute la barre. Demander propose de passer à un temps fort." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Только показывать отмечает сегменты на шкале. Главы сообщества появляются в списке, а метки всего видео отмечают всю шкалу. Спрашивать предлагает перейти к интересному моменту." } }
     } },
+    "Show original toggle" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Original-Umschalter anzeigen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Show original toggle" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar interruptor de original" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher le commutateur d’original" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показывать переключатель оригинала" } }
+    } },
     "Show Save button" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Speichern-Taste anzeigen" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Show Save button" } },
@@ -3445,6 +3501,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ceci supprime tous les fichiers dans Documents/Logs/. Si « Enregistrer les journaux dans un fichier » est activé, un nouveau fichier journal sera ouvert pour les nouvelles entrées." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Это удалит все файлы в Documents/Logs/. Если включён параметр «Сохранять логи в файл», для новых записей будет создан новый файл лога." } }
     } },
+    "This removes the playlist and its saved entries." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Dadurch werden die Playlist und ihre gespeicherten Einträge entfernt." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "This removes the playlist and its saved entries." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Esto elimina la lista y sus entradas guardadas." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cela supprime la playlist et ses entrées enregistrées." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удаляет плейлист и сохранённые записи." } }
+    } },
     "Thumbnail size" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Miniaturgröße" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Thumbnail size" } },
@@ -3689,6 +3752,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Vídeos mostrados al inicio" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vidéos affichées au départ" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Видео при первом показе" } }
+    } },
+    "Videos you watch will appear here." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Videos, die du ansiehst, erscheinen hier." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Videos you watch will appear here." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Los vídeos que veas aparecerán aquí." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les vidéos que vous regardez apparaîtront ici." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Здесь появятся видео, которые вы смотрите." } }
     } },
     "View count batch interval" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Intervall für Aufrufzahlen" } },

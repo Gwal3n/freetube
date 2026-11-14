@@ -114,6 +114,9 @@ enum SettingsSearchIndex {
                 || displayTitle == String(localized: "Right side"))
                 && UserPreferences().playerVerticalSwipeAction != .adjustPlayback:
                 return String(localized: "Vertical swipe in fullscreen")
+            case .player where displayTitle == String(localized: "Collapsed description preview")
+                && !UserPreferences().showDescription:
+                return String(localized: "Show description")
             case .player where displayTitle == String(localized: "Featured comment preview")
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
@@ -157,6 +160,9 @@ enum SettingsSearchIndex {
             case .community where displayTitle == String(localized: "Random frame if none submitted")
                 && !UserPreferences().deArrowThumbnails:
                 return String(localized: "Replace thumbnails")
+            case .community where displayTitle == String(localized: "Show original toggle")
+                && !(UserPreferences().deArrowTitles || UserPreferences().deArrowThumbnails):
+                return String(localized: "Replace titles")
             case .community where displayTitle == String(localized: "Segment colors")
                 && !UserPreferences().sponsorBlockEnabled:
                 return String(localized: "SponsorBlock")
@@ -189,6 +195,7 @@ enum SettingsSearchIndex {
             "Vertical swipe in fullscreen", "Left side", "Right side",
             "Show Save button", "Show Share button", "Show Download button", "Scrubber color", "Custom scrubber color",
             "Remember mini player position", "Transport buttons", "Seek amount", "Show description",
+            "Collapsed description preview",
             "Show comments", "Pin Comments heading", "Load more as you scroll", "Show commenter photos",
             "Tap commenter to open channel", "Featured comment preview", "Show Up Next",
             "Pin Up Next heading", "Show channel avatars", "Tap channel to open", "Thumbnail size",
@@ -231,7 +238,7 @@ enum SettingsSearchIndex {
         ]),
         Group(destination: .importExport, titles: [
             "Import & Export", "Export All Settings and Data", "Import Full Backup",
-            "Export Subscriptions CSV", "Import Subscriptions CSV", "Export Local Playlists",
+            "Export Subscriptions CSV", "Import Subscriptions CSV", "Export Playlists",
             "Import Playlist Archive", "Import Playlist CSV Files"
         ]),
         Group(destination: .downloads, titles: [
@@ -248,7 +255,7 @@ enum SettingsSearchIndex {
         Group(destination: .community, titles: [
             "SponsorBlock & DeArrow", "SponsorBlock", "Segment colors", "Minimum length to auto-skip",
             "Undo banner duration", "Replace titles", "Replace thumbnails",
-            "Random frame if none submitted", "Sponsors", "Self-promotion",
+            "Random frame if none submitted", "Show original toggle", "Sponsors", "Self-promotion",
             "Exclusive access", "Interaction reminders", "Intros", "Outros", "Previews",
             "Hooks and greetings", "Non-music sections", "Filler", "Highlights",
             "Community chapters"

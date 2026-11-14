@@ -7,6 +7,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
     @AppStorage("pinUpNextHeading") private var pinUpNextHeading = false
     @AppStorage("pinQueueHeading") private var pinQueueHeading = false
+    @AppStorage("showCollapsedDescriptionPreview") private var showCollapsedDescriptionPreview = true
     let video: Video
     let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
@@ -125,6 +126,7 @@ struct PlayerInformationPanel<Actions: View>: View {
             isExpanded: isDetailsExpanded,
             isLoading: isLoadingDetails,
             loadFailed: detailsLoadFailed,
+            showsCollapsedPreview: showCollapsedDescriptionPreview,
             onSeek: onSeek,
             onRetry: onRetryDetails,
             onExpand: onExpandDetails

@@ -57,7 +57,7 @@ struct LocalHistoryScreen: View {
         historyContent
             .navigationTitle(mode == .continueWatching
                              ? String(localized: "Continue Watching")
-                             : String(localized: "Local History"))
+                             : String(localized: "History"))
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: mode == .continueWatching
                         ? Text("Search continue watching") : Text("Search history"))
@@ -117,9 +117,9 @@ struct LocalHistoryScreen: View {
                             )
                         } else {
                             ContentUnavailableView(
-                                "No Local History",
+                                "No History",
                                 systemImage: "clock.arrow.circlepath",
-                                description: Text("Videos you watch will appear here on this device.")
+                                description: Text("Videos you watch will appear here.")
                             )
                         }
                     }

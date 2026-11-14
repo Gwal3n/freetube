@@ -42,7 +42,7 @@ struct LocalPlaylistsScreen: View {
         playlistList
         .environment(\.editMode, $editMode)
         .initialContentLoading(hasLoaded: hasLoaded)
-        .navigationTitle("Local Playlists")
+        .navigationTitle("Playlists")
         .searchable(text: $searchText, prompt: "Search playlists")
         .onChange(of: searchText) { _, newValue in
             if !newValue.isEmpty && editMode.isEditing { finishEditing() }
@@ -125,7 +125,7 @@ struct LocalPlaylistsScreen: View {
             }
             Button("Cancel", role: .cancel) { pendingContextDeletion = nil }
         } message: {
-            Text("This removes the local playlist and its saved entries.")
+            Text("This removes the playlist and its saved entries.")
         }
         .sheet(item: $editingPlaylist) { playlist in
             EditLocalPlaylistSheet(playlist: playlist) { title, description in
@@ -139,7 +139,7 @@ struct LocalPlaylistsScreen: View {
     private var emptyStateOverlay: some View {
         if hasLoaded && playlists.isEmpty {
             ContentUnavailableView(
-                "No local playlists",
+                "No playlists",
                 systemImage: "music.note.list",
                 description: Text("Create a playlist here or import playlists from Settings.")
             )

@@ -41,6 +41,7 @@ struct UserPreferences {
     @AppStorage("automaticFeedViewCountInterval") var automaticFeedViewCountIntervalRaw: String = FeedRefreshInterval.hourly.rawValue
     @AppStorage("showComments") var showComments: Bool = true
     @AppStorage("showDescription") var showDescription: Bool = true
+    @AppStorage("showCollapsedDescriptionPreview") var showCollapsedDescriptionPreview: Bool = true
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("featuredCommentsNearPlaybackOnly") var featuredCommentsNearPlaybackOnly: Bool = false
     @AppStorage("showCommentAuthorPhotos") var showCommentAuthorPhotos: Bool = true
@@ -68,6 +69,7 @@ struct UserPreferences {
     @AppStorage("com.leshko.freetube.deArrowTitles") var deArrowTitles: Bool = false
     @AppStorage("com.leshko.freetube.deArrowThumbnails") var deArrowThumbnails: Bool = false
     @AppStorage("com.leshko.freetube.deArrowRandomThumbnails") var deArrowRandomThumbnails: Bool = true
+    @AppStorage("com.leshko.freetube.deArrowShowOriginalToggle") var deArrowShowOriginalToggle: Bool = true
     @AppStorage("playerTopControlOrder") var playerTopControlOrderRaw: String = PlayerTopControl.encodeOrder(PlayerTopControl.defaultOrder)
     @AppStorage("hiddenPlayerTopControls") var hiddenPlayerTopControlsRaw: String = ""
     @AppStorage("playerControlLayout") var playerControlLayoutRaw: String = ""

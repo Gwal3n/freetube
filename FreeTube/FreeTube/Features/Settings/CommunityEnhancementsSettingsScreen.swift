@@ -75,6 +75,11 @@ struct CommunityEnhancementsSettingsScreen: View {
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Random frame if none submitted")
                 }
+                if model.deArrowTitles || model.deArrowThumbnails {
+                    Toggle("Show original toggle", isOn: $model.deArrowShowOriginalToggle)
+                        .tint(settingsToggleTint)
+                        .settingsSearchRow("Show original toggle")
+                }
             } header: {
                 Text(verbatim: "DeArrow")
             }

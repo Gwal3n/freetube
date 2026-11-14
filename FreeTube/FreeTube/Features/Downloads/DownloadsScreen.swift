@@ -4,6 +4,7 @@ import UIKit
 
 @available(iOS 17.0, *)
 struct DownloadsScreen: View {
+    var isEmbedded: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppNavigationRouter.self) private var navigationRouter
     @State private var model = DownloadsViewModel()
@@ -108,7 +109,18 @@ struct DownloadsScreen: View {
     private var totalCount: Int { store.entries.count }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        Group {
+            if isEmbedded {
+                downloadsRoot
+            } else {
+                NavigationStack(path: $path) {
+                    downloadsRoot
+                }
+            }
+        }
+    }
+
+    private var downloadsRoot: some View {
             List(selection: $selectedIDs) {
                 if totalCount > 0 {
                     Section {
@@ -349,13 +361,12 @@ struct DownloadsScreen: View {
                 }
             }
             .onChange(of: navigationRouter.downloads?.id, initial: true) { _, _ in
-                guard let request = navigationRouter.downloads else { return }
+                guard !isEmbedded, let request = navigationRouter.downloads else { return }
                 navigationRouter.downloads = nil
                 AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
                     .info("Downloads received player destination")
                 path.append(request.destination)
             }
-        }
     }
 
     // MARK: - Saved section header (stats + sort)

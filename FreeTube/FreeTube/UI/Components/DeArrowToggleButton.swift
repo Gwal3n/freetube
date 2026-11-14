@@ -6,10 +6,11 @@ struct DeArrowToggleButton: View {
     let video: Video
     let model: DeArrowVideoViewModel
     var onThumbnail = false
+    @AppStorage("com.leshko.freetube.deArrowShowOriginalToggle") private var showOriginalToggle = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if model.hasReplacement(for: video) {
+        if showOriginalToggle, model.hasReplacement(for: video) {
             Button {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                     model.toggleOriginal(for: video)

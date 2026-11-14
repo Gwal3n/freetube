@@ -23,7 +23,7 @@ struct LocalSubscriptionsScreen: View {
         Group {
             if store.subscriptions.isEmpty {
                 ContentUnavailableView(
-                    "No local subscriptions",
+                    "No subscriptions",
                     systemImage: "person.2.slash",
                     description: Text(
                         "Subscribe from a channel page or import a YouTube subscriptions CSV in Settings."
@@ -88,7 +88,7 @@ struct LocalSubscriptionsScreen: View {
                 }
             }
         }
-        .navigationTitle("Local subscriptions")
+        .navigationTitle("Subscriptions")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search subscriptions")
         .toolbar {
@@ -103,7 +103,7 @@ struct LocalSubscriptionsScreen: View {
             }
         }
         .confirmationDialog(
-            "Remove all local subscriptions?",
+            "Remove all subscriptions?"
             isPresented: $showingClearConfirmation,
             titleVisibility: .visible
         ) {

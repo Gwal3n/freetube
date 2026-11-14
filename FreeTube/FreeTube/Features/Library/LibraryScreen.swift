@@ -10,6 +10,7 @@ struct LibraryScreen: View {
     @AppStorage("libraryShelfContent") private var libraryShelfContentRaw = LibraryShelfContent.continueWatching.rawValue
     @AppStorage("recentLibraryVideoCount") private var recentLibraryVideoCount = 5
     @AppStorage("saveWatchHistory") private var saveWatchHistory = true
+    @AppStorage("showDownloadsTab") private var showDownloadsTab = true
     @State private var localHistoryCount: Int?
     @State private var recentVideos: [WatchHistorySnapshot] = []
     @State private var resumableVideos: [WatchHistorySnapshot] = []
@@ -17,6 +18,7 @@ struct LibraryScreen: View {
     @State private var savedMomentStore = SavedMomentStore.shared
     @State private var blocklist = VideoBlocklist.shared
     @State private var localPlaylistCount: Int?
+    @State private var downloads = DownloadsStore.shared
     @State private var externalDestination: AppNavigationRequest.Destination?
     @State private var rootIsVisible = false
     @State private var didLoadRootData = false
@@ -132,7 +134,7 @@ struct LibraryScreen: View {
                     .onAppear { log.info("Library history destination appeared") }
             } label: {
                 LibraryDestinationRow(
-                    title: "Local history",
+                    title: "History",
                     subtitle: countSubtitle(localHistoryCount, noun: "video"),
                     systemImage: "clock.arrow.circlepath"
                 )
@@ -172,7 +174,7 @@ struct LibraryScreen: View {
                     .onAppear { log.info("Library subscriptions destination appeared") }
             } label: {
                 LibraryDestinationRow(
-                    title: "Local subscriptions",
+                    title: "Subscriptions",
                     subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
                     systemImage: "person.2.fill"
                 )
@@ -184,12 +186,25 @@ struct LibraryScreen: View {
                     .onAppear { log.info("Library playlists destination appeared") }
             } label: {
                 LibraryDestinationRow(
-                    title: "Local playlists",
+                    title: "Playlists",
                     subtitle: countSubtitle(localPlaylistCount, noun: "playlist"),
                     systemImage: "music.note.list"
                 )
             }
             .tint(Color.primary)
+
+            if !showDownloadsTab {
+                NavigationLink {
+                    DownloadsScreen(isEmbedded: true)
+                } label: {
+                    LibraryDestinationRow(
+                        title: "Downloads",
+                        subtitle: countSubtitle(downloads.entries.count, noun: "video"),
+                        systemImage: "arrow.down.circle"
+                    )
+                }
+                .tint(Color.primary)
+            }
         }
     }
 

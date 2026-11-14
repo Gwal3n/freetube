@@ -8,46 +8,55 @@ struct PlayerDescription: View {
     let isExpanded: Bool
     let isLoading: Bool
     let loadFailed: Bool
+    var showsCollapsedPreview: Bool = true
     let onSeek: (TimeInterval) -> Void
     let onRetry: () -> Void
     let onExpand: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var showsCollapsedText: Bool {
+        !isExpanded && showsCollapsedPreview && text != nil
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if isExpanded {
-                if let text {
-                    RichDescriptionText(parts: parts, fallback: text, onSeek: onSeek)
-                        .appFont(.subheadline)
-                        .foregroundStyle(.primary)
-                        .transition(.opacity)
-                } else if isLoading {
-                    PlayerDescriptionPlaceholder()
-                        .transition(.opacity)
-                } else if loadFailed {
-                    HStack(spacing: 8) {
-                        Text("Description unavailable").appFont(.subheadline).foregroundStyle(.secondary)
-                        Button("Retry", action: onRetry)
-                            .font(.caption.weight(.semibold))
-                            .buttonStyle(.bordered)
+        Group {
+            if isExpanded || showsCollapsedText {
+                VStack(alignment: .leading, spacing: 8) {
+                    if isExpanded {
+                        if let text {
+                            RichDescriptionText(parts: parts, fallback: text, onSeek: onSeek)
+                                .appFont(.subheadline)
+                                .foregroundStyle(.primary)
+                                .transition(.opacity)
+                        } else if isLoading {
+                            PlayerDescriptionPlaceholder()
+                                .transition(.opacity)
+                        } else if loadFailed {
+                            HStack(spacing: 8) {
+                                Text("Description unavailable").appFont(.subheadline).foregroundStyle(.secondary)
+                                Button("Retry", action: onRetry)
+                                    .font(.caption.weight(.semibold))
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                    } else if let text {
+                        Button(action: onExpand) {
+                            Text(text)
+                                .appFont(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ResponsiveButtonStyle())
+                        .accessibilityHint("Expand description")
                     }
                 }
-            } else if let text {
-                Button(action: onExpand) {
-                    Text(text)
-                        .appFont(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ResponsiveButtonStyle())
-                .accessibilityHint("Expand description")
+                .padding(.horizontal)
             }
         }
-        .padding(.horizontal)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isExpanded)
         .animation(reduceMotion ? nil : InterfaceMotion.content, value: isLoading)
     }

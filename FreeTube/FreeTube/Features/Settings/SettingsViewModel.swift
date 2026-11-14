@@ -50,6 +50,9 @@ final class SettingsViewModel {
     var deArrowRandomThumbnails: Bool {
         didSet { preferences.deArrowRandomThumbnails = deArrowRandomThumbnails }
     }
+    var deArrowShowOriginalToggle: Bool {
+        didSet { preferences.deArrowShowOriginalToggle = deArrowShowOriginalToggle }
+    }
     var sponsorBlockEnabled: Bool {
         didSet { preferences.sponsorBlockEnabled = sponsorBlockEnabled }
     }
@@ -146,6 +149,7 @@ final class SettingsViewModel {
         self.deArrowTitles = preferences.deArrowTitles
         self.deArrowThumbnails = preferences.deArrowThumbnails
         self.deArrowRandomThumbnails = preferences.deArrowRandomThumbnails
+        self.deArrowShowOriginalToggle = preferences.deArrowShowOriginalToggle
         self.sponsorBlockEnabled = preferences.sponsorBlockEnabled
         self.sponsorBlockMinimumSkipSeconds = preferences.sponsorBlockMinimumSkipSeconds
         self.sponsorBlockNoticeSeconds = preferences.sponsorBlockNoticeSeconds
@@ -245,6 +249,11 @@ final class SettingsViewModel {
     var showDescription: Bool {
         get { preferences.showDescription }
         set { preferences.showDescription = newValue }
+    }
+
+    var showCollapsedDescriptionPreview: Bool {
+        get { preferences.showCollapsedDescriptionPreview }
+        set { preferences.showCollapsedDescriptionPreview = newValue }
     }
 
     var showSearchSuggestions: Bool {
