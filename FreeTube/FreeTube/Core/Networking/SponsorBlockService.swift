@@ -60,7 +60,8 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
     ) async throws -> [SponsorBlockSegment] {
         guard !videoID.isEmpty, !categories.isEmpty else { return [] }
         let categoryValues = categories.map(\.rawValue).sorted()
-        let cacheKey = "\(videoID)|\(categoryValues.joined(separator: ","))" as NSString
+        let actionTypeValues = Self.actionTypes(for: categories)
+        let cacheKey = "\(videoID)|\(categoryValues.joined(separator: ","))|\(actionTypeValues.joined(separator: ","))" as NSString
         if let cached = cache.object(forKey: cacheKey) {
             return cached.segments
         }
@@ -70,11 +71,18 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
         guard var components = URLComponents(
             string: "https://sponsor.ajay.app/api/skipSegments/\(prefix)"
         ) else { throw URLError(.badURL) }
+        // The API defaults to actionTypes=["skip"], which omits chapters, highlights (poi),
+        // and full-video labels. Request only the action types our enabled categories need.
         let categoriesData = try JSONEncoder().encode(categoryValues)
-        guard let categoriesJSON = String(data: categoriesData, encoding: .utf8) else {
+        let actionTypesData = try JSONEncoder().encode(actionTypeValues)
+        guard let categoriesJSON = String(data: categoriesData, encoding: .utf8),
+              let actionTypesJSON = String(data: actionTypesData, encoding: .utf8) else {
             throw URLError(.badURL)
         }
-        components.queryItems = [URLQueryItem(name: "categories", value: categoriesJSON)]
+        components.queryItems = [
+            URLQueryItem(name: "categories", value: categoriesJSON),
+            URLQueryItem(name: "actionTypes", value: actionTypesJSON),
+        ]
         guard let url = components.url else { throw URLError(.badURL) }
 
         var request = URLRequest(url: url)
@@ -91,6 +99,19 @@ final class SponsorBlockService: SponsorBlockServicing, @unchecked Sendable {
         let result = try Self.decodeSegments(data, videoID: videoID, categories: categories)
         if !result.isEmpty { cache.setObject(CacheEntry(segments: result), forKey: cacheKey) }
         return result
+    }
+
+    /// Action types required for the enabled categories. Server default is only `skip`.
+    static func actionTypes(for categories: Set<SponsorBlockCategory>) -> [String] {
+        var types: [String] = []
+        let skipCategories: Set<SponsorBlockCategory> = [
+            .sponsor, .selfPromotion, .interaction, .intro, .outro, .preview, .hook, .musicOfftopic, .filler
+        ]
+        if !categories.isDisjoint(with: skipCategories) { types.append("skip") }
+        if categories.contains(where: \.supportsFullVideoLabel) { types.append("full") }
+        if categories.contains(.highlight) { types.append("poi") }
+        if categories.contains(.chapter) { types.append("chapter") }
+        return types
     }
 
     /// Keeps SponsorBlock's chapter and full-video actions distinct from skippable ranges.
