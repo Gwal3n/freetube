@@ -89,20 +89,22 @@ enum PlayerViewportLayout {
         return min(max(naturalHeight, compactHeight), viewportHeight * 0.72)
     }
 
-    /// Tracks the timeline thumb while keeping the selected preview width plus edge clearance
-    /// wholly inside the player surface at both ends of the video.
+    /// Tracks the timeline thumb while keeping the preview wholly inside the player surface at
+    /// both ends of the video. `edgeClearance` reserves each side's time label, so the preview
+    /// stops beside it rather than sliding over it.
     static func storyboardPreviewX(
         time: TimeInterval,
         duration: TimeInterval,
         surfaceWidth: CGFloat,
-        previewWidth: CGFloat = 116
+        previewWidth: CGFloat = 116,
+        edgeClearance: CGFloat = 8
     ) -> CGFloat {
         guard duration.isFinite, duration > 0, time.isFinite, surfaceWidth > 0 else {
             return surfaceWidth / 2
         }
         let fraction = min(max(time / duration, 0), 1)
         let trackX = 12 + (surfaceWidth - 24) * CGFloat(fraction)
-        let minimumCenterX = previewWidth / 2 + 8
+        let minimumCenterX = previewWidth / 2 + edgeClearance
         guard surfaceWidth >= minimumCenterX * 2 else { return surfaceWidth / 2 }
         return min(max(trackX, minimumCenterX), surfaceWidth - minimumCenterX)
     }

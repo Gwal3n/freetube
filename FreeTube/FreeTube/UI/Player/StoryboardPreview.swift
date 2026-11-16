@@ -11,6 +11,10 @@ struct StoryboardPreview: View {
     let previewTime: TimeInterval
     let chapterTitle: String?
     let style: SeekPreviewStyle
+    /// Shifts only the time line, so it can stop beside the timeline's clocks while the image
+    /// keeps following the thumb.
+    var labelOffset: CGFloat = 0
+    var onLabelWidthChange: (CGFloat) -> Void = { _ in }
 
     private var previewSize: CGSize {
         let sourceAspect = tile.width > 0 && tile.height > 0
@@ -49,7 +53,13 @@ struct StoryboardPreview: View {
             // timestamp lines up with the player's existing time labels.
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            seekPreviewTimeLabel(previewTime, chapterTitle: chapterTitle, style: style)
+            seekPreviewTimeLabel(
+                previewTime,
+                chapterTitle: chapterTitle,
+                style: style,
+                onWidthChange: onLabelWidthChange
+            )
+            .offset(x: labelOffset)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -64,6 +74,10 @@ struct AudioOnlySeekPreview: View {
     let previewTime: TimeInterval
     let chapterTitle: String?
     let style: SeekPreviewStyle
+    /// Shifts only the time line, so it can stop beside the timeline's clocks while the image
+    /// keeps following the thumb.
+    var labelOffset: CGFloat = 0
+    var onLabelWidthChange: (CGFloat) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 3) {
@@ -88,7 +102,13 @@ struct AudioOnlySeekPreview: View {
             }
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            seekPreviewTimeLabel(previewTime, chapterTitle: chapterTitle, style: style)
+            seekPreviewTimeLabel(
+                previewTime,
+                chapterTitle: chapterTitle,
+                style: style,
+                onWidthChange: onLabelWidthChange
+            )
+            .offset(x: labelOffset)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -109,7 +129,8 @@ private func seekPreviewTimestamp(_ time: TimeInterval) -> String {
 private func seekPreviewTimeLabel(
     _ time: TimeInterval,
     chapterTitle: String?,
-    style: SeekPreviewStyle
+    style: SeekPreviewStyle,
+    onWidthChange: @escaping (CGFloat) -> Void
 ) -> some View {
     HStack(spacing: 5) {
         Text(verbatim: seekPreviewTimestamp(time))
@@ -124,6 +145,11 @@ private func seekPreviewTimeLabel(
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+        proxy.size.width
+    } action: { width in
+        onWidthChange(width)
     }
     .foregroundStyle(.white)
     .frame(maxWidth: style.maximumWidth + 40)
