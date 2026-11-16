@@ -18,8 +18,10 @@ struct PlaylistContextPreview: View {
                 if let channel = playlist.channelName, !channel.isEmpty {
                     Text(channel).appFont(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
-                if let count = playlist.videoCount {
-                    Text("\(count.formatted()) videos").appFont(.caption).foregroundStyle(.secondary)
+                if playlist.isMix {
+                    Text("Mix").appFont(.caption).foregroundStyle(.secondary)
+                } else if let count = playlist.videoCount, count > 0 {
+                    Text("\(count) videos").appFont(.caption).foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

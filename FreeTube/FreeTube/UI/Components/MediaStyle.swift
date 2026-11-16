@@ -43,4 +43,16 @@ extension View {
         listRowSeparator(.hidden)
             .listRowInsets(MediaStyle.listRowInsets)
     }
+
+    /// A hairline edge, as on Music artwork, so letterboxed or black thumbnails keep a visible
+    /// shape against the page in both appearances.
+    func mediaArtworkOutline(cornerRadius: CGFloat = MediaStyle.thumbnailRadius) -> some View {
+        overlay {
+            if cornerRadius > 0 {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
 }

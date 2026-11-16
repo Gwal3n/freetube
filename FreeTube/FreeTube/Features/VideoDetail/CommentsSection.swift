@@ -125,10 +125,12 @@ struct CommentsSection: View {
                                 Task { await model.loadMore() }
                             } label: {
                                 Label("Load more comments", systemImage: "chevron.down")
+                                    .font(.subheadline.weight(.medium))
                                     .frame(maxWidth: .infinity, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.primary)
+                            .buttonStyle(ResponsiveButtonStyle())
+                            .foregroundStyle(.tint)
                         }
                     }
                 }
@@ -152,47 +154,16 @@ struct CommentsSection: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
 
-            Menu {
-                if model.sortingModes.count > 1 {
-                    ForEach(model.sortingModes) { mode in
-                        Button {
-                            if !isExpanded {
-                                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                                    isExpanded = true
-                                }
-                            }
-                            expandedReplyCommentIDs.removeAll()
-                            Task { await model.selectSortingMode(mode) }
-                        } label: {
-                            if mode.isSelected {
-                                Label(sortLabel(for: mode), systemImage: "checkmark")
-                            } else {
-                                Text(sortLabel(for: mode))
-                            }
-                        }
-                    }
-                } else {
-                    Text("Sort options load with comments")
-                }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                    .contentShape(Circle())
+            if isExpanded {
+                sortMenu
+                    .transition(.opacity)
             }
-            .buttonStyle(ResponsiveButtonStyle())
-            .disabled(model.isLoading)
-            .accessibilityLabel("Sort comments")
-            .accessibilityValue(selectedSortingModeLabel)
 
             Button {
                 toggleComments()
             } label: {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                DisclosureChevron(isExpanded: isExpanded)
                     .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Circle())
             }
@@ -201,6 +172,37 @@ struct CommentsSection: View {
         }
         .frame(minHeight: 44)
         .padding(.horizontal)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            if model.sortingModes.count > 1 {
+                ForEach(model.sortingModes) { mode in
+                    Button {
+                        expandedReplyCommentIDs.removeAll()
+                        Task { await model.selectSortingMode(mode) }
+                    } label: {
+                        if mode.isSelected {
+                            Label(sortLabel(for: mode), systemImage: "checkmark")
+                        } else {
+                            Text(sortLabel(for: mode))
+                        }
+                    }
+                }
+            } else {
+                Text("Sort options load with comments")
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                .contentShape(Circle())
+        }
+        .buttonStyle(ResponsiveButtonStyle())
+        .disabled(model.isLoading)
+        .accessibilityLabel("Sort comments")
+        .accessibilityValue(selectedSortingModeLabel)
     }
 
     private var selectedSortingModeLabel: String {

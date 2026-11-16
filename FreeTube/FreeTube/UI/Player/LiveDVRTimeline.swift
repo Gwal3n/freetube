@@ -5,8 +5,7 @@ import SwiftUI
 /// even if the live edge advances before the gesture ends.
 @available(iOS 17.0, *)
 struct LiveDVRTimeline: View {
-    @AppStorage("playerScrubberColorMode") private var scrubberColorModeRaw = PlayerScrubberColorMode.standard.rawValue
-    @AppStorage("playerScrubberCustomHex") private var scrubberCustomHex = "#FF0000"
+    var scrubberTint = PlayerScrubberTint()
 
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
@@ -17,10 +16,7 @@ struct LiveDVRTimeline: View {
     @State private var dragTarget: TimeInterval?
     @State private var dragRange: ClosedRange<TimeInterval>?
 
-    private var scrubberColor: Color {
-        (PlayerScrubberColorMode(rawValue: scrubberColorModeRaw) ?? .standard)
-            .color(customHex: scrubberCustomHex)
-    }
+    private var scrubberColor: Color { scrubberTint.color }
 
     var body: some View {
         if let range = dragRange ?? seekableRange, range.upperBound - range.lowerBound >= 30 {

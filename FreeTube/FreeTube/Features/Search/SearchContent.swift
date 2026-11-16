@@ -327,8 +327,17 @@ struct SearchContent: View {
                     }
                 )
             }
+            .contentMargins(.bottom, floatingSearchFieldClearance, for: .scrollContent)
             .scrollDismissesKeyboard(.immediately)
         }
+    }
+
+    /// iOS 26 floats the search field above the keyboard without contributing to the safe area,
+    /// so the last suggestions would otherwise stay hidden beneath it.
+    private var floatingSearchFieldClearance: CGFloat {
+        guard !MacIntegration.isRunningOnMac else { return 0 }
+        if #available(iOS 26.0, *) { return 64 }
+        return 0
     }
 
     @ViewBuilder
@@ -347,7 +356,9 @@ struct SearchContent: View {
                     } label: {
                         ChannelRow(channel: entry.channel)
                     }
-                    .mediaListRow()
+                    // The disclosure accessory needs the standard trailing margin to line up with Clear.
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
                 }
                 .onDelete { offsets in
                     var entries = channels
@@ -368,6 +379,7 @@ struct SearchContent: View {
                     }
                     .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     .accessibilityLabel("Show more recent channels")
                 }
             }
@@ -377,25 +389,47 @@ struct SearchContent: View {
                     showingClearSearchHistoryConfirmation = true
                 }
                 ForEach(searches) { entry in
-                    Button {
-                        if isSearching || MacIntegration.isRunningOnMac {
-                            model.query = entry.query
-                            onRunSearch(entry.query)
-                            dismissKeyboard()
-                        } else {
-                            // Running from the inactive screen would show results outside the
-                            // active search; fill the field instead and submit from there.
-                            onEditQuery(entry.query)
+                    // Separate borderless buttons: a default-styled List row fires every button in it.
+                    HStack(spacing: 0) {
+                        Button {
+                            if isSearching || MacIntegration.isRunningOnMac {
+                                model.query = entry.query
+                                onRunSearch(entry.query)
+                                dismissKeyboard()
+                            } else {
+                                // Running from the inactive screen would show results outside the
+                                // active search; fill the field instead and submit from there.
+                                onEditQuery(entry.query)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .foregroundStyle(.secondary)
+                                Text(entry.query)
+                                    .foregroundStyle(.primary)
+                                Spacer(minLength: 8)
+                            }
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
-                    } label: {
-                        HStack {
-                            Image(systemName: "clock.arrow.circlepath")
+                        .buttonStyle(.borderless)
+
+                        Button {
+                            if isSearching || MacIntegration.isRunningOnMac {
+                                model.query = entry.query
+                            } else {
+                                onEditQuery(entry.query)
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.left")
                                 .foregroundStyle(.secondary)
-                            Text(entry.query)
-                                .foregroundStyle(.primary)
-                            Spacer()
+                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Fill search with \(entry.query)")
                     }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 4))
                 }
                 .onDelete { offsets in
                     for index in offsets {
@@ -491,20 +525,16 @@ struct SearchContent: View {
         clearLabel: LocalizedStringKey,
         onClear: @escaping () -> Void
     ) -> some View {
-        HStack {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
+        ListSectionTitle(title) {
             Button("Clear", action: onClear)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.tint)
                 .buttonStyle(.plain)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                .contentShape(Rectangle())
                 .accessibilityLabel(clearLabel)
         }
-        .padding(.top, 8)
+        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 0, trailing: 16))
         .listRowSeparator(.hidden)
         .deleteDisabled(true)
     }

@@ -106,8 +106,8 @@ final class PlayerDetailsModel {
         } else if let viewsText = details?.viewCountText?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !viewsText.isEmpty {
             parts.append(viewsText)
-        } else if let views = video.viewCount, views > 0 {
-            parts.append("\(Self.formatCount(views)) views")
+        } else if !video.viewCountString.isEmpty {
+            parts.append(video.viewCountString)
         }
         if let count = details?.likeCount, count > 0 {
             parts.append("\(Self.formatCount(count)) likes")

@@ -18,6 +18,18 @@ final class PlaylistLoadingTests: XCTestCase {
         XCTAssertEqual(restored.customArtworkData, updated.customArtworkData)
     }
 
+    func testMixesAreDetectedFromTheirListID() {
+        func playlist(_ id: String) -> Playlist {
+            Playlist(id: id, title: "", channelID: nil, channelName: nil, thumbnailURL: nil,
+                     videoCount: 0, descriptionText: nil, isOwnedByUser: false)
+        }
+        XCTAssertTrue(playlist("RDGSuJGZFSPE0").isMix)
+        XCTAssertTrue(playlist("RDEMhe2rZ3LJ9N1ICpVkyx2Dmg").isMix)
+        XCTAssertFalse(playlist("RDCLAK5uy_kxyz").isMix)
+        XCTAssertFalse(playlist("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG").isMix)
+        XCTAssertFalse(playlist("VLPLx0sYbCqOb8").isMix)
+    }
+
     func testViewCountLabelIsNotUsedAsPlaylistChannel() {
         XCTAssertEqual(Mappers.channelName(from: "21K views"), "")
         XCTAssertEqual(Mappers.channelName(from: "Zeta Explained"), "Zeta Explained")

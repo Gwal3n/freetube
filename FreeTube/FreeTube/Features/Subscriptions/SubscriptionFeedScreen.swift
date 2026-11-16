@@ -227,13 +227,13 @@ struct SubscriptionFeedScreen: View {
                     if model.selectedGroupID != nil {
                         ContentUnavailableView(
                             "No videos in this group",
-                            systemImage: "rectangle.stack",
+                            systemImage: "play.rectangle.on.rectangle",
                             description: Text("Add subscribed channels to this group or pull down to refresh.")
                         )
                     } else {
                         ContentUnavailableView(
                             "Nothing new",
-                            systemImage: "rectangle.stack",
+                            systemImage: "play.rectangle.on.rectangle",
                             description: Text("Pull down to refresh your subscriptions.")
                         )
                     }

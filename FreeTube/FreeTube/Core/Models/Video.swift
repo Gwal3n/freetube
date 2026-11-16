@@ -152,16 +152,17 @@ extension Video {
     /// API didn't return a count, so callers can hide the label entirely.
     var viewCountString: String {
         guard let viewCount, viewCount > 0 else { return "" }
+        let compact: String
         if viewCount >= 1_000_000_000 {
-            return "\(trim(Double(viewCount) / 1_000_000_000))B views"
+            compact = "\(trim(Double(viewCount) / 1_000_000_000))B"
+        } else if viewCount >= 1_000_000 {
+            compact = "\(trim(Double(viewCount) / 1_000_000))M"
+        } else if viewCount >= 1_000 {
+            compact = "\(trim(Double(viewCount) / 1_000))K"
+        } else {
+            return String(localized: "\(viewCount) views")
         }
-        if viewCount >= 1_000_000 {
-            return "\(trim(Double(viewCount) / 1_000_000))M views"
-        }
-        if viewCount >= 1_000 {
-            return "\(trim(Double(viewCount) / 1_000))K views"
-        }
-        return "\(viewCount) views"
+        return String(localized: "\(compact) views")
     }
 
     private func trim(_ value: Double) -> String {

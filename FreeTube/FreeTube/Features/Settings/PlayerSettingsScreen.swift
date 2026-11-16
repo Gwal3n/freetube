@@ -123,6 +123,7 @@ struct PlayerSettingsScreen: View {
             Section {
                 Picker("Scrubber color", selection: $playerScrubberColorMode) {
                     Text("Default red").tag(PlayerScrubberColorMode.standard.rawValue)
+                    Text("Accent color").tag(PlayerScrubberColorMode.accent.rawValue)
                     Text("Custom").tag(PlayerScrubberColorMode.custom.rawValue)
                 }
                 .settingsSearchRow("Scrubber color")

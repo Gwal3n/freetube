@@ -15,6 +15,13 @@ struct Playlist: Identifiable, Hashable, Sendable {
 }
 
 extension Playlist {
+    /// YouTube Mixes (`RD…` list IDs) are generated and open-ended; their reported video
+    /// count is meaningless, often zero. `RDCLAK…` lists are finite YouTube Music albums.
+    var isMix: Bool {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasPrefix("RD") && !trimmed.hasPrefix("RDCLAK")
+    }
+
     var youtubeURL: URL? {
         let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
         let bare = trimmed.hasPrefix("VL") ? String(trimmed.dropFirst(2)) : trimmed

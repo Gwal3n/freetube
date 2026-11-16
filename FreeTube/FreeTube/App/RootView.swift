@@ -47,9 +47,9 @@ struct RootView: View {
 
         var symbol: String {
             switch self {
-            case .feed: "rectangle.stack"
+            case .feed: "play.rectangle.on.rectangle"
             case .search: "magnifyingglass"
-            case .library: "play.square.stack"
+            case .library: "books.vertical"
             case .downloads: "arrow.down.circle"
             case .settings: "gearshape"
             }

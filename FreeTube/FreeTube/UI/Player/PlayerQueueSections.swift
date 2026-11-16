@@ -144,10 +144,8 @@ struct PlayerQueueSections: View {
                     isManualQueueExpanded.toggle()
                 }
             } label: {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                DisclosureChevron(isExpanded: isManualQueueExpanded)
                     .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(isManualQueueExpanded ? 90 : 0))
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Circle())
             }

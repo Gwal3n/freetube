@@ -15,6 +15,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "%@ abonnés" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "%@ подписчиков" } }
     } },
+    "%@ views" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "%@ Aufrufe" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ views" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "%@ vistas" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "%@ vues" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "%@ просмотров" } }
+    } },
     "%@ · streaming…" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "%@ · streamt…" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ · streaming…" } },
@@ -44,18 +51,18 @@
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "%lld подписчиков" } }
     } },
     "%lld videos" : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "%lld Videos" } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld videos" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "%lld vídeos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "%lld vidéos" } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "%lld видео" } }
+      "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld Video" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld Videos" } } } } },
+      "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld video" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld videos" } } } } },
+      "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld vídeo" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld vídeos" } } } } },
+      "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld vidéo" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld vidéos" } } } } },
+      "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld видео" } }, "few" : { "stringUnit" : { "state" : "translated", "value" : "%lld видео" } }, "many" : { "stringUnit" : { "state" : "translated", "value" : "%lld видео" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld видео" } } } } }
     } },
     "%lld views" : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "%lld Aufrufe" } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld views" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "%lld vistas" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "%lld vues" } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "%lld просмотров" } }
+      "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld Aufruf" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld Aufrufe" } } } } },
+      "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld view" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld views" } } } } },
+      "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld vista" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld vistas" } } } } },
+      "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld vue" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld vues" } } } } },
+      "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld просмотр" } }, "few" : { "stringUnit" : { "state" : "translated", "value" : "%lld просмотра" } }, "many" : { "stringUnit" : { "state" : "translated", "value" : "%lld просмотров" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld просмотра" } } } } }
     } },
     "1 (sequential)" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "1 (sequenziell)" } },
@@ -105,6 +112,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "6 horas" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "6 heures" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "6 часов" } }
+    } },
+    "Mix" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Микс" } }
     } },
     "[MIT license](https://github.com/Gwal3n/freetube/blob/main/LICENSE)" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "[MIT-Lizenz](https://github.com/Gwal3n/freetube/blob/main/LICENSE)" } },

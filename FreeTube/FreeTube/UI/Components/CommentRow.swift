@@ -69,7 +69,7 @@ struct CommentRow: View {
                     if let repliesTitle, let onToggleReplies {
                         Button(action: onToggleReplies) {
                             HStack(spacing: 4) {
-                                Image(systemName: repliesExpanded ? "chevron.up" : "chevron.down")
+                                DisclosureChevron(isExpanded: repliesExpanded, font: .caption2.weight(.semibold))
                                 Text(repliesTitle)
                             }
                             .appFont(.caption)

@@ -6,11 +6,12 @@ struct MiniPlayerProgress: View {
     static let trackHeight: CGFloat = 2
 
     @Environment(PlayerStateManager.self) private var player
+    var scrubberTint = PlayerScrubberTint()
 
     var body: some View {
         GeometryReader { proxy in
             Capsule()
-                .fill(Color.red)
+                .fill(scrubberTint.color)
                 .frame(width: proxy.size.width * progress, height: Self.trackHeight)
         }
         .frame(height: Self.trackHeight)

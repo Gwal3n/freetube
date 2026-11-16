@@ -21,10 +21,8 @@ struct PlayerSectionHeading: View {
             }
             Spacer(minLength: 8)
             if showsDisclosureIndicator {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                DisclosureChevron(isExpanded: isExpanded)
                     .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Circle())
             }

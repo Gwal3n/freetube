@@ -98,7 +98,9 @@ struct VideoThumbnail: View {
                         .accessibilityLabel("Watched")
                 }
             }
+            .background(MediaStyle.placeholderFill)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .mediaArtworkOutline(cornerRadius: cornerRadius)
             .accessibilityHidden(true)
     }
 }

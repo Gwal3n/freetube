@@ -2,8 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, *)
 struct SponsorBlockTimeline: View {
-    @AppStorage("playerScrubberColorMode") private var scrubberColorModeRaw = PlayerScrubberColorMode.standard.rawValue
-    @AppStorage("playerScrubberCustomHex") private var scrubberCustomHex = "#FF0000"
+    var scrubberTint = PlayerScrubberTint()
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     @AppStorage("sponsorBlockShowFullVideoSeekStripe") private var showFullVideoSeekStripe = false
 
@@ -31,10 +30,7 @@ struct SponsorBlockTimeline: View {
     private var fullVideoLabel: SponsorBlockCategory? {
         SponsorBlockSegment.primaryFullVideoLabel(in: segments)
     }
-    private var scrubberColor: Color {
-        (PlayerScrubberColorMode(rawValue: scrubberColorModeRaw) ?? .standard)
-            .color(customHex: scrubberCustomHex)
-    }
+    private var scrubberColor: Color { scrubberTint.color }
 
     var body: some View {
         if isLive, duration <= 0 {

@@ -50,10 +50,8 @@ struct PlayerMetadataHeader<Actions: View>: View {
                                 title(branding.title(for: video))
                                 fullVideoBadge
                                 Spacer(minLength: 0)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption.weight(.semibold))
+                                DisclosureChevron(isExpanded: isDetailsExpanded)
                                     .foregroundStyle(.secondary)
-                                    .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
                             }
                             .contentShape(Rectangle())
                         }

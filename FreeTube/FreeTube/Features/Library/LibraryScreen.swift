@@ -176,7 +176,7 @@ struct LibraryScreen: View {
                 LibraryDestinationRow(
                     title: "Subscriptions",
                     subtitle: countSubtitle(localSubscriptions.subscriptions.count, noun: "channel"),
-                    systemImage: "person.2.fill"
+                    systemImage: "person.2"
                 )
             }
             .tint(Color.primary)
@@ -214,23 +214,26 @@ struct LibraryScreen: View {
 
     private func videoShelf(_ title: String, entries: [WatchHistorySnapshot]) -> some View {
         Section {
-            ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: 12) {
-                    ForEach(entries) { entry in
-                        LibraryVideoShelfCard(
-                            entry: entry,
-                            canMarkComplete: libraryShelfContent == .continueWatching
-                        )
+            VStack(alignment: .leading, spacing: 10) {
+                ListSectionTitle(verbatim: title)
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(entries) { entry in
+                            LibraryVideoShelfCard(
+                                entry: entry,
+                                canMarkComplete: libraryShelfContent == .continueWatching
+                            )
+                        }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
-            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 0))
+            // Zero leading inset puts the title and first card on the grouped cards' edge,
+            // which is also where the large navigation title starts.
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-        } header: {
-            Text(title)
         }
     }
 

@@ -16,7 +16,20 @@ struct PlaylistRow: View {
     var showsMoreMenu: Bool = false
 
     private var videoCount: Int? {
-        playlist.videoCount ?? resolvedVideoCount
+        guard !playlist.isMix, let count = playlist.videoCount ?? resolvedVideoCount, count > 0 else {
+            return nil
+        }
+        return count
+    }
+
+    private var thumbnailSize: CGSize {
+        MediaStyle.compactVideoThumbnailSize(for: dynamicTypeSize)
+    }
+
+    private var badgeText: String? {
+        if playlist.isMix { return String(localized: "Mix") }
+        guard let count = videoCount else { return nil }
+        return String(localized: "\(count) videos")
     }
 
     var body: some View {
@@ -41,7 +54,7 @@ struct PlaylistRow: View {
         .task(id: playlist.id) { await actionsModel.refresh(id: playlist.id) }
         .task(id: playlist.id) {
             resolvedVideoCount = nil
-            guard playlist.videoCount == nil else { return }
+            guard playlist.videoCount == nil, !playlist.isMix else { return }
             do { try await Task.sleep(for: .milliseconds(400)) }
             catch { return }
             let count = await PlaylistCountResolver.shared.count(for: playlist.id)
@@ -59,33 +72,31 @@ struct PlaylistRow: View {
 
     private var content: some View {
         HStack(spacing: MediaStyle.spacing) {
-            ZStack(alignment: .bottom) {
-                KFImage(playlist.thumbnailURL)
-                    .thumbnail(size: CGSize(width: 96, height: 56)) {
-                        MediaStyle.placeholderFill
-                    }
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 96, height: 56)
-
-                if let count = videoCount, !dynamicTypeSize.isAccessibilitySize {
-                    HStack(spacing: 4) {
-                        Image(systemName: "rectangle.stack.fill")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("\(count.formatted(.number.notation(.compactName))) \(count == 1 ? "video" : "videos")")
-                            .accessibilityLabel("\(count) \(count == 1 ? "video" : "videos")")
-                        Spacer(minLength: 0)
-                    }
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.black.opacity(0.76))
+            KFImage(playlist.thumbnailURL)
+                .thumbnail(size: thumbnailSize) {
+                    MediaStyle.placeholderFill
                 }
-            }
-            .frame(width: 96, height: 56)
-            .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+                .resizable()
+                .scaledToFill()
+                .frame(width: thumbnailSize.width, height: thumbnailSize.height)
+                .background(MediaStyle.placeholderFill)
+                .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+                .mediaArtworkOutline()
+                .overlay(alignment: .bottomTrailing) {
+                    if let badgeText, !dynamicTypeSize.isAccessibilitySize {
+                        HStack(spacing: 3) {
+                            Image(systemName: playlist.isMix ? "infinity" : "rectangle.stack.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(verbatim: badgeText)
+                        }
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4))
+                        .padding(5)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 Text(playlist.title)
@@ -97,8 +108,8 @@ struct PlaylistRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                 }
-                if dynamicTypeSize.isAccessibilitySize, let count = videoCount {
-                    Text("\(count.formatted()) \(count == 1 ? "video" : "videos")")
+                if dynamicTypeSize.isAccessibilitySize, let badgeText {
+                    Text(verbatim: badgeText)
                         .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }

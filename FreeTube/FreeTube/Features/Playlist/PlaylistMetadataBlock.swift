@@ -44,8 +44,7 @@ struct PlaylistMetadataBlock: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(isExpanded ? "Less" : "More details")
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2.weight(.bold))
+                        DisclosureChevron(isExpanded: isExpanded, font: .caption2.weight(.bold))
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.primary)
