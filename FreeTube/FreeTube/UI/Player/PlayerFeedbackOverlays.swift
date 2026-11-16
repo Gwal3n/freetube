@@ -62,7 +62,6 @@ struct PlayerFeedbackOverlays: View {
                     AudioOnlySeekPreview(
                         artwork: player.currentArtwork,
                         thumbnailURL: player.currentVideo?.thumbnailURL,
-                        previewTime: previewTime,
                         style: seekPreviewStyle
                     )
                 } else if let tile = player.storyboard?.tile(
@@ -74,7 +73,6 @@ struct PlayerFeedbackOverlays: View {
                     StoryboardPreview(
                         tile: tile,
                         videoPresentationSize: player.videoPresentationSize,
-                        previewTime: previewTime,
                         style: seekPreviewStyle
                     )
                 }

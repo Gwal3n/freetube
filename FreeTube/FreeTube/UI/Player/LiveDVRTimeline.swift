@@ -55,17 +55,23 @@ struct LiveDVRTimeline: View {
                 GeometryReader { proxy in
                     let width = max(proxy.size.width, 1)
                     let progress = fraction(of: displayedPosition, in: range)
+                    // The fill keeps showing actual playback; only the thumb follows a scrub.
+                    let isScrubbing = dragTarget != nil || previewElapsed != nil
+                    let playbackProgress = isScrubbing
+                        ? fraction(of: range.upperBound - elapsed < 10 ? range.upperBound : elapsed, in: range)
+                        : progress
+                    let thumbSize: CGFloat = dragTarget != nil ? 18 : 14
 
                     ZStack(alignment: .leading) {
                         Capsule().fill(.white.opacity(0.28)).frame(height: 4)
-                        Capsule().fill(scrubberColor).frame(width: width * progress, height: 4)
+                        Capsule().fill(scrubberColor).frame(width: width * playbackProgress, height: 4)
                         Circle()
                             .fill(scrubberColor)
-                            .frame(width: 14, height: 14)
-                            .offset(x: min(max(width * progress - 7, 0), width - 14))
+                            .frame(width: thumbSize, height: thumbSize)
+                            .offset(x: min(max(width * progress - thumbSize / 2, 0), width - thumbSize))
                     }
                     .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
+                    .contentShape(Rectangle().inset(by: -6))
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in

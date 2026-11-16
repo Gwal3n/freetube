@@ -12,6 +12,7 @@ struct PlayerSettingsScreen: View {
     @AppStorage("customDoubleTapSeekSeconds") private var customDoubleTapSeekSeconds = 20
     @AppStorage("playerScrubberColorMode") private var playerScrubberColorMode = PlayerScrubberColorMode.standard.rawValue
     @AppStorage("playerScrubberCustomHex") private var playerScrubberCustomHex = "#FF0000"
+    @AppStorage("scrubberChapterHighlight") private var scrubberChapterHighlight = true
     @AppStorage("transportButtonMode") private var transportButtonMode = "videos"
     @AppStorage("transportSeekSeconds") private var transportSeekSeconds = 10
     @AppStorage("upNextRowSize") private var upNextRowSize = UpNextRowSize.compact.rawValue
@@ -134,8 +135,13 @@ struct PlayerSettingsScreen: View {
                     ), supportsOpacity: false)
                     .settingsSearchRow("Custom scrubber color")
                 }
+                Toggle("Highlight chapter while scrubbing", isOn: $scrubberChapterHighlight)
+                    .tint(settingsToggleTint)
+                    .settingsSearchRow("Highlight chapter while scrubbing")
             } header: {
                 Text("Timeline")
+            } footer: {
+                Text("Enlarges the chapter under the scrubber so its bounds are easier to see.")
             }
 
             Section {

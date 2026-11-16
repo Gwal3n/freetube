@@ -169,7 +169,7 @@ final class AppBackupService {
         "incognitoEnabled", "incognitoSkipSearchHistory", "incognitoSkipWatchHistory", "incognitoSkipWatchProgress",
         "incognitoHideWatchProgress", "incognitoHideFeed", "incognitoHideLibrary",
         "logToFile", "playerScrollDiagnosticsEnabled", "manualQueue",
-        "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "playerPanelSectionOrder",
+        "playerControlLayout", "playerMoreMenuDividers", "playerTopControlOrder", "playerScrubberColorMode", "playerScrubberCustomHex", "scrubberChapterHighlight", "playerPanelSectionOrder",
         "libraryShelfContent", "leftFullscreenSwipeAction", "recentLibraryVideoCount", "rightFullscreenSwipeAction",
         "preferredQuality", "prefetchVideoDetails", "rememberFloatingPlayerPlacement", "resumeAfterAudioInterruption",
         "saveSearchHistory", "saveRecentChannels", "recentChannelsJSON", "recentSearchLimit", "recentChannelLimit", "saveWatchHistory", "seekPreviewStyle", "holdSpeedIndicatorStyle", "holdSpeedIndicatorAutoHide", "holdSpeedIndicatorHideDelay", "showChannelAboutTab", "showChannelLiveTab", "showPlayerDownloadButton", "showPlayerSaveButton", "showPlayerShareButton",

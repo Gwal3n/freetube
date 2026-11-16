@@ -228,8 +228,8 @@ struct CommentsSection: View {
             comment: comment,
             repliesTitle: comment.replyCount > 0 && comment.replyContinuationToken != nil
                 ? (expandedReplyCommentIDs.contains(comment.id)
-                    ? "Hide replies"
-                    : "View \(comment.replyCount) replies")
+                    ? String(localized: "Hide replies")
+                    : String(localized: "View \(comment.replyCount) replies"))
                 : nil,
             repliesExpanded: expandedReplyCommentIDs.contains(comment.id),
             onToggleReplies: comment.replyCount > 0 && comment.replyContinuationToken != nil

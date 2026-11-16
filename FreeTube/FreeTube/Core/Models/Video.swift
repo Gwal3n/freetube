@@ -152,20 +152,28 @@ extension Video {
     /// API didn't return a count, so callers can hide the label entirely.
     var viewCountString: String {
         guard let viewCount, viewCount > 0 else { return "" }
-        let compact: String
-        if viewCount >= 1_000_000_000 {
-            compact = "\(trim(Double(viewCount) / 1_000_000_000))B"
-        } else if viewCount >= 1_000_000 {
-            compact = "\(trim(Double(viewCount) / 1_000_000))M"
-        } else if viewCount >= 1_000 {
-            compact = "\(trim(Double(viewCount) / 1_000))K"
-        } else {
-            return String(localized: "\(viewCount) views")
-        }
+        return Self.viewCountLabel(viewCount)
+    }
+
+    static func viewCountLabel(_ count: Int) -> String {
+        guard let compact = compactCount(count) else { return String(localized: "\(count) views") }
         return String(localized: "\(compact) views")
     }
 
-    private func trim(_ value: Double) -> String {
+    static func likeCountLabel(_ count: Int) -> String {
+        guard let compact = compactCount(count) else { return String(localized: "\(count) likes") }
+        return String(localized: "\(compact) likes")
+    }
+
+    /// "1.2K", "12M", "3B"; nil below one thousand so callers can use a pluralized whole number.
+    private static func compactCount(_ count: Int) -> String? {
+        if count >= 1_000_000_000 { return "\(trim(Double(count) / 1_000_000_000))B" }
+        if count >= 1_000_000 { return "\(trim(Double(count) / 1_000_000))M" }
+        if count >= 1_000 { return "\(trim(Double(count) / 1_000))K" }
+        return nil
+    }
+
+    private static func trim(_ value: Double) -> String {
         // Drop the decimal when whole, otherwise show one digit ("1.2", "12").
         if value >= 100 || value.truncatingRemainder(dividingBy: 1) == 0 {
             return String(format: "%.0f", value)

@@ -193,7 +193,7 @@ enum SettingsSearchIndex {
         Group(destination: .player, titles: [
             "Player", "Tap video to play or pause", "Swipe to seek", "Double-tap seek", "Seek preview",
             "Vertical swipe in fullscreen", "Left side", "Right side",
-            "Show Save button", "Show Share button", "Show Download button", "Scrubber color", "Custom scrubber color",
+            "Show Save button", "Show Share button", "Show Download button", "Scrubber color", "Custom scrubber color", "Highlight chapter while scrubbing",
             "Remember mini player position", "Transport buttons", "Seek amount", "Show description",
             "Collapsed description preview",
             "Show comments", "Pin Comments heading", "Load more as you scroll", "Show commenter photos",

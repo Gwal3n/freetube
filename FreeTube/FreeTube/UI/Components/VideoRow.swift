@@ -64,7 +64,7 @@ struct VideoRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             Group {
                 if let onTapChannel {
                     linkedContent(branding: branding, channelID: nil, onTapChannel: onTapChannel)
@@ -85,6 +85,9 @@ struct VideoRow: View {
                 EmptyView()
             case .actions(let offersPlayNext):
                 VideoMoreActionsMenu(video: video, offersPlayNext: offersPlayNext, onOpenChannel: onOpenChannel)
+                    // Centers the glyph on the title's first line while keeping the 44pt target;
+                    // an offset (not an alignment guide) leaves the row height unchanged.
+                    .offset(y: -13)
             case .reserved:
                 Color.clear
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)

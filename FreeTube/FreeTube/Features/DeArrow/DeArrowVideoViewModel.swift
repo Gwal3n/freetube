@@ -46,8 +46,8 @@ final class DeArrowVideoViewModel {
 
     func title(for video: Video) -> String {
         guard videoID == video.id, replaceTitles, !showsOriginal(for: video),
-              let title = branding.title else { return video.title }
-        return title
+              let title = branding.title else { return video.title.collapsingDisplayWhitespace }
+        return title.collapsingDisplayWhitespace
     }
 
     func thumbnailData(for video: Video) -> Data? {

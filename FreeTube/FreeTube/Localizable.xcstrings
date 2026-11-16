@@ -36,6 +36,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "%lld éléments" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "%lld элементов" } }
     } },
+    "%lld likes" : { "localizations" : {
+      "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld „Gefällt mir“" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld „Gefällt mir“" } } } } },
+      "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld like" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld likes" } } } } },
+      "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld Me gusta" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld Me gusta" } } } } },
+      "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld J’aime" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld J’aime" } } } } },
+      "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld отметка «Нравится»" } }, "few" : { "stringUnit" : { "state" : "translated", "value" : "%lld отметки «Нравится»" } }, "many" : { "stringUnit" : { "state" : "translated", "value" : "%lld отметок «Нравится»" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld отметки «Нравится»" } } } } }
+    } },
     "%lld selected" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "%lld ausgewählt" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld selected" } },
@@ -113,12 +120,40 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "6 heures" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "6 часов" } }
     } },
+    "Highlight chapter while scrubbing" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Kapitel beim Spulen hervorheben" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Highlight chapter while scrubbing" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Resaltar capítulo al desplazarse" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mettre en évidence le chapitre pendant le défilement" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Выделять главу при перемотке" } }
+    } },
+    "Enlarges the chapter under the scrubber so its bounds are easier to see." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Vergrößert das Kapitel unter dem Regler, damit seine Grenzen besser erkennbar sind." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Enlarges the chapter under the scrubber so its bounds are easier to see." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Amplía el capítulo bajo el control deslizante para que sus límites se vean mejor." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Agrandit le chapitre sous le curseur pour mieux voir ses limites." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Увеличивает главу под ползунком, чтобы её границы было лучше видно." } }
+    } },
+    "Hide replies" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Antworten ausblenden" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Hide replies" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Ocultar respuestas" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Masquer les réponses" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скрыть ответы" } }
+    } },
     "Mix" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Микс" } }
+    } },
+    "View %lld replies" : { "localizations" : {
+      "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld Antwort ansehen" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld Antworten ansehen" } } } } },
+      "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "View %lld reply" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "View %lld replies" } } } } },
+      "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "Ver %lld respuesta" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "Ver %lld respuestas" } } } } },
+      "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "Voir %lld réponse" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "Voir %lld réponses" } } } } },
+      "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "Показать %lld ответ" } }, "few" : { "stringUnit" : { "state" : "translated", "value" : "Показать %lld ответа" } }, "many" : { "stringUnit" : { "state" : "translated", "value" : "Показать %lld ответов" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "Показать %lld ответа" } } } } }
     } },
     "[MIT license](https://github.com/Gwal3n/freetube/blob/main/LICENSE)" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "[MIT-Lizenz](https://github.com/Gwal3n/freetube/blob/main/LICENSE)" } },
@@ -3794,6 +3829,13 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "En uso: %@. Al alcanzar el límite de caché se eliminan las descargas más antiguas. La reproducción no guarda una copia. Más fragmentos paralelos pueden acelerar las descargas, pero provocar límites de solicitudes." } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Espace utilisé : %@. Les téléchargements les plus anciens sont supprimés lorsque la limite du cache est atteinte. La lecture n’enregistre pas de copie. Plus de fragments parallèles peuvent accélérer les téléchargements, mais provoquer des limitations de débit." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Использовано: %@. При достижении лимита кеша удаляются самые старые загрузки. Воспроизведение не сохраняет копию. Большее число параллельных фрагментов может ускорить загрузку, но вызвать ограничения частоты запросов." } }
+    } },
+    "more" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "mehr" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "more" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "más" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "plus" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "ещё" } }
     } },
     "v%@ (%@) — [freetube.io](https://freetube.io)" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "v%1$@ (%2$@) — [freetube.io](https://freetube.io)" } },

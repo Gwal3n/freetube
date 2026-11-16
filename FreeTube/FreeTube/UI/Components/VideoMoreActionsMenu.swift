@@ -40,7 +40,7 @@ struct VideoMoreActionsMenu: View {
             )
         } label: {
             Image(systemName: "ellipsis")
-                .font(.body)
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                 .contentShape(Rectangle())

@@ -57,7 +57,7 @@ struct CommentRow: View {
                             isBodyExpanded.toggle()
                         }
                     }
-                    .appFont(.caption, weight: .semibold)
+                    .appFont(.caption, weight: .medium)
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 }
@@ -82,7 +82,8 @@ struct CommentRow: View {
             }
         }
         .padding(.horizontal)
-        .padding(.vertical, 6)
+        // Top-level threads get a consistent gap between them; replies stay tight under their parent.
+        .padding(.vertical, isReply ? 4 : 10)
     }
 
     private var authorIdentity: some View {

@@ -37,6 +37,8 @@ struct CustomPlayerControls: View {
 
     var body: some View {
         ZStack {
+            legibilityScrim
+
             VStack(spacing: 0) {
                 HStack {
                     if showsCollapseButton {
@@ -151,6 +153,22 @@ struct CustomPlayerControls: View {
         .accessibilityHidden(!isVisible && !isSeekPreviewActive)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
+    }
+
+    /// Soft top and bottom gradients so white controls and timeline labels stay readable on
+    /// bright frames. The bottom one also backs the timeline during swipe-seek previews.
+    private var legibilityScrim: some View {
+        VStack(spacing: 0) {
+            LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 88 + topControlsSafeAreaPadding)
+                .opacity(isVisible ? 1 : 0)
+            Spacer(minLength: 0)
+            LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 96 + bottomTimelinePadding)
+                .opacity(isVisible || isSeekPreviewActive ? 1 : 0)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

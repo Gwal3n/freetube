@@ -41,14 +41,19 @@ struct PlayerDescription: View {
                         }
                     } else if let text {
                         Button(action: onExpand) {
-                            Text(text)
-                                .appFont(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 6)
-                                .contentShape(Rectangle())
+                            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                                Text(text)
+                                    .appFont(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text("more")
+                                    .appFont(.subheadline, weight: .semibold)
+                                    .foregroundStyle(.primary)
+                            }
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(ResponsiveButtonStyle())
                         .accessibilityHint("Expand description")

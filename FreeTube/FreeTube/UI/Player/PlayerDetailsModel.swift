@@ -105,22 +105,33 @@ final class PlayerDetailsModel {
             }
         } else if let viewsText = details?.viewCountText?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !viewsText.isEmpty {
-            parts.append(viewsText)
+            parts.append(Self.exactViewCount(in: viewsText).map(Video.viewCountLabel) ?? viewsText)
         } else if !video.viewCountString.isEmpty {
             parts.append(video.viewCountString)
         }
         if let count = details?.likeCount, count > 0 {
-            parts.append("\(Self.formatCount(count)) likes")
+            parts.append(Video.likeCountLabel(count))
         }
         if let uploadDate = details?.uploadDateText?.trimmingCharacters(in: .whitespacesAndNewlines),
            !uploadDate.isEmpty {
-            parts.append("Uploaded \(uploadDate)")
+            parts.append(uploadDate)
         } else if let published = video.publishedAt {
-            parts.append("Uploaded \(published.formatted(date: .abbreviated, time: .omitted))")
+            parts.append(published.formatted(date: .abbreviated, time: .omitted))
         } else if let relative = video.publishedRelative, !relative.isEmpty {
-            parts.append("Uploaded \(relative)")
+            parts.append(relative)
         }
         return parts.joined(separator: " • ")
+    }
+
+    /// Reads the number from the watch page's exact "5,364,808 views" text so the row can use the
+    /// same compact style as likes. Anything else (labels, other wording) is shown unchanged.
+    static func exactViewCount(in text: String) -> Int? {
+        let lowered = text.lowercased()
+        let suffixes = [" views", " view"]
+        guard let suffix = suffixes.first(where: lowered.hasSuffix) else { return nil }
+        let number = lowered.dropLast(suffix.count).filter { $0 != "," }
+        guard !number.isEmpty, number.allSatisfy(\.isASCII), let count = Int(number), count > 0 else { return nil }
+        return count
     }
 
     /// The shared details cache is useful for ordinary videos, but live viewership goes stale.
@@ -150,18 +161,5 @@ final class PlayerDetailsModel {
 
     func commentsCountText(fallback: String?) -> String? {
         details?.commentsCountText ?? fallback
-    }
-
-    private static func formatCount(_ count: Int) -> String {
-        if count >= 1_000_000_000 {
-            return String(format: "%.1fB", Double(count) / 1_000_000_000)
-        }
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        }
-        if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
     }
 }

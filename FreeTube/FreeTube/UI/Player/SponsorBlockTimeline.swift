@@ -5,6 +5,8 @@ struct SponsorBlockTimeline: View {
     var scrubberTint = PlayerScrubberTint()
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     @AppStorage("sponsorBlockShowFullVideoSeekStripe") private var showFullVideoSeekStripe = false
+    @AppStorage("scrubberChapterHighlight") private var highlightsScrubbedChapter = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
@@ -22,10 +24,26 @@ struct SponsorBlockTimeline: View {
     @State private var scrubChapterID: VideoChapter.ID?
     @State private var chapterHapticTrigger = 0
 
+    /// Where the thumb, time label, and chapter label point. While scrubbing this is the target;
+    /// the progress fill keeps showing actual playback until the seek is committed.
     private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
+    private var isScrubbing: Bool { dragTime != nil || previewElapsed != nil }
     private var currentChapter: VideoChapter? {
         // Match chapter-list highlighting: tolerate brief AVPlayer undershoot after a seek.
         chapters.last { $0.startTime <= displayedTime + 0.35 }
+    }
+
+    private static let trackHeight: CGFloat = 4
+    private static let highlightedTrackHeight: CGFloat = 8
+
+    /// The chapter under the thumb while scrubbing, enlarged when that preference is on.
+    private var highlightedChapterRange: ClosedRange<TimeInterval>? {
+        guard highlightsScrubbedChapter, isScrubbing, duration > 0,
+              let index = chapters.lastIndex(where: { $0.startTime <= displayedTime }) else { return nil }
+        let start = chapters[index].startTime
+        let end = index + 1 < chapters.count ? chapters[index + 1].startTime : duration
+        guard end > start else { return nil }
+        return start...end
     }
     private var fullVideoLabel: SponsorBlockCategory? {
         SponsorBlockSegment.primaryFullVideoLabel(in: segments)
@@ -49,22 +67,27 @@ struct SponsorBlockTimeline: View {
         let sponsorColors = SponsorBlockColorPalette(json: sponsorBlockColorOverridesJSON)
         VStack(spacing: 4) {
             HStack(spacing: 7) {
-                // The track follows the finger, but the elapsed clock remains the real
-                // playback position until the seek is committed.
-                Text(verbatim: format(elapsed))
+                Text(verbatim: format(displayedTime))
                 if let currentChapter {
                     Button(action: onShowChapters) {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Text(verbatim: currentChapter.title)
                                 .lineLimit(1)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 7, weight: .bold))
+                                .font(.system(size: 9, weight: .bold))
                         }
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.white)
+                        // A pill drawn outside the layout makes the label read as a control
+                        // without changing the row height the seek preview aligns to.
+                        .background {
+                            Capsule()
+                                .fill(.white.opacity(0.18))
+                                .padding(.horizontal, -7)
+                                .padding(.vertical, -3)
+                        }
                         .frame(maxWidth: 190, alignment: .leading)
                     }
-                    // Expand only the interactive shape; keep the compact chapter typography and
-                    // timeline layout unchanged.
+                    .padding(.leading, 6)
                     .contentShape(.interaction, Rectangle().inset(by: -10))
                     .accessibilityLabel("Current chapter, \(currentChapter.title)")
                 }
@@ -76,20 +99,29 @@ struct SponsorBlockTimeline: View {
 
             GeometryReader { proxy in
                 let width = max(proxy.size.width, 1)
-                let progress = fraction(for: displayedTime)
+                let playbackProgress = fraction(for: elapsed)
+                let thumbProgress = fraction(for: displayedTime)
+                let highlight = highlightedChapterRange
+                let gapWidth: CGFloat = chapters.count > 1
+                    && width / CGFloat(chapters.count) < 24 ? 1 : 2
+                let thumbSize: CGFloat = dragTime != nil ? 18 : 14
 
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.22)).frame(height: 4)
+                    Capsule().fill(.white.opacity(0.22)).frame(height: Self.trackHeight)
                     ForEach(bufferedRanges.indices, id: \.self) { index in
                         let range = bufferedRanges[index]
                         let start = fraction(for: range.lowerBound)
                         let end = fraction(for: range.upperBound)
                         Capsule()
                             .fill(.white.opacity(0.55))
-                            .frame(width: width * max(0, end - start), height: 4)
+                            .frame(width: width * max(0, end - start), height: Self.trackHeight)
                             .offset(x: width * start)
                     }
-                    Capsule().fill(scrubberColor).frame(width: width * progress, height: 4)
+                    Capsule().fill(scrubberColor).frame(width: width * playbackProgress, height: Self.trackHeight)
+
+                    if let highlight {
+                        highlightedChapter(highlight, width: width, playbackProgress: playbackProgress)
+                    }
 
                     // Full-video labels are annotations, never a seek target. Keep their slim
                     // stripe below the progress track so the playback position stays clear.
@@ -106,30 +138,34 @@ struct SponsorBlockTimeline: View {
                             .fill(sponsorColors.color(for: segment.category))
                             .frame(
                                 width: segment.category == .highlight ? max(3, segmentWidth) : max(2, segmentWidth),
-                                height: 4
+                                height: segmentHeight(segment, in: highlight)
                             )
                             .offset(x: width * fraction(for: segment.startTime))
                     }
 
                     // Fine gaps divide the shared progress track without competing visually with
                     // SponsorBlock's colored ranges. The first chapter starts at zero, so only
-                    // later boundaries need a marker.
+                    // later boundaries need a marker. Dense chapter lists get hairline gaps.
                     ForEach(chapters.filter { $0.startTime > 0 }) { chapter in
                         Rectangle()
                             .fill(.black)
-                            .frame(width: 2, height: 4)
-                            .offset(x: min(max(width * fraction(for: chapter.startTime) - 1, 0), width - 2))
+                            .frame(width: gapWidth, height: Self.highlightedTrackHeight)
+                            .offset(x: min(max(width * fraction(for: chapter.startTime) - gapWidth / 2, 0), width - gapWidth))
                             .blendMode(.destinationOut)
                     }
 
                     Circle()
                         .fill(scrubberColor)
-                        .frame(width: 14, height: 14)
-                        .offset(x: min(max(width * progress - 7, 0), width - 14))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .offset(x: min(max(width * thumbProgress - thumbSize / 2, 0), width - thumbSize))
                 }
                 .compositingGroup()
                 .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
+                .animation(reduceMotion ? nil : InterfaceMotion.quick, value: highlight)
+                .animation(reduceMotion ? nil : InterfaceMotion.quick, value: thumbSize)
+                // Extends touch below the track and into the row gap above it, but never over the
+                // chapter label, whose own button must keep receiving taps.
+                .contentShape(TimelineTouchShape())
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
@@ -183,6 +219,54 @@ struct SponsorBlockTimeline: View {
         chapterHapticTrigger &+= 1
     }
 
+    /// The scrubbed chapter drawn taller and brighter over the normal track, keeping its own
+    /// buffered and played portions.
+    @ViewBuilder
+    private func highlightedChapter(
+        _ range: ClosedRange<TimeInterval>,
+        width: CGFloat,
+        playbackProgress: CGFloat
+    ) -> some View {
+        let start = fraction(for: range.lowerBound)
+        let end = fraction(for: range.upperBound)
+        let height = Self.highlightedTrackHeight
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(.white.opacity(0.42))
+                .frame(width: width * (end - start), height: height)
+            ForEach(bufferedRanges.indices, id: \.self) { index in
+                let buffered = bufferedRanges[index]
+                let lower = max(fraction(for: buffered.lowerBound), start)
+                let upper = min(fraction(for: buffered.upperBound), end)
+                if upper > lower {
+                    Rectangle()
+                        .fill(.white.opacity(0.72))
+                        .frame(width: width * (upper - lower), height: height)
+                        .offset(x: width * (lower - start))
+                }
+            }
+            if playbackProgress > start {
+                Rectangle()
+                    .fill(scrubberColor)
+                    .saturation(1.3)
+                    .frame(width: width * (min(playbackProgress, end) - start), height: height)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 2))
+        .offset(x: width * start)
+    }
+
+    /// SponsorBlock ranges match the track's thickness, including inside the enlarged chapter.
+    private func segmentHeight(
+        _ segment: SponsorBlockSegment,
+        in highlight: ClosedRange<TimeInterval>?
+    ) -> CGFloat {
+        guard let highlight,
+              segment.startTime < highlight.upperBound,
+              segment.endTime > highlight.lowerBound else { return Self.trackHeight }
+        return Self.highlightedTrackHeight
+    }
+
     private func fraction(for time: TimeInterval) -> CGFloat {
         guard duration.isFinite, duration > 0, time.isFinite else { return 0 }
         return CGFloat(min(max(time / duration, 0), 1))
@@ -198,4 +282,12 @@ struct SponsorBlockTimeline: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
+}
+
+/// About 36 points of touch for the 24-point track frame: 4 points up into the gap below the
+/// time labels, 8 down into the timeline's bottom padding, and 12 past each end.
+private struct TimelineTouchShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(CGRect(x: rect.minX - 12, y: rect.minY - 4, width: rect.width + 24, height: rect.height + 12))
+    }
 }

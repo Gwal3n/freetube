@@ -8,7 +8,6 @@ import Kingfisher
 struct StoryboardPreview: View {
     let tile: VideoStoryboard.Tile
     let videoPresentationSize: CGSize
-    let previewTime: TimeInterval
     let style: SeekPreviewStyle
 
     private var previewSize: CGSize {
@@ -44,11 +43,11 @@ struct StoryboardPreview: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
             }
-            // Keep the image's lower edge fixed across wide and tall videos so the preview
-            // timestamp lines up with the player's existing time labels.
+            // Keep the image's lower edge fixed across wide and tall videos so it always sits
+            // just above the player's time labels.
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            seekPreviewTimeLabel(previewTime)
+            timelineLabelClearance
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -60,7 +59,6 @@ struct StoryboardPreview: View {
 struct AudioOnlySeekPreview: View {
     let artwork: UIImage?
     let thumbnailURL: URL?
-    let previewTime: TimeInterval
     let style: SeekPreviewStyle
 
     var body: some View {
@@ -86,26 +84,13 @@ struct AudioOnlySeekPreview: View {
             }
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            seekPreviewTimeLabel(previewTime)
+            timelineLabelClearance
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
 }
 
-private func seekPreviewTimestamp(_ time: TimeInterval) -> String {
-    guard time.isFinite, time >= 0 else { return "0:00" }
-    let total = Int(time)
-    let hours = total / 3600
-    let minutes = (total % 3600) / 60
-    let seconds = total % 60
-    if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
-    return String(format: "%d:%02d", minutes, seconds)
-}
-
-@ViewBuilder
-private func seekPreviewTimeLabel(_ time: TimeInterval) -> some View {
-    Text(verbatim: seekPreviewTimestamp(time))
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.white)
-        .frame(minHeight: 26)
+/// Holds the tile above the timeline's time row, which shows the target time while scrubbing.
+private var timelineLabelClearance: some View {
+    Color.clear.frame(height: 26)
 }
