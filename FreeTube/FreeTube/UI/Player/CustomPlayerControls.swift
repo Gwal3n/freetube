@@ -181,6 +181,20 @@ extension Image {
             .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
     }
 
+    /// Symbols with different intrinsic proportions (circled, wide, short) rendered at a shared
+    /// font size sit at visibly different heights. Fitting each one into the same box gives the
+    /// top-right row one optical height.
+    func playerTopGlyph() -> some View {
+        resizable()
+            .scaledToFit()
+            .fontWeight(.bold)
+            .frame(width: 24, height: 20)
+            .foregroundStyle(.white)
+            .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+            .contentShape(Circle())
+            .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+    }
+
     func playerCenterControl() -> some View {
         font(.system(size: 27, weight: .semibold))
             .foregroundStyle(.white)

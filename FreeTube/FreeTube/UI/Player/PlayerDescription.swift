@@ -9,6 +9,7 @@ struct PlayerDescription: View {
     let isLoading: Bool
     let loadFailed: Bool
     var showsCollapsedPreview: Bool = true
+    var showsMoreLabel: Bool = true
     let onSeek: (TimeInterval) -> Void
     let onRetry: () -> Void
     let onExpand: () -> Void
@@ -48,9 +49,11 @@ struct PlayerDescription: View {
                                     .lineLimit(2)
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                Text("more")
-                                    .appFont(.subheadline, weight: .semibold)
-                                    .foregroundStyle(.primary)
+                                if showsMoreLabel {
+                                    Text("more")
+                                        .appFont(.subheadline, weight: .semibold)
+                                        .foregroundStyle(.primary)
+                                }
                             }
                             .padding(.vertical, 6)
                             .contentShape(Rectangle())

@@ -17,6 +17,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     @State private var showingFullVideoDescription = false
+    @ScaledMetric(relativeTo: .title3) private var titleLineHeight: CGFloat = 25
 
     init(
         video: Video,
@@ -46,12 +47,17 @@ struct PlayerMetadataHeader<Actions: View>: View {
                 HStack(alignment: .center, spacing: 4) {
                     if showsDescription {
                         Button(action: onToggleDetails) {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                title(branding.title(for: video))
-                                fullVideoBadge
+                            HStack(alignment: .top, spacing: 0) {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    title(branding.title(for: video))
+                                    fullVideoBadge
+                                }
                                 Spacer(minLength: 0)
+                                // Same trailing column as the Up Next and Comments chevrons,
+                                // centred on the title's first line.
                                 DisclosureChevron(isExpanded: isDetailsExpanded)
                                     .foregroundStyle(.secondary)
+                                    .frame(width: MediaStyle.actionSize, height: titleLineHeight)
                             }
                             .contentShape(Rectangle())
                         }

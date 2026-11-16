@@ -72,32 +72,7 @@ struct PlaylistRow: View {
 
     private var content: some View {
         HStack(spacing: MediaStyle.spacing) {
-            KFImage(playlist.thumbnailURL)
-                .thumbnail(size: thumbnailSize) {
-                    MediaStyle.placeholderFill
-                }
-                .resizable()
-                .scaledToFill()
-                .frame(width: thumbnailSize.width, height: thumbnailSize.height)
-                .background(MediaStyle.placeholderFill)
-                .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
-                .mediaArtworkOutline()
-                .overlay(alignment: .bottomTrailing) {
-                    if let badgeText, !dynamicTypeSize.isAccessibilitySize {
-                        HStack(spacing: 3) {
-                            Image(systemName: playlist.isMix ? "infinity" : "rectangle.stack.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                            Text(verbatim: badgeText)
-                        }
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4))
-                        .padding(5)
-                    }
-                }
-
+            artwork
             VStack(alignment: .leading, spacing: MediaStyle.labelSpacing) {
                 Text(playlist.title)
                     .appFont(.subheadline, weight: .semibold)
@@ -120,5 +95,53 @@ struct PlaylistRow: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// Two receding cards peek above the artwork so playlists read as collections beside video
+    /// rows. The stack fits inside the video thumbnail's frame, keeping mixed rows aligned.
+    private var artwork: some View {
+        let stackInset: CGFloat = 6
+        let imageSize = CGSize(width: thumbnailSize.width, height: thumbnailSize.height - stackInset)
+        let layerRadius = MediaStyle.thumbnailRadius - 2
+        return ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: layerRadius, style: .continuous)
+                .fill(Color.secondary.opacity(0.22))
+                .frame(width: imageSize.width - 16, height: imageSize.height)
+                .offset(y: -stackInset)
+            RoundedRectangle(cornerRadius: layerRadius, style: .continuous)
+                .fill(Color.secondary.opacity(0.4))
+                .frame(width: imageSize.width - 8, height: imageSize.height)
+                .offset(y: -stackInset / 2)
+            artworkImage(size: imageSize)
+        }
+        .frame(width: thumbnailSize.width, height: thumbnailSize.height, alignment: .bottom)
+    }
+
+    private func artworkImage(size: CGSize) -> some View {
+        KFImage(playlist.thumbnailURL)
+            .thumbnail(size: thumbnailSize) {
+                MediaStyle.placeholderFill
+            }
+            .resizable()
+            .scaledToFill()
+            .frame(width: size.width, height: size.height)
+            .background(MediaStyle.placeholderFill)
+            .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+            .mediaArtworkOutline()
+            .overlay(alignment: .bottomTrailing) {
+                if let badgeText, !dynamicTypeSize.isAccessibilitySize {
+                    HStack(spacing: 3) {
+                        Image(systemName: playlist.isMix ? "infinity" : "rectangle.stack.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(verbatim: badgeText)
+                    }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4))
+                    .padding(5)
+                }
+            }
     }
 }

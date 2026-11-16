@@ -125,7 +125,10 @@ final class SearchService: SearchServicing {
                 return .channel(Mappers.channel(from: yt))
             }
             if let yt = result as? YTPlaylist {
-                return .playlist(Mappers.playlist(from: yt))
+                // Mixes are generated per viewer by the watch page; the anonymous playlist
+                // browse request returns them empty, so a Mix result could only open blank.
+                let playlist = Mappers.playlist(from: yt)
+                return playlist.isMix ? nil : .playlist(playlist)
             }
             return nil
         }

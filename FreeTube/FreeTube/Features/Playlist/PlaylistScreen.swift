@@ -39,6 +39,11 @@ struct PlaylistScreen: View {
 
     private var isSearching: Bool { !searchQuery.isEmpty }
 
+    /// The artwork, and the skeleton that stands in for it, run beneath the transparent bar.
+    private var usesImmersiveHeader: Bool {
+        !isSearching && (model.details != nil || model.isLoading)
+    }
+
     private var displaysWatchProgress: Bool {
         showHistoryProgressBars && !(incognitoEnabled && incognitoHideWatchProgress)
     }
@@ -76,7 +81,7 @@ struct PlaylistScreen: View {
                 }
             }
         }
-        .ignoresSafeArea(.container, edges: model.details == nil || isSearching ? [] : .top)
+        .ignoresSafeArea(.container, edges: usesImmersiveHeader ? .top : [])
         .background(MediaStyle.pageBackground)
         .coordinateSpace(name: "playlistScroll")
         .onPreferenceChange(PlaylistTitlePositionKey.self) { titleBottom in
@@ -176,6 +181,7 @@ struct PlaylistScreen: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
         }
+        .padding(.top, PlayerLayoutMetrics.safeAreaInsets.top)
         .modifier(SkeletonPulse())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading playlist")

@@ -51,7 +51,7 @@ struct SearchContent: View {
             } else if let results = model.results {
                 resultsList(results)
             } else if model.isLoading {
-                MediaListPlaceholder()
+                MediaListPlaceholder { resultsHeader }
             } else if model.didSearchFail {
                 ContentUnavailableView {
                     Label("Unable to Search", systemImage: "wifi.exclamationmark")
@@ -79,6 +79,11 @@ struct SearchContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Swapping between suggestions, results, and history is a content replacement. Without
+        // this, it inherits the search bar's presentation animation and cross-fades and slides
+        // whole Lists on top of the system's own transition.
+        .transaction(value: contentPhase) { $0.animation = nil }
+        .transaction(value: isSearching) { $0.animation = nil }
         .onChange(of: model.submittedQuery) { _, _ in
             model.invalidateFilteredPrefetch()
         }
@@ -373,7 +378,7 @@ struct SearchContent: View {
                     } label: {
                         Text("More")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .contentShape(Rectangle())
                     }
@@ -389,7 +394,8 @@ struct SearchContent: View {
                     showingClearSearchHistoryConfirmation = true
                 }
                 ForEach(searches) { entry in
-                    // Separate borderless buttons: a default-styled List row fires every button in it.
+                    // Separate plain buttons: a default-styled List row fires every button in it,
+                    // and borderless buttons tint their labels with the accent color.
                     HStack(spacing: 0) {
                         Button {
                             if isSearching || MacIntegration.isRunningOnMac {
@@ -412,24 +418,29 @@ struct SearchContent: View {
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.plain)
 
-                        Button {
-                            if isSearching || MacIntegration.isRunningOnMac {
+                        // Filling only differs from running while the field is active; inactive
+                        // rows already fill the field, so a second control would repeat the row.
+                        if isSearching || MacIntegration.isRunningOnMac {
+                            Button {
                                 model.query = entry.query
-                            } else {
-                                onEditQuery(entry.query)
+                            } label: {
+                                Image(systemName: "arrow.up.left")
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                    .contentShape(Rectangle())
                             }
-                        } label: {
-                            Image(systemName: "arrow.up.left")
-                                .foregroundStyle(.secondary)
-                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                                .contentShape(Rectangle())
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Fill search with \(entry.query)")
                         }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Fill search with \(entry.query)")
                     }
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 4))
+                    .listRowInsets(EdgeInsets(
+                        top: 0,
+                        leading: 16,
+                        bottom: 0,
+                        trailing: isSearching || MacIntegration.isRunningOnMac ? 4 : 16
+                    ))
                 }
                 .onDelete { offsets in
                     for index in offsets {
@@ -528,7 +539,7 @@ struct SearchContent: View {
         ListSectionTitle(title) {
             Button("Clear", action: onClear)
                 .font(.subheadline)
-                .foregroundStyle(.tint)
+                .foregroundStyle(.secondary)
                 .buttonStyle(.plain)
                 .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                 .contentShape(Rectangle())
@@ -537,6 +548,18 @@ struct SearchContent: View {
         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 0, trailing: 16))
         .listRowSeparator(.hidden)
         .deleteDisabled(true)
+    }
+
+    private enum ContentPhase: Equatable {
+        case suggestions, results, loading, failed, history, empty
+    }
+
+    private var contentPhase: ContentPhase {
+        if model.isEditingNewQuery { return .suggestions }
+        if model.results != nil { return .results }
+        if model.isLoading { return .loading }
+        if model.didSearchFail { return .failed }
+        return history.isEmpty && recentChannels.isEmpty ? .empty : .history
     }
 
     private var recentChannels: [RecentChannel] {

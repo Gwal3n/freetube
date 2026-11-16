@@ -6,7 +6,6 @@ struct SponsorBlockTimeline: View {
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     @AppStorage("sponsorBlockShowFullVideoSeekStripe") private var showFullVideoSeekStripe = false
     @AppStorage("scrubberChapterHighlight") private var highlightsScrubbedChapter = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
@@ -24,8 +23,8 @@ struct SponsorBlockTimeline: View {
     @State private var scrubChapterID: VideoChapter.ID?
     @State private var chapterHapticTrigger = 0
 
-    /// Where the thumb, time label, and chapter label point. While scrubbing this is the target;
-    /// the progress fill keeps showing actual playback until the seek is committed.
+    /// Where the thumb and chapter label point. While scrubbing this is the target; the progress
+    /// fill and elapsed clock keep showing actual playback until the seek is committed.
     private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
     private var isScrubbing: Bool { dragTime != nil || previewElapsed != nil }
     private var currentChapter: VideoChapter? {
@@ -67,7 +66,7 @@ struct SponsorBlockTimeline: View {
         let sponsorColors = SponsorBlockColorPalette(json: sponsorBlockColorOverridesJSON)
         VStack(spacing: 4) {
             HStack(spacing: 7) {
-                Text(verbatim: format(displayedTime))
+                Text(verbatim: format(elapsed))
                 if let currentChapter {
                     Button(action: onShowChapters) {
                         HStack(spacing: 4) {
@@ -77,17 +76,8 @@ struct SponsorBlockTimeline: View {
                                 .font(.system(size: 9, weight: .bold))
                         }
                         .foregroundStyle(.white)
-                        // A pill drawn outside the layout makes the label read as a control
-                        // without changing the row height the seek preview aligns to.
-                        .background {
-                            Capsule()
-                                .fill(.white.opacity(0.18))
-                                .padding(.horizontal, -7)
-                                .padding(.vertical, -3)
-                        }
                         .frame(maxWidth: 190, alignment: .leading)
                     }
-                    .padding(.leading, 6)
                     .contentShape(.interaction, Rectangle().inset(by: -10))
                     .accessibilityLabel("Current chapter, \(currentChapter.title)")
                 }
@@ -107,21 +97,7 @@ struct SponsorBlockTimeline: View {
                 let thumbSize: CGFloat = dragTime != nil ? 18 : 14
 
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.22)).frame(height: Self.trackHeight)
-                    ForEach(bufferedRanges.indices, id: \.self) { index in
-                        let range = bufferedRanges[index]
-                        let start = fraction(for: range.lowerBound)
-                        let end = fraction(for: range.upperBound)
-                        Capsule()
-                            .fill(.white.opacity(0.55))
-                            .frame(width: width * max(0, end - start), height: Self.trackHeight)
-                            .offset(x: width * start)
-                    }
-                    Capsule().fill(scrubberColor).frame(width: width * playbackProgress, height: Self.trackHeight)
-
-                    if let highlight {
-                        highlightedChapter(highlight, width: width, playbackProgress: playbackProgress)
-                    }
+                    track(width: width, playbackProgress: playbackProgress, highlight: highlight)
 
                     // Full-video labels are annotations, never a seek target. Keep their slim
                     // stripe below the progress track so the playback position stays clear.
@@ -161,8 +137,6 @@ struct SponsorBlockTimeline: View {
                 }
                 .compositingGroup()
                 .frame(maxHeight: .infinity)
-                .animation(reduceMotion ? nil : InterfaceMotion.quick, value: highlight)
-                .animation(reduceMotion ? nil : InterfaceMotion.quick, value: thumbSize)
                 // Extends touch below the track and into the row gap above it, but never over the
                 // chapter label, whose own button must keep receiving taps.
                 .contentShape(TimelineTouchShape())
@@ -219,41 +193,40 @@ struct SponsorBlockTimeline: View {
         chapterHapticTrigger &+= 1
     }
 
-    /// The scrubbed chapter drawn taller and brighter over the normal track, keeping its own
-    /// buffered and played portions.
-    @ViewBuilder
-    private func highlightedChapter(
-        _ range: ClosedRange<TimeInterval>,
+    /// Base, buffered, and played layers drawn once at the enlarged height and clipped to the
+    /// track's outline. The scrubbed chapter is the same layers seen through a taller window, so
+    /// its colors match the rest of the track exactly; only the played fill gains saturation.
+    private func track(
         width: CGFloat,
-        playbackProgress: CGFloat
+        playbackProgress: CGFloat,
+        highlight: ClosedRange<TimeInterval>?
     ) -> some View {
-        let start = fraction(for: range.lowerBound)
-        let end = fraction(for: range.upperBound)
-        let height = Self.highlightedTrackHeight
-        ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(.white.opacity(0.42))
-                .frame(width: width * (end - start), height: height)
+        let highlightFractions = highlight.map { fraction(for: $0.lowerBound)...fraction(for: $0.upperBound) }
+        return ZStack(alignment: .leading) {
+            Rectangle().fill(.white.opacity(0.22))
             ForEach(bufferedRanges.indices, id: \.self) { index in
-                let buffered = bufferedRanges[index]
-                let lower = max(fraction(for: buffered.lowerBound), start)
-                let upper = min(fraction(for: buffered.upperBound), end)
-                if upper > lower {
-                    Rectangle()
-                        .fill(.white.opacity(0.72))
-                        .frame(width: width * (upper - lower), height: height)
-                        .offset(x: width * (lower - start))
-                }
+                let range = bufferedRanges[index]
+                let start = fraction(for: range.lowerBound)
+                let end = fraction(for: range.upperBound)
+                Rectangle()
+                    .fill(.white.opacity(0.55))
+                    .frame(width: width * max(0, end - start))
+                    .offset(x: width * start)
             }
-            if playbackProgress > start {
+            Rectangle().fill(scrubberColor).frame(width: width * playbackProgress)
+            if let highlightFractions, playbackProgress > highlightFractions.lowerBound {
                 Rectangle()
                     .fill(scrubberColor)
                     .saturation(1.3)
-                    .frame(width: width * (min(playbackProgress, end) - start), height: height)
+                    .frame(width: width * (min(playbackProgress, highlightFractions.upperBound) - highlightFractions.lowerBound))
+                    .offset(x: width * highlightFractions.lowerBound)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 2))
-        .offset(x: width * start)
+        .frame(width: width, height: Self.highlightedTrackHeight)
+        .clipShape(TimelineTrackShape(
+            trackHeight: Self.trackHeight,
+            highlight: highlightFractions
+        ))
     }
 
     /// SponsorBlock ranges match the track's thickness, including inside the enlarged chapter.
@@ -282,6 +255,31 @@ struct SponsorBlockTimeline: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
+}
+
+/// A capsule track with an optional taller rounded window over the highlighted fraction range.
+private struct TimelineTrackShape: Shape {
+    let trackHeight: CGFloat
+    let highlight: ClosedRange<CGFloat>?
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(
+            roundedRect: CGRect(x: rect.minX, y: rect.midY - trackHeight / 2, width: rect.width, height: trackHeight),
+            cornerRadius: trackHeight / 2
+        )
+        if let highlight, highlight.upperBound > highlight.lowerBound {
+            path.addRoundedRect(
+                in: CGRect(
+                    x: rect.minX + rect.width * highlight.lowerBound,
+                    y: rect.minY,
+                    width: rect.width * (highlight.upperBound - highlight.lowerBound),
+                    height: rect.height
+                ),
+                cornerSize: CGSize(width: 2, height: 2)
+            )
+        }
+        return path
+    }
 }
 
 /// About 36 points of touch for the 24-point track frame: 4 points up into the gap below the

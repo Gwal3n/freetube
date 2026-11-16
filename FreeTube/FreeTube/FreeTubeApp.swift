@@ -28,6 +28,7 @@ struct FreeTubeApp: App {
                 .tint(useAccentTheme && !accentNavigationOnly
                       ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)
                       : .primary)
+                .progressViewStyle(NeutralSpinnerProgressViewStyle())
                 .environment(\.settingsToggleTint,
                              useAccentTheme && !accentNavigationOnly
                              ? (AppAccentPreset(rawValue: appAccentPresetRaw) ?? .classic).color(customHex: appCustomAccentHex)

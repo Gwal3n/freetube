@@ -14,7 +14,6 @@ struct InitialContentLoadingModifier: ViewModifier {
             .overlay {
                 if !hasLoaded {
                     ProgressView()
-                        .progressViewStyle(.circular)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 40)
                         .accessibilityLabel("Loading")

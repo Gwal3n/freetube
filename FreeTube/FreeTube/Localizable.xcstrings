@@ -687,6 +687,27 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aperçu de la description réduite" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Превью свёрнутого описания" } }
     } },
+    "Normal" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Обычный" } }
+    } },
+    "Show “more” after preview" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "„mehr“ nach der Vorschau anzeigen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Show “more” after preview" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar «más» tras la vista previa" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher « plus » après l’aperçu" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показывать «ещё» после превью" } }
+    } },
+    "Small" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Klein" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Small" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Pequeño" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Petit" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Маленький" } }
+    } },
     "Comments" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Kommentare" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Comments" } },

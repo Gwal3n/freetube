@@ -25,9 +25,6 @@ struct LibraryScreen: View {
 
     var body: some View {
         List {
-            if saveWatchHistory && showLibraryShelf && !shelfEntries.isEmpty {
-                videoShelf(libraryShelfContent.shelfTitle, entries: shelfEntries)
-            }
             localHistorySection
             downloadsSection
         }
@@ -192,6 +189,10 @@ struct LibraryScreen: View {
                 )
             }
             .tint(Color.primary)
+        } header: {
+            if saveWatchHistory && showLibraryShelf && !shelfEntries.isEmpty {
+                videoShelf(libraryShelfContent.shelfTitle, entries: shelfEntries)
+            }
         }
     }
 
@@ -212,29 +213,29 @@ struct LibraryScreen: View {
         }
     }
 
+    /// Drawn as the first section's header rather than as a row: grouped rows are masked to the
+    /// section's rounded corners, which clipped the cards scrolling past the row's edges.
     private func videoShelf(_ title: String, entries: [WatchHistorySnapshot]) -> some View {
-        Section {
-            VStack(alignment: .leading, spacing: 10) {
-                ListSectionTitle(verbatim: title)
-                ScrollView(.horizontal) {
-                    LazyHStack(alignment: .top, spacing: 12) {
-                        ForEach(entries) { entry in
-                            LibraryVideoShelfCard(
-                                entry: entry,
-                                canMarkComplete: libraryShelfContent == .continueWatching
-                            )
-                        }
+        VStack(alignment: .leading, spacing: 10) {
+            ListSectionTitle(verbatim: title)
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(entries) { entry in
+                        LibraryVideoShelfCard(
+                            entry: entry,
+                            canMarkComplete: libraryShelfContent == .continueWatching
+                        )
                     }
-                    .padding(.vertical, 4)
                 }
-                .scrollIndicators(.hidden)
+                .padding(.vertical, 4)
             }
-            // Zero leading inset puts the title and first card on the grouped cards' edge,
-            // which is also where the large navigation title starts.
-            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
         }
+        .textCase(nil)
+        // Zero leading inset puts the title and first card on the grouped cards' edge,
+        // which is also where the large navigation title starts.
+        .listRowInsets(EdgeInsets(top: 16, leading: 0, bottom: 14, trailing: 0))
     }
 
     /// Builds the "N videos" / "N playlists" subtitle. When the library response hasn't

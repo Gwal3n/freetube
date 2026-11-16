@@ -48,11 +48,19 @@ struct LibraryVideoShelfCard: View {
                 } action: { frame in
                     launchAnchor.frame = frame
                 }
-                Text(entry.title)
-                    .appFont(.caption, weight: .medium)
-                    .foregroundStyle(.primary)
-                    .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
-                    .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.title)
+                        .appFont(.caption, weight: .medium)
+                        .foregroundStyle(.primary)
+                        .lineLimit(MediaStyle.mediaTitleLineLimit(for: dynamicTypeSize))
+                        .multilineTextAlignment(.leading)
+                    if !entry.channelName.isEmpty {
+                        Text(entry.channelName)
+                            .appFont(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
             .frame(width: 160, alignment: .leading)
             .contentShape(Rectangle())

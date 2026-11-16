@@ -99,7 +99,7 @@ struct PlayerTopControls: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .playerTopControl()
+                        .playerTopGlyph()
                 }
                 .accessibilityLabel("More player controls")
             }
@@ -118,7 +118,7 @@ struct PlayerTopControls: View {
         case .loop:
             Button(action: onToggleLoop) {
                 Image(systemName: "repeat.1")
-                    .playerTopControl()
+                    .playerTopGlyph()
                     .opacity(isLooping ? 1 : 0.58)
             }
             .accessibilityLabel("Loop video")
@@ -126,7 +126,7 @@ struct PlayerTopControls: View {
         case .mute:
             Button(action: onToggleMute) {
                 Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .playerTopControl()
+                    .playerTopGlyph()
             }
             .accessibilityLabel(isMuted ? "Unmute" : "Mute")
         case .fullscreen:
@@ -134,22 +134,22 @@ struct PlayerTopControls: View {
                 Image(systemName: isFullscreen
                     ? "arrow.down.right.and.arrow.up.left"
                     : "arrow.up.left.and.arrow.down.right")
-                    .playerTopControl()
+                    .playerTopGlyph()
             }
             .accessibilityLabel(isFullscreen ? "Exit fullscreen" : "Enter fullscreen")
         case .autoplay:
             Button(action: onToggleAutoplay) {
                 Image(systemName: isAutoplayEnabled ? "play.circle.fill" : "play.circle")
-                    .playerTopControl()
+                    .playerTopGlyph()
                     .opacity(isAutoplayEnabled ? 1 : 0.58)
             }
             .accessibilityLabel("Autoplay next")
             .accessibilityValue(isAutoplayEnabled ? "On" : "Off")
         case .audioOnly:
             Button(action: onToggleAudioOnly) {
-                Image(systemName: isAudioOnly ? "headphones.circle.fill" : "headphones")
-                    .playerTopControl()
-                    .opacity(isAudioOnly ? 1 : 0.72)
+                Image(systemName: "headphones")
+                    .playerTopGlyph()
+                    .opacity(isAudioOnly ? 1 : 0.58)
             }
             .disabled(isSwitchingAudioMode)
             .accessibilityLabel("Audio-only playback")
@@ -159,7 +159,7 @@ struct PlayerTopControls: View {
                 qualityChoices
             } label: {
                 Text(verbatim: reportedQualityLabel)
-                    .font(.caption.weight(.bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(minWidth: 44, minHeight: 44)
                     .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
@@ -170,7 +170,7 @@ struct PlayerTopControls: View {
         case .playbackDetails:
             Button(action: onShowPlaybackDetails) {
                 Image(systemName: control.systemImage)
-                    .playerTopControl()
+                    .playerTopGlyph()
             }
             .accessibilityLabel("Playback details")
         case .captions:
@@ -179,16 +179,16 @@ struct PlayerTopControls: View {
             Menu {
                 sleepTimerChoices
             } label: {
-                Image(systemName: sleepTimerOption == .off ? "moon.zzz" : "moon.fill")
-                    .playerTopControl()
-                    .opacity(sleepTimerOption == .off ? 0.72 : 1)
+                Image(systemName: sleepTimerOption == .off ? "moon.zzz" : "moon.zzz.fill")
+                    .playerTopGlyph()
+                    .opacity(sleepTimerOption == .off ? 0.58 : 1)
             }
             .accessibilityLabel("Sleep timer")
             .accessibilityValue(sleepTimerOption == .off ? "Off" : "On")
         case .frameStepping:
             Button(action: onToggleFrameStepping) {
                 Image(systemName: isFrameStepping ? "film.fill" : "film")
-                    .playerTopControl()
+                    .playerTopGlyph()
             }
             .disabled(!canUseFineSeeking)
             .accessibilityLabel("Fine seeking")
@@ -260,7 +260,7 @@ struct PlayerTopControls: View {
             if onPlayer {
                 Image(systemName: captionsModel.selectedTrackID == nil
                     ? "captions.bubble" : "captions.bubble.fill")
-                    .playerTopControl()
+                    .playerTopGlyph()
             } else {
                 Label("Captions", systemImage: captionsModel.selectedTrackID == nil
                     ? "captions.bubble" : "captions.bubble.fill")
@@ -332,11 +332,11 @@ struct PlayerTopControls: View {
         } label: {
             HStack(spacing: 4) {
                 if isPreparingFastPlayback {
-                    ProgressView().tint(.white).controlSize(.mini)
+                    ProgressView().progressViewStyle(.circular).tint(.white).controlSize(.mini)
                 }
                 Text(rateLabel(effectivePlaybackRate))
             }
-                .font(.caption.weight(.bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(.white)
                 .frame(minWidth: 44, minHeight: 44)
                 .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
