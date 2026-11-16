@@ -117,12 +117,6 @@ enum SettingsSearchIndex {
             case .player where displayTitle == String(localized: "Collapsed description preview")
                 && !UserPreferences().showDescription:
                 return String(localized: "Show description")
-            case .player where displayTitle == String(localized: "Show “more” after preview")
-                && !UserPreferences().showDescription:
-                return String(localized: "Show description")
-            case .player where displayTitle == String(localized: "Show “more” after preview")
-                && !UserPreferences().showCollapsedDescriptionPreview:
-                return String(localized: "Collapsed description preview")
             case .player where displayTitle == String(localized: "Featured comment preview")
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
@@ -201,7 +195,7 @@ enum SettingsSearchIndex {
             "Vertical swipe in fullscreen", "Left side", "Right side",
             "Show Save button", "Show Share button", "Show Download button", "Scrubber color", "Custom scrubber color", "Highlight chapter while scrubbing",
             "Remember mini player position", "Transport buttons", "Seek amount", "Show description",
-            "Collapsed description preview", "Show “more” after preview",
+            "Collapsed description preview",
             "Show comments", "Pin Comments heading", "Load more as you scroll", "Show commenter photos",
             "Tap commenter to open channel", "Featured comment preview", "Show Up Next",
             "Pin Up Next heading", "Show channel avatars", "Tap channel to open", "Thumbnail size",

@@ -9,6 +9,7 @@ struct StoryboardPreview: View {
     let tile: VideoStoryboard.Tile
     let videoPresentationSize: CGSize
     let previewTime: TimeInterval
+    let chapterTitle: String?
     let style: SeekPreviewStyle
 
     private var previewSize: CGSize {
@@ -44,6 +45,9 @@ struct StoryboardPreview: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
             }
+            .overlay(alignment: .top) {
+                seekPreviewChapterLabel(chapterTitle, width: style.maximumWidth)
+            }
             // Keep the image's lower edge fixed across wide and tall videos so the preview
             // timestamp lines up with the player's existing time labels.
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
@@ -61,6 +65,7 @@ struct AudioOnlySeekPreview: View {
     let artwork: UIImage?
     let thumbnailURL: URL?
     let previewTime: TimeInterval
+    let chapterTitle: String?
     let style: SeekPreviewStyle
 
     var body: some View {
@@ -83,6 +88,9 @@ struct AudioOnlySeekPreview: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
+            }
+            .overlay(alignment: .top) {
+                seekPreviewChapterLabel(chapterTitle, width: style.maximumWidth)
             }
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
@@ -108,4 +116,18 @@ private func seekPreviewTimeLabel(_ time: TimeInterval) -> some View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
         .frame(minHeight: 26)
+}
+
+/// The target chapter, drawn just above the image without adding to the preview's layout, so
+/// the preview timestamp stays aligned with the timeline's time row.
+@ViewBuilder
+private func seekPreviewChapterLabel(_ title: String?, width: CGFloat) -> some View {
+    if let title, !title.isEmpty {
+        Text(verbatim: title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .frame(width: width)
+            .alignmentGuide(.top) { $0[.bottom] + 4 }
+    }
 }

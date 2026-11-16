@@ -38,8 +38,7 @@ struct PlayerActionBar: View {
             HStack(spacing: 4) {
                 if showSaveButton {
                     Button(action: onSaveToPlaylist) {
-                        Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                            .font(.title3.weight(.semibold))
+                        actionGlyph(isSaved ? "bookmark.fill" : "bookmark", height: 20)
                             .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                             .contentShape(Rectangle())
                             .contentTransition(.symbolEffect(.replace))
@@ -72,8 +71,10 @@ struct PlayerActionBar: View {
                             }
                         }
                     } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.title3.weight(.semibold))
+                        // The arrow rises above the box, so the glyph's bounding box sits low;
+                        // lift it so the box lines up with the neighbouring symbols.
+                        actionGlyph("square.and.arrow.up", height: 23)
+                            .offset(y: -1)
                             .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                             .contentShape(Rectangle())
                     }
@@ -84,7 +85,11 @@ struct PlayerActionBar: View {
 
                 if showDownloadButton {
                     if downloadState == .available {
-                        DownloadOptionsMenu(video: video, onSelect: onDownloadChoice)
+                        DownloadOptionsMenu(video: video, onSelect: onDownloadChoice) {
+                            actionGlyph("arrow.down.circle", height: 21)
+                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                                .contentShape(Rectangle())
+                        }
                             .id(video.id)
                             .buttonStyle(ResponsiveButtonStyle())
                             .foregroundStyle(.primary)
@@ -108,14 +113,22 @@ struct PlayerActionBar: View {
     private var downloadLabel: some View {
         switch downloadState {
         case .downloaded:
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title3.weight(.semibold))
+            actionGlyph("checkmark.circle.fill", height: 21)
         case .downloading:
             ProgressView().controlSize(.small)
         case .available:
-            Image(systemName: "arrow.down.circle")
-                .font(.title3.weight(.semibold))
+            actionGlyph("arrow.down.circle", height: 21)
         }
+    }
+
+    /// Bookmark, share, and circled symbols have different intrinsic heights at one point size.
+    /// Explicit heights make the row read as one size.
+    private func actionGlyph(_ systemName: String, height: CGFloat) -> some View {
+        Image(systemName: systemName)
+            .resizable()
+            .scaledToFit()
+            .fontWeight(.semibold)
+            .frame(height: height)
     }
 
     private var downloadAccessibilityLabel: String {

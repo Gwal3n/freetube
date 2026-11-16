@@ -694,13 +694,6 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Обычный" } }
     } },
-    "Show “more” after preview" : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "„mehr“ nach der Vorschau anzeigen" } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Show “more” after preview" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar «más» tras la vista previa" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher « plus » après l’aperçu" } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показывать «ещё» после превью" } }
-    } },
     "Small" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Klein" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Small" } },
@@ -3850,13 +3843,6 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "En uso: %@. Al alcanzar el límite de caché se eliminan las descargas más antiguas. La reproducción no guarda una copia. Más fragmentos paralelos pueden acelerar las descargas, pero provocar límites de solicitudes." } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Espace utilisé : %@. Les téléchargements les plus anciens sont supprimés lorsque la limite du cache est atteinte. La lecture n’enregistre pas de copie. Plus de fragments parallèles peuvent accélérer les téléchargements, mais provoquer des limitations de débit." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Использовано: %@. При достижении лимита кеша удаляются самые старые загрузки. Воспроизведение не сохраняет копию. Большее число параллельных фрагментов может ускорить загрузку, но вызвать ограничения частоты запросов." } }
-    } },
-    "more" : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "mehr" } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "more" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "más" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "plus" } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "ещё" } }
     } },
     "v%@ (%@) — [freetube.io](https://freetube.io)" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "v%1$@ (%2$@) — [freetube.io](https://freetube.io)" } },

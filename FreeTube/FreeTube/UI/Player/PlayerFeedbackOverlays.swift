@@ -63,6 +63,7 @@ struct PlayerFeedbackOverlays: View {
                         artwork: player.currentArtwork,
                         thumbnailURL: player.currentVideo?.thumbnailURL,
                         previewTime: previewTime,
+                        chapterTitle: chapterTitle(at: previewTime),
                         style: seekPreviewStyle
                     )
                 } else if let tile = player.storyboard?.tile(
@@ -75,6 +76,7 @@ struct PlayerFeedbackOverlays: View {
                         tile: tile,
                         videoPresentationSize: player.videoPresentationSize,
                         previewTime: previewTime,
+                        chapterTitle: chapterTitle(at: previewTime),
                         style: seekPreviewStyle
                     )
                 }
@@ -120,5 +122,9 @@ struct PlayerFeedbackOverlays: View {
             )
             .zIndex(7)
         }
+    }
+
+    private func chapterTitle(at time: TimeInterval) -> String? {
+        player.chapters.last { $0.startTime <= time }?.title
     }
 }

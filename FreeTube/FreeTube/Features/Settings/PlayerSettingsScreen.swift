@@ -20,7 +20,6 @@ struct PlayerSettingsScreen: View {
     @AppStorage("openUpNextChannelsOnTap") private var openUpNextChannelsOnTap = false
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
-    @AppStorage("showDescriptionMoreLabel") private var showDescriptionMoreLabel = true
     @AppStorage("pinUpNextHeading") private var pinUpNextHeading = false
     @AppStorage("pinQueueHeading") private var pinQueueHeading = false
     @State private var showingCustomSeekEditor = false
@@ -162,11 +161,6 @@ struct PlayerSettingsScreen: View {
                     Toggle("Collapsed description preview", isOn: Bindable(model).showCollapsedDescriptionPreview)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Collapsed description preview")
-                    if model.showCollapsedDescriptionPreview {
-                        Toggle("Show “more” after preview", isOn: $showDescriptionMoreLabel)
-                            .tint(settingsToggleTint)
-                            .settingsSearchRow("Show “more” after preview")
-                    }
                 }
                 Toggle("Show comments", isOn: Bindable(model).showComments)
                     .tint(settingsToggleTint)

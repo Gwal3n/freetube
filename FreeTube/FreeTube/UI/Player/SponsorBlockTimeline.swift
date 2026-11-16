@@ -23,13 +23,16 @@ struct SponsorBlockTimeline: View {
     @State private var scrubChapterID: VideoChapter.ID?
     @State private var chapterHapticTrigger = 0
 
-    /// Where the thumb and chapter label point. While scrubbing this is the target; the progress
-    /// fill and elapsed clock keep showing actual playback until the seek is committed.
+    /// Where the thumb points. While scrubbing this is the target; the progress fill, elapsed
+    /// clock, and chapter label keep showing actual playback until the seek is committed.
     private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
     private var isScrubbing: Bool { dragTime != nil || previewElapsed != nil }
+    /// Hidden while scrubbing: the seek preview names the target chapter beside its timestamp,
+    /// and a playback-time label here would sit under that preview.
     private var currentChapter: VideoChapter? {
+        guard !isScrubbing else { return nil }
         // Match chapter-list highlighting: tolerate brief AVPlayer undershoot after a seek.
-        chapters.last { $0.startTime <= displayedTime + 0.35 }
+        return chapters.last { $0.startTime <= elapsed + 0.35 }
     }
 
     private static let trackHeight: CGFloat = 4

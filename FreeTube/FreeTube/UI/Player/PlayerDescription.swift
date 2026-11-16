@@ -9,7 +9,6 @@ struct PlayerDescription: View {
     let isLoading: Bool
     let loadFailed: Bool
     var showsCollapsedPreview: Bool = true
-    var showsMoreLabel: Bool = true
     let onSeek: (TimeInterval) -> Void
     let onRetry: () -> Void
     let onExpand: () -> Void
@@ -42,21 +41,14 @@ struct PlayerDescription: View {
                         }
                     } else if let text {
                         Button(action: onExpand) {
-                            HStack(alignment: .lastTextBaseline, spacing: 6) {
-                                Text(text)
-                                    .appFont(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                if showsMoreLabel {
-                                    Text("more")
-                                        .appFont(.subheadline, weight: .semibold)
-                                        .foregroundStyle(.primary)
-                                }
-                            }
-                            .padding(.vertical, 6)
-                            .contentShape(Rectangle())
+                            Text(text)
+                                .appFont(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(ResponsiveButtonStyle())
                         .accessibilityHint("Expand description")
