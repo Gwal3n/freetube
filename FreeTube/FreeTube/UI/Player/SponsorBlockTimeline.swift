@@ -6,6 +6,7 @@ struct SponsorBlockTimeline: View {
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     @AppStorage("sponsorBlockShowFullVideoSeekStripe") private var showFullVideoSeekStripe = false
     @AppStorage("scrubberChapterHighlight") private var highlightsScrubbedChapter = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let elapsed: TimeInterval
     let previewElapsed: TimeInterval?
@@ -27,12 +28,11 @@ struct SponsorBlockTimeline: View {
     /// clock, and chapter label keep showing actual playback until the seek is committed.
     private var displayedTime: TimeInterval { dragTime ?? previewElapsed ?? elapsed }
     private var isScrubbing: Bool { dragTime != nil || previewElapsed != nil }
-    /// Hidden while scrubbing: the seek preview names the target chapter beside its timestamp,
-    /// and a playback-time label here would sit under that preview.
+    /// The playback chapter. It fades out while scrubbing: the seek preview names the target
+    /// chapter beside its timestamp, and this label would sit under that preview.
     private var currentChapter: VideoChapter? {
-        guard !isScrubbing else { return nil }
         // Match chapter-list highlighting: tolerate brief AVPlayer undershoot after a seek.
-        return chapters.last { $0.startTime <= elapsed + 0.35 }
+        chapters.last { $0.startTime <= elapsed + 0.35 }
     }
 
     private static let trackHeight: CGFloat = 4
@@ -82,6 +82,10 @@ struct SponsorBlockTimeline: View {
                         .frame(maxWidth: 190, alignment: .leading)
                     }
                     .contentShape(.interaction, Rectangle().inset(by: -10))
+                    .opacity(isScrubbing ? 0 : 1)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isScrubbing)
+                    .allowsHitTesting(!isScrubbing)
+                    .accessibilityHidden(isScrubbing)
                     .accessibilityLabel("Current chapter, \(currentChapter.title)")
                 }
                 Spacer()

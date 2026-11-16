@@ -45,14 +45,11 @@ struct StoryboardPreview: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
             }
-            .overlay(alignment: .top) {
-                seekPreviewChapterLabel(chapterTitle, width: style.maximumWidth)
-            }
             // Keep the image's lower edge fixed across wide and tall videos so the preview
             // timestamp lines up with the player's existing time labels.
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            seekPreviewTimeLabel(previewTime)
+            seekPreviewTimeLabel(previewTime, chapterTitle: chapterTitle, style: style)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -89,12 +86,9 @@ struct AudioOnlySeekPreview: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.92), lineWidth: 1.5)
             }
-            .overlay(alignment: .top) {
-                seekPreviewChapterLabel(chapterTitle, width: style.maximumWidth)
-            }
             .frame(width: style.maximumWidth, height: style.maximumHeight, alignment: .bottom)
 
-            seekPreviewTimeLabel(previewTime)
+            seekPreviewTimeLabel(previewTime, chapterTitle: chapterTitle, style: style)
         }
         .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
     }
@@ -110,24 +104,29 @@ private func seekPreviewTimestamp(_ time: TimeInterval) -> String {
     return String(format: "%d:%02d", minutes, seconds)
 }
 
-@ViewBuilder
-private func seekPreviewTimeLabel(_ time: TimeInterval) -> some View {
-    Text(verbatim: seekPreviewTimestamp(time))
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.white)
-        .frame(minHeight: 26)
-}
-
-/// The target chapter, drawn just above the image without adding to the preview's layout, so
-/// the preview timestamp stays aligned with the timeline's time row.
-@ViewBuilder
-private func seekPreviewChapterLabel(_ title: String?, width: CGFloat) -> some View {
-    if let title, !title.isEmpty {
-        Text(verbatim: title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .frame(width: width)
-            .alignmentGuide(.top) { $0[.bottom] + 4 }
+/// The target time with its chapter beside it. The time never truncates; the chapter takes
+/// what is left of a row slightly wider than the tile and truncates there.
+private func seekPreviewTimeLabel(
+    _ time: TimeInterval,
+    chapterTitle: String?,
+    style: SeekPreviewStyle
+) -> some View {
+    HStack(spacing: 5) {
+        Text(verbatim: seekPreviewTimestamp(time))
+            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .fixedSize()
+        if let chapterTitle, !chapterTitle.isEmpty {
+            Text(verbatim: "·")
+                .font(.subheadline.weight(.semibold))
+            Text(verbatim: chapterTitle)
+                .font(.subheadline.weight(.medium))
+                .opacity(0.9)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
     }
+    .foregroundStyle(.white)
+    .frame(maxWidth: style.maximumWidth + 40)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(minHeight: 26)
 }
