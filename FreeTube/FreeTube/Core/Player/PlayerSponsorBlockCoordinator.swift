@@ -14,6 +14,8 @@ final class PlayerSponsorBlockCoordinator {
     @ObservationIgnored private var handledSegmentIDs = Set<String>()
     @ObservationIgnored private var lookupTask: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    /// Highlight Ask held until playback is ready so loading does not start its dismiss timer.
+    @ObservationIgnored private var pendingAskNotice: SponsorBlockNotice?
     private(set) var segments: [SponsorBlockSegment] = []
     private(set) var notice: SponsorBlockNotice?
     private(set) var communityChapters: [VideoChapter] = []
@@ -88,18 +90,30 @@ final class PlayerSponsorBlockCoordinator {
         return (highlight, current)
     }
 
-    /// - Parameter seconds: Timed auto-dismiss for Undo banners. Pass `nil` for Ask prompts that
-    ///   should stay until the viewer skips, dismisses, or the video changes.
-    func showNotice(_ notice: SponsorBlockNotice, for seconds: TimeInterval?) {
+    /// Shows a notice and auto-dismisses after `seconds` (Undo banner duration for skips and Ask).
+    func showNotice(_ notice: SponsorBlockNotice, for seconds: TimeInterval) {
+        pendingAskNotice = nil
         noticeTask?.cancel()
         noticeTask = nil
         self.notice = notice
-        guard let seconds else { return }
         noticeTask = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
             guard self?.notice?.id == notice.id else { return }
             self?.notice = nil
         }
+    }
+
+    /// Holds an Ask prompt until playback reaches `.readyToPlay`, then starts its dismiss timer.
+    func deferAskNotice(_ notice: SponsorBlockNotice) {
+        pendingAskNotice = notice
+    }
+
+    @discardableResult
+    func presentPendingAskIfNeeded(for seconds: TimeInterval) -> Bool {
+        guard let notice = pendingAskNotice else { return false }
+        pendingAskNotice = nil
+        showNotice(notice, for: seconds)
+        return true
     }
 
     func cancelNoticeDismissal() {
@@ -109,6 +123,7 @@ final class PlayerSponsorBlockCoordinator {
 
     func dismissNotice() {
         cancelNoticeDismissal()
+        pendingAskNotice = nil
         notice = nil
     }
 
@@ -185,6 +200,7 @@ final class PlayerSponsorBlockCoordinator {
     func clear(on player: AVQueuePlayer) {
         lookupTask?.cancel()
         lookupTask = nil
+        pendingAskNotice = nil
         dismissNotice()
         segments = []
         communityChapters = []

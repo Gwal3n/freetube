@@ -135,12 +135,27 @@ final class VideoContentPrefetchStore {
         }
     }
 
+    /// Drops the cached first comments page for one video so the next open fetches a fresh
+    /// thread. Details stay cached; in-flight comment tasks are cancelled so they cannot
+    /// repopulate the entry with the response that was already mid-flight.
+    func invalidateComments(for videoID: String) {
+        commentTasks[videoID]?.cancel()
+        commentTasks[videoID] = nil
+        guard var entry = entries[videoID], entry.comments != nil else { return }
+        entry.comments = nil
+        entries[videoID] = entry
+    }
+
     /// Forget stored metadata without cancelling a request already needed by an open view.
     /// The generation stops an in-flight response from silently repopulating a cleared cache.
     func clearCache() {
         cacheGeneration += 1
         entries.removeAll()
         recency.removeAll()
+        detailTasks.values.forEach { $0.cancel() }
+        commentTasks.values.forEach { $0.cancel() }
+        detailTasks.removeAll()
+        commentTasks.removeAll()
     }
 
     private func trimIfNeeded() {

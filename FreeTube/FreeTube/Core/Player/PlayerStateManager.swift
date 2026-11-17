@@ -25,7 +25,13 @@ final class PlayerStateManager {
     private(set) var currentVideo: Video?
     /// Artwork for Now Playing and the player backdrop.
     private(set) var currentArtwork: UIImage?
-    var loadState: LoadState = .idle
+    var loadState: LoadState = .idle {
+        didSet {
+            if loadState == .readyToPlay {
+                presentPendingSponsorBlockAskIfNeeded()
+            }
+        }
+    }
     var isPlaying: Bool = false
     /// True only when the current item reached its natural end and no automatic transition has
     /// replaced it. Drives replay chrome and lets a backward seek resume from the chosen point.
@@ -396,6 +402,9 @@ final class PlayerStateManager {
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
         clearChapterState()
+        // Prefetch caches the first comments page for the session; drop it on each open so
+        // expanding Comments is not stuck on an earlier snapshot of the thread.
+        VideoContentPrefetchStore.shared.invalidateComments(for: video.id)
         storyboard = nil
         captionTracks = []
         commentsCountText = nil

@@ -118,14 +118,25 @@ extension PlayerStateManager {
     }
 
     private func showSponsorBlockNotice(_ notice: SponsorBlockNotice) {
+        let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
         switch notice.kind {
         case .prompt:
-            // Ask prompts wait for Skip / Dismiss; Undo banner duration only applies to skips.
-            sponsorBlockCoordinator.showNotice(notice, for: nil)
+            // Don't show or start the dismiss timer while the item is still loading.
+            if case .readyToPlay = loadState {
+                sponsorBlockCoordinator.showNotice(notice, for: seconds)
+            } else {
+                sponsorBlockCoordinator.deferAskNotice(notice)
+            }
         case .skipped:
-            let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
             sponsorBlockCoordinator.showNotice(notice, for: seconds)
         }
+    }
+
+    /// Call when playback becomes ready so a deferred highlight Ask can appear and time out.
+    func presentPendingSponsorBlockAskIfNeeded() {
+        guard case .readyToPlay = loadState else { return }
+        let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
+        _ = sponsorBlockCoordinator.presentPendingAskIfNeeded(for: seconds)
     }
 
     /// Clears cached segment responses without changing the currently playing video's markers.

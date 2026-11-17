@@ -30,9 +30,9 @@ enum PlayerViewportLayout {
         return max(8, aspectHeight - availableSize.height + 16)
     }
 
-    /// Keeps landscape chrome inside the visible widescreen picture and outside the notch. Tall
-    /// videos deliberately retain the complete safe width so their controls remain usable rather
-    /// than being squeezed into the narrow portrait image at the centre of a landscape display.
+    /// Aspect-fits chrome to the visible picture inside the player surface (same box AVPlayer
+    /// letterboxes into with `.resizeAspect`). Landscape still respects the notch / home
+    /// indicator; tall videos keep the usable safe width rather than a skinny centre strip.
     static func controlFrame(
         surfaceSize: CGSize,
         isLandscape: Bool,
@@ -41,29 +41,40 @@ enum PlayerViewportLayout {
         safeAreaInsets: UIEdgeInsets
     ) -> CGRect {
         let full = CGRect(origin: .zero, size: surfaceSize)
-        guard isLandscape, surfaceSize.width > 0, surfaceSize.height > 0 else { return full }
+        guard surfaceSize.width > 0, surfaceSize.height > 0 else { return full }
 
-        let safeMinX = min(surfaceSize.width, safeAreaInsets.left)
-        let safeMaxX = max(
-            safeMinX,
-            surfaceSize.width - (hasChapterSidebar ? 0 : safeAreaInsets.right)
-        )
-        let safeWidth = safeMaxX - safeMinX
-        let isTallVideo = presentationSize.width > 0
-            && presentationSize.height > 0
-            && presentationSize.height > presentationSize.width
-        guard !isTallVideo else {
-            return CGRect(x: safeMinX, y: 0, width: safeWidth, height: surfaceSize.height)
+        let safeMinX: CGFloat
+        let safeMaxX: CGFloat
+        if isLandscape {
+            safeMinX = min(surfaceSize.width, safeAreaInsets.left)
+            safeMaxX = max(
+                safeMinX,
+                surfaceSize.width - (hasChapterSidebar ? 0 : safeAreaInsets.right)
+            )
+        } else {
+            safeMinX = 0
+            safeMaxX = surfaceSize.width
+        }
+        let safeWidth = max(0, safeMaxX - safeMinX)
+        let safeHeight = surfaceSize.height
+        guard safeWidth > 0, safeHeight > 0 else { return full }
+
+        // Until AVPlayer reports a size, fill the surface — guessing 16:9 misaligns tall videos.
+        guard presentationSize.width > 0, presentationSize.height > 0 else {
+            return CGRect(x: safeMinX, y: 0, width: safeWidth, height: safeHeight)
         }
 
-        let aspect = presentationSize.width > 0 && presentationSize.height > 0
-            ? presentationSize.width / presentationSize.height
-            : 16 / 9
-        let fittedWidth = min(safeWidth, surfaceSize.height * aspect)
-        let fittedHeight = min(surfaceSize.height, fittedWidth / aspect)
+        let isTallVideo = presentationSize.height > presentationSize.width
+        if isLandscape, isTallVideo {
+            return CGRect(x: safeMinX, y: 0, width: safeWidth, height: safeHeight)
+        }
+
+        let aspect = presentationSize.width / presentationSize.height
+        let fittedWidth = min(safeWidth, safeHeight * aspect)
+        let fittedHeight = min(safeHeight, fittedWidth / aspect)
         return CGRect(
             x: safeMinX + (safeWidth - fittedWidth) / 2,
-            y: (surfaceSize.height - fittedHeight) / 2,
+            y: (safeHeight - fittedHeight) / 2,
             width: fittedWidth,
             height: fittedHeight
         )

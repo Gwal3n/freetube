@@ -16,6 +16,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let onOpenChannel: () -> Void
     let actions: Actions
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.appFontPreset) private var fontPreset
     @AppStorage("sponsorBlockColorOverridesJSON") private var sponsorBlockColorOverridesJSON = "{}"
     @State private var showingFullVideoDescription = false
     @ScaledMetric(relativeTo: .title3) private var titleLineHeight: CGFloat = 25
@@ -53,7 +54,8 @@ struct PlayerMetadataHeader<Actions: View>: View {
                             HStack(alignment: .top, spacing: 0) {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     title(branding.title(for: video))
-                                    offlineBadge
+                                        .contentTransition(.opacity)
+                                        .multilineTextAlignment(.leading)
                                     fullVideoBadge
                                 }
                                 Spacer(minLength: 0)
@@ -72,7 +74,8 @@ struct PlayerMetadataHeader<Actions: View>: View {
                     } else {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             title(branding.title(for: video))
-                            offlineBadge
+                                .contentTransition(.opacity)
+                                .multilineTextAlignment(.leading)
                             fullVideoBadge
                             Spacer(minLength: 0)
                         }
@@ -124,22 +127,16 @@ struct PlayerMetadataHeader<Actions: View>: View {
         }
     }
 
-    private func title(_ value: String) -> some View {
-        Text(value)
-            .contentTransition(.opacity)
-            .appFont(.title3, weight: .semibold)
-            .multilineTextAlignment(.leading)
-    }
-
-    @ViewBuilder
-    private var offlineBadge: some View {
-        if isPlayingOffline {
-            Text("Offline")
-                .appFont(.caption2, weight: .medium)
+    /// Offline is concatenated into the title Text so it follows the last glyph, not a mid-line HStack slot.
+    private func title(_ value: String) -> Text {
+        let titleText = Text(value)
+            .font(fontPreset.font(.title3, weight: .semibold))
+        guard isPlayingOffline else { return titleText }
+        return titleText
+            + Text(verbatim: " ")
+            + Text("Offline")
+                .font(fontPreset.font(.caption2, weight: .medium))
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)
-                .accessibilityLabel("Playing offline")
-        }
     }
 
     @ViewBuilder
