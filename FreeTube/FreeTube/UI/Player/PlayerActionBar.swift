@@ -28,6 +28,8 @@ struct PlayerActionBar: View {
     @AppStorage("showPlayerShareButton") private var showShareButton = true
     @AppStorage("showPlayerDownloadButton") private var showDownloadButton = true
     @State private var savedMomentStore = SavedMomentStore.shared
+    /// Owned here so starting a download can swap the toolbar control without destroying the sheet.
+    @State private var showingDownloadDetails = false
 
     private var isSaved: Bool {
         isSavedToPlaylist || savedMomentStore.hasMoments(for: video.id)
@@ -84,28 +86,40 @@ struct PlayerActionBar: View {
                 }
 
                 if showDownloadButton {
-                    if downloadState == .available {
-                        DownloadOptionsMenu(video: video, onSelect: onDownloadChoice) {
-                            actionGlyph("arrow.down.circle", height: 21)
-                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                                .contentShape(Rectangle())
-                        }
-                            .id(video.id)
-                            .buttonStyle(ResponsiveButtonStyle())
-                            .foregroundStyle(.primary)
-                    } else {
-                        Button(action: onDownload) {
-                            downloadLabel
-                                .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(ResponsiveButtonStyle())
-                        .foregroundStyle(.primary)
-                        .opacity(downloadState == .downloading ? 0.72 : 1)
-                        .accessibilityLabel(downloadAccessibilityLabel)
-                    }
+                    downloadControl
                 }
             }
+            .sheet(isPresented: $showingDownloadDetails) {
+                DownloadDetailsSheet(video: video, onDownload: onDownloadChoice)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var downloadControl: some View {
+        if downloadState == .available {
+            DownloadOptionsMenu(
+                video: video,
+                onSelect: onDownloadChoice,
+                onShowDetails: { showingDownloadDetails = true }
+            ) {
+                actionGlyph("arrow.down.circle", height: 21)
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Rectangle())
+            }
+            .id(video.id)
+            .buttonStyle(ResponsiveButtonStyle())
+            .foregroundStyle(.primary)
+        } else {
+            Button(action: onDownload) {
+                downloadLabel
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .foregroundStyle(.primary)
+            .opacity(downloadState == .downloading ? 0.72 : 1)
+            .accessibilityLabel(downloadAccessibilityLabel)
         }
     }
 

@@ -70,7 +70,7 @@ struct VideoMoreActionsMenu: View {
                 player.load(selectedVideo, skipRecommendations: preservesPlaylist)
             }
         }
-                .sheet(isPresented: $showingDownloadDetails) {
+        .sheet(isPresented: $showingDownloadDetails) {
             DownloadDetailsSheet(video: video, onDownload: startDownload)
         }
         .onChange(of: downloadModel?.downloadError?.id) { _, _ in

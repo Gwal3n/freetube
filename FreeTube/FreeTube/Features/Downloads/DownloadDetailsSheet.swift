@@ -132,14 +132,19 @@ struct DownloadDetailsSheet: View {
         .presentationDetents([.medium, .large])
     }
 
-    @ViewBuilder
     private func qualityLabel(_ quality: VideoQuality) -> some View {
         let title = quality == .auto
             ? String(localized: "Automatic (up to 1080p)")
             : String(localized: "Up to \(quality.displayName)")
-        Text(title)
-        if let bytes = model.estimatedBytes[quality] {
-            Text(verbatim: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+        // One view per option — bare sibling Texts in a Picker become separate rows.
+        HStack {
+            Text(title)
+            Spacer(minLength: 8)
+            if let bytes = model.estimatedBytes[quality] {
+                Text(verbatim: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
         }
     }
 
