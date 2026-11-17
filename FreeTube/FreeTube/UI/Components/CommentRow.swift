@@ -63,16 +63,15 @@ struct CommentRow: View {
                 }
 
                 HStack(spacing: 16) {
-                    // Fixed like column so the replies control stays at one x, regardless of
-                    // whether the count is 9, 99, or 999.
+                    // Tight ~3-digit slot keeps the replies control steady for common counts
+                    // without a wide empty gap beside single-digit likes.
                     HStack(spacing: 4) {
                         Image(systemName: "hand.thumbsup")
                         Text(verbatim: "\(comment.likeCount)")
                             .monospacedDigit()
-                            .frame(width: 36, alignment: .leading)
+                            .frame(minWidth: 22, alignment: .leading)
                     }
                     .appFont(.caption)
-                    .frame(width: 56, alignment: .leading)
 
                     if let repliesTitle, let onToggleReplies {
                         Button(action: onToggleReplies) {

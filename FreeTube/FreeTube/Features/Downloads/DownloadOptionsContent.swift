@@ -17,7 +17,9 @@ struct DownloadOptionsContent: View {
             onSelect(defaultQuality)
         } label: {
             Label("Auto", systemImage: "arrow.down.circle")
-            Text(verbatim: defaultQuality.displayName)
+            // When the saved default is Auto, its display name is also "Auto" — repeating it
+            // reads as "Auto Auto". Spell the ceiling instead.
+            Text(defaultQuality == .auto ? "Up to 1080p" : defaultQuality.displayName)
         }
         Button(action: onShowDetails) {
             Label("Download details…", systemImage: "slider.horizontal.3")

@@ -164,6 +164,14 @@ struct ChannelScreen: View {
                 // Reserves the header's footprint, plus a little air so the first row isn't
                 // crowded against the tab bar. The header is drawn over the top of this.
                 Color.clear.frame(height: pagerState.headerTotalHeight + ChannelProfileMetrics.contentTopInset)
+                // System refresh sits under the immersive header, so show a visible spinner here.
+                if model.isRefreshing {
+                    ProgressView()
+                        .controlSize(.regular)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .accessibilityLabel("Refreshing channel")
+                }
                 // Reserve only enough content for the header to collapse. A full viewport here
                 // adds the tab bar and top inset again, letting short tabs scroll into blank space.
                 channelContent(details, tab: tab)

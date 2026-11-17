@@ -372,20 +372,38 @@ struct SearchContent: View {
                         recentChannelsJSON = json
                     }
                 }
-                if channels.count > visibleRecentChannelCount {
-                    Button {
-                        visibleRecentChannelCount += Self.recentChannelPageSize
-                    } label: {
-                        Text("More")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
+                if channels.count > Self.recentChannelPageSize {
+                    HStack(spacing: 24) {
+                        if channels.count > visibleRecentChannelCount {
+                            Button {
+                                visibleRecentChannelCount += Self.recentChannelPageSize
+                            } label: {
+                                Text("More")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .frame(minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show more recent channels")
+                        }
+                        if visibleRecentChannelCount > Self.recentChannelPageSize {
+                            Button {
+                                visibleRecentChannelCount = Self.recentChannelPageSize
+                            } label: {
+                                Text("Less")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .frame(minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show fewer recent channels")
+                        }
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                    .accessibilityLabel("Show more recent channels")
                 }
             }
             let searches = Array(history.prefix(recentSearchLimit))

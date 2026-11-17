@@ -183,12 +183,26 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Options" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры" } }
     } },
+    "Show fewer recent channels" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Weniger kürzlich angesehene Kanäle anzeigen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Show fewer recent channels" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar menos canales recientes" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher moins de chaînes récentes" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показать меньше недавних каналов" } }
+    } },
     "Size estimate unavailable until formats load." : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Größenschätzung erst verfügbar, wenn die Formate geladen sind." } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Size estimate unavailable until formats load." } },
       "es" : { "stringUnit" : { "state" : "translated", "value" : "La estimación de tamaño no está disponible hasta que se carguen los formatos." } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’estimation de taille sera disponible une fois les formats chargés." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Оценка размера появится после загрузки форматов." } }
+    } },
+    "Up to 1080p" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Bis zu 1080p" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Up to 1080p" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Hasta 1080p" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Jusqu’à 1080p" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "До 1080p" } }
     } },
     "View %lld replies" : { "localizations" : {
       "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld Antwort ansehen" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld Antworten ansehen" } } } } },
