@@ -26,8 +26,6 @@ final class DownloadsStore {
     /// actor at the end of a background scan — views observe via SwiftUI's standard
     /// observation tracking.
     private(set) var entries: [DownloadEntry] = []
-    /// O(1) membership for thumbnail/offline badges. Rebuilt whenever `entries` is replaced.
-    private(set) var downloadedVideoIDs: Set<String> = []
     /// True while a background scan is in flight. `SettingsScreen` and others can read this
     /// to show a spinner next to the cache-size label on first launch.
     private(set) var isScanning: Bool = false
@@ -84,7 +82,6 @@ final class DownloadsStore {
             await MainActor.run {
                 guard let self else { return }
                 self.entries = scanned
-                self.downloadedVideoIDs = Set(scanned.map(\.videoID))
                 self.isScanning = false
                 self.log.debug("refresh: \(scanned.count, privacy: .public) entries from \(Self.downloadsDirectory().path, privacy: .public)")
             }
@@ -105,11 +102,6 @@ final class DownloadsStore {
 
     func thumbnail(forVideoID videoID: String) -> Data? {
         entries.first { $0.metadata?.videoID == videoID }?.metadata?.thumbnailData
-    }
-
-    /// Whether a completed download exists for this video. Safe to call from list bodies.
-    func containsVideo(_ videoID: String) -> Bool {
-        downloadedVideoIDs.contains(videoID)
     }
 
     func metadata(at fileURL: URL) -> DownloadMetadata? {

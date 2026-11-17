@@ -218,13 +218,6 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lecture hors ligne" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Офлайн-воспроизведение" } }
     } },
-    "Ready for offline playback" : { "localizations" : {
-      "de" : { "stringUnit" : { "state" : "translated", "value" : "Bereit für Offline-Wiedergabe" } },
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready for offline playback" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Listo para reproducir sin conexión" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Prêt pour la lecture hors ligne" } },
-      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Готово к офлайн-воспроизведению" } }
-    } },
     "Selected option uses %@." : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Die gewählte Option nutzt %@." } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Selected option uses %@." } },

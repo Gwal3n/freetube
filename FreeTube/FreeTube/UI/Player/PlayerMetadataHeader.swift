@@ -53,6 +53,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                             HStack(alignment: .top, spacing: 0) {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     title(branding.title(for: video))
+                                    offlineBadge
                                     fullVideoBadge
                                 }
                                 Spacer(minLength: 0)
@@ -71,6 +72,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                     } else {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             title(branding.title(for: video))
+                            offlineBadge
                             fullVideoBadge
                             Spacer(minLength: 0)
                         }
@@ -80,7 +82,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                     }
                 }
 
-                if video.isLive || isPlayingOffline || !statsText.isEmpty {
+                if video.isLive || !statsText.isEmpty {
                     HStack(spacing: 7) {
                         if video.isLive {
                             Text("LIVE")
@@ -89,9 +91,6 @@ struct PlayerMetadataHeader<Actions: View>: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(.red, in: RoundedRectangle(cornerRadius: 3))
-                        }
-                        if isPlayingOffline {
-                            OfflineMediaBadge(style: .playerLabel)
                         }
                         if !statsText.isEmpty {
                             Text(statsText)
@@ -133,6 +132,17 @@ struct PlayerMetadataHeader<Actions: View>: View {
     }
 
     @ViewBuilder
+    private var offlineBadge: some View {
+        if isPlayingOffline {
+            Text("Offline")
+                .appFont(.caption2, weight: .medium)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("Playing offline")
+        }
+    }
+
+    @ViewBuilder
     private var fullVideoBadge: some View {
         if let fullVideoLabel, let name = fullVideoLabel.fullVideoLabelName {
             Button {
@@ -160,8 +170,14 @@ struct PlayerMetadataHeader<Actions: View>: View {
     }
 
     private func accessibilityTitle(_ title: String) -> String {
-        guard let name = fullVideoLabel?.fullVideoLabelName else { return title }
-        return "\(title), \(String(localized: "Full video label")): \(name)"
+        var parts = [title]
+        if isPlayingOffline {
+            parts.append(String(localized: "Playing offline"))
+        }
+        if let name = fullVideoLabel?.fullVideoLabelName {
+            parts.append("\(String(localized: "Full video label")): \(name)")
+        }
+        return parts.joined(separator: ", ")
     }
 
     @ViewBuilder

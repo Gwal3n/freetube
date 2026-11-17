@@ -14,7 +14,6 @@ struct VideoThumbnail: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var savedMomentStore = SavedMomentStore.shared
-    @State private var downloads = DownloadsStore.shared
     @AppStorage("watchProgressColorMode") private var progressColorMode = WatchIndicatorStyle.ColorMode.red.rawValue
     @AppStorage("watchProgressCustomHex") private var progressCustomHex = "#FF0000"
     @AppStorage("finishedVideoIndicator") private var finishedIndicator = WatchIndicatorStyle.FinishedMode.none.rawValue
@@ -63,12 +62,6 @@ struct VideoThumbnail: View {
                         .frame(width: compactBadge ? 7 : 8, height: compactBadge ? 7 : 8)
                         .overlay(Circle().strokeBorder(.black.opacity(0.65), lineWidth: 1))
                         .padding(compactBadge ? 5 : 7)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if downloads.containsVideo(video.id) {
-                    OfflineMediaBadge(style: .thumbnail(compact: compactBadge))
-                        .padding(compactBadge ? 3 : 5)
                 }
             }
             .overlay(alignment: .bottomTrailing) {
