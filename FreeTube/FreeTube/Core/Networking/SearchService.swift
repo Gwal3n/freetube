@@ -118,8 +118,8 @@ final class SearchService: SearchServicing {
 
     private func mapResults(_ results: [any YTSearchResult], continuation: String?) -> SearchResult {
         let items: [SearchHit] = results.compactMap { result in
-            if let yt = result as? YTVideo {
-                return .video(Mappers.video(from: yt))
+            if let yt = result as? YTVideo, let video = Mappers.video(from: yt) {
+                return .video(video)
             }
             if let yt = result as? YTChannel {
                 return .channel(Mappers.channel(from: yt))

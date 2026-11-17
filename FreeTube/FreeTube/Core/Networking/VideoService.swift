@@ -129,7 +129,7 @@ final class VideoService: VideoServicing {
                 data: [.query: id]
             )
             let response = rawResponse.info
-            let recommended = response.recommendedVideos.compactMap { $0 as? YTVideo }.map(Mappers.video(from:))
+            let recommended = response.recommendedVideos.compactMap { $0 as? YTVideo }.compactMap(Mappers.video(from:))
             let extractedDescription = rawResponse.description
             let descriptionText = extractedDescription?.text
                 ?? response.videoDescription?.compactMap(\.text).joined()
@@ -186,7 +186,7 @@ final class VideoService: VideoServicing {
             let response = try await MoreVideoInfosResponse.RecommendedVideosContinuation
                 .sendThrowingRequest(youtubeModel: client.model, data: [.continuation: continuation])
             return RecommendedVideosPage(
-                videos: response.results.compactMap { $0 as? YTVideo }.map(Mappers.video(from:)),
+                videos: response.results.compactMap { $0 as? YTVideo }.compactMap(Mappers.video(from:)),
                 continuationToken: response.continuationToken
             )
         } catch {

@@ -14,7 +14,10 @@ enum Mappers {
 
     // MARK: - Videos
 
-    static func video(from yt: YTVideo) -> Video {
+    /// Returns nil for members-only listings. Anonymous playback cannot open them, so search,
+    /// channel tabs, playlists, and the subscription feed must never surface them.
+    static func video(from yt: YTVideo) -> Video? {
+        guard !isMembersOnlyListing(yt) else { return nil }
         // Parse display timeLength — YouTubeKit rejects three-part stamps like "1:02:03".
         let duration = Self.duration(from: yt.timeLength)
         // Empty Shorts lockup thumbs → canonical hqdefault CDN URL.
@@ -35,6 +38,25 @@ enum Mappers {
             isLive: yt.timeLength?.localizedCaseInsensitiveCompare("live") == .orderedSame,
             isShort: false
         )
+    }
+
+    /// Classic renderers set `memberOnly` from `BADGE_STYLE_TYPE_MEMBERS_ONLY`. Channel lockups
+    /// often omit that flag; YouTubeKit then parks the lone relative-date metadata part in
+    /// `viewCount` (e.g. "1 day ago"), which is how those rows used to show up as "1 view".
+    static func isMembersOnlyListing(_ yt: YTVideo) -> Bool {
+        if yt.memberOnly == true { return true }
+        guard let views = yt.viewCount?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !views.isEmpty else { return false }
+        return looksLikeRelativeAge(views)
+    }
+
+    /// Relative upload ages YouTube puts in `publishedTimeText` / lockup date parts.
+    static func looksLikeRelativeAge(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        if lower.contains("view") { return false }
+        if lower.contains("ago") { return true }
+        let units = ["second", "minute", "hour", "day", "week", "month", "year"]
+        return units.contains { lower.contains($0) }
     }
 
     static func duration(from timeLength: String?) -> TimeInterval? {
@@ -71,6 +93,8 @@ enum Mappers {
     private static func parseViewCount(_ text: String?) -> Int? {
         guard let text else { return nil }
         let lower = text.lowercased()
+        // Lockup members-only rows put "1 day ago" here; never treat ages as view counts.
+        guard !looksLikeRelativeAge(text) else { return nil }
         // Quick path: pure digits with optional separators ("1,234,567").
         let digits = text.unicodeScalars.filter(CharacterSet.decimalDigits.contains).map(Character.init)
         if let value = Int(String(digits)), !lower.contains("k"), !lower.contains("m"), !lower.contains("b") {

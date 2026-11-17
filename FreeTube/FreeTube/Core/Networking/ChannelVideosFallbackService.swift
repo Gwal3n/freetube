@@ -286,6 +286,7 @@ final class ChannelVideosFallbackService: Sendable {
     /// Legacy `videoRenderer` extractor. Same fields YouTubeKit's `YTVideo.decodeJSON` reads.
     private static func decodeVideoRenderer(_ json: [String: Any], channelID: String) -> Video? {
         guard let videoID = json["videoId"] as? String else { return nil }
+        if hasMembersOnlyBadge(json["badges"]) { return nil }
 
         let title: String = {
             if let simple = (json["title"] as? [String: Any])?["simpleText"] as? String { return simple }
@@ -307,6 +308,7 @@ final class ChannelVideosFallbackService: Sendable {
         let viewText = (json["shortViewCountText"] as? [String: Any])?["simpleText"] as? String
             ?? ((json["shortViewCountText"] as? [String: Any])?["runs"] as? [[String: Any]])?
                 .compactMap { $0["text"] as? String }.joined()
+        if let viewText, Mappers.looksLikeRelativeAge(viewText) { return nil }
         let publishedRel = (json["publishedTimeText"] as? [String: Any])?["simpleText"] as? String
 
         return Video(
@@ -343,6 +345,7 @@ final class ChannelVideosFallbackService: Sendable {
         var viewsText: String?
         var publishedRel: String?
         for row in rows ?? [] {
+            if hasMembersOnlyLockupBadge(row["badges"]) { return nil }
             guard let parts = row["metadataParts"] as? [[String: Any]] else { continue }
             for part in parts {
                 guard let textJSON = part["text"] as? [String: Any],
@@ -358,6 +361,7 @@ final class ChannelVideosFallbackService: Sendable {
                 }
             }
         }
+        if let viewsText, Mappers.looksLikeRelativeAge(viewsText) { return nil }
 
         let sources = (((json["contentImage"] as? [String: Any])?["thumbnailViewModel"] as? [String: Any])?["image"] as? [String: Any])?["sources"] as? [[String: Any]]
         let thumb = sources?.compactMap { $0["url"] as? String }.last.flatMap(URL.init(string:))
@@ -396,6 +400,22 @@ final class ChannelVideosFallbackService: Sendable {
             isLive: durationText == nil,
             isShort: false
         )
+    }
+
+    private static func hasMembersOnlyBadge(_ badges: Any?) -> Bool {
+        guard let badges = badges as? [[String: Any]] else { return false }
+        return badges.contains {
+            ($0["metadataBadgeRenderer"] as? [String: Any])?["style"] as? String
+                == "BADGE_STYLE_TYPE_MEMBERS_ONLY"
+        }
+    }
+
+    private static func hasMembersOnlyLockupBadge(_ badges: Any?) -> Bool {
+        guard let badges = badges as? [[String: Any]] else { return false }
+        return badges.contains {
+            ($0["badgeViewModel"] as? [String: Any])?["badgeStyle"] as? String
+                == "BADGE_MEMBERS_ONLY"
+        }
     }
 
     /// "1:23" → 83, "1:02:03" → 3723. Returns nil for live / unparseable.

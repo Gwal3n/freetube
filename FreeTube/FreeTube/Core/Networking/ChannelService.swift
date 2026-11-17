@@ -248,8 +248,7 @@ final class ChannelService: ChannelServicing {
         let channelID2 = response.channelId ?? channelID
         let channelThumb = Mappers.bestThumbnailURL(response.avatarThumbnails)
         let newVideos: [Video] = (continuation.contents?.items ?? []).compactMap { item -> Video? in
-            guard let yt = item as? YTVideo else { return nil }
-            let v = Mappers.video(from: yt)
+            guard let yt = item as? YTVideo, let v = Mappers.video(from: yt) else { return nil }
             return Video(
                 id: v.id,
                 title: v.title,
@@ -305,8 +304,7 @@ final class ChannelService: ChannelServicing {
         let channelID = response.channelId ?? ""
         let channelThumb = Mappers.bestThumbnailURL(response.avatarThumbnails)
         let videos: [Video] = content.items.compactMap { item -> Video? in
-            guard let yt = item as? YTVideo else { return nil }
-            let v = Mappers.video(from: yt)
+            guard let yt = item as? YTVideo, let v = Mappers.video(from: yt) else { return nil }
             return Video(
                 id: v.id,
                 title: v.title,

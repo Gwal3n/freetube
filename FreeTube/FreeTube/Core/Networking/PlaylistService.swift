@@ -43,7 +43,7 @@ final class PlaylistService: PlaylistServicing {
         } catch {
             throw YouTubeServiceError.network(error)
         }
-        let videos = response.results.map(Mappers.video(from:))
+        let videos = response.results.compactMap(Mappers.video(from:))
         let placeholder = Playlist(id: "", title: "", channelID: nil, channelName: nil, thumbnailURL: nil, videoCount: nil, descriptionText: nil, isOwnedByUser: false)
         return PlaylistDetails(playlist: placeholder, videos: videos, continuationToken: response.continuationToken)
     }
@@ -54,7 +54,7 @@ final class PlaylistService: PlaylistServicing {
         // the actual header owner; if that is malformed, use a valid uploader from the list.
         let headerOwnerName = Mappers.channelName(from: owner?.name)
         let ownerName = headerOwnerName.isEmpty
-            ? (response.results.lazy.map { Mappers.video(from: $0).channelName }.first(where: { !$0.isEmpty }) ?? "")
+            ? (response.results.lazy.compactMap { Mappers.video(from: $0)?.channelName }.first(where: { !$0.isEmpty }) ?? "")
             : headerOwnerName
         let playlist = Playlist(
             id: response.playlistId ?? fallbackID,
@@ -73,8 +73,8 @@ final class PlaylistService: PlaylistServicing {
         // skip the channel field entirely).
         let ownerID = owner?.channelId ?? ""
         let ownerThumb = Mappers.bestThumbnailURL(owner?.thumbnails ?? [])
-        let videos: [Video] = response.results.map { yt in
-            let v = Mappers.video(from: yt)
+        let videos: [Video] = response.results.compactMap { yt in
+            guard let v = Mappers.video(from: yt) else { return nil }
             return Video(
                 id: v.id,
                 title: v.title,
