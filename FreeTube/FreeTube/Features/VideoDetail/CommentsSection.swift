@@ -38,13 +38,19 @@ struct CommentsSection: View {
                     }
                     .clipped()
                 } header: {
+                    // Solid black, never material: blur over the player panel looked milky.
+                    // The hairline appears only once content is scrolling underneath.
                     header
-                        .background {
-                            Rectangle()
-                                .fill(.thinMaterial)
-                        }
+                        .background(Color.black)
                         .overlay(alignment: .bottom) {
-                            Divider()
+                            Rectangle()
+                                .fill(Color.white.opacity(0.14))
+                                .frame(height: 1)
+                                .opacity(player.playerPanelAtTop ? 0 : 1)
+                                .animation(
+                                    reduceMotion ? nil : .easeOut(duration: 0.15),
+                                    value: player.playerPanelAtTop
+                                )
                         }
                 }
             } else {
