@@ -292,22 +292,18 @@ struct ChapterListPanel: View {
         return HStack(spacing: 12) {
             chapterThumbnail(chapter, size: thumbSize)
                 .frame(width: thumbSize.width, height: thumbSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(alignment: .bottomTrailing) {
-                    Text(chapter.timeDescription ?? format(chapter.startTime))
-                        .font(.caption2.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 4))
-                        .padding(4)
-                }
+                .background(MediaStyle.placeholderFill)
+                .clipShape(RoundedRectangle(cornerRadius: MediaStyle.thumbnailRadius, style: .continuous))
+                .mediaArtworkOutline()
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(chapter.title)
                     .font(.subheadline.weight(isCurrent ? .semibold : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
+                Text(verbatim: chapter.timeDescription ?? format(chapter.startTime))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
                 if isCurrent {
                     Label("Playing", systemImage: "speaker.wave.2.fill")
                         .font(.caption2.weight(.medium))

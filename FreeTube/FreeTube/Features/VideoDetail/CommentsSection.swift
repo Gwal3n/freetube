@@ -38,7 +38,14 @@ struct CommentsSection: View {
                     }
                     .clipped()
                 } header: {
-                    header.background(Color(uiColor: .systemBackground))
+                    header
+                        .background {
+                            Rectangle()
+                                .fill(.thinMaterial)
+                        }
+                        .overlay(alignment: .bottom) {
+                            Divider()
+                        }
                 }
             } else {
                 LazyVStack(alignment: .leading, spacing: 8) {

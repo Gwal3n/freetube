@@ -16,6 +16,7 @@ struct VideoMoreActionsMenu: View {
     @State private var addToPlaylistVideo: Video?
     @State private var savedMomentsVideo: Video?
     @State private var downloadModel: PlayerActionsModel?
+    @State private var showingDownloadDetails = false
 
     init(video: Video, offersPlayNext: Bool = false, onRemoveFromUpNext: (() -> Void)? = nil, onOpenChannel: (() -> Void)? = nil) {
         self.video = video
@@ -34,6 +35,7 @@ struct VideoMoreActionsMenu: View {
                 onRemoveFromUpNext: onRemoveFromUpNext,
                 onOpenChannel: onOpenChannel,
                 onDownload: startDownload,
+                onShowDownloadDetails: { showingDownloadDetails = true },
                 shareFileURL: $shareFileURL,
                 addToPlaylistVideo: $addToPlaylistVideo,
                 savedMomentsVideo: $savedMomentsVideo
@@ -68,6 +70,9 @@ struct VideoMoreActionsMenu: View {
                 player.load(selectedVideo, skipRecommendations: preservesPlaylist)
             }
         }
+                .sheet(isPresented: $showingDownloadDetails) {
+            DownloadDetailsSheet(video: video, onDownload: startDownload)
+        }
         .onChange(of: downloadModel?.downloadError?.id) { _, _ in
             guard let error = downloadModel?.downloadError else { return }
             errorPresenter.present(error)
@@ -91,6 +96,7 @@ private struct VideoActionsContent: View {
     let onRemoveFromUpNext: (() -> Void)?
     let onOpenChannel: (() -> Void)?
     let onDownload: (VideoQuality) -> Void
+    let onShowDownloadDetails: () -> Void
     @Binding var shareFileURL: URL?
     @Binding var addToPlaylistVideo: Video?
     @Binding var savedMomentsVideo: Video?
@@ -108,6 +114,7 @@ private struct VideoActionsContent: View {
         onRemoveFromUpNext: (() -> Void)?,
         onOpenChannel: (() -> Void)?,
         onDownload: @escaping (VideoQuality) -> Void,
+        onShowDownloadDetails: @escaping () -> Void,
         shareFileURL: Binding<URL?>,
         addToPlaylistVideo: Binding<Video?>,
         savedMomentsVideo: Binding<Video?>
@@ -119,6 +126,7 @@ private struct VideoActionsContent: View {
         self.onRemoveFromUpNext = onRemoveFromUpNext
         self.onOpenChannel = onOpenChannel
         self.onDownload = onDownload
+        self.onShowDownloadDetails = onShowDownloadDetails
         _shareFileURL = shareFileURL
         _addToPlaylistVideo = addToPlaylistVideo
         _savedMomentsVideo = savedMomentsVideo
@@ -188,7 +196,7 @@ private struct VideoActionsContent: View {
         }
         Divider()
         Menu {
-            DownloadOptionsContent(video: video, onSelect: onDownload)
+            DownloadOptionsContent(onSelect: onDownload, onShowDetails: onShowDownloadDetails)
         } label: {
             Label("Download", systemImage: "arrow.down.circle")
         }
@@ -258,6 +266,7 @@ private struct VideoContextMenuModifier: ViewModifier {
     @State private var addToPlaylistVideo: Video?
     @State private var savedMomentsVideo: Video?
     @State private var downloadModel: PlayerActionsModel?
+    @State private var showingDownloadDetails = false
 
     func body(content: Content) -> some View {
         content
@@ -270,6 +279,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                     onRemoveFromUpNext: onRemoveFromUpNext,
                     onOpenChannel: onOpenChannel,
                     onDownload: startDownload,
+                    onShowDownloadDetails: { showingDownloadDetails = true },
                     shareFileURL: $shareFileURL,
                     addToPlaylistVideo: $addToPlaylistVideo,
                     savedMomentsVideo: $savedMomentsVideo
@@ -307,6 +317,9 @@ private struct VideoContextMenuModifier: ViewModifier {
                         && player.queue.items.contains(where: { $0.id == selectedVideo.id })
                     player.load(selectedVideo, skipRecommendations: preservesPlaylist)
                 }
+            }
+            .sheet(isPresented: $showingDownloadDetails) {
+                DownloadDetailsSheet(video: video, onDownload: startDownload)
             }
             .onChange(of: downloadModel?.downloadError?.id) { _, _ in
                 guard let error = downloadModel?.downloadError else { return }

@@ -63,9 +63,17 @@ struct CommentRow: View {
                 }
 
                 HStack(spacing: 16) {
-                    Label("\(comment.likeCount)", systemImage: "hand.thumbsup")
-                        .labelStyle(.titleAndIcon)
-                        .appFont(.caption)
+                    // Fixed like column so the replies control stays at one x, regardless of
+                    // whether the count is 9, 99, or 999.
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.thumbsup")
+                        Text(verbatim: "\(comment.likeCount)")
+                            .monospacedDigit()
+                            .frame(width: 36, alignment: .leading)
+                    }
+                    .appFont(.caption)
+                    .frame(width: 56, alignment: .leading)
+
                     if let repliesTitle, let onToggleReplies {
                         Button(action: onToggleReplies) {
                             HStack(spacing: 4) {

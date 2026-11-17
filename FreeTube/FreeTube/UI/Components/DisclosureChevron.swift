@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The single glyph for content that expands in place: a trailing chevron that rotates from
-/// right to down, matching native disclosure groups. Navigation and load-more actions use
-/// their own glyphs.
+/// Trailing chevron for content that expands in place. Collapsed points down; expanded points
+/// up — the Music / Podcasts section pattern. Navigation and load-more actions use their own glyphs.
 struct DisclosureChevron: View {
     let isExpanded: Bool
     var font: Font = .footnote.weight(.semibold)
@@ -10,9 +9,9 @@ struct DisclosureChevron: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Image(systemName: "chevron.right")
+        Image(systemName: "chevron.down")
             .font(font)
-            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            .rotationEffect(.degrees(isExpanded ? 180 : 0))
             .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isExpanded)
             .accessibilityHidden(true)
     }

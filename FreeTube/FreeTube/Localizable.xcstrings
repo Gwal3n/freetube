@@ -120,6 +120,34 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "6 heures" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "6 часов" } }
     } },
+    "About %@ for the selected option." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Etwa %@ für die gewählte Option." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "About %@ for the selected option." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Aprox. %@ para la opción seleccionada." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Environ %@ pour l’option sélectionnée." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Около %@ для выбранного варианта." } }
+    } },
+    "Auto" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Авто" } }
+    } },
+    "Download details…" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Downloaddetails …" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Download details…" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Detalles de descarga…" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Détails du téléchargement…" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры загрузки…" } }
+    } },
+    "Estimating size…" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Größe wird geschätzt …" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Estimating size…" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Estimando el tamaño…" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Estimation de la taille…" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Оценка размера…" } }
+    } },
     "Highlight chapter while scrubbing" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Kapitel beim Spulen hervorheben" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Highlight chapter while scrubbing" } },
@@ -147,6 +175,20 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Микс" } }
+    } },
+    "Options" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Optionen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Options" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Opciones" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Options" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры" } }
+    } },
+    "Size estimate unavailable until formats load." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Größenschätzung erst verfügbar, wenn die Formate geladen sind." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Size estimate unavailable until formats load." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "La estimación de tamaño no está disponible hasta que se carguen los formatos." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’estimation de taille sera disponible une fois les formats chargés." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Оценка размера появится после загрузки форматов." } }
     } },
     "View %lld replies" : { "localizations" : {
       "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld Antwort ansehen" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld Antworten ansehen" } } } } },

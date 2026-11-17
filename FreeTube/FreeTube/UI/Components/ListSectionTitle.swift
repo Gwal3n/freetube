@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Bold browsing-section title, as in Music and TV ("Recently Played"), drawn as row content
-/// so it aligns with the screen's large title instead of the indented system header.
+/// Secondary browsing-section title under a large navigation title. Kept quieter than the
+/// screen title so Search / Library hierarchy stays clear.
 struct ListSectionTitle<Trailing: View>: View {
     let title: Text
     @ViewBuilder var trailing: () -> Trailing
@@ -19,8 +19,8 @@ struct ListSectionTitle<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             title
-                .appFont(.title3, weight: .bold)
-                .foregroundStyle(.primary)
+                .appFont(.subheadline, weight: .semibold)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
