@@ -69,6 +69,16 @@ struct FloatingMiniPlayerChrome: View {
 
                 Spacer(minLength: 0)
 
+                HStack(alignment: .bottom, spacing: 0) {
+                    if player.acceptedStreamStrategy == .localFile {
+                        OfflineMediaBadge(style: .miniPlayer)
+                            .padding(.leading, 6)
+                            .padding(.bottom, 6)
+                            .allowsHitTesting(false)
+                    }
+                    Spacer(minLength: 0)
+                }
+
                 MiniPlayerProgress()
                     .background(.black.opacity(0.45))
             }

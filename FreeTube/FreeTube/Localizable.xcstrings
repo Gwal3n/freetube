@@ -148,6 +148,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Détails du téléchargement…" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры загрузки…" } }
     } },
+    "Download progress" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Downloadfortschritt" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Download progress" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Progreso de descarga" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Progression du téléchargement" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ход загрузки" } }
+    } },
     "Downloaded" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Heruntergeladen" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Downloaded" } },
@@ -190,12 +197,33 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mix" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Микс" } }
     } },
+    "Offline" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Offline" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Offline" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin conexión" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Hors ligne" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Офлайн" } }
+    } },
     "Options" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Optionen" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Options" } },
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Opciones" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Options" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры" } }
+    } },
+    "Playing offline" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Offline-Wiedergabe" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Playing offline" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Reproduciendo sin conexión" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lecture hors ligne" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Офлайн-воспроизведение" } }
+    } },
+    "Ready for offline playback" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Bereit für Offline-Wiedergabe" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready for offline playback" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Listo para reproducir sin conexión" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Prêt pour la lecture hors ligne" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Готово к офлайн-воспроизведению" } }
     } },
     "Selected option uses %@." : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Die gewählte Option nutzt %@." } },

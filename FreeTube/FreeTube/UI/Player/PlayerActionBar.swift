@@ -97,7 +97,8 @@ struct PlayerActionBar: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        if downloadState == .available {
+        switch downloadState {
+        case .available:
             DownloadOptionsMenu(
                 video: video,
                 onSelect: onDownloadChoice,
@@ -110,7 +111,20 @@ struct PlayerActionBar: View {
             .id(video.id)
             .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
-        } else {
+        case .downloading:
+            // Reopen the progress sheet; cancel only lives inside that sheet.
+            Button {
+                showingDownloadDetails = true
+            } label: {
+                downloadLabel
+                    .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ResponsiveButtonStyle())
+            .foregroundStyle(.primary)
+            .opacity(0.72)
+            .accessibilityLabel("Download progress")
+        case .downloaded:
             Button(action: onDownload) {
                 downloadLabel
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
@@ -118,7 +132,6 @@ struct PlayerActionBar: View {
             }
             .buttonStyle(ResponsiveButtonStyle())
             .foregroundStyle(.primary)
-            .opacity(downloadState == .downloading ? 0.72 : 1)
             .accessibilityLabel(downloadAccessibilityLabel)
         }
     }

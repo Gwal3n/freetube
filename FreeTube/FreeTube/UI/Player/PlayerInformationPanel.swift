@@ -11,6 +11,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     let video: Video
     let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
+    let isPlayingOffline: Bool
     let descriptionText: String?
     let descriptionParts: [VideoDescriptionPart]
     let commentsCountText: String?
@@ -36,6 +37,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         video: Video,
         fullVideoLabel: SponsorBlockCategory?,
         statsText: String,
+        isPlayingOffline: Bool,
         descriptionText: String?,
         descriptionParts: [VideoDescriptionPart],
         commentsCountText: String?,
@@ -60,6 +62,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.video = video
         self.fullVideoLabel = fullVideoLabel
         self.statsText = statsText
+        self.isPlayingOffline = isPlayingOffline
         self.descriptionText = descriptionText
         self.descriptionParts = descriptionParts
         self.commentsCountText = commentsCountText
@@ -109,6 +112,7 @@ struct PlayerInformationPanel<Actions: View>: View {
             video: video,
             fullVideoLabel: fullVideoLabel,
             statsText: statsText,
+            isPlayingOffline: isPlayingOffline,
             isDetailsExpanded: isDetailsExpanded,
             showsDescription: showsDescription,
             canOpenChannel: !video.channelID.isEmpty,

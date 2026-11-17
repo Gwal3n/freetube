@@ -8,6 +8,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let video: Video
     let fullVideoLabel: SponsorBlockCategory?
     let statsText: String
+    let isPlayingOffline: Bool
     let isDetailsExpanded: Bool
     let showsDescription: Bool
     let canOpenChannel: Bool
@@ -23,6 +24,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         video: Video,
         fullVideoLabel: SponsorBlockCategory?,
         statsText: String,
+        isPlayingOffline: Bool = false,
         isDetailsExpanded: Bool,
         showsDescription: Bool,
         canOpenChannel: Bool,
@@ -33,6 +35,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         self.video = video
         self.fullVideoLabel = fullVideoLabel
         self.statsText = statsText
+        self.isPlayingOffline = isPlayingOffline
         self.isDetailsExpanded = isDetailsExpanded
         self.showsDescription = showsDescription
         self.canOpenChannel = canOpenChannel
@@ -77,7 +80,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
                     }
                 }
 
-                if video.isLive || !statsText.isEmpty {
+                if video.isLive || isPlayingOffline || !statsText.isEmpty {
                     HStack(spacing: 7) {
                         if video.isLive {
                             Text("LIVE")
@@ -86,6 +89,9 @@ struct PlayerMetadataHeader<Actions: View>: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                        }
+                        if isPlayingOffline {
+                            OfflineMediaBadge(style: .playerLabel)
                         }
                         if !statsText.isEmpty {
                             Text(statsText)

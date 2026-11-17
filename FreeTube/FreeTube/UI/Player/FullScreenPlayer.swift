@@ -249,6 +249,14 @@ struct FullScreenPlayer: View {
                         anchor: .bottom
                     )
                     .offset(y: max(0, fullscreenSwipeTranslation))
+                    if !isFloating, player.acceptedStreamStrategy == .localFile {
+                        OfflineMediaBadge(style: .playerLabel)
+                            .padding(.leading, 12)
+                            .padding(.top, 52)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .allowsHitTesting(false)
+                            .zIndex(4)
+                    }
                     if !isFloating, let badge = gestureBadge {
                         PlayerGestureBadge(text: badge.text, isPlain: badge.isPlain)
                             .position(
@@ -1152,6 +1160,7 @@ struct FullScreenPlayer: View {
                 in: player.sponsorBlockSegments
             ),
             statsText: detailsModel.statsText(for: video),
+            isPlayingOffline: player.acceptedStreamStrategy == .localFile,
             descriptionText: detailsModel.description(for: video),
             descriptionParts: detailsModel.details?.descriptionParts ?? [],
             commentsCountText: detailsModel.commentsCountText(
