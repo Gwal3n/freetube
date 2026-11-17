@@ -88,9 +88,13 @@ final class PlayerSponsorBlockCoordinator {
         return (highlight, current)
     }
 
-    func showNotice(_ notice: SponsorBlockNotice, for seconds: TimeInterval) {
+    /// - Parameter seconds: Timed auto-dismiss for Undo banners. Pass `nil` for Ask prompts that
+    ///   should stay until the viewer skips, dismisses, or the video changes.
+    func showNotice(_ notice: SponsorBlockNotice, for seconds: TimeInterval?) {
         noticeTask?.cancel()
+        noticeTask = nil
         self.notice = notice
+        guard let seconds else { return }
         noticeTask = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
             guard self?.notice?.id == notice.id else { return }

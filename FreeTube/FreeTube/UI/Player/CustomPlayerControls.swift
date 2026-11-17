@@ -155,17 +155,25 @@ struct CustomPlayerControls: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
     }
 
-    /// Soft top and bottom gradients so white controls and timeline labels stay readable on
-    /// bright frames. The bottom one also backs the timeline during swipe-seek previews.
+    /// One vignette on the control surface (fitted video frame). No second full-bleed dim.
     private var legibilityScrim: some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 88 + topControlsSafeAreaPadding)
-                .opacity(isVisible ? 1 : 0)
-            Spacer(minLength: 0)
-            LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 96 + bottomTimelinePadding)
-                .opacity(isVisible || isSeekPreviewActive ? 1 : 0)
+        GeometryReader { proxy in
+            let height = max(proxy.size.height, 1)
+            let topStrength = isVisible ? 0.42 : 0
+            let bottomStrength = (isVisible || isSeekPreviewActive) ? 0.48 : 0
+            let topEnd = min(0.38, (88 + topControlsSafeAreaPadding) / height)
+            let bottomStart = max(0.62, 1 - (96 + bottomTimelinePadding) / height)
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(topStrength), location: 0),
+                    .init(color: .black.opacity(0), location: topEnd),
+                    .init(color: .black.opacity(0), location: bottomStart),
+                    .init(color: .black.opacity(bottomStrength), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .opacity(topStrength > 0 || bottomStrength > 0 ? 1 : 0)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)

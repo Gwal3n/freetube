@@ -23,6 +23,7 @@ struct SearchContent: View {
     @Environment(\.dismissSearch) private var dismissSearch
     @Environment(\.isSearching) private var isSearching
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showHistoryProgressBars") private var showHistoryProgressBars = true
     @AppStorage("incognitoEnabled") private var incognitoEnabled = false
     @AppStorage("incognitoSkipSearchHistory") private var incognitoSkipSearchHistory = true
@@ -372,11 +373,14 @@ struct SearchContent: View {
                         recentChannelsJSON = json
                     }
                 }
+                .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: visibleRecentChannelCount)
                 if channels.count > Self.recentChannelPageSize {
                     HStack(spacing: 24) {
                         if channels.count > visibleRecentChannelCount {
                             Button {
-                                visibleRecentChannelCount += Self.recentChannelPageSize
+                                withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) {
+                                    visibleRecentChannelCount += Self.recentChannelPageSize
+                                }
                             } label: {
                                 Text("More")
                                     .font(.subheadline.weight(.medium))
@@ -389,7 +393,9 @@ struct SearchContent: View {
                         }
                         if visibleRecentChannelCount > Self.recentChannelPageSize {
                             Button {
-                                visibleRecentChannelCount = Self.recentChannelPageSize
+                                withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) {
+                                    visibleRecentChannelCount = Self.recentChannelPageSize
+                                }
                             } label: {
                                 Text("Less")
                                     .font(.subheadline.weight(.medium))

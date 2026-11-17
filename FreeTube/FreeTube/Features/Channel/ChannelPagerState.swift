@@ -14,6 +14,8 @@ final class ChannelPagerState {
     var headerCollapse: CGFloat = 0
     var pageContentPositions: [String: CGFloat] = [:]
     var pageOffsets: [String: CGFloat] = [:]
+    /// Rubber-band pull below the top edge; drives the overlay refresh spinner while dragging.
+    var pullDistance: CGFloat = 0
 
     // Estimated heights prevent the first page's rows from briefly sitting under the header.
     var headerContentHeight: CGFloat = ChannelProfileMetrics.estimatedHeaderHeight
@@ -61,8 +63,12 @@ final class ChannelPagerState {
 
     /// Spend downward scroll on header collapse before moving content; reverse that order when
     /// scrolling upward. Each tab retains its own content position through tab changes.
-    func handlePageScroll(tab: ChannelProfileTab, offset: CGFloat) {
-        let offset = Self.normalizedPageOffset(offset)
+    /// `rawOffset` may be negative while the user is pulling to refresh.
+    func handlePageScroll(tab: ChannelProfileTab, offset rawOffset: CGFloat) {
+        if tab.id == selectedTab.id {
+            pullDistance = rawOffset < 0 ? -rawOffset : 0
+        }
+        let offset = Self.normalizedPageOffset(rawOffset)
         let previous = pageOffsets[tab.id] ?? offset
         pageOffsets[tab.id] = offset
         guard tab.id == selectedTab.id else { return }
@@ -101,6 +107,10 @@ final class ChannelPagerState {
 
     nonisolated static func normalizedPageOffset(_ offset: CGFloat) -> CGFloat {
         max(0, offset)
+    }
+
+    func updatePullDistance(from rawOffset: CGFloat) {
+        pullDistance = rawOffset < 0 ? -rawOffset : 0
     }
 
     nonisolated static func minimumPageContentHeight(viewport: CGFloat, tabBar: CGFloat, topInset: CGFloat) -> CGFloat {

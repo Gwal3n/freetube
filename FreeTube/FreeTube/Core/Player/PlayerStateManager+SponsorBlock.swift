@@ -55,20 +55,21 @@ extension PlayerStateManager {
         )
         updateDisplayedChapters()
 
-        // A highlight is a point to jump *to*, not a duration to skip once playback reaches it.
-        // Offer it as soon as the lookup finishes while leaving Show only as a marker-only mode.
-        if let highlight = installation.highlight {
+        // The lookup may finish after playback has already entered a segment. Boundary observers
+        // cannot fire retroactively, so evaluate the current position once immediately — before
+        // any highlight Ask, so a skip Undo does not immediately replace that prompt.
+        if let current = installation.current {
+            handleSponsorBlockSegment(current, enteredAt: elapsed)
+        }
+
+        // A highlight is a point to jump *to*, not a duration to skip. Offer Ask only when we
+        // did not just surface a skip notice for the current playhead.
+        if let highlight = installation.highlight, sponsorBlockNotice == nil {
             showSponsorBlockNotice(SponsorBlockNotice(
                 category: .highlight,
                 originalStartTime: elapsed,
                 kind: .prompt(endTime: highlight.startTime)
             ))
-        }
-
-        // The lookup may finish after playback has already entered a segment. Boundary observers
-        // cannot fire retroactively, so evaluate the current position once immediately.
-        if let current = installation.current {
-            handleSponsorBlockSegment(current, enteredAt: elapsed)
         }
     }
 
@@ -117,8 +118,14 @@ extension PlayerStateManager {
     }
 
     private func showSponsorBlockNotice(_ notice: SponsorBlockNotice) {
-        let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
-        sponsorBlockCoordinator.showNotice(notice, for: seconds)
+        switch notice.kind {
+        case .prompt:
+            // Ask prompts wait for Skip / Dismiss; Undo banner duration only applies to skips.
+            sponsorBlockCoordinator.showNotice(notice, for: nil)
+        case .skipped:
+            let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
+            sponsorBlockCoordinator.showNotice(notice, for: seconds)
+        }
     }
 
     /// Clears cached segment responses without changing the currently playing video's markers.

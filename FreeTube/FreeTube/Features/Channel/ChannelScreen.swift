@@ -31,6 +31,7 @@ struct ChannelScreen: View {
             if let details = model.details {
                 pager(details)
                 header(details)
+                channelRefreshIndicator
                 if pagerState.showsNavigationTitle {
                     navigationBarBackdrop
                 }
@@ -164,14 +165,6 @@ struct ChannelScreen: View {
                 // Reserves the header's footprint, plus a little air so the first row isn't
                 // crowded against the tab bar. The header is drawn over the top of this.
                 Color.clear.frame(height: pagerState.headerTotalHeight + ChannelProfileMetrics.contentTopInset)
-                // System refresh sits under the immersive header, so show a visible spinner here.
-                if model.isRefreshing {
-                    ProgressView()
-                        .controlSize(.regular)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .accessibilityLabel("Refreshing channel")
-                }
                 // Reserve only enough content for the header to collapse. A full viewport here
                 // adds the tab bar and top inset again, letting short tabs scroll into blank space.
                 channelContent(details, tab: tab)
@@ -200,12 +193,33 @@ struct ChannelScreen: View {
             await model.refresh(activeSort: tab == .videos ? videoSort : .newest)
         }
         .onPreferenceChange(ChannelPageOffsetKey.self) { offsets in
+            if let raw = offsets[tab.id], tab.id == pagerState.selectedTab.id {
+                pagerState.updatePullDistance(from: raw)
+            }
             if #unavailable(iOS 18.0) {
                 pagerState.pageOffsets.merge(offsets) { _, new in new }
             }
         }
         .modifier(PageScrollGeometry { pagerState.handlePageScroll(tab: tab, offset: $0) })
         .modifier(PageScrollAlignment(request: pagerState.pageScrollTargets[tab.id]))
+    }
+
+    /// Drawn above the immersive header so pull-to-refresh is visible while dragging and loading.
+    private var channelRefreshIndicator: some View {
+        let pull = pagerState.pullDistance
+        let progress = min(1, pull / 72)
+        let visible = model.isRefreshing || pull > 10
+        return ProgressView()
+            .controlSize(.regular)
+            .opacity(model.isRefreshing ? 1 : progress)
+            .scaleEffect(model.isRefreshing ? 1 : max(0.7, progress))
+            .padding(.top, 12)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .opacity(visible ? 1 : 0)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: model.isRefreshing)
+            .allowsHitTesting(false)
+            .accessibilityLabel("Refreshing channel")
+            .accessibilityHidden(!visible)
     }
 
     private static func pageSpace(_ tab: ChannelProfileTab) -> String {
@@ -621,7 +635,8 @@ private struct PageScrollGeometry: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content.onScrollGeometryChange(for: CGFloat.self) { geometry in
-                ChannelPagerState.normalizedPageOffset(geometry.contentOffset.y + geometry.contentInsets.top)
+                // Keep rubber-band negatives so pull-to-refresh can show an overlay spinner.
+                geometry.contentOffset.y + geometry.contentInsets.top
             } action: { _, new in
                 onScroll(new)
             }
