@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Quality menu; the details sheet owns size estimates and the full chooser.
 @available(iOS 17.0, *)
 struct DownloadOptionsMenu<MenuLabel: View>: View {
     let video: Video

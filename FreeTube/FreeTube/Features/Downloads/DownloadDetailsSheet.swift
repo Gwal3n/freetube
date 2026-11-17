@@ -2,11 +2,6 @@ import SwiftUI
 
 import Kingfisher
 
-/// Detailed download chooser: artwork, quality with size estimates, and an explicit Download
-/// action that keeps the sheet open to show transfer progress. Dismissing (swipe or Close)
-/// leaves the download running in Downloads; only Cancel download stops it. Caption embedding
-/// is omitted — downloads do not mux captions today. Container labels appear only when format
-/// mime metadata already supplies them.
 @available(iOS 17.0, *)
 struct DownloadDetailsSheet: View {
     let video: Video
@@ -38,22 +33,18 @@ struct DownloadDetailsSheet: View {
     }
 
     private var isTransferring: Bool {
-        guard let snapshot = activeSnapshot else {
-            return didStartDownload && downloads.localFile(for: video.id) == nil
+        if let snapshot = activeSnapshot {
+            switch snapshot.state {
+            case .queued, .downloading, .paused: return true
+            case .completed, .failed: return false
+            }
         }
-        switch snapshot.state {
-        case .queued, .downloading, .paused: return true
-        case .completed, .failed: return false
-        }
+        return didStartDownload && downloads.localFile(for: video.id) == nil
     }
 
     private var isCompleted: Bool {
-        downloads.localFile(for: video.id) != nil
-            && (didStartDownload || activeSnapshot != nil)
-    }
-
-    private var selectedContainer: String? {
-        model.containerByQuality[effectiveQuality]
+        if case .completed = activeSnapshot?.state { return true }
+        return didStartDownload && downloads.localFile(for: video.id) != nil
     }
 
     var body: some View {
@@ -98,16 +89,16 @@ struct DownloadDetailsSheet: View {
                     Toggle("Audio only", isOn: $audioOnly)
                         .disabled(isTransferring || isCompleted)
                     if !audioOnly {
-                        ForEach(videoQualities) { quality in
-                            qualityRow(quality)
+                        Picker("Quality", selection: $selectedQuality) {
+                            ForEach(videoQualities) { quality in
+                                qualityLabel(quality)
+                                    .tag(quality)
+                            }
                         }
-                    } else {
-                        qualityRow(.audioOnly)
+                        .disabled(isTransferring || isCompleted)
                     }
                 } header: {
                     Text("Options")
-                } footer: {
-                    optionsFooter
                 }
 
                 Section {
@@ -131,66 +122,24 @@ struct DownloadDetailsSheet: View {
                 }
                 await model.loadEstimates(for: video)
             }
+            .onChange(of: activeSnapshot?.id) { _, newID in
+                // External cancel clears the row; return to the Download button.
+                if didStartDownload, newID == nil, !isCompleted {
+                    didStartDownload = false
+                }
+            }
         }
         .presentationDetents([.medium, .large])
     }
 
     @ViewBuilder
-    private func qualityRow(_ quality: VideoQuality) -> some View {
-        let isSelected = effectiveQuality == quality
-        Button {
-            if quality == .audioOnly {
-                audioOnly = true
-            } else {
-                audioOnly = false
-                selectedQuality = quality
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title(for: quality))
-                        .foregroundStyle(.primary)
-                    if let container = model.containerByQuality[quality] {
-                        Text(verbatim: container)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 8)
-                if let bytes = model.estimatedBytes[quality] {
-                    Text(verbatim: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                } else if model.isLoading {
-                    ProgressView()
-                        .controlSize(.mini)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(isTransferring || isCompleted)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private func title(for quality: VideoQuality) -> String {
-        switch quality {
-        case .auto: return String(localized: "Automatic (up to 1080p)")
-        case .audioOnly: return String(localized: "Audio only")
-        default: return String(localized: "Up to \(quality.displayName)")
-        }
-    }
-
-    @ViewBuilder
-    private var optionsFooter: some View {
-        if model.isLoading {
-            Text("Estimating size…")
-        } else if let selectedContainer {
-            Text("Selected option uses \(selectedContainer).")
-        } else if model.hasLoaded, model.estimatedBytes.isEmpty {
-            Text("Size estimate unavailable until formats load.")
+    private func qualityLabel(_ quality: VideoQuality) -> some View {
+        let title = quality == .auto
+            ? String(localized: "Automatic (up to 1080p)")
+            : String(localized: "Up to \(quality.displayName)")
+        Text(title)
+        if let bytes = model.estimatedBytes[quality] {
+            Text(verbatim: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
         }
     }
 

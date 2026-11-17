@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Compact download menu: one-tap Auto (the saved default) plus an entry that opens the details sheet.
 @available(iOS 17.0, *)
 struct DownloadOptionsContent: View {
     @AppStorage("defaultDownloadQuality") private var defaultDownloadQualityRaw = VideoQuality.p360.rawValue
@@ -17,13 +16,10 @@ struct DownloadOptionsContent: View {
         Button {
             onSelect(defaultQuality)
         } label: {
-            Label("Auto", systemImage: "arrow.down.circle")
-            // When the saved default is Auto, its display name is also "Auto" — repeating it
-            // reads as "Auto Auto". Spell the ceiling instead.
-            Text(defaultQuality == .auto ? "Up to 1080p" : defaultQuality.displayName)
+            Label("Download", systemImage: "arrow.down.circle")
         }
         Button(action: onShowDetails) {
-            Label("Download details…", systemImage: "slider.horizontal.3")
+            Label("Options", systemImage: "slider.horizontal.3")
         }
         .onAppear {
             DownloadOptionsViewModel.prefetch(for: video)

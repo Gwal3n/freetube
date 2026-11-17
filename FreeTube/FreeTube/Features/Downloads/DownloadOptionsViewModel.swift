@@ -1,18 +1,12 @@
 import Foundation
 import Observation
 
-/// Best-effort sizes for the download picker. This is metadata-only and never resolves or saves a
-/// signed stream URL; the download manager still chooses and validates the actual file.
-///
-/// Estimates are cached per video so opening the download menu can warm them before the details
-/// sheet appears.
+/// Best-effort sizes for the download picker. Metadata only — never resolves or stores stream URLs.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
 final class DownloadOptionsViewModel {
     private(set) var estimatedBytes: [VideoQuality: Int64] = [:]
-    /// Container label from the format we'd pick for each quality (e.g. "MP4"), when known.
-    private(set) var containerByQuality: [VideoQuality: String] = [:]
     private(set) var isLoading = false
     private(set) var hasLoaded = false
 
@@ -22,7 +16,6 @@ final class DownloadOptionsViewModel {
         self.videoService = videoService ?? VideoService()
     }
 
-    /// Starts a shared estimate fetch as soon as the download control is available.
     static func prefetch(for video: Video) {
         guard Self.cache[video.id] == nil else { return }
         _ = Self.startFetch(video, videoService: VideoService())
@@ -30,7 +23,7 @@ final class DownloadOptionsViewModel {
 
     func loadEstimates(for video: Video) async {
         if let cached = Self.cache[video.id] {
-            apply(cached)
+            estimatedBytes = cached
             hasLoaded = true
             return
         }
@@ -41,13 +34,8 @@ final class DownloadOptionsViewModel {
         }
         await Self.startFetch(video, videoService: videoService).value
         if let cached = Self.cache[video.id] {
-            apply(cached)
+            estimatedBytes = cached
         }
-    }
-
-    private func apply(_ cached: CacheEntry) {
-        estimatedBytes = cached.bytes
-        containerByQuality = cached.containers
     }
 
     @discardableResult
@@ -68,23 +56,17 @@ final class DownloadOptionsViewModel {
     private static func fetchEstimates(
         for video: Video,
         videoService: any VideoServicing
-    ) async -> CacheEntry? {
+    ) async -> [VideoQuality: Int64]? {
         guard let info = try? await videoService.fetchInfo(id: video.id), !Task.isCancelled else { return nil }
         guard let duration = video.duration ?? info.video.duration,
               duration.isFinite, duration > 0 else { return nil }
 
         var bytes: [VideoQuality: Int64] = [:]
-        var containers: [VideoQuality: String] = [:]
 
         let audioFormats = info.formats.filter(\.isAudioOnly)
         let audioBitrate = audioFormats.compactMap(\.bitrate).filter { $0 > 0 }.max()
-        if let audio = audioFormats.max(by: { ($0.bitrate ?? 0) < ($1.bitrate ?? 0) }) {
-            if let audioBitrate, let size = Self.bytes(bitrate: audioBitrate, duration: duration) {
-                bytes[.audioOnly] = size
-            }
-            if let label = Self.containerLabel(for: audio.mimeType) {
-                containers[.audioOnly] = label
-            }
+        if let audioBitrate, let size = Self.bytes(bitrate: audioBitrate, duration: duration) {
+            bytes[.audioOnly] = size
         }
 
         let videos = info.formats.filter { format in
@@ -107,12 +89,9 @@ final class DownloadOptionsViewModel {
             if let size = Self.bytes(bitrate: combined, duration: duration) {
                 bytes[quality] = size
             }
-            if let label = Self.containerLabel(for: selected.mimeType) {
-                containers[quality] = label
-            }
         }
 
-        return CacheEntry(bytes: bytes, containers: containers)
+        return bytes
     }
 
     private static func bytes(bitrate: Int, duration: TimeInterval) -> Int64? {
@@ -121,20 +100,6 @@ final class DownloadOptionsViewModel {
         return Int64(value)
     }
 
-    /// Only labels we can infer from mime metadata already on the format — not a codec picker.
-    static func containerLabel(for mimeType: String) -> String? {
-        let lower = mimeType.lowercased()
-        if lower.contains("mp4") || lower.contains("m4a") || lower.contains("avc") { return "MP4" }
-        if lower.contains("webm") || lower.contains("vp9") || lower.contains("vp8") { return "WebM" }
-        if lower.contains("av01") || lower.contains("av1") { return "AV1" }
-        return nil
-    }
-
-    private struct CacheEntry {
-        var bytes: [VideoQuality: Int64]
-        var containers: [VideoQuality: String]
-    }
-
-    @ObservationIgnored private static var cache: [String: CacheEntry] = [:]
+    @ObservationIgnored private static var cache: [String: [VideoQuality: Int64]] = [:]
     @ObservationIgnored private static var inFlight: [String: Task<Void, Never>] = [:]
 }
