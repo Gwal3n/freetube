@@ -137,7 +137,7 @@ struct DownloadDetailsSheet: View {
             ? String(localized: "Automatic (up to 1080p)")
             : String(localized: "Up to \(quality.displayName)")
         // One view per option — bare sibling Texts in a Picker become separate rows.
-        HStack {
+        return HStack {
             Text(title)
             Spacer(minLength: 8)
             if let bytes = model.estimatedBytes[quality] {
