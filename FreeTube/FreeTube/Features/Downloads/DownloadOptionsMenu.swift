@@ -11,6 +11,7 @@ struct DownloadOptionsMenu<MenuLabel: View>: View {
     var body: some View {
         Menu {
             DownloadOptionsContent(
+                video: video,
                 onSelect: onSelect,
                 onShowDetails: { showingDetails = true }
             )
@@ -18,6 +19,9 @@ struct DownloadOptionsMenu<MenuLabel: View>: View {
             label()
         }
         .accessibilityLabel("Download")
+        .onAppear {
+            DownloadOptionsViewModel.prefetch(for: video)
+        }
         .sheet(isPresented: $showingDetails) {
             DownloadDetailsSheet(video: video, onDownload: onSelect)
         }

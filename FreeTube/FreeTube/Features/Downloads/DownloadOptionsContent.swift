@@ -5,6 +5,7 @@ import SwiftUI
 struct DownloadOptionsContent: View {
     @AppStorage("defaultDownloadQuality") private var defaultDownloadQualityRaw = VideoQuality.p360.rawValue
 
+    let video: Video
     let onSelect: (VideoQuality) -> Void
     let onShowDetails: () -> Void
 
@@ -23,6 +24,9 @@ struct DownloadOptionsContent: View {
         }
         Button(action: onShowDetails) {
             Label("Download details…", systemImage: "slider.horizontal.3")
+        }
+        .onAppear {
+            DownloadOptionsViewModel.prefetch(for: video)
         }
     }
 }

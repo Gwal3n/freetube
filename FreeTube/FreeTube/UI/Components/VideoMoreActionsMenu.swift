@@ -196,7 +196,7 @@ private struct VideoActionsContent: View {
         }
         Divider()
         Menu {
-            DownloadOptionsContent(onSelect: onDownload, onShowDetails: onShowDownloadDetails)
+            DownloadOptionsContent(video: video, onSelect: onDownload, onShowDetails: onShowDownloadDetails)
         } label: {
             Label("Download", systemImage: "arrow.down.circle")
         }

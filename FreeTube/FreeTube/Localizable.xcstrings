@@ -134,12 +134,26 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Авто" } }
     } },
+    "Cancel download" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Download abbrechen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel download" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cancelar descarga" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Annuler le téléchargement" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отменить загрузку" } }
+    } },
     "Download details…" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Downloaddetails …" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Download details…" } },
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Detalles de descarga…" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Détails du téléchargement…" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры загрузки…" } }
+    } },
+    "Downloaded" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Heruntergeladen" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Downloaded" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Descargado" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Téléchargé" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Загружено" } }
     } },
     "Estimating size…" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Größe wird geschätzt …" } },
@@ -183,6 +197,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Options" } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Параметры" } }
     } },
+    "Selected option uses %@." : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Die gewählte Option nutzt %@." } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Selected option uses %@." } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "La opción seleccionada usa %@." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’option sélectionnée utilise %@." } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Выбранный вариант использует %@." } }
+    } },
     "Show fewer recent channels" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Weniger kürzlich angesehene Kanäle anzeigen" } },
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Show fewer recent channels" } },
@@ -196,6 +217,20 @@
       "es" : { "stringUnit" : { "state" : "translated", "value" : "La estimación de tamaño no está disponible hasta que se carguen los formatos." } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "L’estimation de taille sera disponible une fois les formats chargés." } },
       "ru" : { "stringUnit" : { "state" : "translated", "value" : "Оценка размера появится после загрузки форматов." } }
+    } },
+    "Starting download…" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Download wird gestartet …" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Starting download…" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Iniciando descarga…" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Démarrage du téléchargement…" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "Загрузка начинается…" } }
+    } },
+    "Up to %@" : { "localizations" : {
+      "de" : { "stringUnit" : { "state" : "translated", "value" : "Bis zu %@" } },
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Up to %@" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Hasta %@" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Jusqu’à %@" } },
+      "ru" : { "stringUnit" : { "state" : "translated", "value" : "До %@" } }
     } },
     "Up to 1080p" : { "localizations" : {
       "de" : { "stringUnit" : { "state" : "translated", "value" : "Bis zu 1080p" } },
