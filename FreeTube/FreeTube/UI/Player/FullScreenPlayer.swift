@@ -200,6 +200,9 @@ struct FullScreenPlayer: View {
                         },
                         isInteractionEnabled: player.fullScreenPresented,
                         isZoomEnabled: player.fullScreenPresented && (isLandscape || usesPortraitFullscreen),
+                        fillsFrame: isFloating && PlayerViewportLayout.fillsFloatingFrame(
+                            presentationSize: player.videoPresentationSize
+                        ),
                         onZoomPinch: { magnitude, focalPoint, state in
                             zoomModel.pinch(magnitude, focalPoint: focalPoint, state: state)
                         },
@@ -258,6 +261,11 @@ struct FullScreenPlayer: View {
                             .allowsHitTesting(false)
                             .zIndex(5)
                     }
+                    Color.black
+                        .opacity(!isFloating && showsPlayerControls ? 0.28 : 0)
+                        // Dim the fixed surface, not AVPlayer's presentation rect (avoids aspect flash).
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .allowsHitTesting(false)
                     if player.fullScreenPresented,
                        captionsModel.selectedTrackID != nil,
                        !captionsModel.cues.isEmpty {

@@ -31,7 +31,6 @@ struct ChannelScreen: View {
             if let details = model.details {
                 pager(details)
                 header(details)
-                channelRefreshIndicator
                 if pagerState.showsNavigationTitle {
                     navigationBarBackdrop
                 }
@@ -176,6 +175,13 @@ struct ChannelScreen: View {
                         ),
                         alignment: .topLeading
                     )
+                    // The system refresh control is hidden under the header; draw feedback in
+                    // the gap that opens between the tab bar and the list instead.
+                    .overlay(alignment: .top) {
+                        if tab == pagerState.selectedTab {
+                            ChannelRefreshIndicator(pagerState: pagerState, isRefreshing: model.isRefreshing)
+                        }
+                    }
             }
             .background {
                 GeometryReader { geometry in
@@ -211,11 +217,6 @@ struct ChannelScreen: View {
         }
         .modifier(PageScrollGeometry { pagerState.handlePageScroll(tab: tab, offset: $0) })
         .modifier(PageScrollAlignment(request: pagerState.pageScrollTargets[tab.id]))
-    }
-
-    /// Drawn above the immersive header so pull-to-refresh is visible while dragging and loading.
-    private var channelRefreshIndicator: some View {
-        ChannelRefreshIndicator(pagerState: pagerState, isRefreshing: model.isRefreshing)
     }
 
     private static func pageSpace(_ tab: ChannelProfileTab) -> String {

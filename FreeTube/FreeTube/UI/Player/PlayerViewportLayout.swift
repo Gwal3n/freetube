@@ -71,6 +71,16 @@ enum PlayerViewportLayout {
         )
     }
 
+    /// The 16:9 mini-player fills its frame when the video is close enough to 16:9 that fitting
+    /// would only leave thin bars (e.g. 2:1). Larger mismatches keep the whole picture visible.
+    static func fillsFloatingFrame(presentationSize: CGSize) -> Bool {
+        guard presentationSize.width > 0, presentationSize.height > 0 else { return false }
+        let aspect = presentationSize.width / presentationSize.height
+        let frameAspect: CGFloat = 16 / 9
+        let maximumCrop: CGFloat = 0.15
+        return aspect >= frameAspect * (1 - maximumCrop) && aspect <= frameAspect / (1 - maximumCrop)
+    }
+
     /// Uses the video's display-correct dimensions for portrait/tall media, bounded so the lower
     /// content remains reachable before the header compresses to 16:9.
     static func expandedSurfaceHeight(

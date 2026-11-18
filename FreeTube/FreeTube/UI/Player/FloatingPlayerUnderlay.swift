@@ -10,7 +10,12 @@ struct FloatingPlayerUnderlay: View {
             if layout.isVisible {
                 let origin = proxy.frame(in: .global).origin
                 ZStack {
-                    FloatingPlayerVideoLayer(player: player.player)
+                    FloatingPlayerVideoLayer(
+                        player: player.player,
+                        fillsFrame: PlayerViewportLayout.fillsFloatingFrame(
+                            presentationSize: player.videoPresentationSize
+                        )
+                    )
                     // The root player covers the video with its thumbnail until the first
                     // frame is ready. Mirror that same artwork here so loading does not
                     PlayerArtworkBackdrop(

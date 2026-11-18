@@ -29,6 +29,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var entersPiPAutomatically: Bool = true
     var isInteractionEnabled: Bool = true
     var isZoomEnabled = false
+    var fillsFrame = false
     var onZoomPinch: (CGFloat, CGPoint, UIGestureRecognizer.State) -> Void = { _, _, _ in }
     var onZoomPan: (CGSize, UIGestureRecognizer.State) -> Void = { _, _ in }
 
@@ -63,6 +64,7 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsPictureInPicturePlayback = true
         controller.allowsVideoFrameAnalysis = false
+        controller.videoGravity = fillsFrame ? .resizeAspectFill : .resizeAspect
         controller.view.isUserInteractionEnabled = isInteractionEnabled
         controller.view.accessibilityElementsHidden = !isInteractionEnabled
         // Force the hierarchy to load before asking for `contentOverlayView`.
@@ -80,6 +82,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
         controller.showsPlaybackControls = showsControls
         controller.canStartPictureInPictureAutomaticallyFromInline = entersPiPAutomatically
         controller.allowsVideoFrameAnalysis = false
+        let gravity: AVLayerVideoGravity = fillsFrame ? .resizeAspectFill : .resizeAspect
+        if controller.videoGravity != gravity { controller.videoGravity = gravity }
         // SwiftUI's `.allowsHitTesting(false)` does not always propagate through a
         controller.view.isUserInteractionEnabled = isInteractionEnabled
         controller.view.accessibilityElementsHidden = !isInteractionEnabled

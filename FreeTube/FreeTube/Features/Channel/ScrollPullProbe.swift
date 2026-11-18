@@ -23,6 +23,9 @@ struct ScrollPullProbe: UIViewRepresentable {
         var onPullChange: ((CGFloat) -> Void)?
         private var observation: NSKeyValueObservation?
         private var lastPull: CGFloat = 0
+        /// Top inset without the refresh control: while refreshing, UIKit adds the control's
+        /// height to the inset, which would otherwise read the still-open gap as zero pull.
+        private var restingTopInset: CGFloat?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -36,8 +39,13 @@ struct ScrollPullProbe: UIViewRepresentable {
             observation = scrollView.observe(\.contentOffset, options: [.initial, .new]) { [weak self] scrollView, _ in
                 // contentOffset only changes on the main thread.
                 MainActor.assumeIsolated {
-                    let pull = max(0, -(scrollView.contentOffset.y + scrollView.adjustedContentInset.top))
-                    self?.report(pull.rounded())
+                    guard let self else { return }
+                    if scrollView.refreshControl?.isRefreshing != true || self.restingTopInset == nil {
+                        self.restingTopInset = scrollView.adjustedContentInset.top
+                    }
+                    let inset = self.restingTopInset ?? scrollView.adjustedContentInset.top
+                    let pull = max(0, -(scrollView.contentOffset.y + inset))
+                    self.report(pull.rounded())
                 }
             }
         }

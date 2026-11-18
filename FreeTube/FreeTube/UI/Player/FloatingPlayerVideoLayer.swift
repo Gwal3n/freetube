@@ -7,6 +7,7 @@ import UIKit
 @available(iOS 17.0, *)
 struct FloatingPlayerVideoLayer: UIViewRepresentable {
     let player: AVPlayer
+    var fillsFrame = false
 
     final class LayerView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
@@ -19,12 +20,16 @@ struct FloatingPlayerVideoLayer: UIViewRepresentable {
         view.backgroundColor = .black
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
-        view.playerLayer?.videoGravity = .resizeAspect
+        view.playerLayer?.videoGravity = fillsFrame ? .resizeAspectFill : .resizeAspect
         view.playerLayer?.player = player
         return view
     }
 
     func updateUIView(_ view: LayerView, context: Context) {
+        let gravity: AVLayerVideoGravity = fillsFrame ? .resizeAspectFill : .resizeAspect
+        if view.playerLayer?.videoGravity != gravity {
+            view.playerLayer?.videoGravity = gravity
+        }
         if view.playerLayer?.player !== player {
             view.playerLayer?.player = player
         }
