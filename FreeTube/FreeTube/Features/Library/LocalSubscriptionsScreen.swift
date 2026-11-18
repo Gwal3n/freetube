@@ -75,7 +75,7 @@ struct LocalSubscriptionsScreen: View {
                             }
                         }
                         .listStyle(.plain)
-                        .refreshable {
+                        .pullToRefresh {
                             await refreshProfilePhotos()
                         }
 

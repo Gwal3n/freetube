@@ -97,7 +97,7 @@ struct LocalHistoryScreen: View {
                     ContentUnavailableView.search(text: searchText)
                         .containerRelativeFrame(.vertical)
                 }
-                .refreshable { await refreshHistory() }
+                .pullToRefresh { await refreshHistory() }
             } else if visibleEntries.isEmpty && !hasMore {
                 ScrollView {
                     Group {
@@ -125,7 +125,7 @@ struct LocalHistoryScreen: View {
                     }
                     .containerRelativeFrame(.vertical)
                 }
-                .refreshable { await refreshHistory() }
+                .pullToRefresh { await refreshHistory() }
             } else {
                 historyList
             }
@@ -151,7 +151,7 @@ struct LocalHistoryScreen: View {
             }
         }
         .listStyle(.plain)
-        .refreshable { await refreshHistory() }
+        .pullToRefresh { await refreshHistory() }
     }
 
     private func historyRow(_ entry: WatchHistorySnapshot) -> some View {

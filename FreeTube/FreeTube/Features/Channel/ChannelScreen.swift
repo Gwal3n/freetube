@@ -186,7 +186,8 @@ struct ChannelScreen: View {
             }
             .background {
                 // Pulls start with the header expanded; the gap opens just below it.
-                RefreshControlPlacement(
+                PullRefreshRing(
+                    placement: .enclosingScrollView,
                     topOffset: pagerState.headerTotalHeight + ChannelProfileMetrics.contentTopInset / 2
                 )
                 .allowsHitTesting(false)

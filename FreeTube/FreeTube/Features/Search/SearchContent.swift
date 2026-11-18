@@ -196,7 +196,7 @@ struct SearchContent: View {
             }
             .listStyle(.plain)
             .scrollDismissesKeyboard(.immediately)
-            .refreshable { await model.refresh() }
+            .pullToRefresh { await model.refresh() }
             .task(id: FilterFillRequest(
                 resultsRevision: model.resultsRevision,
                 filters: model.videoFilters,

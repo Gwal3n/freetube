@@ -64,7 +64,7 @@ struct LibraryScreen: View {
                 await loadRootData()
             }
         }
-        .refreshable {
+        .pullToRefresh {
             await loadHistorySummary()
             localPlaylistCount = await localPlaylistCountFromStore()
         }
