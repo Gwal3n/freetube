@@ -261,8 +261,17 @@ struct FullScreenPlayer: View {
                             .allowsHitTesting(false)
                             .zIndex(5)
                     }
-                    Color.black
-                        .opacity(!isFloating && showsPlayerControls ? 0.28 : 0)
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.45), location: 0),
+                            .init(color: .black.opacity(0.15), location: 0.35),
+                            .init(color: .black.opacity(0.15), location: 0.65),
+                            .init(color: .black.opacity(0.5), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                        .opacity(!isFloating && showsPlayerControls ? 1 : 0)
                         // Dim the fixed surface, not AVPlayer's presentation rect (avoids aspect flash).
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
