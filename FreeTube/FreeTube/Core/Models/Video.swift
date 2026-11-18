@@ -165,6 +165,11 @@ extension Video {
         return String(localized: "\(compact) likes")
     }
 
+    /// "1.2K", "12M", "3B", or the whole number below one thousand.
+    static func compactNumber(_ count: Int) -> String {
+        compactCount(count) ?? "\(count)"
+    }
+
     /// "1.2K", "12M", "3B"; nil below one thousand so callers can use a pluralized whole number.
     private static func compactCount(_ count: Int) -> String? {
         if count >= 1_000_000_000 { return "\(trim(Double(count) / 1_000_000_000))B" }

@@ -108,12 +108,29 @@ final class PlayerSponsorBlockCoordinator {
         pendingAskNotice = notice
     }
 
+    /// Shows a held Ask unless the playhead (after any resume seek) is already past its target.
     @discardableResult
-    func presentPendingAskIfNeeded(for seconds: TimeInterval) -> Bool {
+    func presentPendingAskIfNeeded(for seconds: TimeInterval, position: TimeInterval) -> Bool {
         guard let notice = pendingAskNotice else { return false }
         pendingAskNotice = nil
+        guard !Self.highlightPrompt(notice, isPassedAt: position) else { return false }
         showNotice(notice, for: seconds)
         return true
+    }
+
+    /// A jump-to-highlight prompt is pointless once the playhead has reached the highlight.
+    func dismissHighlightPromptIfPassed(position: TimeInterval) {
+        if let pendingAskNotice, Self.highlightPrompt(pendingAskNotice, isPassedAt: position) {
+            self.pendingAskNotice = nil
+        }
+        if let notice, Self.highlightPrompt(notice, isPassedAt: position) {
+            dismissNotice()
+        }
+    }
+
+    private static func highlightPrompt(_ notice: SponsorBlockNotice, isPassedAt position: TimeInterval) -> Bool {
+        guard notice.category == .highlight, case .prompt(let target) = notice.kind else { return false }
+        return position >= target - 0.5
     }
 
     func cancelNoticeDismissal() {

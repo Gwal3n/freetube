@@ -89,36 +89,41 @@ struct CustomPlayerControls: View {
                         .disabled(isFrameStepping ? !canStepBackward : (transportButtonMode == "seek" ? false : !hasPrevious))
                         .accessibilityLabel(isFrameStepping ? "Fine step backward" : (transportButtonMode == "seek" ? "Seek backward" : "Previous video"))
                     }
-                    Group {
-                        if isPreparing {
-                            PlaybackActivityIndicator(size: 34, lineWidth: 3.5)
-                                .frame(width: 68, height: 68)
-                                .allowsHitTesting(false)
-                                .accessibilityLabel("Preparing video")
-                        } else {
-                            Button(action: onTogglePlayPause) {
-                                Group {
-                                    if hasEnded {
-                                        Image(systemName: "arrow.counterclockwise")
-                                            .font(.system(size: 34, weight: .semibold))
-                                    } else {
-                                        PlaybackMorphShape(progress: isPlaying ? 1 : 0)
-                                            .fill(.white)
-                                            .frame(width: 34, height: 34)
-                                    }
-                                }
-                                .foregroundStyle(.white)
-                                .frame(width: 68, height: 68)
-                                .contentShape(Circle())
-                                .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
-                                .animation(
-                                    reduceMotion ? nil : .easeInOut(duration: 0.14),
-                                    value: isPlaying
-                                )
+                    // Stays a button while loading: pausing there cancels autoplay once ready.
+                    Button(action: onTogglePlayPause) {
+                        ZStack {
+                            if isPreparing {
+                                PlaybackActivityIndicator(size: 62, lineWidth: 3)
+                                    .accessibilityHidden(true)
                             }
-                            .accessibilityLabel(hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
+                            Group {
+                                if hasEnded && !isPreparing {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.system(size: 34, weight: .semibold))
+                                } else {
+                                    PlaybackMorphShape(progress: isPlaying ? 1 : 0)
+                                        .fill(.white)
+                                        .frame(
+                                            width: isPreparing ? 26 : 34,
+                                            height: isPreparing ? 26 : 34
+                                        )
+                                }
+                            }
                         }
+                        .foregroundStyle(.white)
+                        .frame(width: 68, height: 68)
+                        .contentShape(Circle())
+                        .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 0.14),
+                            value: isPlaying
+                        )
                     }
+                    .accessibilityLabel(
+                        isPreparing
+                            ? (isPlaying ? "Loading. Pause" : "Loading. Play")
+                            : (hasEnded ? "Replay" : (isPlaying ? "Pause" : "Play"))
+                    )
                     .frame(width: 68, height: 68)
                     if transportButtonMode != "off" || isFrameStepping {
                         Button {
@@ -147,15 +152,16 @@ struct CustomPlayerControls: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomTimelinePadding)
                 .opacity(isVisible || isSeekPreviewActive ? 1 : 0)
+                .allowsHitTesting(!isPreparing)
             }
         }
-        .allowsHitTesting(isVisible && !isPreparing)
+        .allowsHitTesting(isVisible)
         .accessibilityHidden(!isVisible && !isSeekPreviewActive)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: isVisible)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: isSeekPreviewActive)
     }
 
-    /// One vignette on the control surface (fitted video frame). No second full-bleed dim.
+    /// The player's only control dim, drawn in `controlFrame` so it always matches the chrome.
     private var legibilityScrim: some View {
         GeometryReader { proxy in
             let height = max(proxy.size.height, 1)

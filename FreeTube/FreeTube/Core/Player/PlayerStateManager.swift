@@ -32,6 +32,8 @@ final class PlayerStateManager {
             }
         }
     }
+    /// True from a new video's load until its saved resume position is applied (or skipped).
+    @ObservationIgnored var holdsSponsorBlockAskForResume = false
     var isPlaying: Bool = false
     /// True only when the current item reached its natural end and no automatic transition has
     /// replaced it. Drives replay chrome and lets a backward seek resume from the chosen point.
@@ -304,6 +306,7 @@ final class PlayerStateManager {
         recommendations.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
+        holdsSponsorBlockAskForResume = false
         clearChapterState()
         storyboard = nil
         captionTracks = []
@@ -401,6 +404,7 @@ final class PlayerStateManager {
         recommendations.cancel()
         contentPrefetchTask?.cancel()
         clearSponsorBlockState()
+        holdsSponsorBlockAskForResume = true
         clearChapterState()
         // Prefetch caches the first comments page for the session; drop it on each open so
         // expanding Comments is not stuck on an earlier snapshot of the thread.
@@ -611,9 +615,21 @@ final class PlayerStateManager {
         persistCurrentPlaybackProgress(force: true)
     }
 
+    /// What play/pause controls should show. While a stream resolves or buffers, AVPlayer has
+    /// nothing to report and `isPlaying` is reset by candidate swaps, so the user's intent wins:
+    /// pausing here stops the optimistic start and the readiness retry from autoplaying.
+    var showsPlayingState: Bool {
+        switch loadState {
+        case .resolving, .buffering:
+            return wantsPlayback
+        case .idle, .downloading, .readyToPlay, .failed:
+            return isPlaying
+        }
+    }
+
     func togglePlayPause() {
-        log.info("togglePlayPause() (isPlaying=\(self.isPlaying, privacy: .public))")
-        isPlaying ? pause() : play()
+        log.info("togglePlayPause() (isPlaying=\(self.isPlaying, privacy: .public) wantsPlayback=\(self.wantsPlayback, privacy: .public))")
+        showsPlayingState ? pause() : play()
     }
 
     func requestInlinePlaybackRestoration() {

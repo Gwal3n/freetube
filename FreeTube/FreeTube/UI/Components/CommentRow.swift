@@ -67,7 +67,7 @@ struct CommentRow: View {
                     // without a wide empty gap beside single-digit likes.
                     HStack(spacing: 4) {
                         Image(systemName: "hand.thumbsup")
-                        Text(verbatim: "\(comment.likeCount)")
+                        Text(verbatim: Video.compactNumber(comment.likeCount))
                             .monospacedDigit()
                             .frame(minWidth: 22, alignment: .leading)
                     }

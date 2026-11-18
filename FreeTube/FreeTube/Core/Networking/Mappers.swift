@@ -175,7 +175,7 @@ enum Mappers {
         }
         let number = stripped.dropLast().trimmingCharacters(in: .whitespaces)
         guard let value = Double(number) else { return nil }
-        return Int(value * multiplier)
+        return Int((value * multiplier).rounded())
     }
 
     static func channel(from yt: YTLittleChannelInfos) -> Channel {
@@ -210,7 +210,8 @@ enum Mappers {
     // MARK: - Comments
 
     static func comment(from yt: YTComment, authorAvatarURL: URL? = nil) -> Comment {
-        let likeCount = Int(yt.likesCount?.filter(\.isNumber) ?? "") ?? 0
+        // YouTube sends compact counts ("73K", "1.2M"); digit-only filtering turned 73K into 73.
+        let likeCount = parseAbbreviatedCount(yt.likesCount) ?? 0
         return Comment(
             id: yt.commentIdentifier,
             authorName: yt.sender?.name ?? "",
@@ -219,7 +220,7 @@ enum Mappers {
             bodyText: yt.text,
             likeCount: likeCount,
             publishedRelative: yt.timePosted ?? "",
-            replyCount: Int(yt.totalRepliesNumber?.filter(\.isNumber) ?? "") ?? yt.replies.count,
+            replyCount: parseAbbreviatedCount(yt.totalRepliesNumber) ?? yt.replies.count,
             replyContinuationToken: yt.actionsParams[.repliesContinuation]
         )
     }

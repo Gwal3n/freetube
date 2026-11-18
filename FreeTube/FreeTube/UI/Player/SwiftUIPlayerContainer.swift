@@ -180,16 +180,19 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                             height: presentedSize.height,
                             alignment: .top
                         )
+                        // While covering the tapped thumbnail, match its corners and skip the
+                        // shadow so neither outline shows around the edges.
                         .clipShape(
                             RoundedRectangle(
-                                cornerRadius: player.fullScreenPresented
-                                    ? FloatingMiniPlayerChrome.cornerRadius * transition
-                                    : FloatingMiniPlayerChrome.cornerRadius,
+                                cornerRadius: (launchFrame != nil
+                                    ? MediaStyle.thumbnailRadius
+                                    : FloatingMiniPlayerChrome.cornerRadius)
+                                    * (player.fullScreenPresented ? transition : 1),
                                 style: .continuous
                             )
                         )
                         .shadow(
-                            color: .black.opacity(floatingIsStashed ? 0
+                            color: .black.opacity(floatingIsStashed || launchFrame != nil ? 0
                                 : 0.32 * (player.fullScreenPresented ? transition : 1)),
                             radius: floatingIsStashed ? 0
                                 : 14 * (player.fullScreenPresented ? transition : 1),

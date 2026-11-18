@@ -345,6 +345,7 @@ extension PlayerStateManager {
                     acceptedStreamItem = item
                     acceptedStreamStrategy = candidate.strategy
                     loadState = .readyToPlay
+                    releaseSponsorBlockAskAfterResume()
                     if wantsPlayback { play() } else { updateNowPlaying() }
                     reconcilePlaybackRate()
                     log.info("resolveAndPlay: recovered with candidate=\(candidate.strategy.rawValue, privacy: .public)")
@@ -371,6 +372,7 @@ extension PlayerStateManager {
                       currentVideo?.id == video.id, player.currentItem === item else { return }
                 guard item.status == .readyToPlay else { return }
                 applyStoredResumePosition(savedProgress, for: video)
+                releaseSponsorBlockAskAfterResume()
                 updateNowPlaying()
                 contentPrefetchTask?.cancel()
                 contentPrefetchTask = Task {

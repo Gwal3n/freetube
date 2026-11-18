@@ -121,22 +121,30 @@ extension PlayerStateManager {
         let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
         switch notice.kind {
         case .prompt:
-            // Don't show or start the dismiss timer while the item is still loading.
-            if case .readyToPlay = loadState {
-                sponsorBlockCoordinator.showNotice(notice, for: seconds)
-            } else {
-                sponsorBlockCoordinator.deferAskNotice(notice)
-            }
+            // Hold it while loading and until any saved resume position has been applied, so
+            // neither loading nor a resume past the highlight shows or times out the prompt.
+            sponsorBlockCoordinator.deferAskNotice(notice)
+            presentPendingSponsorBlockAskIfNeeded()
         case .skipped:
             sponsorBlockCoordinator.showNotice(notice, for: seconds)
         }
     }
 
-    /// Call when playback becomes ready so a deferred highlight Ask can appear and time out.
+    /// Call once playback is ready and the resume decision is made, so a deferred highlight Ask
+    /// can appear and time out — unless the playhead already passed the highlight.
     func presentPendingSponsorBlockAskIfNeeded() {
-        guard case .readyToPlay = loadState else { return }
+        guard case .readyToPlay = loadState, !holdsSponsorBlockAskForResume else { return }
         let seconds = min(max(preferences.sponsorBlockNoticeSeconds, 1), 15)
-        _ = sponsorBlockCoordinator.presentPendingAskIfNeeded(for: seconds)
+        _ = sponsorBlockCoordinator.presentPendingAskIfNeeded(
+            for: seconds,
+            position: pendingSeekTarget ?? elapsed
+        )
+    }
+
+    /// The start position is settled (resumed, restored, or left at the start).
+    func releaseSponsorBlockAskAfterResume() {
+        holdsSponsorBlockAskForResume = false
+        presentPendingSponsorBlockAskIfNeeded()
     }
 
     /// Clears cached segment responses without changing the currently playing video's markers.

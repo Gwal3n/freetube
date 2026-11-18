@@ -11,6 +11,15 @@ final class DisplayFormattingTests: XCTestCase {
         XCTAssertNil(PlayerDetailsModel.exactViewCount(in: "12K views"))
     }
 
+    func testCommentLikeCountsKeepCompactMagnitude() {
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("73K"), 73_000)
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("4.1K"), 4_100)
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("1.2M"), 1_200_000)
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("264"), 264)
+        XCTAssertEqual(Video.compactNumber(73_000), "73K")
+        XCTAssertEqual(Video.compactNumber(264), "264")
+    }
+
     func testDisplayWhitespaceCollapsesRunsAndKeepsCleanTitles() {
         XCTAssertEqual("Alive 2007  [Full Concert]".collapsingDisplayWhitespace, "Alive 2007 [Full Concert]")
         XCTAssertEqual("Line\nbreak\ttab".collapsingDisplayWhitespace, "Line break tab")

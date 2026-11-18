@@ -35,6 +35,7 @@ extension PlayerStateManager {
         // target instead of the periodic observer's up-to-0.5-second-old playback position.
         elapsed = boundedSeconds
         pendingSeekTarget = boundedSeconds
+        sponsorBlockCoordinator.dismissHighlightPromptIfPassed(position: boundedSeconds)
         seekRequestID += 1
         let requestID = seekRequestID
         let time = CMTime(seconds: boundedSeconds, preferredTimescale: 600)

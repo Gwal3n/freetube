@@ -11,6 +11,7 @@ struct CommentsSection: View {
     @State private var isExpanded = false
     @State private var collapseAfterScroll = false
     @State private var expandedReplyCommentIDs: Set<String> = []
+    @State private var isHeadingPinned = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PlayerStateManager.self) private var player
     @AppStorage("showFeaturedCommentPreview") private var showsFeaturedCommentPreview = false
@@ -39,17 +40,22 @@ struct CommentsSection: View {
                     .clipped()
                 } header: {
                     // Solid black, never material: blur over the player panel looked milky.
-                    // The hairline appears only once content is scrolling underneath.
+                    // The hairline appears only once the heading is anchored at the top.
                     header
                         .background(Color.black)
+                        .onGeometryChange(for: Bool.self) { proxy in
+                            proxy.frame(in: .scrollView).minY <= 1
+                        } action: { pinned in
+                            isHeadingPinned = pinned
+                        }
                         .overlay(alignment: .bottom) {
                             Rectangle()
                                 .fill(Color.white.opacity(0.14))
                                 .frame(height: 1)
-                                .opacity(player.playerPanelAtTop ? 0 : 1)
+                                .opacity(isHeadingPinned ? 1 : 0)
                                 .animation(
                                     reduceMotion ? nil : .easeOut(duration: 0.15),
-                                    value: player.playerPanelAtTop
+                                    value: isHeadingPinned
                                 )
                         }
                 }

@@ -11,6 +11,10 @@ enum PlayerArtworkResolver {
            let cached = ImageCache.default.retrieveImageInMemoryCache(forKey: url.cacheKey) {
             return (cached, false)
         }
+        // Show the feed's smaller copy at once; the full image still replaces it when fetched.
+        if let recent = RecentThumbnailCache.shared.image(for: video.id) {
+            return (recent, true)
+        }
         if let data = DownloadsStore.shared.thumbnail(forVideoID: video.id) {
             return (UIImage(data: data), true)
         }

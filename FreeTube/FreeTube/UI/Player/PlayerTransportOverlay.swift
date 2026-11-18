@@ -34,7 +34,7 @@ struct PlayerTransportOverlay: View {
             isPreparing: isPreparing,
             isSeekPreviewActive: isSeekPreviewActive,
             isFrameStepping: isFrameStepping,
-            isPlaying: player.isPlaying,
+            isPlaying: player.showsPlayingState,
             hasEnded: player.hasEnded,
             previewElapsed: previewElapsed,
             hasPrevious: hasPrevious,

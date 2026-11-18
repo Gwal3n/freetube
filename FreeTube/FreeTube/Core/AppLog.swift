@@ -22,6 +22,18 @@ public struct AppLogMessage: ExpressibleByStringLiteral, ExpressibleByStringInte
         }
 
         public mutating func appendLiteral(_ literal: String) { output.append(literal) }
+        // YouTubeKit retroactively conforms `String` to `LocalizedError`, so without these exact
+        // overloads every interpolated string resolved to the Error overload and rendered as
+        // "domain=Swift.String code=1".
+        public mutating func appendInterpolation(_ value: String) {
+            output.append(value)
+        }
+        public mutating func appendInterpolation(_ value: String, privacy: AppLogPrivacy) {
+            switch privacy {
+            case .public: output.append(value)
+            case .private: output.append("<private>")
+            }
+        }
         public mutating func appendInterpolation<T>(_ value: T) {
             output.append(String(describing: value))
         }

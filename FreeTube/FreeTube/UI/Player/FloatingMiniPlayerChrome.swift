@@ -38,7 +38,7 @@ struct FloatingMiniPlayerChrome: View {
             VStack(spacing: 0) {
                 HStack {
                     cornerButton(
-                        accessibilityLabel: player.hasEnded ? "Replay" : player.isPlaying ? "Pause" : "Play",
+                        accessibilityLabel: player.hasEnded ? "Replay" : player.showsPlayingState ? "Pause" : "Play",
                         action: { player.togglePlayPause() },
                         label: {
                             Group {
@@ -46,10 +46,10 @@ struct FloatingMiniPlayerChrome: View {
                                     Image(systemName: "arrow.counterclockwise")
                                         .font(.system(size: 14, weight: .bold))
                                 } else {
-                                    PlaybackMorphShape(progress: player.isPlaying ? 1 : 0)
+                                    PlaybackMorphShape(progress: player.showsPlayingState ? 1 : 0)
                                         .fill(.white)
                                         .frame(width: 14, height: 14)
-                                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: player.isPlaying)
+                                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: player.showsPlayingState)
                                 }
                             }
                             .frame(width: 14, height: 14)

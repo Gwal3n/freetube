@@ -38,6 +38,9 @@ struct VideoThumbnail: View {
             .thumbnail(size: size, scale: displayScale, fadeDuration: reduceMotion ? 0 : 0.15) {
                 Rectangle().fill(MediaStyle.placeholderFill)
             }
+            .onSuccess { [videoID = video.id] result in
+                RecentThumbnailCache.shared.store(result.image, for: videoID)
+            }
             .resizable()
             .scaledToFill()
             .frame(width: size.width, height: size.height)
