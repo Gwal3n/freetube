@@ -14,9 +14,6 @@ final class ChannelPagerState {
     var headerCollapse: CGFloat = 0
     var pageContentPositions: [String: CGFloat] = [:]
     var pageOffsets: [String: CGFloat] = [:]
-    /// Rubber-band pull past the selected page's top edge, from `ScrollPullProbe`.
-    var pullDistance: CGFloat = 0
-
     // Estimated heights prevent the first page's rows from briefly sitting under the header.
     var headerContentHeight: CGFloat = ChannelProfileMetrics.estimatedHeaderHeight
     var tabBarHeight: CGFloat = ChannelProfileMetrics.estimatedTabBarHeight

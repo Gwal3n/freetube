@@ -175,13 +175,6 @@ struct ChannelScreen: View {
                         ),
                         alignment: .topLeading
                     )
-                    // The system refresh control is hidden under the header; draw feedback in
-                    // the gap that opens between the tab bar and the list instead.
-                    .overlay(alignment: .top) {
-                        if tab == pagerState.selectedTab {
-                            ChannelRefreshIndicator(pagerState: pagerState, isRefreshing: model.isRefreshing)
-                        }
-                    }
             }
             .background {
                 GeometryReader { geometry in
@@ -192,10 +185,10 @@ struct ChannelScreen: View {
                 }
             }
             .background {
-                ScrollPullProbe(triggerDistance: ChannelRefreshIndicator.triggerDistance) { pull in
-                    guard tab.id == pagerState.selectedTab.id else { return }
-                    pagerState.pullDistance = pull
-                }
+                // Pulls start with the header expanded; the gap opens just below it.
+                RefreshControlPlacement(
+                    topOffset: pagerState.headerTotalHeight + ChannelProfileMetrics.contentTopInset / 2
+                )
                 .allowsHitTesting(false)
             }
         }
