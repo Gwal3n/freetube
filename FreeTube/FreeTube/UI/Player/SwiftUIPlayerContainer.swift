@@ -852,6 +852,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             floatingActionsSuppressed = false
             player.fullScreenPresented = true
         } completion: {
+            AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+                .info("Player expansion finished presented=\(player.fullScreenPresented, privacy: .public) launchFrame=\(String(describing: player.launchSourceFrame), privacy: .public)")
             guard player.fullScreenPresented else { return }
             player.finishLaunchPresentation()
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {

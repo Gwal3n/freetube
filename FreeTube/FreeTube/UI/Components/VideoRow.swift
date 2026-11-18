@@ -141,6 +141,8 @@ struct VideoRow: View {
     }
 
     private func openVideo() {
+        AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+            .info("Video row tapped id=\(video.id, privacy: .public) frame=\(String(describing: launchAnchor.frame), privacy: .public)")
         player.prepareLaunch(for: video.id, from: launchAnchor.frame)
         onTap()
     }
