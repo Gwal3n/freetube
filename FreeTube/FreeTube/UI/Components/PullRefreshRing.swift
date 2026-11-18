@@ -1,10 +1,13 @@
 import SwiftUI
 import UIKit
 
+private let log = AppLog(subsystem: "com.leshko.freetube", category: "PullRefresh")
+
 /// Replaces the native refresh spinner of a `.refreshable` scroll view with
 /// `PullRefreshRingView`, drawn inside the system refresh control so it keeps the native
-/// position. UIKit commits at a private distance, so the ring would not match it; this starts
-/// the same refresh control itself once the ring is full. Draws nothing in SwiftUI.
+/// position. UIKit still decides when the pull is far enough (and plays its haptic), but it
+/// does so mid-drag; SwiftUI's refresh handlers are therefore detached from the control and
+/// sent only once the finger lifts. Draws nothing in SwiftUI.
 @available(iOS 17.0, *)
 struct PullRefreshRing: UIViewRepresentable {
     enum Placement {
@@ -14,7 +17,8 @@ struct PullRefreshRing: UIViewRepresentable {
         case adjacentScrollView
     }
 
-    static let triggerDistance: CGFloat = 90
+    /// Pull at which UIKit last committed to a refresh; the ring fills against this.
+    @MainActor static var triggerDistance: CGFloat = 120
 
     var placement: Placement = .adjacentScrollView
     /// Moves the refresh control down, for content whose top is covered by an overlay.
@@ -38,13 +42,17 @@ struct PullRefreshRing: UIViewRepresentable {
         var placement: Placement = .adjacentScrollView
         var topOffset: CGFloat = 0
         private weak var scrollView: UIScrollView?
+        private weak var control: UIRefreshControl?
         private var observation: NSKeyValueObservation?
         private let ring = PullRefreshRingView()
         /// Top inset without the refresh control: while refreshing, UIKit adds the control's
         /// height to the inset, which would otherwise read the still-open gap as zero pull.
         private var restingTopInset: CGFloat?
-        /// One trigger per pull; rearmed once the scroll view returns to its top edge.
-        private var hasTriggered = false
+        private var heldActions: [UIAction] = []
+        private var heldTargets: [(target: AnyObject, selector: Selector)] = []
+        /// UIKit has committed to a refresh, waiting for the finger to lift.
+        private var awaitingRelease = false
+        private var wasDragging = false
         /// Hides the ring while the content settles back after a refresh ends.
         private var isSettling = false
         private var attachAttempts = 0
@@ -66,6 +74,13 @@ struct PullRefreshRing: UIViewRepresentable {
 
         func update() {
             guard let scrollView, let control = scrollView.refreshControl else { return }
+            if control !== self.control {
+                self.control = control
+                heldActions = []
+                heldTargets = []
+                log.info("Attached to refresh control")
+            }
+            holdRefreshHandlers(of: control)
             if control.tintColor != .clear { control.tintColor = .clear }
             if ring.superview !== control { control.addSubview(ring) }
             let transform = CGAffineTransform(translationX: 0, y: topOffset)
@@ -75,35 +90,75 @@ struct PullRefreshRing: UIViewRepresentable {
                 restingTopInset = scrollView.adjustedContentInset.top
             }
             let pull = max(0, -(scrollView.contentOffset.y + (restingTopInset ?? 0)))
+            let isDragging = scrollView.isDragging
             ring.frame = CGRect(x: control.bounds.midX - 14, y: control.bounds.midY - 14, width: 28, height: 28)
 
-            if control.isRefreshing {
+            if control.isRefreshing, !awaitingRelease, isDragging, !isSettling {
+                // UIKit just committed (and played its haptic). Hold the refresh until release.
+                awaitingRelease = true
+                if pull > 40 { PullRefreshRing.triggerDistance = pull }
+            }
+            if awaitingRelease, wasDragging, !isDragging {
+                awaitingRelease = false
+                sendHeldRefresh(from: control)
+            }
+            wasDragging = isDragging
+
+            if control.isRefreshing, !awaitingRelease {
                 isSettling = true
-            } else if pull < 1 {
-                isSettling = false
-                if !scrollView.isDragging { hasTriggered = false }
-            }
-
-            if !hasTriggered, !control.isRefreshing, scrollView.isDragging,
-               pull >= PullRefreshRing.triggerDistance {
-                hasTriggered = true
-                control.beginRefreshing()
-                control.sendActions(for: .valueChanged)
-            }
-
-            if control.isRefreshing {
                 ring.update(progress: 1, isRefreshing: true)
+            } else if awaitingRelease {
+                ring.update(progress: 1, isRefreshing: false)
             } else {
+                if pull < 1 { isSettling = false }
                 let progress = isSettling ? 0 : min(1, pull / PullRefreshRing.triggerDistance)
                 ring.update(progress: progress, isRefreshing: false)
+            }
+        }
+
+        /// SwiftUI may re-register its handler on updates, so this runs on every pass.
+        private func holdRefreshHandlers(of control: UIRefreshControl) {
+            var actions: [UIAction] = []
+            var targets: [(target: AnyObject, selector: Selector)] = []
+            control.enumerateEventHandlers { action, targetAction, event, _ in
+                guard event.contains(.valueChanged) else { return }
+                if let action {
+                    actions.append(action)
+                } else if let targetAction, let target = targetAction.0 {
+                    targets.append((target as AnyObject, targetAction.1))
+                }
+            }
+            guard !actions.isEmpty || !targets.isEmpty else { return }
+            for action in actions {
+                control.removeAction(action, for: .valueChanged)
+            }
+            for entry in targets {
+                control.removeTarget(entry.target, action: entry.selector, for: .valueChanged)
+            }
+            heldActions = actions
+            heldTargets = targets
+        }
+
+        private func sendHeldRefresh(from control: UIRefreshControl) {
+            guard control.isRefreshing else { return }
+            if heldActions.isEmpty, heldTargets.isEmpty {
+                log.error("No refresh handler to send; ending refresh")
+                control.endRefreshing()
+                return
+            }
+            for action in heldActions {
+                control.sendAction(action)
+            }
+            for entry in heldTargets {
+                control.sendAction(entry.selector, to: entry.target, for: nil)
             }
         }
 
         private func attachIfNeeded() {
             guard window != nil, scrollView == nil else { return }
             guard let target = findScrollView() else {
-                // SwiftUI installs the refresh control lazily; retry briefly.
-                guard attachAttempts < 10 else { return }
+                // SwiftUI may still be building the scroll view; retry briefly.
+                guard attachAttempts < 20 else { return }
                 attachAttempts += 1
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     self?.attachIfNeeded()
@@ -111,6 +166,7 @@ struct PullRefreshRing: UIViewRepresentable {
                 return
             }
             scrollView = target
+            // The refresh control can be installed after this; update() picks it up lazily.
             observation = target.observe(\.contentOffset, options: [.initial]) { [weak self] _, _ in
                 // contentOffset only changes on the main thread.
                 MainActor.assumeIsolated { self?.update() }
@@ -121,7 +177,8 @@ struct PullRefreshRing: UIViewRepresentable {
             observation = nil
             scrollView = nil
             restingTopInset = nil
-            hasTriggered = false
+            awaitingRelease = false
+            wasDragging = false
             isSettling = false
         }
 
@@ -130,9 +187,7 @@ struct PullRefreshRing: UIViewRepresentable {
             case .enclosingScrollView:
                 var ancestor = superview
                 while let view = ancestor {
-                    if let scrollView = view as? UIScrollView {
-                        return scrollView.refreshControl == nil ? nil : scrollView
-                    }
+                    if let scrollView = view as? UIScrollView { return scrollView }
                     ancestor = view.superview
                 }
                 return nil
