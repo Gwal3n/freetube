@@ -69,7 +69,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 floatingWidthRange.upperBound,
                 max(floatingWidthRange.lowerBound, player.floatingMiniPlayerWidth)
             )
-            let floatingSize = CGSize(width: floatingWidth, height: floatingWidth * 9 / 16)
+            let floatingSize = PlayerViewportLayout.floatingWindowSize(
+                baseWidth: floatingWidth,
+                presentationSize: player.videoPresentationSize,
+                maximumWidth: proxy.size.width - 28
+            )
             let cornerBase = floatingCorner.center(
                 in: proxy.size,
                 window: floatingSize,
@@ -735,13 +739,21 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard let startWidth = floatingPinchStartWidth else { return }
                 let width = min(widthRange.upperBound,
                     max(widthRange.lowerBound, startWidth * value.magnification))
-                let window = CGSize(width: width, height: width * 9 / 16)
-                let widthChange = width - startWidth
+                let startWindow = PlayerViewportLayout.floatingWindowSize(
+                    baseWidth: startWidth,
+                    presentationSize: player.videoPresentationSize,
+                    maximumWidth: viewport.width - 28
+                )
+                let window = PlayerViewportLayout.floatingWindowSize(
+                    baseWidth: width,
+                    presentationSize: player.videoPresentationSize,
+                    maximumWidth: viewport.width - 28
+                )
                 let visualCenter = CGPoint(
                     x: base.x + floatingDragTranslation.width
-                        + (0.5 - floatingPinchAnchor.x) * widthChange,
+                        + (0.5 - floatingPinchAnchor.x) * (window.width - startWindow.width),
                     y: base.y + floatingDragTranslation.height
-                        + (0.5 - floatingPinchAnchor.y) * widthChange * 9 / 16
+                        + (0.5 - floatingPinchAnchor.y) * (window.height - startWindow.height)
                 )
                 let cornerBase = floatingCorner.center(
                     in: viewport, window: window,

@@ -200,9 +200,6 @@ struct FullScreenPlayer: View {
                         },
                         isInteractionEnabled: player.fullScreenPresented,
                         isZoomEnabled: player.fullScreenPresented && (isLandscape || usesPortraitFullscreen),
-                        fillsFrame: isFloating && PlayerViewportLayout.fillsFloatingFrame(
-                            presentationSize: player.videoPresentationSize
-                        ),
                         onZoomPinch: { magnitude, focalPoint, state in
                             zoomModel.pinch(magnitude, focalPoint: focalPoint, state: state)
                         },

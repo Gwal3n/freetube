@@ -56,7 +56,9 @@ struct PlayerViewportGeometry {
 
         // The playlist browser overlays the lower content and must not resize or lift the video.
         let uncollapsedSurfaceHeight = expandedSurfaceHeight - consumedCollapse
-        let floatingAspectHeight = surfaceWidth * 9 / 16
+        let videoAspect = presentationSize.width > 0 && presentationSize.height > 0
+            ? presentationSize.width / presentationSize.height : 16 / 9
+        let floatingAspectHeight = surfaceWidth / max(16 / 9, videoAspect)
         let floatingAspectMix = min(1, max(0, (collapseProgress - 0.65) / 0.35))
         let desiredSurfaceHeight = uncollapsedSurfaceHeight
             + (floatingAspectHeight - uncollapsedSurfaceHeight) * floatingAspectMix

@@ -71,14 +71,21 @@ enum PlayerViewportLayout {
         )
     }
 
-    /// The 16:9 mini-player fills its frame when the video is close enough to 16:9 that fitting
-    /// would only leave thin bars (e.g. 2:1). Larger mismatches keep the whole picture visible.
-    static func fillsFloatingFrame(presentationSize: CGSize) -> Bool {
-        guard presentationSize.width > 0, presentationSize.height > 0 else { return false }
+    /// `baseWidth` is the stored 16:9 mini-player width. Videos wider than 16:9 keep that height
+    /// and widen the window instead of letterboxing, up to `maximumWidth`.
+    static func floatingWindowSize(
+        baseWidth: CGFloat,
+        presentationSize: CGSize,
+        maximumWidth: CGFloat
+    ) -> CGSize {
+        let height = baseWidth * 9 / 16
+        guard presentationSize.width > 0, presentationSize.height > 0 else {
+            return CGSize(width: baseWidth, height: height)
+        }
         let aspect = presentationSize.width / presentationSize.height
-        let frameAspect: CGFloat = 16 / 9
-        let maximumCrop: CGFloat = 0.15
-        return aspect >= frameAspect * (1 - maximumCrop) && aspect <= frameAspect / (1 - maximumCrop)
+        guard aspect > 16 / 9 else { return CGSize(width: baseWidth, height: height) }
+        let width = min(height * aspect, max(baseWidth, maximumWidth))
+        return CGSize(width: width, height: width / aspect)
     }
 
     /// Uses the video's display-correct dimensions for portrait/tall media, bounded so the lower
