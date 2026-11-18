@@ -60,8 +60,23 @@ final class PullRefreshRingView: UIView {
             ring.removeAnimation(forKey: Self.spinKey)
             ring.strokeEnd = progress
             alpha = progress > 0.02 ? 0.4 + 0.6 * progress : 0
+            if progress > 0.02 { transform = .identity }
         }
         CATransaction.commit()
+    }
+
+    /// Shrinks and fades the ring after a refresh instead of removing it abruptly.
+    func fadeOut() {
+        UIView.animate(
+            withDuration: 0.3,
+            delay: 0,
+            options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction]
+        ) {
+            self.alpha = 0
+            self.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+        } completion: { _ in
+            self.ring.removeAnimation(forKey: Self.spinKey)
+        }
     }
 
     private func applyColor() {

@@ -182,7 +182,7 @@ struct SubscriptionFeedScreen: View {
                 }
             }
             .onChange(of: feedFilter) { _, filter in filter.save() }
-            .pullToRefresh { await model.refresh() }
+            .pullToRefresh(showsRefreshingIndicator: false) { await model.refresh() }
             .task(id: filteredFillKey) { await fillFilteredFeed() }
             .task(id: suggestionTaskKey) {
                 await suggestionsModel.update(

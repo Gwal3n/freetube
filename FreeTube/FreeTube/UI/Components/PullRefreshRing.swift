@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+private let log = AppLog(subsystem: "com.leshko.freetube", category: "PullRefresh")
+
 /// The app's pull-to-refresh. `UIRefreshControl` commits to a refresh mid-drag and cannot be
 /// talked out of it, so this observes the scroll view directly instead: the ring follows the
 /// pull, a haptic marks crossing the threshold, and the refresh starts only if the finger
@@ -16,10 +18,14 @@ struct PullRefreshRing: UIViewRepresentable {
 
     static let triggerDistance: CGFloat = 110
     static let refreshingGap: CGFloat = 56
+    /// Near-instant refreshes still spin briefly, so the ring doesn't flash and snap shut.
+    static let minimumRefreshingDuration: Duration = .milliseconds(700)
 
     var placement: Placement = .adjacentScrollView
     /// Moves the ring down, for content whose top is covered by an overlay.
     var topOffset: CGFloat = 0
+    /// When false the ring fades on release and the gap closes; the screen shows its own progress.
+    var showsRefreshingIndicator = true
     let action: @Sendable () async -> Void
 
     func makeUIView(context: Context) -> AttachmentView {
@@ -37,6 +43,7 @@ struct PullRefreshRing: UIViewRepresentable {
     private func configure(_ view: AttachmentView) {
         view.placement = placement
         view.topOffset = topOffset
+        view.showsRefreshingIndicator = showsRefreshingIndicator
         view.action = action
     }
 
@@ -46,6 +53,7 @@ struct PullRefreshRing: UIViewRepresentable {
 
         var placement: Placement = .adjacentScrollView
         var topOffset: CGFloat = 0
+        var showsRefreshingIndicator = true
         var action: (@Sendable () async -> Void)?
         private weak var scrollView: UIScrollView?
         private var observation: NSKeyValueObservation?
@@ -95,10 +103,10 @@ struct PullRefreshRing: UIViewRepresentable {
             }
 
             if isRefreshing {
-                ring.update(progress: 1, isRefreshing: true)
+                if showsRefreshingIndicator { ring.update(progress: 1, isRefreshing: true) }
             } else if isSettling {
+                // The ring is fading out; leave it alone until the content has settled.
                 if pull < 1 { isSettling = false }
-                ring.update(progress: 0, isRefreshing: false)
             } else {
                 ring.update(progress: min(1, pull / PullRefreshRing.triggerDistance), isRefreshing: false)
             }
@@ -151,10 +159,20 @@ struct PullRefreshRing: UIViewRepresentable {
         private func beginRefresh() {
             isRefreshing = true
             isSettling = true
-            applyHold()
+            let showsIndicator = showsRefreshingIndicator
+            if showsIndicator {
+                applyHold()
+            } else {
+                ring.fadeOut()
+            }
             let action = self.action
             Task { @MainActor [weak self] in
+                let started = ContinuousClock.now
                 await action?()
+                if showsIndicator {
+                    let remaining = PullRefreshRing.minimumRefreshingDuration - (ContinuousClock.now - started)
+                    if remaining > .zero { try? await Task.sleep(for: remaining) }
+                }
                 self?.endRefresh()
             }
         }
@@ -181,9 +199,9 @@ struct PullRefreshRing: UIViewRepresentable {
             }
             if animated {
                 UIView.animate(
-                    withDuration: 0.3,
+                    withDuration: 0.35,
                     delay: 0,
-                    options: [.beginFromCurrentState, .allowUserInteraction],
+                    options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut],
                     animations: changes
                 )
             } else {
@@ -193,8 +211,12 @@ struct PullRefreshRing: UIViewRepresentable {
 
         private func endRefresh() {
             isRefreshing = false
+            if showsRefreshingIndicator { ring.fadeOut() }
             releaseHold(animated: true)
-            update()
+            if let scrollView,
+               scrollView.contentOffset.y + scrollView.adjustedContentInset.top > -1 {
+                isSettling = false
+            }
         }
 
         private func attachIfNeeded() {
@@ -209,6 +231,7 @@ struct PullRefreshRing: UIViewRepresentable {
                 return
             }
             scrollView = target
+            log.info("Attached to \(String(describing: type(of: target)), privacy: .public) height=\(Int(target.bounds.height), privacy: .public)")
             target.alwaysBounceVertical = true
             target.panGestureRecognizer.addTarget(self, action: #selector(handlePan(_:)))
             observation = target.observe(\.contentOffset, options: [.initial]) { [weak self] _, _ in
@@ -237,10 +260,16 @@ struct PullRefreshRing: UIViewRepresentable {
                 }
                 return nil
             case .adjacentScrollView:
+                // Other tabs' lists can live in the same hierarchy; only accept the list this
+                // view is the background of, i.e. one whose on-screen frame contains it.
+                guard bounds.width > 0, bounds.height > 0 else { return nil }
+                let center = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: nil)
                 var ancestor = superview
                 var depth = 0
                 while let view = ancestor, depth < 4 {
-                    if let scrollView = Self.verticalScrollView(in: view) { return scrollView }
+                    if let scrollView = Self.verticalScrollView(in: view, containing: center) {
+                        return scrollView
+                    }
                     ancestor = view.superview
                     depth += 1
                 }
@@ -248,14 +277,19 @@ struct PullRefreshRing: UIViewRepresentable {
             }
         }
 
-        /// The outermost sizeable scroll view; breadth-first so a list wins over its rows.
-        private static func verticalScrollView(in root: UIView) -> UIScrollView? {
+        /// The outermost sizeable visible scroll view over `point` (window coordinates);
+        /// breadth-first so a list wins over scroll views inside its rows.
+        private static func verticalScrollView(in root: UIView, containing point: CGPoint) -> UIScrollView? {
             var queue = [root]
             var index = 0
             while index < queue.count, index < 400 {
                 let view = queue[index]
                 index += 1
-                if let scrollView = view as? UIScrollView, scrollView.bounds.height >= 200 {
+                guard !view.isHidden, view.alpha > 0.01 else { continue }
+                if let scrollView = view as? UIScrollView,
+                   scrollView.bounds.height >= 200,
+                   scrollView.window != nil,
+                   scrollView.convert(scrollView.bounds, to: nil).contains(point) {
                     return scrollView
                 }
                 queue.append(contentsOf: view.subviews)
@@ -268,7 +302,13 @@ struct PullRefreshRing: UIViewRepresentable {
 extension View {
     /// Pull-to-refresh with the app's ring; the action runs only after releasing past the threshold.
     @available(iOS 17.0, *)
-    func pullToRefresh(action: @escaping @Sendable () async -> Void) -> some View {
-        background(PullRefreshRing(action: action).allowsHitTesting(false))
+    func pullToRefresh(
+        showsRefreshingIndicator: Bool = true,
+        action: @escaping @Sendable () async -> Void
+    ) -> some View {
+        background(
+            PullRefreshRing(showsRefreshingIndicator: showsRefreshingIndicator, action: action)
+                .allowsHitTesting(false)
+        )
     }
 }
