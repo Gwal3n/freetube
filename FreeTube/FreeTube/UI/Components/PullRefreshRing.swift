@@ -157,6 +157,7 @@ struct PullRefreshRing: UIViewRepresentable {
         }
 
         private func beginRefresh() {
+            log.info("Released past threshold; refreshing")
             isRefreshing = true
             isSettling = true
             let showsIndicator = showsRefreshingIndicator
@@ -262,39 +263,29 @@ struct PullRefreshRing: UIViewRepresentable {
             case .adjacentScrollView:
                 // Other tabs' lists can live in the same hierarchy; only accept the list this
                 // view is the background of, i.e. one whose on-screen frame contains it.
-                guard bounds.width > 0, bounds.height > 0 else { return nil }
-                let center = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: nil)
+                // Hidden tabs' lists share this frame, so ask the window which list is actually
+                // on top here, then require it to be a near relative of this background view.
+                guard let window, bounds.width > 0, bounds.height > 0 else { return nil }
+                let center = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: window)
+                var hit = window.hitTest(center, with: nil)
+                var candidate: UIScrollView?
+                while let view = hit {
+                    if let scrollView = view as? UIScrollView, scrollView.bounds.height >= 200 {
+                        candidate = scrollView
+                        break
+                    }
+                    hit = view.superview
+                }
+                guard let candidate else { return nil }
                 var ancestor = superview
                 var depth = 0
                 while let view = ancestor, depth < 4 {
-                    if let scrollView = Self.verticalScrollView(in: view, containing: center) {
-                        return scrollView
-                    }
+                    if candidate.isDescendant(of: view) { return candidate }
                     ancestor = view.superview
                     depth += 1
                 }
                 return nil
             }
-        }
-
-        /// The outermost sizeable visible scroll view over `point` (window coordinates);
-        /// breadth-first so a list wins over scroll views inside its rows.
-        private static func verticalScrollView(in root: UIView, containing point: CGPoint) -> UIScrollView? {
-            var queue = [root]
-            var index = 0
-            while index < queue.count, index < 400 {
-                let view = queue[index]
-                index += 1
-                guard !view.isHidden, view.alpha > 0.01 else { continue }
-                if let scrollView = view as? UIScrollView,
-                   scrollView.bounds.height >= 200,
-                   scrollView.window != nil,
-                   scrollView.convert(scrollView.bounds, to: nil).contains(point) {
-                    return scrollView
-                }
-                queue.append(contentsOf: view.subviews)
-            }
-            return nil
         }
     }
 }
