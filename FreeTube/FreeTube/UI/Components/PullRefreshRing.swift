@@ -67,35 +67,15 @@ struct PullRefreshRing: UIViewRepresentable {
         private var heldInset: CGFloat = 0
         private var baseContentInset: CGFloat = 0
         private var attachAttempts = 0
-        private var validationTimer: Timer?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            validationTimer?.invalidate()
-            validationTimer = nil
             if window == nil {
                 detach()
             } else {
                 attachAttempts = 0
                 attachIfNeeded()
-                guard placement == .adjacentScrollView else { return }
-                validationTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.validateAttachment() }
-                }
             }
-        }
-
-        /// SwiftUI swaps content (e.g. a loading placeholder List for the results List) and the
-        /// outgoing list can still be on top at attach time. Follow whichever list is current.
-        private func validateAttachment() {
-            guard window != nil, !isRefreshing, scrollView?.isDragging != true else { return }
-            if let current = scrollView, current.window != nil {
-                guard let found = findScrollView(), found !== current else { return }
-            }
-            if scrollView != nil { log.info("Watched list replaced; re-attaching") }
-            detach()
-            attachAttempts = 0
-            attachIfNeeded()
         }
 
         override func layoutSubviews() {
