@@ -71,21 +71,18 @@ enum PlayerViewportLayout {
         )
     }
 
-    /// `baseWidth` is the stored 16:9 mini-player width. Videos wider than 16:9 keep that height
-    /// and widen the window instead of letterboxing, up to `maximumWidth`.
+    /// Keeps the stored mini-player width and follows the video's aspect for height, so nothing
+    /// is letterboxed or cropped. Very tall videos shrink to fit `maximumHeight`.
     static func floatingWindowSize(
         baseWidth: CGFloat,
         presentationSize: CGSize,
-        maximumWidth: CGFloat
+        maximumHeight: CGFloat
     ) -> CGSize {
-        let height = baseWidth * 9 / 16
-        guard presentationSize.width > 0, presentationSize.height > 0 else {
-            return CGSize(width: baseWidth, height: height)
-        }
-        let aspect = presentationSize.width / presentationSize.height
-        guard aspect > 16 / 9 else { return CGSize(width: baseWidth, height: height) }
-        let width = min(height * aspect, max(baseWidth, maximumWidth))
-        return CGSize(width: width, height: width / aspect)
+        let aspect = presentationSize.width > 0 && presentationSize.height > 0
+            ? presentationSize.width / presentationSize.height
+            : 16 / 9
+        let height = min(baseWidth / aspect, max(1, maximumHeight))
+        return CGSize(width: height * aspect, height: height)
     }
 
     /// Uses the video's display-correct dimensions for portrait/tall media, bounded so the lower

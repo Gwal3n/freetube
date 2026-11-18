@@ -72,7 +72,9 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             let floatingSize = PlayerViewportLayout.floatingWindowSize(
                 baseWidth: floatingWidth,
                 presentationSize: player.videoPresentationSize,
-                maximumWidth: proxy.size.width - 28
+                maximumHeight: floatingMaximumHeight(
+                    in: proxy.size, topInset: systemInsets.top, bottomInset: miniBottomPadding
+                )
             )
             let cornerBase = floatingCorner.center(
                 in: proxy.size,
@@ -407,6 +409,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
         return min(160, maximum)...maximum
     }
 
+    private func floatingMaximumHeight(
+        in size: CGSize,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> CGFloat {
+        max(90, size.height - topInset - bottomInset - 28)
+    }
+
     private func floatingYBounds(
         in size: CGSize,
         window: CGSize,
@@ -739,15 +749,18 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard let startWidth = floatingPinchStartWidth else { return }
                 let width = min(widthRange.upperBound,
                     max(widthRange.lowerBound, startWidth * value.magnification))
+                let maximumHeight = floatingMaximumHeight(
+                    in: viewport, topInset: topInset, bottomInset: bottomInset
+                )
                 let startWindow = PlayerViewportLayout.floatingWindowSize(
                     baseWidth: startWidth,
                     presentationSize: player.videoPresentationSize,
-                    maximumWidth: viewport.width - 28
+                    maximumHeight: maximumHeight
                 )
                 let window = PlayerViewportLayout.floatingWindowSize(
                     baseWidth: width,
                     presentationSize: player.videoPresentationSize,
-                    maximumWidth: viewport.width - 28
+                    maximumHeight: maximumHeight
                 )
                 let visualCenter = CGPoint(
                     x: base.x + floatingDragTranslation.width
