@@ -192,7 +192,7 @@ struct ChannelScreen: View {
                 }
             }
             .background {
-                ScrollPullProbe { pull in
+                ScrollPullProbe(triggerDistance: ChannelRefreshIndicator.triggerDistance) { pull in
                     guard tab.id == pagerState.selectedTab.id else { return }
                     pagerState.pullDistance = pull
                 }

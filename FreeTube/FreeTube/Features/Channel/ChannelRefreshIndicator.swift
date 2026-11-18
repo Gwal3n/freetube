@@ -9,8 +9,8 @@ struct ChannelRefreshIndicator: View {
     let isRefreshing: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Roughly where UIKit's refresh control commits to a refresh.
-    private static let triggerDistance: CGFloat = 90
+    /// `ScrollPullProbe` starts the refresh at this distance, so a full ring means refreshing.
+    static let triggerDistance: CGFloat = 90
     private static let size: CGFloat = 28
 
     var body: some View {
