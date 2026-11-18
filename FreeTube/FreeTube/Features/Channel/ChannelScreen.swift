@@ -189,7 +189,9 @@ struct ChannelScreen: View {
                 PullRefreshRing(
                     placement: .enclosingScrollView,
                     topOffset: pagerState.headerTotalHeight + ChannelProfileMetrics.contentTopInset / 2
-                )
+                ) {
+                    await model.refresh(activeSort: tab == .videos ? videoSort : .newest)
+                }
                 .allowsHitTesting(false)
             }
         }
@@ -201,9 +203,6 @@ struct ChannelScreen: View {
         )
         .modifier(HiddenTopScrollEdgeEffect())
         .coordinateSpace(name: Self.pageSpace(tab))
-        .refreshable {
-            await model.refresh(activeSort: tab == .videos ? videoSort : .newest)
-        }
         .onPreferenceChange(ChannelPageOffsetKey.self) { offsets in
             if #unavailable(iOS 18.0) {
                 pagerState.pageOffsets.merge(offsets) { _, new in new }
