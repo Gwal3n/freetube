@@ -161,6 +161,10 @@ struct PlayerInformationPanel<Actions: View>: View {
                     )
                 }
             case .comments:
+                if video.isLive {
+                    LiveChatSection(videoID: video.id)
+                        .id("live-chat-\(video.id)")
+                }
                 if showsComments {
                     CommentsSection(
                         videoID: video.id,
