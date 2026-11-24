@@ -20,6 +20,43 @@ final class DisplayFormattingTests: XCTestCase {
         XCTAssertEqual(Video.compactNumber(264), "264")
     }
 
+    func testLiveSearchViewerCountsKeepMagnitudeAndWatchingLabel() {
+        // "1.2K watching" must not collapse to 12 via digits-only stripping.
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("1.2K watching"), 1_200)
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("45.3K watching"), 45_300)
+        XCTAssertEqual(Mappers.parseAbbreviatedCount("856 watching"), 856)
+        let live = Video(
+            id: "abcdefghijk",
+            title: "Live",
+            channelID: "UCtest",
+            channelName: "Channel",
+            channelThumbnailURL: nil,
+            thumbnailURL: nil,
+            duration: nil,
+            viewCount: 1_200,
+            publishedAt: nil,
+            descriptionSnippet: nil,
+            isLive: true,
+            isShort: false
+        )
+        XCTAssertEqual(live.viewCountString, "1.2K watching")
+        let vod = Video(
+            id: live.id,
+            title: live.title,
+            channelID: live.channelID,
+            channelName: live.channelName,
+            channelThumbnailURL: nil,
+            thumbnailURL: nil,
+            duration: 120,
+            viewCount: 1_200,
+            publishedAt: nil,
+            descriptionSnippet: nil,
+            isLive: false,
+            isShort: false
+        )
+        XCTAssertEqual(vod.viewCountString, "1.2K views")
+    }
+
     func testDisplayWhitespaceCollapsesRunsAndKeepsCleanTitles() {
         XCTAssertEqual("Alive 2007  [Full Concert]".collapsingDisplayWhitespace, "Alive 2007 [Full Concert]")
         XCTAssertEqual("Line\nbreak\ttab".collapsingDisplayWhitespace, "Line break tab")

@@ -148,16 +148,21 @@ extension Video {
         return now.addingTimeInterval(-seconds)
     }
 
-    /// Compact human-readable view-count string (e.g. "1.2M views", "856 views"). Empty when the
-    /// API didn't return a count, so callers can hide the label entirely.
+    /// Compact human-readable count for list rows. Live rows use concurrent viewers
+    /// ("1.2K watching"); VODs use cumulative views. Empty when the API omitted a count.
     var viewCountString: String {
         guard let viewCount, viewCount > 0 else { return "" }
-        return Self.viewCountLabel(viewCount)
+        return isLive ? Self.liveViewerCountLabel(viewCount) : Self.viewCountLabel(viewCount)
     }
 
     static func viewCountLabel(_ count: Int) -> String {
         guard let compact = compactCount(count) else { return String(localized: "\(count) views") }
         return String(localized: "\(compact) views")
+    }
+
+    static func liveViewerCountLabel(_ count: Int) -> String {
+        guard let compact = compactCount(count) else { return String(localized: "\(count) watching") }
+        return String(localized: "\(compact) watching")
     }
 
     static func likeCountLabel(_ count: Int) -> String {

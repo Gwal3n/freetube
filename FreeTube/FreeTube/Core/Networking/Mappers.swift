@@ -90,33 +90,13 @@ enum Mappers {
         URL(string: "https://i.ytimg.com/vi/\(videoID)/hqdefault.jpg")
     }
 
+    /// Search/live rows use `shortViewCountText` as either `"1.2M views"` or `"1.2K watching"`.
+    /// Digits-only stripping of `"1.2K watching"` wrongly yields `12`; route through the
+    /// abbreviated parser after rejecting relative-age lockup noise.
     private static func parseViewCount(_ text: String?) -> Int? {
         guard let text else { return nil }
-        let lower = text.lowercased()
-        // Lockup members-only rows put "1 day ago" here; never treat ages as view counts.
         guard !looksLikeRelativeAge(text) else { return nil }
-        // Quick path: pure digits with optional separators ("1,234,567").
-        let digits = text.unicodeScalars.filter(CharacterSet.decimalDigits.contains).map(Character.init)
-        if let value = Int(String(digits)), !lower.contains("k"), !lower.contains("m"), !lower.contains("b") {
-            return value
-        }
-        // Short-form path ("1.2M views", "856K"): parse the leading number then apply suffix.
-        let trimmed = lower
-            .replacingOccurrences(of: "views", with: "")
-            .replacingOccurrences(of: "view", with: "")
-            .trimmingCharacters(in: .whitespaces)
-        guard let last = trimmed.last else { return nil }
-        let multiplier: Double
-        switch last {
-        case "k": multiplier = 1_000
-        case "m": multiplier = 1_000_000
-        case "b": multiplier = 1_000_000_000
-        default:
-            return Int(String(digits))
-        }
-        let number = trimmed.dropLast().trimmingCharacters(in: .whitespaces)
-        guard let value = Double(number) else { return nil }
-        return Int(value * multiplier)
+        return parseAbbreviatedCount(text)
     }
 
     // MARK: - Channels
@@ -142,6 +122,7 @@ enum Mappers {
         let lower = raw.lowercased()
         let suffixes = [
             "subscribers", "subscriber",
+            "watching",
             "views", "view",
             "videos", "video",
             "playlists", "playlist",
