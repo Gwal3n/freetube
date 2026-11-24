@@ -123,6 +123,8 @@ final class PlayerStateManager {
     /// Shared with the SwiftUI presentation container so its global drag pauses while the chapter
     /// panel owns vertical gestures.
     var chapterListPresented: Bool = false
+    /// Live chat sheet/sidebar; same presentation ownership as chapters.
+    var liveChatPresented: Bool = false
     /// Current bottom edge of the *visible* video surface in expanded-player coordinates. A
     /// raised playlist panel can cover part of the video; its scroll must never collapse the
     /// player even when the gesture begins within the video's original frame.
@@ -785,6 +787,7 @@ final class PlayerStateManager {
         miniPlayerVisible = false
         fullScreenPresented = false
         chapterListPresented = false
+        liveChatPresented = false
         expandedPlayerSurfaceHeight = 0
         playlistPanelPresented = false
         playerPanelAtTop = true

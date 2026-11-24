@@ -30,6 +30,7 @@ struct PlayerInformationPanel<Actions: View>: View {
     let onRetryDetails: () -> Void
     let onOpenChannel: () -> Void
     let onOpenRecommendationChannel: (String) -> Void
+    let onOpenLiveChat: () -> Void
     let onSeek: (TimeInterval) -> Void
     let actions: Actions
 
@@ -56,6 +57,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         onRetryDetails: @escaping () -> Void,
         onOpenChannel: @escaping () -> Void,
         onOpenRecommendationChannel: @escaping (String) -> Void,
+        onOpenLiveChat: @escaping () -> Void,
         onSeek: @escaping (TimeInterval) -> Void,
         @ViewBuilder actions: () -> Actions
     ) {
@@ -81,6 +83,7 @@ struct PlayerInformationPanel<Actions: View>: View {
         self.onRetryDetails = onRetryDetails
         self.onOpenChannel = onOpenChannel
         self.onOpenRecommendationChannel = onOpenRecommendationChannel
+        self.onOpenLiveChat = onOpenLiveChat
         self.onSeek = onSeek
         self.actions = actions()
     }
@@ -117,7 +120,8 @@ struct PlayerInformationPanel<Actions: View>: View {
             showsDescription: showsDescription,
             canOpenChannel: !video.channelID.isEmpty,
             onToggleDetails: onToggleDetails,
-            onOpenChannel: onOpenChannel
+            onOpenChannel: onOpenChannel,
+            onOpenLiveChat: video.isLive ? onOpenLiveChat : nil
         ) {
             actions
         }
@@ -161,10 +165,6 @@ struct PlayerInformationPanel<Actions: View>: View {
                     )
                 }
             case .comments:
-                if video.isLive {
-                    LiveChatSection(videoID: video.id)
-                        .id("live-chat-\(video.id)")
-                }
                 if showsComments {
                     CommentsSection(
                         videoID: video.id,

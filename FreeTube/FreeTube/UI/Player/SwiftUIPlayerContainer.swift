@@ -498,7 +498,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard player.fullScreenPresented,
                       verticalSizeClass != .compact,
                       player.playerPresentationGestureEnabled,
-                      !player.chapterListPresented else { return }
+                      !player.chapterListPresented,
+                      !player.liveChatPresented else { return }
                 let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
@@ -555,6 +556,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
 
     private func animateCollapse(in size: CGSize) {
         player.chapterListPresented = false
+        player.liveChatPresented = false
         guard !reduceMotion else {
             player.fullScreenPresented = false
             presentationTranslation = 0

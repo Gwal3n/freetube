@@ -60,6 +60,7 @@ struct FullScreenPlayer: View {
     @State private var isPlaylistPanelPresented = false
     @State private var playlistPanelExpansion: CGFloat = 0
     @State private var chapterPanelExpansion: CGFloat = 0
+    @State private var liveChatPanelExpansion: CGFloat = 0
     /// Portrait videos use an in-place fullscreen mode rather than rotating a tall source into a
     /// short landscape viewport. The same fullscreen control toggles this state back off.
     @State private var portraitVideoFullscreen = false
@@ -131,7 +132,8 @@ struct FullScreenPlayer: View {
                 isFloating: isFloating,
                 isLandscape: isLandscape,
                 usesPortraitFullscreen: usesPortraitFullscreen,
-                sidePanelPresented: player.chapterListPresented || isPlaylistPanelPresented,
+                sidePanelPresented: player.chapterListPresented || player.liveChatPresented
+                    || isPlaylistPanelPresented,
                 panelScrollOffset: panelScrollOffset,
                 collapseProgress: collapseProgress,
                 controlsVisible: controlsVisibility.isVisible
@@ -355,6 +357,7 @@ struct FullScreenPlayer: View {
                     scrubberSeekPreview = nil
                     swipeAdjustment.cancel()
                     player.chapterListPresented = false
+                    player.liveChatPresented = false
                     portraitVideoFullscreen = false
                     fullscreenSwipeTranslation = 0
                     fullscreenSwipeIsVertical = nil
@@ -437,6 +440,24 @@ struct FullScreenPlayer: View {
                 // leaves a stale strip at the trailing edge for one render pass. Remove it
                 // atomically and let the underlying column resize; portrait retains its sheet
                 // transition because its geometry does not change horizontally.
+                .transition(isLandscape ? .identity : .move(edge: .bottom))
+                .zIndex(5)
+            }
+
+            if !isFloating, player.liveChatPresented, player.currentVideo?.isLive == true,
+               let liveVideoID = player.currentVideo?.id, !usesPortraitFullscreen {
+                let chatTop = surfaceHeight * (1 - liveChatPanelExpansion)
+                PlayerLiveChatOverlay(
+                    videoID: liveVideoID,
+                    isLandscape: isLandscape,
+                    expansionProgress: $liveChatPanelExpansion,
+                    expansionTravel: surfaceHeight
+                )
+                .frame(
+                    width: isLandscape ? sidePanelWidth : proxy.size.width,
+                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - chatTop)
+                )
+                .offset(y: isLandscape ? 0 : chatTop)
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
                 .zIndex(5)
             }
@@ -618,6 +639,14 @@ struct FullScreenPlayer: View {
         .onChange(of: player.chapterListPresented) { _, isPresented in
             if !isPresented { chapterPanelExpansion = 0 }
         }
+        .onChange(of: player.liveChatPresented) { _, isPresented in
+            if !isPresented { liveChatPanelExpansion = 0 }
+        }
+        .onChange(of: player.currentVideo?.id) { _, _ in
+            if player.liveChatPresented, player.currentVideo?.isLive != true {
+                player.liveChatPresented = false
+            }
+        }
         .onDisappear {
             pendingCommentsCollapse = nil
             swipeAdjustment.cancel()
@@ -734,6 +763,7 @@ struct FullScreenPlayer: View {
                 guard !player.chapters.isEmpty else { return }
                 withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     isPlaylistPanelPresented = false
+                    player.liveChatPresented = false
                     player.chapterListPresented.toggle()
                 }
                 showPlayerControls()
@@ -780,6 +810,7 @@ struct FullScreenPlayer: View {
             withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                 portraitVideoFullscreen.toggle()
                 player.chapterListPresented = false
+                player.liveChatPresented = false
                 isPlaylistPanelPresented = false
             }
             if portraitVideoFullscreen {
@@ -948,6 +979,7 @@ struct FullScreenPlayer: View {
 
     private func enterFullscreen() {
         player.chapterListPresented = false
+        player.liveChatPresented = false
         isPlaylistPanelPresented = false
         if isPortraitVideo {
             portraitVideoFullscreen = true
@@ -1200,6 +1232,14 @@ struct FullScreenPlayer: View {
             onOpenRecommendationChannel: { channelID in
                 openChannel(channelID)
             },
+            onOpenLiveChat: {
+                guard video.isLive else { return }
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    isPlaylistPanelPresented = false
+                    player.chapterListPresented = false
+                    player.liveChatPresented.toggle()
+                }
+            },
             onSeek: { player.seek(to: $0) }
         ) {
             playerActions(video)
@@ -1316,6 +1356,7 @@ struct FullScreenPlayer: View {
     private func collapseForNavigation(_ navigate: @escaping () -> Void) {
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             player.chapterListPresented = false
+            player.liveChatPresented = false
             isPlaylistPanelPresented = false
         }
         player.requestPlayerCollapse(then: navigate)

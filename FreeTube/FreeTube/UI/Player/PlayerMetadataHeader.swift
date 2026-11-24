@@ -14,6 +14,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
     let canOpenChannel: Bool
     let onToggleDetails: () -> Void
     let onOpenChannel: () -> Void
+    var onOpenLiveChat: (() -> Void)? = nil
     let actions: Actions
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.appFontPreset) private var fontPreset
@@ -31,6 +32,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         canOpenChannel: Bool,
         onToggleDetails: @escaping () -> Void,
         onOpenChannel: @escaping () -> Void,
+        onOpenLiveChat: (() -> Void)? = nil,
         @ViewBuilder actions: () -> Actions
     ) {
         self.video = video
@@ -42,6 +44,7 @@ struct PlayerMetadataHeader<Actions: View>: View {
         self.canOpenChannel = canOpenChannel
         self.onToggleDetails = onToggleDetails
         self.onOpenChannel = onOpenChannel
+        self.onOpenLiveChat = onOpenLiveChat
         self.actions = actions()
     }
 
@@ -94,6 +97,15 @@ struct PlayerMetadataHeader<Actions: View>: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                            if let onOpenLiveChat {
+                                Button(action: onOpenLiveChat) {
+                                    Label("Live chat", systemImage: "text.bubble")
+                                        .labelStyle(.titleAndIcon)
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(ResponsiveButtonStyle())
+                                .accessibilityHint("Opens live chat")
+                            }
                         }
                         if !statsText.isEmpty {
                             Text(statsText)

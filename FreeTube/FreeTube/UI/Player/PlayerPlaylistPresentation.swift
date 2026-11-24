@@ -17,7 +17,8 @@ struct PlayerPlaylistPresentation: View {
 
     @ViewBuilder
     var body: some View {
-        if player.activePlaylist != nil, !usesPortraitFullscreen, !player.chapterListPresented {
+        if player.activePlaylist != nil, !usesPortraitFullscreen,
+           !player.chapterListPresented, !player.liveChatPresented {
             let dockHeight = 60 + PlayerLayoutMetrics.safeAreaInsets.bottom
             let browserTop = surfaceHeight * (1 - expansion)
             PlayerPlaylistPanel(
@@ -28,6 +29,7 @@ struct PlayerPlaylistPresentation: View {
                 onOpen: {
                     withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                         player.chapterListPresented = false
+                        player.liveChatPresented = false
                         expansion = 0
                         isPresented = true
                     }
