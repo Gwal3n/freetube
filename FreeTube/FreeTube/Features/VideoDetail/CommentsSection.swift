@@ -209,7 +209,7 @@ struct CommentsSection: View {
                     }
                 }
             } else {
-                Text("Sort options load with comments")
+                Text("Not available")
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")

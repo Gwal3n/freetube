@@ -20,6 +20,7 @@ struct PlayerLiveChatOverlay: View {
             onDismiss: {
                 withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     player.liveChatPresented = false
+                    expansionProgress = 0
                 }
             }
         )

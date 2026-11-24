@@ -1253,7 +1253,13 @@ struct FullScreenPlayer: View {
                 withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
                     isPlaylistPanelPresented = false
                     player.chapterListPresented = false
-                    player.liveChatPresented.toggle()
+                    if player.liveChatPresented {
+                        player.liveChatPresented = false
+                        liveChatPanelExpansion = 0
+                    } else {
+                        liveChatPanelExpansion = 0
+                        player.liveChatPresented = true
+                    }
                 }
             },
             onSeek: { player.seek(to: $0) }

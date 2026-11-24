@@ -108,8 +108,12 @@ struct LiveDVRTimeline: View {
     }
 
     /// White LIVE text for contrast on the video; the dot alone turns red at the live edge.
+    /// Avoid `.disabled` here — SwiftUI fades disabled controls, which washes out LIVE at the edge.
     private func liveLabel(atLiveEdge: Bool) -> some View {
-        Button(action: onGoLive) {
+        Button {
+            guard !atLiveEdge else { return }
+            onGoLive()
+        } label: {
             HStack(spacing: 5) {
                 Circle()
                     .fill(atLiveEdge ? Color.red : Color.white.opacity(0.85))
@@ -121,7 +125,7 @@ struct LiveDVRTimeline: View {
         }
         .buttonStyle(.plain)
         .contentShape(.interaction, Rectangle().inset(by: -10))
-        .disabled(atLiveEdge)
+        .allowsHitTesting(!atLiveEdge)
         .accessibilityLabel(atLiveEdge ? "At live edge" : "Return to live")
     }
 

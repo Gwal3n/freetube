@@ -86,6 +86,8 @@ struct LiveChatPanel: View {
                 .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
         }
         .shadow(color: .black.opacity(0.28), radius: 14)
+        // Move the complete sheet after background/clipping so the material travels with the drag
+        // instead of leaving a parked rectangle over the feed (same as chapters).
         .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
         .errorToast(Bindable(model).errorState)
         .task(id: videoID) {
@@ -120,70 +122,81 @@ struct LiveChatPanel: View {
     @ViewBuilder
     private var chatScrollView: some View {
         if #available(iOS 18.0, *) {
-            chatList
+            chatRows
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
                     geometry.contentOffset.y + geometry.contentInsets.top
                 } action: { _, rawOffset in
                     listScrollOffset = max(0, rawOffset)
                     let overscroll = max(0, -rawOffset)
                     listOverscroll = overscroll
+                    // After a cancelled pull, retain compensation until the ScrollView finishes
+                    // its own snap-back; dropping it at touch-up would create a one-frame gap.
                     if isDraggingListSheet, listDismissOrigin == 0, overscroll <= 0.5 {
                         isDraggingListSheet = false
                     }
                 }
                 .simultaneousGesture(listHandoffDismissGesture)
         } else {
-            chatList
+            chatRows
         }
     }
 
-    @ViewBuilder
-    private var chatList: some View {
-        if model.chatUnavailable {
-            ContentUnavailableView(
-                "Live chat unavailable",
-                systemImage: "bubble.left.and.bubble.right",
-                description: Text("Chat isn’t available for this stream.")
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if model.isLoading && model.messages.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if model.messages.isEmpty {
-            ContentUnavailableView(
-                model.chatEnded ? "Live chat has ended" : "Waiting for messages",
-                systemImage: "text.bubble",
-                description: Text(model.chatEnded
-                    ? "This stream’s chat is no longer updating."
-                    : "New messages will appear here.")
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
+    private var chatRows: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 4) {
+                    if model.chatUnavailable {
+                        ContentUnavailableView(
+                            "Live chat unavailable",
+                            systemImage: "bubble.left.and.bubble.right",
+                            description: Text("Chat isn’t available for this stream.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 48)
+                    } else if model.isLoading && model.messages.isEmpty {
+                        ProgressView()
+                            .controlSize(.regular)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 36)
+                            .padding(.bottom, 24)
+                            .accessibilityLabel("Loading live chat")
+                    } else if model.messages.isEmpty {
+                        ContentUnavailableView(
+                            model.chatEnded ? "Live chat has ended" : "Waiting for messages",
+                            systemImage: "text.bubble",
+                            description: Text(model.chatEnded
+                                ? "This stream’s chat is no longer updating."
+                                : "New messages will appear here.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 48)
+                    } else {
                         ForEach(model.messages) { message in
                             LiveChatRow(message: message)
                                 .id(message.id)
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-                    .offset(y: isDraggingListSheet ? -listOverscroll : 0)
                 }
-                .scrollIndicators(.visible)
-                .scrollBounceBehavior(.always, axes: .vertical)
-                .onChange(of: model.messages.last?.id) { _, id in
-                    guard let id else { return }
-                    // Stay pinned to the latest message while near the bottom.
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
-                        proxy.scrollTo(id, anchor: .bottom)
-                    }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+                // Once the gesture hands off, the complete panel already follows the finger. Cancel
+                // the ScrollView's simultaneous visual rubber-band so the rows retain a constant
+                // distance from the header instead of appearing to travel twice as fast.
+                .offset(y: isDraggingListSheet ? -listOverscroll : 0)
+            }
+            .scrollIndicators(.visible)
+            .scrollBounceBehavior(.always, axes: .vertical)
+            .onChange(of: model.messages.last?.id) { _, id in
+                guard let id, !isDraggingListSheet else { return }
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+                    proxy.scrollTo(id, anchor: .bottom)
                 }
             }
         }
     }
 
+    /// The list owns the gesture while it has content above it. As soon as it reaches the top,
+    /// continued downward travel is measured from that exact handoff point and moves the sheet.
     private var listHandoffDismissGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
@@ -234,7 +247,10 @@ struct LiveChatPanel: View {
             }
     }
 
+    /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
     private var headerDragGesture: some Gesture {
+        // Measure against the screen rather than the moving panel. A local-space gesture changes
+        // its own coordinate system as `.offset` moves the sheet, producing visible oscillation.
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
                 guard !isLandscape else { return }
@@ -250,6 +266,9 @@ struct LiveChatPanel: View {
                 headerDragStartExpansion = nil
                 let finalPosition = max(0, value.translation.height)
                 let projectedPosition = max(0, value.predictedEndTranslation.height)
+                // Both positions must remain beyond the threshold. An upward reversal projects
+                // back above it and therefore cancels, even if the sheet was previously pulled
+                // much farther down.
                 if start == 0, finalPosition >= Self.dismissalThreshold,
                    projectedPosition >= Self.dismissalThreshold {
                     onDismiss()

@@ -120,8 +120,7 @@ struct PlayerInformationPanel<Actions: View>: View {
             showsDescription: showsDescription,
             canOpenChannel: !video.channelID.isEmpty,
             onToggleDetails: onToggleDetails,
-            onOpenChannel: onOpenChannel,
-            onOpenLiveChat: video.isLive ? onOpenLiveChat : nil
+            onOpenChannel: onOpenChannel
         ) {
             actions
         }
@@ -165,7 +164,9 @@ struct PlayerInformationPanel<Actions: View>: View {
                     )
                 }
             case .comments:
-                if showsComments {
+                if video.isLive {
+                    LiveChatSection(onOpen: onOpenLiveChat)
+                } else if showsComments {
                     CommentsSection(
                         videoID: video.id,
                         countText: commentsCountText,
