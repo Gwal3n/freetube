@@ -125,6 +125,8 @@ final class PlayerStateManager {
     var chapterListPresented: Bool = false
     /// Live chat sheet/sidebar; same presentation ownership as chapters.
     var liveChatPresented: Bool = false
+    /// Survives sheet dismiss for the current video so reopening does not bootstrap again.
+    @ObservationIgnored private var liveChatSession: LiveChatViewModel?
     /// Current bottom edge of the *visible* video surface in expanded-player coordinates. A
     /// raised playlist panel can cover part of the video; its scroll must never collapse the
     /// player even when the gesture begins within the video's original frame.
@@ -150,6 +152,22 @@ final class PlayerStateManager {
                   index != queue.currentIndex {
             queue.remove(at: index)
         }
+    }
+
+    /// Returns the in-memory chat session for `videoID`, creating it on first use.
+    func liveChatSession(for videoID: String) -> LiveChatViewModel {
+        if let liveChatSession, liveChatSession.videoID == videoID {
+            return liveChatSession
+        }
+        let session = LiveChatViewModel(videoID: videoID)
+        liveChatSession = session
+        return session
+    }
+
+    func clearLiveChatSession() {
+        liveChatSession?.stopPolling()
+        liveChatSession = nil
+        liveChatPresented = false
     }
 
     // MARK: - AVPlayer
@@ -273,6 +291,7 @@ final class PlayerStateManager {
         liveSeekableRange = nil
         clearSponsorBlockState()
         clearChapterState()
+        clearLiveChatSession()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
@@ -310,6 +329,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         holdsSponsorBlockAskForResume = false
         clearChapterState()
+        clearLiveChatSession()
         storyboard = nil
         captionTracks = []
         commentsCountText = nil
@@ -408,6 +428,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         holdsSponsorBlockAskForResume = true
         clearChapterState()
+        clearLiveChatSession()
         // Prefetch caches the first comments page for the session; drop it on each open so
         // expanding Comments is not stuck on an earlier snapshot of the thread.
         VideoContentPrefetchStore.shared.invalidateComments(for: video.id)
@@ -777,6 +798,7 @@ final class PlayerStateManager {
         contentPrefetchTask = nil
         clearSponsorBlockState()
         clearChapterState()
+        clearLiveChatSession()
         storyboard = nil
         captionTracks = []
         recommendations.resetPager()
@@ -787,7 +809,6 @@ final class PlayerStateManager {
         miniPlayerVisible = false
         fullScreenPresented = false
         chapterListPresented = false
-        liveChatPresented = false
         expandedPlayerSurfaceHeight = 0
         playlistPanelPresented = false
         playerPanelAtTop = true

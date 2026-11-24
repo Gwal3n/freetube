@@ -1,11 +1,13 @@
 import Foundation
 import Observation
 
-/// Read-only live chat for one video. Polls only while `startPolling` is active; tokens stay in memory.
+/// Read-only live chat for one video. Messages and continuation survive sheet dismiss; polling
+/// pauses while closed and resumes without a full bootstrap when reopened.
 @available(iOS 17.0, *)
 @MainActor
 @Observable
 final class LiveChatViewModel {
+    let videoID: String
     private(set) var messages: [LiveChatMessage] = []
     private(set) var isLoading = false
     private(set) var isPolling = false
@@ -13,11 +15,13 @@ final class LiveChatViewModel {
     private(set) var chatEnded = false
     var errorState: ErrorState?
 
-    private let videoID: String
     private let service: any LiveChatServicing
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "LiveChat")
     private var pollTask: Task<Void, Never>?
     private var knownIDs = Set<String>()
+    private var continuation: String?
+    private var apiKey: String?
+    private var clientVersion: String?
     private static let messageLimit = 400
 
     init(videoID: String, service: (any LiveChatServicing)? = nil) {
@@ -26,7 +30,7 @@ final class LiveChatViewModel {
     }
 
     func startPolling() {
-        guard pollTask == nil, !chatUnavailable else { return }
+        guard pollTask == nil, !chatUnavailable, !chatEnded else { return }
         pollTask = Task { [weak self] in
             await self?.runPollingLoop()
         }
@@ -46,15 +50,22 @@ final class LiveChatViewModel {
             isPolling = false
         }
         do {
-            let bootstrap = try await service.bootstrap(videoID: videoID)
-            guard !Task.isCancelled else { return }
-            var continuation = bootstrap.continuation
-            // First page often includes recent history; show it, then keep polling.
+            if continuation == nil || apiKey == nil || clientVersion == nil {
+                let bootstrap = try await service.bootstrap(videoID: videoID)
+                guard !Task.isCancelled else { return }
+                continuation = bootstrap.continuation
+                apiKey = bootstrap.apiKey
+                clientVersion = bootstrap.clientVersion
+            }
+            guard var activeContinuation = continuation,
+                  let apiKey,
+                  let clientVersion else { return }
+
             while !Task.isCancelled {
                 let page = try await service.poll(
-                    continuation: continuation,
-                    apiKey: bootstrap.apiKey,
-                    clientVersion: bootstrap.clientVersion
+                    continuation: activeContinuation,
+                    apiKey: apiKey,
+                    clientVersion: clientVersion
                 )
                 guard !Task.isCancelled else { return }
                 isLoading = false
@@ -64,7 +75,8 @@ final class LiveChatViewModel {
                     log.info("Live chat ended for \(self.videoID, privacy: .public)")
                     return
                 }
-                continuation = page.continuation ?? continuation
+                activeContinuation = page.continuation ?? activeContinuation
+                continuation = activeContinuation
                 try? await Task.sleep(for: page.timeout)
             }
         } catch is CancellationError {

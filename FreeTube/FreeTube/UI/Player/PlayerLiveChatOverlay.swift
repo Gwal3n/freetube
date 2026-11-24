@@ -13,7 +13,7 @@ struct PlayerLiveChatOverlay: View {
 
     var body: some View {
         LiveChatPanel(
-            videoID: videoID,
+            model: player.liveChatSession(for: videoID),
             isLandscape: isLandscape,
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
