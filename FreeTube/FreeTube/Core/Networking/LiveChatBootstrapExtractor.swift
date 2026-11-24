@@ -3,7 +3,7 @@ import Foundation
 /// Pulls the public Innertube key, WEB client version, and first live-chat continuation from a
 /// `live_chat` HTML page. Tokens are request metadata, never persisted.
 nonisolated enum LiveChatBootstrapExtractor {
-    struct Bootstrap: Sendable {
+    nonisolated struct Bootstrap: Sendable {
         let apiKey: String
         let clientVersion: String
         let continuation: String

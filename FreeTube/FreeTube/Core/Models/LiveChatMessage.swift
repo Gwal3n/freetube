@@ -1,7 +1,7 @@
 import Foundation
 
 /// One read-only live chat row. Continuations and payloads stay in memory only.
-struct LiveChatMessage: Identifiable, Hashable, Sendable {
+nonisolated struct LiveChatMessage: Identifiable, Hashable, Sendable {
     enum Kind: String, Sendable {
         case text
         case superChat
@@ -20,7 +20,7 @@ struct LiveChatMessage: Identifiable, Hashable, Sendable {
 }
 
 /// One anonymous poll page. `timeout` is YouTube's suggested wait before the next poll.
-struct LiveChatPage: Sendable {
+nonisolated struct LiveChatPage: Sendable {
     let messages: [LiveChatMessage]
     let continuation: String?
     let timeout: Duration

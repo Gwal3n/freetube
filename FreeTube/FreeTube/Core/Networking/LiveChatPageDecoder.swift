@@ -6,11 +6,11 @@ nonisolated enum LiveChatPageDecoder {
         let continuationRoot = value(root, "continuationContents", "liveChatContinuation")
             ?? value(root, "contents", "liveChatRenderer")
         let actions = array(continuationRoot, "actions")
-        var messages: [LiveChatMessage] = []
+        var decoded: [LiveChatMessage] = []
         var seen = Set<String>()
         for action in actions {
-            for message in messages(in: action) where seen.insert(message.id).inserted {
-                messages.append(message)
+            for message in messages(fromAction: action) where seen.insert(message.id).inserted {
+                decoded.append(message)
             }
         }
         let continuations = array(continuationRoot, "continuations")
@@ -20,16 +20,16 @@ nonisolated enum LiveChatPageDecoder {
                 || value($0, "liveChatReplayContinuationData") != nil
         } && next.token == nil
         return LiveChatPage(
-            messages: messages,
+            messages: decoded,
             continuation: next.token,
             timeout: next.timeout,
-            chatEnded: chatEnded && messages.isEmpty
+            chatEnded: chatEnded && decoded.isEmpty
         )
     }
 
     // MARK: - Actions
 
-    private static func messages(in action: Any) -> [LiveChatMessage] {
+    private static func messages(fromAction action: Any) -> [LiveChatMessage] {
         if let item = value(action, "addChatItemAction", "item") {
             if let message = message(from: item) { return [message] }
         }
@@ -38,7 +38,7 @@ nonisolated enum LiveChatPageDecoder {
         }
         // Replay / batch wrappers.
         let replay = array(action, "replayChatItemAction", "actions")
-        return replay.flatMap(messages(in:))
+        return replay.flatMap(messages(fromAction:))
     }
 
     private static func message(from item: Any) -> LiveChatMessage? {
@@ -57,7 +57,7 @@ nonisolated enum LiveChatPageDecoder {
             return LiveChatMessage(
                 id: id,
                 authorName: author,
-                text: String(localized: "Sticker"),
+                text: "Sticker",
                 kind: .sticker,
                 amountText: amount,
                 publishedAt: timestamp(from: renderer)
@@ -67,7 +67,7 @@ nonisolated enum LiveChatPageDecoder {
             let author = simpleText(value(renderer, "authorName")) ?? "Member"
             let header = runsText(value(renderer, "headerSubtext"))
                 ?? runsText(value(renderer, "headerPrimaryText"))
-                ?? String(localized: "New member")
+                ?? "New member"
             let id = (renderer as? [String: Any])?["id"] as? String ?? "member-\(author)-\(header)"
             return LiveChatMessage(
                 id: id,
