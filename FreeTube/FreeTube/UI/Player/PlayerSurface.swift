@@ -21,6 +21,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
     var onSeekPreview: (TimeInterval?) -> Void
     var onSeekFeedback: (String?) -> Void
     var liveSeekableRange: () -> ClosedRange<TimeInterval>?
+    var isLivePlayback: Bool = false
+    var onLiveHoldNotice: (Bool) -> Void = { _ in }
     var onTogglePlayback: () -> Void
     var onToggleControls: () -> Void
     var onCenterTapPlayPause: () -> Void
@@ -49,6 +51,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
             onSeekPreview: onSeekPreview,
             onSeekFeedback: onSeekFeedback,
             liveSeekableRange: liveSeekableRange,
+            isLivePlayback: isLivePlayback,
+            onLiveHoldNotice: onLiveHoldNotice,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls,
             onCenterTapPlayPause: onCenterTapPlayPause,
@@ -105,6 +109,8 @@ struct PlayerSurface: UIViewControllerRepresentable {
             onSeekPreview: onSeekPreview,
             onSeekFeedback: onSeekFeedback,
             liveSeekableRange: liveSeekableRange,
+            isLivePlayback: isLivePlayback,
+            onLiveHoldNotice: onLiveHoldNotice,
             onTogglePlayback: onTogglePlayback,
             onToggleControls: onToggleControls,
             onCenterTapPlayPause: onCenterTapPlayPause,

@@ -44,8 +44,12 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private var horizontalSeekIsLive = false
     private var horizontalSeekPeakVelocity: CGFloat = 0
     private var isHoldingForSpeed = false
+    /// Long-press notice only; rate is never changed while the current item is live.
+    private var isShowingLiveHoldNotice = false
+    private var isLivePlayback = false
     private var holdForSpeedEnabled: Bool
     private var holdSpeedRate: Float
+    private var onLiveHoldNotice: (Bool) -> Void = { _ in }
     private var horizontalSeekEnabled: Bool
     private var doubleTapSeekSeconds: Int
     private var centerTapPlayPauseEnabled: Bool
@@ -69,6 +73,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekPreview: @escaping (TimeInterval?) -> Void,
         onSeekFeedback: @escaping (String?) -> Void,
         liveSeekableRange: @escaping () -> ClosedRange<TimeInterval>?,
+        isLivePlayback: Bool = false,
+        onLiveHoldNotice: @escaping (Bool) -> Void = { _ in },
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void,
         onCenterTapPlayPause: @escaping () -> Void,
@@ -89,6 +95,8 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         self.onSeekPreview = onSeekPreview
         self.onSeekFeedback = onSeekFeedback
         self.liveSeekableRange = liveSeekableRange
+        self.isLivePlayback = isLivePlayback
+        self.onLiveHoldNotice = onLiveHoldNotice
         self.onTogglePlayback = onTogglePlayback
         self.onToggleControls = onToggleControls
         self.onCenterTapPlayPause = onCenterTapPlayPause
@@ -125,15 +133,29 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         onSeekPreview: @escaping (TimeInterval?) -> Void,
         onSeekFeedback: @escaping (String?) -> Void,
         liveSeekableRange: @escaping () -> ClosedRange<TimeInterval>?,
+        isLivePlayback: Bool,
+        onLiveHoldNotice: @escaping (Bool) -> Void,
         onTogglePlayback: @escaping () -> Void,
         onToggleControls: @escaping () -> Void,
         onCenterTapPlayPause: @escaping () -> Void,
         onRestoreFromPictureInPicture: @escaping () -> Void
     ) {
         self.player = player
-        if self.holdForSpeedEnabled != holdForSpeedEnabled {
-            if !holdForSpeedEnabled, isHoldingForSpeed {
+        self.onLiveHoldNotice = onLiveHoldNotice
+        if self.isLivePlayback != isLivePlayback {
+            if isShowingLiveHoldNotice, !isLivePlayback {
+                clearLiveHoldNotice()
+                hideFeedback()
+            } else if isHoldingForSpeed, isLivePlayback {
                 restorePlaybackRateIfNeeded()
+                hideFeedback()
+            }
+            self.isLivePlayback = isLivePlayback
+        }
+        if self.holdForSpeedEnabled != holdForSpeedEnabled {
+            if !holdForSpeedEnabled, isHoldingForSpeed || isShowingLiveHoldNotice {
+                restorePlaybackRateIfNeeded()
+                clearLiveHoldNotice()
                 hideFeedback()
             }
             self.holdForSpeedEnabled = holdForSpeedEnabled
@@ -370,17 +392,37 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             guard holdForSpeedEnabled,
                   let player,
                   player.currentItem?.status == .readyToPlay else { return }
+            if isLivePlayback {
+                // Live HLS does not honour temporary rate changes; keep the hold gesture so a
+                // quiet notice can explain why nothing sped up.
+                isShowingLiveHoldNotice = true
+                onLiveHoldNotice(true)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                log.info("Hold recognized on live item; speed change skipped")
+                return
+            }
             isHoldingForSpeed = true
             effectivePlaybackRate = onHoldSpeedChange(Double(holdSpeedRate))
             log.info("Hold recognized; requested=\(self.holdSpeedRate, privacy: .public)x effective=\(self.effectivePlaybackRate, privacy: .public)x")
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case .ended, .cancelled, .failed:
+            if isShowingLiveHoldNotice {
+                clearLiveHoldNotice()
+                hideFeedback()
+                return
+            }
             restorePlaybackRateIfNeeded()
             log.info("Hold ended; restored playback rate")
             hideFeedback()
         default:
             break
         }
+    }
+
+    private func clearLiveHoldNotice() {
+        guard isShowingLiveHoldNotice else { return }
+        isShowingLiveHoldNotice = false
+        onLiveHoldNotice(false)
     }
 
     @objc private func didPanHorizontally(_ gesture: UIPanGestureRecognizer) {
@@ -487,6 +529,7 @@ final class PlayerGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func restorePlaybackRateIfNeeded() {
+        clearLiveHoldNotice()
         guard isHoldingForSpeed else { return }
         isHoldingForSpeed = false
         effectivePlaybackRate = onHoldSpeedChange(nil)

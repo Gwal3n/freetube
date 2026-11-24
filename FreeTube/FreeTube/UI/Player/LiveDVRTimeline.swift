@@ -32,25 +32,18 @@ struct LiveDVRTimeline: View {
                 ? range.upperBound : position
 
             VStack(spacing: 4) {
-                HStack {
-                    Text(verbatim: formatOffset(displayedOffset))
-                        .monospacedDigit()
-                    Spacer()
-                    Button(action: onGoLive) {
-                        HStack(spacing: 5) {
-                            Circle().frame(width: 5, height: 5)
-                            Text("LIVE")
-                        }
-                        .foregroundStyle(atLiveEdge ? Color.red : Color.white)
-                        .contentShape(Rectangle())
+                HStack(spacing: 8) {
+                    // LIVE stays leading beside the delay clock. At the live edge the clock
+                    // hides so only the label remains.
+                    liveLabel(atLiveEdge: atLiveEdge)
+                    if !atLiveEdge || dragTarget != nil || previewElapsed != nil {
+                        Text(verbatim: formatOffset(displayedOffset))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
                     }
-                    .buttonStyle(.plain)
-                    .contentShape(.interaction, Rectangle().inset(by: -10))
-                    .disabled(atLiveEdge)
-                    .accessibilityLabel(atLiveEdge ? "At live edge" : "Return to live")
+                    Spacer(minLength: 0)
                 }
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.white)
 
                 GeometryReader { proxy in
                     let width = max(proxy.size.width, 1)
@@ -94,24 +87,52 @@ struct LiveDVRTimeline: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Live playback position")
-            .accessibilityValue("\(formatOffset(displayedOffset)) behind live")
+            .accessibilityValue(
+                atLiveEdge
+                    ? "At live edge"
+                    : "\(formatOffset(displayedOffset)) behind live"
+            )
             .accessibilityAdjustableAction { direction in
                 let delta: TimeInterval = direction == .increment ? 10 : -10
                 onSeek(min(max(elapsed + delta, range.lowerBound), range.upperBound))
             }
         } else {
-            HStack {
-                Text("LIVE")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.red, in: RoundedRectangle(cornerRadius: 3))
+            HStack(spacing: 6) {
+                liveBadge
                 Spacer()
             }
             .padding(.vertical, 6)
             .frame(height: 43, alignment: .top)
             .accessibilityLabel("Live broadcast")
+        }
+    }
+
+    /// White LIVE text for contrast on the video; the dot alone turns red at the live edge.
+    private func liveLabel(atLiveEdge: Bool) -> some View {
+        Button(action: onGoLive) {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(atLiveEdge ? Color.red : Color.white.opacity(0.85))
+                    .frame(width: 5, height: 5)
+                Text("LIVE")
+                    .foregroundStyle(.white)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(.interaction, Rectangle().inset(by: -10))
+        .disabled(atLiveEdge)
+        .accessibilityLabel(atLiveEdge ? "At live edge" : "Return to live")
+    }
+
+    private var liveBadge: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color.red)
+                .frame(width: 5, height: 5)
+            Text("LIVE")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white)
         }
     }
 

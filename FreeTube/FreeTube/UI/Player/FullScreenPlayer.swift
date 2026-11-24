@@ -48,6 +48,8 @@ struct FullScreenPlayer: View {
     @State private var scrubberSeekPreview: TimeInterval?
     @State private var isFrameStepping = false
     @State private var isHoldingForSpeed = false
+    /// Quiet notice while hold-for-speed is pressed on a live item (rate is never changed).
+    @State private var isShowingLiveHoldNotice = false
     @State private var holdSpeedIndicatorExpired = false
     @State private var panelScrollOffset: CGFloat = 0
     @State private var panelViewportHeight: CGFloat = 0
@@ -184,6 +186,11 @@ struct FullScreenPlayer: View {
                             gestureSeekFeedback = text
                         },
                         liveSeekableRange: { player.liveSeekableRange },
+                        isLivePlayback: player.currentVideo?.isLive == true,
+                        onLiveHoldNotice: { showing in
+                            isShowingLiveHoldNotice = showing
+                            player.playerHoldGestureActive = showing
+                        },
                         onTogglePlayback: {
                             player.togglePlayPause()
                         },
@@ -351,6 +358,7 @@ struct FullScreenPlayer: View {
                 .onChange(of: player.currentVideo?.id) { _, _ in
                     isFrameStepping = false
                     isHoldingForSpeed = false
+                    isShowingLiveHoldNotice = false
                     player.playerHoldGestureActive = false
                     gestureSeekPreview = nil
                     gestureSeekFeedback = nil
@@ -594,6 +602,10 @@ struct FullScreenPlayer: View {
                     isHoldingForSpeed = false
                     player.playerHoldGestureActive = false
                 }
+                if isShowingLiveHoldNotice {
+                    isShowingLiveHoldNotice = false
+                    player.playerHoldGestureActive = false
+                }
                 isFrameStepping = false
                 isTranscriptPresented = false
                 swipeAdjustment.cancel()
@@ -651,6 +663,7 @@ struct FullScreenPlayer: View {
             pendingCommentsCollapse = nil
             swipeAdjustment.cancel()
             gestureSeekFeedback = nil
+            isShowingLiveHoldNotice = false
             player.playerPresentationGestureEnabled = true
             player.playerHoldGestureActive = false
             player.playlistPanelPresented = false
@@ -793,8 +806,11 @@ struct FullScreenPlayer: View {
     }
 
     /// Hold-speed feedback follows its chosen style and optional auto-hide; seek feedback always
-    /// uses the pill.
+    /// uses the pill. Live holds never change rate — a short notice explains why.
     private var gestureBadge: (text: String, isPlain: Bool)? {
+        if isShowingLiveHoldNotice {
+            return (String(localized: "Unavailable live"), false)
+        }
         if isHoldingForSpeed {
             let style = HoldSpeedIndicatorStyle(rawValue: holdSpeedIndicatorStyleRaw) ?? .pill
             guard style != .none, !holdSpeedIndicatorExpired else { return nil }
