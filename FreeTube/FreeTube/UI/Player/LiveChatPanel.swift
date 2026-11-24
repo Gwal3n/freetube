@@ -188,7 +188,10 @@ struct LiveChatPanel: View {
                     } else {
                         ForEach(model.messages) { message in
                             LiveChatRow(message: message) { channelID in
-                                openChannel(channelID)
+                                player.presentChannelPreview(
+                                    id: channelID,
+                                    name: message.authorName
+                                )
                             }
                             .id(message.id)
                         }
@@ -235,13 +238,6 @@ struct LiveChatPanel: View {
             try? await Task.sleep(for: .milliseconds(animated ? 240 : 16))
             isProgrammaticScroll = false
             isPinnedToBottom = true
-        }
-    }
-
-    private func openChannel(_ channelID: String) {
-        guard !channelID.isEmpty else { return }
-        player.requestPlayerCollapse {
-            NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
         }
     }
 

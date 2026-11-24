@@ -320,9 +320,11 @@ struct CommentsSection: View {
               let channelID = comment.authorChannelID,
               !channelID.isEmpty else { return nil }
         return {
-            player.requestPlayerCollapse {
-                NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
-            }
+            player.presentChannelPreview(
+                id: channelID,
+                name: comment.authorName,
+                thumbnailURL: comment.authorThumbnailURL
+            )
         }
     }
 

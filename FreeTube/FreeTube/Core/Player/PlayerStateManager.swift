@@ -125,6 +125,8 @@ final class PlayerStateManager {
     var chapterListPresented: Bool = false
     /// Live chat sheet/sidebar; same presentation ownership as chapters.
     var liveChatPresented: Bool = false
+    /// Comment / live-chat author preview sheet seed. Presented by `FullScreenPlayer`.
+    var channelPreviewRequest: ChannelPreviewRequest?
     /// Survives sheet dismiss for the current video so reopening does not bootstrap again.
     @ObservationIgnored private var liveChatSession: LiveChatViewModel?
     /// Current bottom edge of the *visible* video surface in expanded-player coordinates. A
@@ -168,6 +170,16 @@ final class PlayerStateManager {
         liveChatSession?.stopPolling()
         liveChatSession = nil
         liveChatPresented = false
+    }
+
+    func presentChannelPreview(id: String, name: String, thumbnailURL: URL? = nil) {
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else { return }
+        channelPreviewRequest = ChannelPreviewRequest(
+            id: trimmedID,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            thumbnailURL: thumbnailURL
+        )
     }
 
     // MARK: - AVPlayer
@@ -799,6 +811,7 @@ final class PlayerStateManager {
         clearSponsorBlockState()
         clearChapterState()
         clearLiveChatSession()
+        channelPreviewRequest = nil
         storyboard = nil
         captionTracks = []
         recommendations.resetPager()
