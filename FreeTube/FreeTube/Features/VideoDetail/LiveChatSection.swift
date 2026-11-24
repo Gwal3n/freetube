@@ -6,6 +6,7 @@ struct LiveChatSection: View {
     let onOpen: () -> Void
 
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isPresented: Bool { player.liveChatPresented }
 
@@ -17,10 +18,13 @@ struct LiveChatSection: View {
                     isExpanded: isPresented,
                     showsDisclosureIndicator: false
                 )
-                DisclosureChevron(isExpanded: isPresented)
+                Image(systemName: isPresented ? "chevron.down" : "chevron.up")
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: MediaStyle.actionSize, height: MediaStyle.actionSize)
                     .contentShape(Circle())
+                    .animation(reduceMotion ? nil : InterfaceMotion.quick, value: isPresented)
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
         }

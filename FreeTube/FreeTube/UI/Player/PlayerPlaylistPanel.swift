@@ -31,6 +31,7 @@ struct PlayerPlaylistPanel: View {
     @State private var listDragStartExpansion: CGFloat = 0
     @State private var listDragStartDismiss: CGFloat = 0
     @State private var isDraggingListSheet = false
+    @State private var isDismissing = false
     @State private var suppressPlaylistSelection = false
     @State private var selectionSuppressionGeneration = 0
     @State private var isSavedLocally = false
@@ -279,7 +280,9 @@ struct PlayerPlaylistPanel: View {
                                     .accessibilityLabel("Share playlist")
                                 }
                             }
-                            Button(action: onDismiss) {
+                            Button {
+                                dismissAnimated()
+                            } label: {
                                 Image(systemName: "xmark")
                                     .font(.subheadline.weight(.bold))
                                     .frame(width: 32, height: 32)
@@ -603,8 +606,7 @@ struct PlayerPlaylistPanel: View {
         )
         switch settlement {
         case .dismiss:
-            dismissTranslation = 0
-            onDismiss()
+            dismissFromDrag()
         case .expanded:
             withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                 expansionProgress = 1
@@ -614,6 +616,32 @@ struct PlayerPlaylistPanel: View {
             withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                 expansionProgress = 0
                 dismissTranslation = 0
+            }
+        }
+    }
+
+    private func dismissAnimated() {
+        guard !isDismissing else { return }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+            onDismiss()
+        }
+    }
+
+    /// Continue from the finger position instead of snapping back before the leave transition.
+    private func dismissFromDrag() {
+        guard !isDismissing else { return }
+        isDismissing = true
+        let offscreen = max(dismissTranslation, expansionTravel)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
+            expansionProgress = 0
+            dismissTranslation = offscreen
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 270))
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                onDismiss()
             }
         }
     }

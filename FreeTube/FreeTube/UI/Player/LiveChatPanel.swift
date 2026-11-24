@@ -7,8 +7,10 @@ import SwiftUI
 struct LiveChatPanel: View {
     private static let dismissalThreshold: CGFloat = 42
     /// Keep following new messages while the user is roughly at the latest row.
-    private static let pinToBottomSlack: CGFloat = 96
+    private static let pinToBottomSlack: CGFloat = 80
+    private static let bottomAnchorID = "liveChatBottomAnchor"
 
+    @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: LiveChatViewModel
     let isLandscape: Bool
@@ -25,7 +27,10 @@ struct LiveChatPanel: View {
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
     @State private var headerDragStartDismiss: CGFloat = 0
-    @State private var isNearBottom = true
+    /// Sticky follow flag: only clears when the user deliberately scrolls away from live.
+    @State private var isPinnedToBottom = true
+    @State private var isProgrammaticScroll = false
+    @State private var isDismissing = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var bottomContentInset: CGFloat {
@@ -53,7 +58,9 @@ struct LiveChatPanel: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button(action: onDismiss) {
+                    Button {
+                        dismissAnimated()
+                    } label: {
                         Image(systemName: "xmark")
                             .font(.subheadline.weight(.bold))
                             .frame(width: 30, height: 30)
@@ -132,7 +139,11 @@ struct LiveChatPanel: View {
                 } action: { _, sample in
                     listScrollOffset = sample.topOffset
                     listOverscroll = sample.overscroll
-                    isNearBottom = sample.isNearBottom
+                    if sample.isNearBottom {
+                        isPinnedToBottom = true
+                    } else if !isProgrammaticScroll {
+                        isPinnedToBottom = false
+                    }
                     // After a cancelled pull, retain compensation until the ScrollView finishes
                     // its own snap-back; dropping it at touch-up would create a one-frame gap.
                     if isDraggingListSheet, listDismissOrigin == 0, sample.overscroll <= 0.5 {
@@ -176,10 +187,16 @@ struct LiveChatPanel: View {
                         .padding(.vertical, 48)
                     } else {
                         ForEach(model.messages) { message in
-                            LiveChatRow(message: message)
-                                .id(message.id)
+                            LiveChatRow(message: message) { channelID in
+                                openChannel(channelID)
+                            }
+                            .id(message.id)
                         }
                     }
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorID)
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
@@ -192,15 +209,64 @@ struct LiveChatPanel: View {
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.always, axes: .vertical)
             .onAppear {
-                guard let id = model.messages.last?.id else { return }
-                proxy.scrollTo(id, anchor: .bottom)
-                isNearBottom = true
+                scrollToBottom(proxy: proxy, animated: false)
+                isPinnedToBottom = true
             }
-            .onChange(of: model.messages.last?.id) { _, id in
-                guard let id, !isDraggingListSheet, isNearBottom else { return }
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.35)) {
-                    proxy.scrollTo(id, anchor: .bottom)
-                }
+            .onChange(of: model.messages.count) { _, _ in
+                guard isPinnedToBottom, !isDraggingListSheet else { return }
+                scrollToBottom(proxy: proxy, animated: true)
+            }
+            .onChange(of: model.messages.last?.id) { _, _ in
+                guard isPinnedToBottom, !isDraggingListSheet else { return }
+                scrollToBottom(proxy: proxy, animated: true)
+            }
+        }
+    }
+
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        isProgrammaticScroll = true
+        let animation: Animation? = animated && !reduceMotion
+            ? .easeOut(duration: 0.22)
+            : nil
+        withAnimation(animation) {
+            proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(animated ? 240 : 16))
+            isProgrammaticScroll = false
+            isPinnedToBottom = true
+        }
+    }
+
+    private func openChannel(_ channelID: String) {
+        guard !channelID.isEmpty else { return }
+        player.requestPlayerCollapse {
+            NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
+        }
+    }
+
+    private func dismissAnimated() {
+        guard !isDismissing else { return }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+            onDismiss()
+        }
+    }
+
+    /// Finish a drag-dismiss from the current finger position without snapping back first.
+    private func dismissFromDrag() {
+        guard !isDismissing else { return }
+        isDismissing = true
+        let offscreen = max(dismissTranslation, expansionTravel)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
+            expansionProgress = 0
+            dismissTranslation = offscreen
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 270))
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                onDismiss()
             }
         }
     }
@@ -210,7 +276,7 @@ struct LiveChatPanel: View {
     private var listHandoffDismissGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
-                guard !isLandscape else { return }
+                guard !isLandscape, !isDismissing else { return }
                 let downward = value.translation.height > 0
                     && abs(value.translation.height) > abs(value.translation.width)
                 guard downward else { return }
@@ -233,7 +299,7 @@ struct LiveChatPanel: View {
                 dismissTranslation = position.dismiss
             }
             .onEnded { value in
-                guard !isLandscape else { return }
+                guard !isLandscape, !isDismissing else { return }
                 if isDraggingListSheet {
                     settleSheet(
                         startExpansion: listDragStartExpansion,
@@ -254,7 +320,7 @@ struct LiveChatPanel: View {
         // its own coordinate system as `.offset` moves the sheet, producing visible oscillation.
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
-                guard !isLandscape else { return }
+                guard !isLandscape, !isDismissing else { return }
                 guard abs(value.translation.height) > abs(value.translation.width) else { return }
                 if headerDragStartExpansion == nil {
                     headerDragStartExpansion = expansionProgress
@@ -271,7 +337,7 @@ struct LiveChatPanel: View {
                 dismissTranslation = position.dismiss
             }
             .onEnded { value in
-                guard !isLandscape else { return }
+                guard !isLandscape, !isDismissing else { return }
                 guard let start = headerDragStartExpansion else { return }
                 let startDismiss = headerDragStartDismiss
                 headerDragStartExpansion = nil
@@ -298,8 +364,7 @@ struct LiveChatPanel: View {
         )
         switch settlement {
         case .dismiss:
-            dismissTranslation = 0
-            onDismiss()
+            dismissFromDrag()
         case .expanded:
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
                 expansionProgress = 1

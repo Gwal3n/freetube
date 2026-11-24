@@ -22,7 +22,8 @@ final class LiveChatViewModel {
     private var continuation: String?
     private var apiKey: String?
     private var clientVersion: String?
-    private static let messageLimit = 400
+    /// Keep only a recent window so reopen stays light and the list can stay pinned to live.
+    private static let messageLimit = 200
 
     init(videoID: String, service: (any LiveChatServicing)? = nil) {
         self.videoID = videoID

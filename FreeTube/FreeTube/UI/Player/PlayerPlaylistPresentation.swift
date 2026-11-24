@@ -35,10 +35,9 @@ struct PlayerPlaylistPresentation: View {
                     }
                 },
                 onDismiss: {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                        isPresented = false
-                        expansion = 0
-                    }
+                    // Animation is owned by the panel (X button vs drag-dismiss paths).
+                    isPresented = false
+                    expansion = 0
                 },
                 onOpenPlaylist: onOpenPlaylist
             )

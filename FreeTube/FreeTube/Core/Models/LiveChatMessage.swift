@@ -12,6 +12,8 @@ nonisolated struct LiveChatMessage: Identifiable, Hashable, Sendable {
 
     let id: String
     let authorName: String
+    /// YouTube channel id when the renderer supplies `authorExternalChannelId`.
+    let authorChannelID: String?
     let text: String
     let kind: Kind
     /// Super Chat / sticker amount label when YouTube supplies one (e.g. "$5.00").

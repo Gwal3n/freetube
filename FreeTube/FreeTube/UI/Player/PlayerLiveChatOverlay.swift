@@ -4,7 +4,6 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerLiveChatOverlay: View {
     @Environment(PlayerStateManager.self) private var player
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let videoID: String
     let isLandscape: Bool
@@ -18,10 +17,9 @@ struct PlayerLiveChatOverlay: View {
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
             onDismiss: {
-                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                    player.liveChatPresented = false
-                    expansionProgress = 0
-                }
+                // Animation is owned by the panel (X button vs drag-dismiss paths).
+                player.liveChatPresented = false
+                expansionProgress = 0
             }
         )
     }
