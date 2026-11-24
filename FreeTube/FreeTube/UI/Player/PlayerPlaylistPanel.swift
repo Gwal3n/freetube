@@ -24,10 +24,12 @@ struct PlayerPlaylistPanel: View {
     @State private var lastAutomaticPageCount: Int?
     @State private var dismissTranslation: CGFloat = 0
     @State private var dragStartProgress: CGFloat?
+    @State private var dragStartDismiss: CGFloat = 0
     @State private var listScrollOffset: CGFloat = 0
     @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
     @State private var listDragStartExpansion: CGFloat = 0
+    @State private var listDragStartDismiss: CGFloat = 0
     @State private var isDraggingListSheet = false
     @State private var suppressPlaylistSelection = false
     @State private var selectionSuppressionGeneration = 0
@@ -504,8 +506,8 @@ struct PlayerPlaylistPanel: View {
     }
 
     /// Match the chapter browser's handoff: the list scrolls normally until it reaches its
-    /// top, then the entire sheet follows a continued downward drag. The expanded detent
-    /// returns to the compact detent first; a subsequent pull dismisses it.
+    /// top, then the entire sheet follows a continued downward drag with no mid-gesture stop
+    /// at the player edge. Detents apply only on release.
     private var listHandoffDismissGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
@@ -515,35 +517,29 @@ struct PlayerPlaylistPanel: View {
                     guard listScrollOffset <= 1 else { return }
                     listDismissOrigin = value.translation.height
                     listDragStartExpansion = expansionProgress
+                    listDragStartDismiss = dismissTranslation
                     isDraggingListSheet = true
                     suppressPlaylistSelection = true
                     selectionSuppressionGeneration &+= 1
                 }
-                let travel = max(0, value.translation.height - listDismissOrigin)
-                if listDragStartExpansion > 0 {
-                    expansionProgress = max(0, listDragStartExpansion - travel / max(1, expansionTravel))
-                } else {
-                    dismissTranslation = travel
-                }
+                let travel = value.translation.height - listDismissOrigin
+                let position = PlayerSheetDragMath.position(
+                    startExpansion: listDragStartExpansion,
+                    startDismiss: listDragStartDismiss,
+                    translationHeight: travel,
+                    expansionTravel: expansionTravel
+                )
+                expansionProgress = position.expansion
+                dismissTranslation = position.dismiss
             }
             .onEnded { value in
                 guard !isLandscape else { return }
                 if isDraggingListSheet {
-                    let finalTravel = max(0, value.translation.height - listDismissOrigin)
-                    let projectedTravel = max(0, value.predictedEndTranslation.height - listDismissOrigin)
-                    if listDragStartExpansion > 0 {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                            let projected = listDragStartExpansion - projectedTravel / max(1, expansionTravel)
-                            expansionProgress = projected < 0.5 ? 0 : 1
-                        }
-                    } else if finalTravel >= Self.dismissalThreshold,
-                              projectedTravel >= Self.dismissalThreshold {
-                        onDismiss()
-                    } else {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                            dismissTranslation = 0
-                        }
-                    }
+                    settleSheet(
+                        startExpansion: listDragStartExpansion,
+                        startDismiss: listDragStartDismiss,
+                        predictedTranslation: value.predictedEndTranslation.height - listDismissOrigin
+                    )
                 }
                 listDismissOrigin = 0
                 if listOverscroll <= 0.5 { isDraggingListSheet = false }
@@ -565,26 +561,60 @@ struct PlayerPlaylistPanel: View {
             .onChanged { value in
                 guard !isLandscape,
                       abs(value.translation.height) > abs(value.translation.width) else { return }
-                if dragStartProgress == nil { dragStartProgress = expansionProgress }
+                if dragStartProgress == nil {
+                    dragStartProgress = expansionProgress
+                    dragStartDismiss = dismissTranslation
+                }
                 let start = dragStartProgress ?? 0
-                expansionProgress = min(1, max(0, start - value.translation.height / max(1, expansionTravel)))
-                dismissTranslation = start == 0 ? max(0, value.translation.height) : 0
+                let position = PlayerSheetDragMath.position(
+                    startExpansion: start,
+                    startDismiss: dragStartDismiss,
+                    translationHeight: value.translation.height,
+                    expansionTravel: expansionTravel
+                )
+                expansionProgress = position.expansion
+                dismissTranslation = position.dismiss
             }
             .onEnded { value in
                 guard !isLandscape else { return }
                 guard let start = dragStartProgress else { return }
+                let startDismiss = dragStartDismiss
                 dragStartProgress = nil
-                if start == 0, value.translation.height > 70,
-                   value.predictedEndTranslation.height > 70 {
-                    dismissTranslation = 0
-                    onDismiss()
-                } else {
-                    withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
-                        let projected = start - value.predictedEndTranslation.height / max(1, expansionTravel)
-                        expansionProgress = projected > 0.5 ? 1 : 0
-                        dismissTranslation = 0
-                    }
-                }
+                dragStartDismiss = 0
+                settleSheet(
+                    startExpansion: start,
+                    startDismiss: startDismiss,
+                    predictedTranslation: value.predictedEndTranslation.height
+                )
             }
+    }
+
+    private func settleSheet(
+        startExpansion: CGFloat,
+        startDismiss: CGFloat,
+        predictedTranslation: CGFloat
+    ) {
+        let settlement = PlayerSheetDragMath.settlement(
+            startExpansion: startExpansion,
+            startDismiss: startDismiss,
+            predictedTranslationHeight: predictedTranslation,
+            expansionTravel: expansionTravel,
+            dismissThreshold: Self.dismissalThreshold
+        )
+        switch settlement {
+        case .dismiss:
+            dismissTranslation = 0
+            onDismiss()
+        case .expanded:
+            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                expansionProgress = 1
+                dismissTranslation = 0
+            }
+        case .collapsed:
+            withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                expansionProgress = 0
+                dismissTranslation = 0
+            }
+        }
     }
 }

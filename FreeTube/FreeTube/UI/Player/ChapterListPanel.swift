@@ -37,8 +37,10 @@ struct ChapterListPanel: View {
     @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
     @State private var listDragStartExpansion: CGFloat = 0
+    @State private var listDragStartDismiss: CGFloat = 0
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
+    @State private var headerDragStartDismiss: CGFloat = 0
     @State private var suppressChapterSelection = false
     @State private var selectionSuppressionGeneration = 0
     @State private var pinnedChapterID: VideoChapter.ID?
@@ -181,38 +183,30 @@ struct ChapterListPanel: View {
                     guard listScrollOffset <= 1 else { return }
                     listDismissOrigin = value.translation.height
                     listDragStartExpansion = expansionProgress
+                    listDragStartDismiss = dismissTranslation
                     isDraggingListSheet = true
                     suppressChapterSelection = true
                     selectionSuppressionGeneration &+= 1
                 }
-                let travel = max(0, value.translation.height - listDismissOrigin)
-                if listDragStartExpansion > 0 {
-                    expansionProgress = max(0, listDragStartExpansion - travel / max(1, expansionTravel))
-                } else {
-                    dismissTranslation = travel
-                }
+                let travel = value.translation.height - listDismissOrigin
+                let position = PlayerSheetDragMath.position(
+                    startExpansion: listDragStartExpansion,
+                    startDismiss: listDragStartDismiss,
+                    translationHeight: travel,
+                    expansionTravel: expansionTravel
+                )
+                expansionProgress = position.expansion
+                dismissTranslation = position.dismiss
             }
             .onEnded { value in
                 guard !isLandscape else { return }
                 if isDraggingListSheet {
-                    let finalPosition = max(0, value.translation.height - listDismissOrigin)
-                    let projectedPosition = max(
-                        0,
-                        value.predictedEndTranslation.height - listDismissOrigin
+                    let projectedTravel = value.predictedEndTranslation.height - listDismissOrigin
+                    settleSheet(
+                        startExpansion: listDragStartExpansion,
+                        startDismiss: listDragStartDismiss,
+                        predictedTranslation: projectedTravel
                     )
-                    if listDragStartExpansion > 0 {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
-                            let projected = listDragStartExpansion - projectedPosition / max(1, expansionTravel)
-                            expansionProgress = projected < 0.5 ? 0 : 1
-                        }
-                    } else if finalPosition >= Self.dismissalThreshold,
-                              projectedPosition >= Self.dismissalThreshold {
-                        onDismiss()
-                    } else {
-                        withAnimation(.snappy(duration: 0.22)) {
-                            dismissTranslation = 0
-                        }
-                    }
                 }
                 listDismissOrigin = 0
                 if listOverscroll <= 0.5 {
@@ -242,31 +236,61 @@ struct ChapterListPanel: View {
             .onChanged { value in
                 guard !isLandscape else { return }
                 guard abs(value.translation.height) > abs(value.translation.width) else { return }
-                if headerDragStartExpansion == nil { headerDragStartExpansion = expansionProgress }
+                if headerDragStartExpansion == nil {
+                    headerDragStartExpansion = expansionProgress
+                    headerDragStartDismiss = dismissTranslation
+                }
                 let start = headerDragStartExpansion ?? 0
-                expansionProgress = min(1, max(0, start - value.translation.height / max(1, expansionTravel)))
-                dismissTranslation = start == 0 ? max(0, value.translation.height) : 0
+                let position = PlayerSheetDragMath.position(
+                    startExpansion: start,
+                    startDismiss: headerDragStartDismiss,
+                    translationHeight: value.translation.height,
+                    expansionTravel: expansionTravel
+                )
+                expansionProgress = position.expansion
+                dismissTranslation = position.dismiss
             }
             .onEnded { value in
                 guard !isLandscape else { return }
                 guard let start = headerDragStartExpansion else { return }
+                let startDismiss = headerDragStartDismiss
                 headerDragStartExpansion = nil
-                let finalPosition = max(0, value.translation.height)
-                let projectedPosition = max(0, value.predictedEndTranslation.height)
-                // Both positions must remain beyond the threshold. An upward reversal projects
-                // back above it and therefore cancels, even if the sheet was previously pulled
-                // much farther down.
-                if start == 0, finalPosition >= Self.dismissalThreshold,
-                   projectedPosition >= Self.dismissalThreshold {
-                    onDismiss()
-                } else {
-                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
-                        let projected = start - value.predictedEndTranslation.height / max(1, expansionTravel)
-                        expansionProgress = projected > 0.5 ? 1 : 0
-                        dismissTranslation = 0
-                    }
-                }
+                headerDragStartDismiss = 0
+                settleSheet(
+                    startExpansion: start,
+                    startDismiss: startDismiss,
+                    predictedTranslation: value.predictedEndTranslation.height
+                )
             }
+    }
+
+    private func settleSheet(
+        startExpansion: CGFloat,
+        startDismiss: CGFloat,
+        predictedTranslation: CGFloat
+    ) {
+        let settlement = PlayerSheetDragMath.settlement(
+            startExpansion: startExpansion,
+            startDismiss: startDismiss,
+            predictedTranslationHeight: predictedTranslation,
+            expansionTravel: expansionTravel,
+            dismissThreshold: Self.dismissalThreshold
+        )
+        switch settlement {
+        case .dismiss:
+            dismissTranslation = 0
+            onDismiss()
+        case .expanded:
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                expansionProgress = 1
+                dismissTranslation = 0
+            }
+        case .collapsed:
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                expansionProgress = 0
+                dismissTranslation = 0
+            }
+        }
     }
 
     private func reconcilePinnedChapter(with time: TimeInterval) {
