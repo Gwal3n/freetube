@@ -6,6 +6,7 @@ import SwiftUI
 struct LiveChatPanel: View {
     private static let dismissalThreshold: CGFloat = 42
 
+    @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let videoID: String
     let isLandscape: Bool
@@ -172,8 +173,13 @@ struct LiveChatPanel: View {
                         .padding(.vertical, 48)
                     } else {
                         ForEach(model.messages) { message in
-                            LiveChatRow(message: message)
-                                .id(message.id)
+                            LiveChatRow(message: message) { channelID in
+                                player.presentChannelPreview(
+                                    id: channelID,
+                                    name: message.authorName
+                                )
+                            }
+                            .id(message.id)
                         }
                     }
                 }

@@ -175,9 +175,9 @@ struct PlayerSettingsScreen: View {
                     Toggle("Show commenter photos", isOn: Bindable(model).showCommentAuthorPhotos)
                         .tint(settingsToggleTint)
                         .settingsSearchRow("Show commenter photos")
-                    Toggle("Tap commenter to open channel", isOn: Bindable(model).openCommentAuthorChannels)
+                    Toggle("Tap commenter to preview channel", isOn: Bindable(model).openCommentAuthorChannels)
                         .tint(settingsToggleTint)
-                        .settingsSearchRow("Tap commenter to open channel")
+                        .settingsSearchRow("Tap commenter to preview channel")
                     Picker("Featured comment preview", selection: featuredCommentSelection) {
                         Text("Off").tag("off")
                         Text("Near playback time").tag("timed")

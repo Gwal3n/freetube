@@ -125,6 +125,8 @@ final class PlayerStateManager {
     var chapterListPresented: Bool = false
     /// Live chat sheet/sidebar; same presentation ownership as chapters.
     var liveChatPresented: Bool = false
+    /// Comment / live-chat author preview sheet seed. Presented by `FullScreenPlayer`.
+    var channelPreviewRequest: ChannelPreviewRequest?
     /// Current bottom edge of the *visible* video surface in expanded-player coordinates. A
     /// raised playlist panel can cover part of the video; its scroll must never collapse the
     /// player even when the gesture begins within the video's original frame.
@@ -150,6 +152,16 @@ final class PlayerStateManager {
                   index != queue.currentIndex {
             queue.remove(at: index)
         }
+    }
+
+    func presentChannelPreview(id: String, name: String, thumbnailURL: URL? = nil) {
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else { return }
+        channelPreviewRequest = ChannelPreviewRequest(
+            id: trimmedID,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            thumbnailURL: thumbnailURL
+        )
     }
 
     // MARK: - AVPlayer
@@ -777,6 +789,7 @@ final class PlayerStateManager {
         contentPrefetchTask = nil
         clearSponsorBlockState()
         clearChapterState()
+        channelPreviewRequest = nil
         storyboard = nil
         captionTracks = []
         recommendations.resetPager()

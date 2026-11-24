@@ -121,7 +121,7 @@ enum SettingsSearchIndex {
                 && !UserPreferences().showComments:
                 return String(localized: "Show comments")
             case .player where (displayTitle == String(localized: "Show commenter photos")
-                || displayTitle == String(localized: "Tap commenter to open channel")
+                || displayTitle == String(localized: "Tap commenter to preview channel")
                 || displayTitle == String(localized: "Load more as you scroll")
                 || displayTitle == String(localized: "Pin Comments heading"))
                 && !UserPreferences().showComments:
@@ -197,7 +197,7 @@ enum SettingsSearchIndex {
             "Remember mini player position", "Transport buttons", "Seek amount", "Show description",
             "Collapsed description preview",
             "Show comments", "Pin Comments heading", "Load more as you scroll", "Show commenter photos",
-            "Tap commenter to open channel", "Featured comment preview", "Show Up Next",
+            "Tap commenter to preview channel", "Featured comment preview", "Show Up Next",
             "Pin Up Next heading", "Show channel avatars", "Tap channel to open", "Thumbnail size",
             "Videos shown at first", "Pin Queue heading", "Reorder sections", "Top controls layout"
         ]),

@@ -3,24 +3,24 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LiveChatRow: View {
     let message: LiveChatMessage
+    var onOpenChannel: ((String) -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             if message.kind != .system {
-                Text(verbatim: message.authorName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(authorColor)
-                    .lineLimit(1)
+                authorLabel
             }
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(message.kind == .system ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
             if let amount = message.amountText, !amount.isEmpty {
                 Text(verbatim: amount)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.yellow)
                     .lineLimit(1)
+                    .textSelection(.enabled)
             }
         }
         .padding(.horizontal, 12)
@@ -29,6 +29,27 @@ struct LiveChatRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var authorLabel: some View {
+        let name = Text(verbatim: message.authorName)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(authorColor)
+            .lineLimit(1)
+        if let channelID = message.authorChannelID,
+           !channelID.isEmpty,
+           let onOpenChannel {
+            Button {
+                onOpenChannel(channelID)
+            } label: {
+                name
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens channel")
+        } else {
+            name
+        }
     }
 
     private var authorColor: Color {

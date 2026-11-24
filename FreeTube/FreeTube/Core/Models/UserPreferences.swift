@@ -45,7 +45,7 @@ struct UserPreferences {
     @AppStorage("showFeaturedCommentPreview") var showFeaturedCommentPreview: Bool = false
     @AppStorage("featuredCommentsNearPlaybackOnly") var featuredCommentsNearPlaybackOnly: Bool = false
     @AppStorage("showCommentAuthorPhotos") var showCommentAuthorPhotos: Bool = true
-    @AppStorage("openCommentAuthorChannels") var openCommentAuthorChannels: Bool = false
+    @AppStorage("openCommentAuthorChannels") var openCommentAuthorChannels: Bool = true
     @AppStorage("showUpNext") var showUpNext: Bool = true
     @AppStorage("showUpNextChannelAvatars") var showUpNextChannelAvatars: Bool = false
     @AppStorage("openUpNextChannelsOnTap") var openUpNextChannelsOnTap: Bool = false

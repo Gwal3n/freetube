@@ -57,6 +57,7 @@ nonisolated enum LiveChatPageDecoder {
             return LiveChatMessage(
                 id: id,
                 authorName: author,
+                authorChannelID: authorChannelID(from: renderer),
                 text: "Sticker",
                 kind: .sticker,
                 amountText: amount,
@@ -72,6 +73,7 @@ nonisolated enum LiveChatPageDecoder {
             return LiveChatMessage(
                 id: id,
                 authorName: author,
+                authorChannelID: authorChannelID(from: renderer),
                 text: header,
                 kind: .membership,
                 amountText: nil,
@@ -85,6 +87,7 @@ nonisolated enum LiveChatPageDecoder {
             return LiveChatMessage(
                 id: id,
                 authorName: "",
+                authorChannelID: nil,
                 text: text,
                 kind: .system,
                 amountText: nil,
@@ -107,11 +110,18 @@ nonisolated enum LiveChatPageDecoder {
         return LiveChatMessage(
             id: id,
             authorName: author,
+            authorChannelID: authorChannelID(from: renderer),
             text: text.isEmpty ? (amount ?? "") : text,
             kind: kind,
             amountText: amount,
             publishedAt: timestamp(from: renderer)
         )
+    }
+
+    private static func authorChannelID(from renderer: Any) -> String? {
+        let raw = (renderer as? [String: Any])?["authorExternalChannelId"] as? String
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     // MARK: - Continuation
