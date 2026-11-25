@@ -1267,8 +1267,9 @@ struct FullScreenPlayer: View {
                         // `onChange(of: liveChatPresented)` resets it after removal.
                         player.liveChatPresented = false
                     } else {
-                        // Open fully expanded so the message list is on-screen immediately.
-                        liveChatPanelExpansion = 1
+                        // Same as chapters: open at the player-bottom detent, drag up for full
+                        // height or down to dismiss.
+                        liveChatPanelExpansion = 0
                         player.liveChatPresented = true
                     }
                 }

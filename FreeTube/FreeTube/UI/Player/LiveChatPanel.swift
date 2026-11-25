@@ -5,8 +5,8 @@ import SwiftUI
 /// survive sheet dismiss.
 @available(iOS 17.0, *)
 struct LiveChatPanel: View {
-    /// Past the player-bottom edge by this much commits a full dismiss (no collapsed detent).
-    private static let dismissalThreshold: CGFloat = 28
+    /// Same threshold as chapters — past the player-bottom edge by this much dismisses.
+    private static let dismissalThreshold: CGFloat = 42
     private static let pinToBottomSlack: CGFloat = 120
     private static let bottomAnchorID = "liveChatBottomAnchor"
 
@@ -208,11 +208,11 @@ struct LiveChatPanel: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.top, 8)
-                    .padding(.bottom, bottomContentInset)
 
-                    // Outside LazyVStack so the anchor is always realized for scrollTo.
+                    // Dedicated bottom buffer outside LazyVStack. Auto-scroll targets this id so
+                    // follow keeps the same gap under the latest row that manual scrolling shows.
                     Color.clear
-                        .frame(height: 1)
+                        .frame(height: bottomContentInset)
                         .id(Self.bottomAnchorID)
                         .accessibilityHidden(true)
                 }
@@ -230,8 +230,6 @@ struct LiveChatPanel: View {
                 scheduleFollowScroll(proxy: proxy, force: false)
             }
             .onChange(of: expansionProgress) { _, newValue in
-                // Re-pin after expand/collapse so layout height changes don't leave rows
-                // scrolled past the new viewport.
                 guard newValue > 0.95 || newValue < 0.05 else { return }
                 scheduleFollowScroll(proxy: proxy, force: true)
             }
@@ -243,7 +241,6 @@ struct LiveChatPanel: View {
         guard !isDraggingListSheet, !isDismissing else { return }
         followScrollTask?.cancel()
         followScrollTask = Task { @MainActor in
-            // Let LazyVStack commit inserted rows, then scroll; a second pass catches late layout.
             await Task.yield()
             guard !Task.isCancelled, !isDraggingListSheet else { return }
             guard force || isPinnedToBottom else { return }
@@ -258,12 +255,7 @@ struct LiveChatPanel: View {
         isProgrammaticScroll = true
         isPinnedToBottom = true
         let scroll = {
-            // Prefer the last real row so we don't overshoot into empty bottom padding.
-            if let lastID = model.messages.last?.id {
-                proxy.scrollTo(lastID, anchor: .bottom)
-            } else {
-                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
-            }
+            proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
         if animated, !reduceMotion {
             withAnimation(.easeOut(duration: 0.2)) {
@@ -415,21 +407,27 @@ struct LiveChatPanel: View {
         startDismiss: CGFloat,
         predictedTranslation: CGFloat
     ) {
-        let travel = max(1, expansionTravel)
-        let startTop = PlayerSheetDragMath.Position.top(
-            expansion: startExpansion,
-            dismiss: startDismiss,
-            travel: travel
+        // Same detents as chapters: expanded (over video), collapsed (player bottom), or dismiss.
+        let settlement = PlayerSheetDragMath.settlement(
+            startExpansion: startExpansion,
+            startDismiss: startDismiss,
+            predictedTranslationHeight: predictedTranslation,
+            expansionTravel: expansionTravel,
+            dismissThreshold: Self.dismissalThreshold
         )
-        let projectedTop = max(0, startTop + predictedTranslation)
-        // No collapsed detent — past the player-bottom edge dismisses fully; otherwise expand.
-        if projectedTop >= travel + Self.dismissalThreshold {
+        switch settlement {
+        case .dismiss:
             dismissFromDrag()
-            return
-        }
-        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
-            expansionProgress = 1
-            dismissTranslation = 0
+        case .expanded:
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                expansionProgress = 1
+                dismissTranslation = 0
+            }
+        case .collapsed:
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                expansionProgress = 0
+                dismissTranslation = 0
+            }
         }
     }
 }
