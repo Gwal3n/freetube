@@ -401,7 +401,11 @@ struct ChannelScreen: View {
         } else if visibleVideos.isEmpty {
             ContentUnavailableView(videos.isEmpty ? emptyTitle : "No Unblocked Videos", systemImage: "play.rectangle")
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 64)
+                .padding(.top, 40)
+                .padding(.bottom, 24)
+                // Parent pages use a tall minHeight for header collapse; without this the
+                // unavailable view fills that height and centers its label near the bottom.
+                .fixedSize(horizontal: false, vertical: true)
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(Array(visibleVideos.enumerated()), id: \.element.id) { index, video in
@@ -431,7 +435,9 @@ struct ChannelScreen: View {
         } else if visiblePlaylists.isEmpty {
             ContentUnavailableView("No Playlists", systemImage: "rectangle.stack")
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 64)
+                .padding(.top, 40)
+                .padding(.bottom, 24)
+                .fixedSize(horizontal: false, vertical: true)
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(Array(visiblePlaylists.enumerated()), id: \.element.id) { index, playlist in
@@ -528,10 +534,20 @@ struct ChannelScreen: View {
     private func channelStats(_ channel: Channel) -> String {
         var values: [String] = []
         if let subscribers = channel.subscriberCount {
-            values.append("\(formattedCount(subscribers)) subscribers")
+            if subscribers >= 1_000 {
+                values.append("\(formattedCount(subscribers)) subscribers")
+            } else if subscribers == 1 {
+                values.append(String(localized: "1 subscriber"))
+            } else {
+                values.append(String(localized: "\(subscribers) subscribers"))
+            }
         }
         if let videos = channel.videoCount {
-            values.append("\(formattedCount(videos)) videos")
+            if videos >= 1_000 {
+                values.append("\(formattedCount(videos)) videos")
+            } else {
+                values.append(String(localized: "\(videos) videos"))
+            }
         }
         return values.joined(separator: " · ")
     }
