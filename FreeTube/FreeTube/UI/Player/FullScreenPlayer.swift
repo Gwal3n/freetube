@@ -1257,8 +1257,9 @@ struct FullScreenPlayer: View {
                     isPlaylistPanelPresented = false
                     player.chapterListPresented = false
                     if player.liveChatPresented {
+                        // Leave expansion alone so `.move(edge: .bottom)` can clear the sheet;
+                        // `onChange(of: liveChatPresented)` resets it after removal.
                         player.liveChatPresented = false
-                        liveChatPanelExpansion = 0
                     } else {
                         liveChatPanelExpansion = 0
                         player.liveChatPresented = true

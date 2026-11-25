@@ -7,7 +7,7 @@ import SwiftUI
 struct LiveChatPanel: View {
     private static let dismissalThreshold: CGFloat = 42
     /// Keep following new messages while the user is roughly at the latest row.
-    private static let pinToBottomSlack: CGFloat = 80
+    private static let pinToBottomSlack: CGFloat = 96
     private static let bottomAnchorID = "liveChatBottomAnchor"
 
     @Environment(PlayerStateManager.self) private var player
@@ -30,6 +30,7 @@ struct LiveChatPanel: View {
     /// Sticky follow flag: only clears when the user deliberately scrolls away from live.
     @State private var isPinnedToBottom = true
     @State private var isProgrammaticScroll = false
+    @State private var followScrollTask: Task<Void, Never>?
     @State private var isDismissing = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -212,32 +213,58 @@ struct LiveChatPanel: View {
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.always, axes: .vertical)
             .onAppear {
-                scrollToBottom(proxy: proxy, animated: false)
                 isPinnedToBottom = true
+                scrollToBottom(proxy: proxy, animated: false)
             }
             .onChange(of: model.messages.count) { _, _ in
-                guard isPinnedToBottom, !isDraggingListSheet else { return }
-                scrollToBottom(proxy: proxy, animated: true)
+                scheduleFollowScroll(proxy: proxy)
             }
             .onChange(of: model.messages.last?.id) { _, _ in
-                guard isPinnedToBottom, !isDraggingListSheet else { return }
-                scrollToBottom(proxy: proxy, animated: true)
+                scheduleFollowScroll(proxy: proxy)
             }
+            .onDisappear {
+                followScrollTask?.cancel()
+                followScrollTask = nil
+            }
+        }
+    }
+
+    /// Coalesce rapid poll batches so one smooth settle follows the latest layout pass.
+    private func scheduleFollowScroll(proxy: ScrollViewProxy) {
+        guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
+        followScrollTask?.cancel()
+        followScrollTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
+            scrollToBottom(proxy: proxy, animated: true)
         }
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
         isProgrammaticScroll = true
-        let animation: Animation? = animated && !reduceMotion
-            ? .easeOut(duration: 0.22)
-            : nil
-        withAnimation(animation) {
+        isPinnedToBottom = true
+        let scroll = {
+            // Prefer the last row for LazyVStack reliability, then the sentinel so new height
+            // after insert still lands flush with the bottom inset.
+            if let lastID = model.messages.last?.id {
+                proxy.scrollTo(lastID, anchor: .bottom)
+            }
             proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
+        if animated, !reduceMotion {
+            withAnimation(.easeOut(duration: 0.28)) {
+                scroll()
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                scroll()
+            }
+        }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(animated ? 240 : 16))
+            try? await Task.sleep(for: .milliseconds(animated ? 300 : 16))
             isProgrammaticScroll = false
-            isPinnedToBottom = true
         }
     }
 
@@ -252,13 +279,15 @@ struct LiveChatPanel: View {
     private func dismissFromDrag() {
         guard !isDismissing else { return }
         isDismissing = true
-        let offscreen = max(dismissTranslation, expansionTravel)
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
-            expansionProgress = 0
+        // Keep the current expansion so the sheet slides away as one piece. Zeroing expansion
+        // here collapses onto the player-bottom "Live chat" detent mid-exit.
+        let clearDistance = expansionTravel * max(expansionProgress, 0) + expansionTravel
+        let offscreen = dismissTranslation + max(clearDistance, expansionTravel)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) {
             dismissTranslation = offscreen
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 270))
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 290))
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {

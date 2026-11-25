@@ -17,9 +17,9 @@ struct PlayerLiveChatOverlay: View {
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
             onDismiss: {
-                // Animation is owned by the panel (X button vs drag-dismiss paths).
+                // Match chapters: only flip presentation. Zeroing expansion here collapses the
+                // sheet onto the player-bottom detent and fights `.move(edge: .bottom)`.
                 player.liveChatPresented = false
-                expansionProgress = 0
             }
         )
     }
