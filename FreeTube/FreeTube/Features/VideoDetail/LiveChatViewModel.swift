@@ -28,6 +28,13 @@ final class LiveChatViewModel {
     private var clientVersion: String?
     /// Keep only a recent window so reopen stays light and the list can stay pinned to live.
     private static let messageLimit = 200
+    /// Steady on-screen cadence (~6/sec). Do not accelerate when a poll dumps a backlog —
+    /// that recreates the hang-then-burst feel.
+    private static let revealInterval: Duration = .milliseconds(160)
+    /// Pending cap: drop older queued lines so we stay near live instead of binge-playing catch-up.
+    private static let maxPendingReveal = 20
+    /// First paint: recent tail only, not the entire bootstrap dump.
+    private static let initialSeedCount = 30
 
     init(videoID: String, service: (any LiveChatServicing)? = nil) {
         self.videoID = videoID
@@ -46,7 +53,6 @@ final class LiveChatViewModel {
         pollTask?.cancel()
         pollTask = nil
         isPolling = false
-        // Keep pendingReveal; draining resumes with the next startPolling.
         revealTask?.cancel()
         revealTask = nil
     }
@@ -81,7 +87,6 @@ final class LiveChatViewModel {
                 enqueue(page.messages)
                 if page.chatEnded || page.continuation == nil {
                     chatEnded = true
-                    // Flush anything still queued so the final lines aren't stranded.
                     flushPendingReveal()
                     log.info("Live chat ended for \(self.videoID, privacy: .public)")
                     return
@@ -99,7 +104,7 @@ final class LiveChatViewModel {
         }
     }
 
-    /// Deduplicate and either show immediately (cold start) or pace into the list.
+    /// Deduplicate and pace into the visible list.
     private func enqueue(_ batch: [LiveChatMessage]) {
         guard !batch.isEmpty else { return }
         var added: [LiveChatMessage] = []
@@ -108,13 +113,16 @@ final class LiveChatViewModel {
         }
         guard !added.isEmpty else { return }
 
-        // First paint should fill the sheet at once; live traffic is revealed steadily.
         if messages.isEmpty {
-            commit(added)
+            // Seed with the recent tail only — dumping the full bootstrap looks like a burst.
+            commit(Array(added.suffix(Self.initialSeedCount)))
             return
         }
 
         pendingReveal.append(contentsOf: added)
+        if pendingReveal.count > Self.maxPendingReveal {
+            pendingReveal.removeFirst(pendingReveal.count - Self.maxPendingReveal)
+        }
         startRevealIfNeeded()
     }
 
@@ -131,17 +139,7 @@ final class LiveChatViewModel {
             guard !pendingReveal.isEmpty else { return }
             let next = pendingReveal.removeFirst()
             commit([next])
-            let backlog = pendingReveal.count
-            // Faster when a backlog builds so reconnect dumps don't take forever; slower when
-            // quiet so poll batches don't land as one visual spike.
-            let delayMs: Int
-            switch backlog {
-            case 40...: delayMs = 35
-            case 20..<40: delayMs = 55
-            case 8..<20: delayMs = 80
-            default: delayMs = 110
-            }
-            try? await Task.sleep(for: .milliseconds(delayMs))
+            try? await Task.sleep(for: Self.revealInterval)
         }
     }
 
