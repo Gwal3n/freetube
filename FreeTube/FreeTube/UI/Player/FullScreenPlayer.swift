@@ -1123,7 +1123,7 @@ struct FullScreenPlayer: View {
     /// live-chat sheet. A fully expanded sheet reports ~0 so drags there dismiss the sheet,
     /// not the player.
     private func publishUncoveredVideoHeight(surfaceHeight: CGFloat) {
-        guard !isFloating, collapseProgress == 0 else { return }
+        guard player.fullScreenPresented, collapseProgress == 0 else { return }
         let coveredFraction: CGFloat
         if isPlaylistPanelPresented {
             coveredFraction = playlistPanelExpansion
