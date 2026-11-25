@@ -337,10 +337,16 @@ struct FullScreenPlayer: View {
                 .onChange(of: playlistPanelExpansion) { _, _ in
                     publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
                 }
+                .onChange(of: chapterPanelExpansion) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
                 .onChange(of: liveChatPanelExpansion) { _, _ in
                     publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
                 }
                 .onChange(of: isPlaylistPanelPresented) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
+                .onChange(of: player.chapterListPresented) { _, _ in
                     publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
                 }
                 .onChange(of: player.liveChatPresented) { _, _ in
@@ -463,8 +469,7 @@ struct FullScreenPlayer: View {
                     videoID: liveVideoID,
                     isLandscape: isLandscape,
                     expansionProgress: $liveChatPanelExpansion,
-                    expansionTravel: surfaceHeight,
-                    containerHeight: proxy.size.height
+                    expansionTravel: surfaceHeight
                 )
                 .frame(
                     width: chatWidth,
@@ -474,8 +479,6 @@ struct FullScreenPlayer: View {
                 )
                 .clipped()
                 .offset(y: isLandscape ? 0 : chatTop)
-                .opacity(max(0, 1 - collapseProgress * 2.5))
-                .allowsHitTesting(collapseProgress < 0.05)
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
                 .zIndex(5)
             }
@@ -1110,13 +1113,16 @@ struct FullScreenPlayer: View {
         }
     }
 
-    /// Shrinks the collapse hit-target to the video still above a raised playlist / live-chat
-    /// sheet. Chapters are excluded — they hard-block player collapse while open.
+    /// Shrinks the collapse hit-target to the video still above a raised playlist / chapters /
+    /// live-chat sheet. A fully expanded sheet reports ~0 so drags there dismiss the sheet;
+    /// a drag on the remaining uncovered video can still collapse the player.
     private func publishUncoveredVideoHeight(surfaceHeight: CGFloat) {
         guard player.fullScreenPresented, collapseProgress == 0 else { return }
         let coveredFraction: CGFloat
         if isPlaylistPanelPresented {
             coveredFraction = playlistPanelExpansion
+        } else if player.chapterListPresented {
+            coveredFraction = chapterPanelExpansion
         } else if player.liveChatPresented {
             coveredFraction = liveChatPanelExpansion
         } else {

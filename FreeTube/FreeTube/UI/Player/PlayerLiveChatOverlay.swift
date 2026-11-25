@@ -9,7 +9,6 @@ struct PlayerLiveChatOverlay: View {
     let isLandscape: Bool
     @Binding var expansionProgress: CGFloat
     let expansionTravel: CGFloat
-    let containerHeight: CGFloat
 
     var body: some View {
         LiveChatPanel(
@@ -17,7 +16,6 @@ struct PlayerLiveChatOverlay: View {
             isLandscape: isLandscape,
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
-            containerHeight: containerHeight,
             onDismiss: {
                 // Only flip presentation. Expansion resets in FullScreenPlayer after removal.
                 player.liveChatPresented = false

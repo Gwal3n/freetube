@@ -20,15 +20,13 @@ struct LiveChatPanel: View {
     @Binding var expansionProgress: CGFloat
     /// Video-surface height — distance from expanded top to the player-bottom edge.
     let expansionTravel: CGFloat
-    /// Full player-column height. Used so dismiss travel clears the sheet even when the feed
-    /// strip is taller than the video.
-    let containerHeight: CGFloat
     let onDismiss: () -> Void
 
     @State private var dismissTranslation: CGFloat = 0
     @State private var listScrollOffset: CGFloat = 0
     @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
+    @State private var listDragStartExpansion: CGFloat = 0
     @State private var listDragStartDismiss: CGFloat = 0
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
@@ -154,7 +152,7 @@ struct LiveChatPanel: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading live chat")
-            .simultaneousGesture(listDismissOnlyGesture)
+            .simultaneousGesture(listHandoffDismissGesture)
         } else if model.messages.isEmpty {
             emptyState(
                 title: model.chatEnded ? "Live chat has ended" : "Waiting for messages",
@@ -183,7 +181,7 @@ struct LiveChatPanel: View {
                         isDraggingListSheet = false
                     }
                 }
-                .simultaneousGesture(listDismissOnlyGesture)
+                .simultaneousGesture(listHandoffDismissGesture)
         } else {
             // iOS 17 has no scroll-geometry signal, so list dismiss would steal every downward
             // drag — match chapters and keep dismiss/expand on the grabber only.
@@ -257,7 +255,7 @@ struct LiveChatPanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Empty body is always "at the top" — pull down dismisses like chapters overscroll.
-        .simultaneousGesture(listDismissOnlyGesture)
+        .simultaneousGesture(listHandoffDismissGesture)
     }
 
     private func updatePinState(distanceFromBottom: CGFloat) {
@@ -294,44 +292,25 @@ struct LiveChatPanel: View {
         }
     }
 
+    /// Same dismiss path as chapters: flip presentation and let the overlay transition clear it.
     private func dismissAnimated() {
         guard !isDismissing else { return }
-        isDismissing = true
-        // Drive the sheet fully off-screen from its current top, then drop presentation.
-        let currentTop = PlayerSheetDragMath.Position.top(
-            expansion: expansionProgress,
-            dismiss: dismissTranslation,
-            travel: expansionTravel
-        )
-        let offscreen = dismissTranslation + max(containerHeight - currentTop, expansionTravel) + 40
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.30)) {
-            dismissTranslation = offscreen
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 310))
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                onDismiss()
-            }
+        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+            onDismiss()
         }
     }
 
+    /// Continue from the finger position instead of snapping back before the leave transition.
     private func dismissFromDrag() {
         guard !isDismissing else { return }
         isDismissing = true
-        let currentTop = PlayerSheetDragMath.Position.top(
-            expansion: expansionProgress,
-            dismiss: dismissTranslation,
-            travel: expansionTravel
-        )
-        // Clear the remaining visible span — feed can be taller than the video travel distance.
-        let offscreen = dismissTranslation + max(containerHeight - currentTop, 1) + 40
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.30)) {
+        let offscreen = max(dismissTranslation, expansionTravel)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
+            expansionProgress = 0
             dismissTranslation = offscreen
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 310))
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 270))
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
@@ -340,42 +319,42 @@ struct LiveChatPanel: View {
         }
     }
 
-    /// List scrolling never expands the sheet. At the top, continued downward travel only
-    /// dismisses; reverse flicks snap the sheet back instead of leaping to fullscreen.
-    private var listDismissOnlyGesture: some Gesture {
+    /// Same handoff as chapters: list owns the gesture until the top, then continued downward
+    /// travel moves the sheet through expand / collapse / dismiss.
+    private var listHandoffDismissGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
-                guard !isLandscape, !isDismissing else { return }
+                guard !isLandscape else { return }
                 let downward = value.translation.height > 0
                     && abs(value.translation.height) > abs(value.translation.width)
                 guard downward else { return }
 
                 if !isDraggingListSheet {
-                    // Empty/loading bodies leave offset at 0, so they dismiss like top overscroll.
                     guard listScrollOffset <= 1 else { return }
                     listDismissOrigin = value.translation.height
+                    listDragStartExpansion = expansionProgress
                     listDragStartDismiss = dismissTranslation
                     isDraggingListSheet = true
                 }
-                let travel = max(0, value.translation.height - listDismissOrigin)
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    dismissTranslation = listDragStartDismiss + travel
-                }
+                let travel = value.translation.height - listDismissOrigin
+                let position = PlayerSheetDragMath.position(
+                    startExpansion: listDragStartExpansion,
+                    startDismiss: listDragStartDismiss,
+                    translationHeight: travel,
+                    expansionTravel: expansionTravel
+                )
+                expansionProgress = position.expansion
+                dismissTranslation = position.dismiss
             }
             .onEnded { value in
-                guard !isLandscape, !isDismissing else { return }
+                guard !isLandscape else { return }
                 if isDraggingListSheet {
-                    let projected = value.predictedEndTranslation.height - listDismissOrigin
-                    let projectedDismiss = listDragStartDismiss + projected
-                    if projectedDismiss >= Self.dismissalThreshold {
-                        dismissFromDrag()
-                    } else {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
-                            dismissTranslation = 0
-                        }
-                    }
+                    let projectedTravel = value.predictedEndTranslation.height - listDismissOrigin
+                    settleSheet(
+                        startExpansion: listDragStartExpansion,
+                        startDismiss: listDragStartDismiss,
+                        predictedTranslation: projectedTravel
+                    )
                 }
                 listDismissOrigin = 0
                 if listOverscroll <= 0.5 {
@@ -384,36 +363,33 @@ struct LiveChatPanel: View {
             }
     }
 
-    /// Grabber/title only — the sole path that can expand over the video.
+    /// Same as chapters: grabber/title drag never competes with list scrolling.
     private var headerDragGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
-                guard !isLandscape, !isDismissing else { return }
+                guard !isLandscape else { return }
                 guard abs(value.translation.height) > abs(value.translation.width) else { return }
                 if headerDragStartExpansion == nil {
                     headerDragStartExpansion = expansionProgress
                     headerDragStartDismiss = dismissTranslation
                 }
+                let start = headerDragStartExpansion ?? 0
                 let position = PlayerSheetDragMath.position(
-                    startExpansion: headerDragStartExpansion ?? expansionProgress,
+                    startExpansion: start,
                     startDismiss: headerDragStartDismiss,
                     translationHeight: value.translation.height,
                     expansionTravel: expansionTravel
                 )
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    expansionProgress = position.expansion
-                    dismissTranslation = position.dismiss
-                }
+                expansionProgress = position.expansion
+                dismissTranslation = position.dismiss
             }
             .onEnded { value in
-                guard !isLandscape, !isDismissing else { return }
+                guard !isLandscape else { return }
                 guard let start = headerDragStartExpansion else { return }
                 let startDismiss = headerDragStartDismiss
                 headerDragStartExpansion = nil
                 headerDragStartDismiss = 0
-                settleHeader(
+                settleSheet(
                     startExpansion: start,
                     startDismiss: startDismiss,
                     predictedTranslation: value.predictedEndTranslation.height
@@ -421,7 +397,7 @@ struct LiveChatPanel: View {
             }
     }
 
-    private func settleHeader(
+    private func settleSheet(
         startExpansion: CGFloat,
         startDismiss: CGFloat,
         predictedTranslation: CGFloat
