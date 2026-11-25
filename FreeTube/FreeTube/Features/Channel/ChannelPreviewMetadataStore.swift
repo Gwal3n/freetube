@@ -1,6 +1,41 @@
 import Foundation
 import Observation
 
+/// Page-derived extras for the compact channel preview (latest upload + tab presence).
+@available(iOS 17.0, *)
+struct ChannelPreviewPageInfo: Equatable, Sendable {
+    let latestTitle: String?
+    let latestRelative: String?
+    let hasShorts: Bool
+    let hasLive: Bool
+
+    static let empty = ChannelPreviewPageInfo(
+        latestTitle: nil,
+        latestRelative: nil,
+        hasShorts: false,
+        hasLive: false
+    )
+
+    static func from(_ details: ChannelDetails, now: Date = .now) -> ChannelPreviewPageInfo {
+        let latest = details.videos.items.first
+        let title = latest?.title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+        let relative = latest?.publishedText(relativeTo: now)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+            ?? latest?.publishedRelative?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+        return ChannelPreviewPageInfo(
+            latestTitle: title,
+            latestRelative: relative,
+            hasShorts: !details.shorts.items.isEmpty || details.shorts.continuationToken != nil,
+            hasLive: !details.directs.items.isEmpty || details.directs.continuationToken != nil
+        )
+    }
+}
+
 @available(iOS 17.0, *)
 @Observable
 @MainActor
@@ -9,7 +44,7 @@ final class ChannelPreviewMetadataStore {
 
     private struct Entry {
         let channel: Channel?
-        let latestVideoTitle: String?
+        let pageInfo: ChannelPreviewPageInfo
         let expiresAt: Date
     }
 
@@ -45,18 +80,15 @@ final class ChannelPreviewMetadataStore {
         )
     }
 
-    /// Newest Videos-tab title when the full page (or its cache) is already warm.
-    func latestVideoTitle(for channelID: String) -> String? {
+    func pageInfo(for channelID: String) -> ChannelPreviewPageInfo {
         if let entry = entries[channelID], entry.expiresAt > .now,
-           let title = entry.latestVideoTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !title.isEmpty {
-            return title
+           entry.pageInfo != .empty {
+            return entry.pageInfo
         }
-        return pageCache.details(for: channelID)?
-            .videos.items.first?
-            .title
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfEmpty
+        if let cached = pageCache.details(for: channelID) {
+            return .from(cached)
+        }
+        return entries[channelID]?.pageInfo ?? .empty
     }
 
     func isLoading(_ channelID: String) -> Bool {
@@ -74,7 +106,7 @@ final class ChannelPreviewMetadataStore {
         guard !channel.id.isEmpty else { return }
         guard channel.subscriberCount == nil || channel.videoCount == nil
                 || channel.descriptionText?.isEmpty != false else { return }
-        if let entry = entries[channel.id], entry.expiresAt > .now { return }
+        if let entry = entries[channel.id], entry.expiresAt > .now, entry.channel != nil { return }
         if let task = inFlight[channel.id] {
             _ = await task.value
             return
@@ -86,7 +118,7 @@ final class ChannelPreviewMetadataStore {
         inFlight[channel.id] = task
         let fetched = await task.value
         inFlight[channel.id] = nil
-        storeMetadata(fetched, for: channel.id)
+        storeMetadata(fetched, pageInfo: nil, for: channel.id)
     }
 
     /// Warm the channel screen cache while the preview sheet is open.
@@ -94,11 +126,7 @@ final class ChannelPreviewMetadataStore {
         let channelID = id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !channelID.isEmpty else { return }
         if let cached = pageCache.details(for: channelID) {
-            storeMetadata(
-                cached.channel,
-                latestVideoTitle: cached.videos.items.first?.title,
-                for: channelID
-            )
+            storeMetadata(cached.channel, pageInfo: .from(cached), for: channelID)
             return
         }
         if pageInFlight[channelID] != nil { return }
@@ -108,11 +136,7 @@ final class ChannelPreviewMetadataStore {
             do {
                 let details = try await service.fetchChannel(id: channelID)
                 pageCache.store(details, for: channelID)
-                self.storeMetadata(
-                    details.channel,
-                    latestVideoTitle: details.videos.items.first?.title,
-                    for: channelID
-                )
+                self.storeMetadata(details.channel, pageInfo: .from(details), for: channelID)
             } catch {
                 // Preview still works from metadata; the channel screen will retry on open.
             }
@@ -122,15 +146,17 @@ final class ChannelPreviewMetadataStore {
 
     private func storeMetadata(
         _ channel: Channel?,
-        latestVideoTitle: String? = nil,
+        pageInfo: ChannelPreviewPageInfo?,
         for channelID: String
     ) {
         let existing = entries[channelID]
+        let resolvedPage = pageInfo
+            ?? existing?.pageInfo
+            ?? pageCache.details(for: channelID).map(ChannelPreviewPageInfo.from)
+            ?? .empty
         entries[channelID] = Entry(
             channel: channel ?? existing?.channel,
-            latestVideoTitle: latestVideoTitle
-                ?? existing?.latestVideoTitle
-                ?? pageCache.details(for: channelID)?.videos.items.first?.title,
+            pageInfo: resolvedPage,
             expiresAt: .now.addingTimeInterval(channel == nil ? 5 * 60 : 30 * 60)
         )
         if entries.count > 64,
