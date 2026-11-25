@@ -38,8 +38,10 @@ struct LiveChatPanel: View {
     @State private var isDismissing = false
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Modest pad above the home indicator — large insets plus scrollTo were parking the
+    /// latest rows under the bottom edge of the sheet.
     private var bottomContentInset: CGFloat {
-        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8) + 20
+        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8) + 8
     }
 
     var body: some View {
@@ -206,12 +208,12 @@ struct LiveChatPanel: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.top, 8)
+                    .padding(.bottom, bottomContentInset)
 
                     // Outside LazyVStack so the anchor is always realized for scrollTo.
                     Color.clear
                         .frame(height: 1)
                         .id(Self.bottomAnchorID)
-                        .padding(.bottom, bottomContentInset)
                         .accessibilityHidden(true)
                 }
                 // Cancel the ScrollView rubber-band once the sheet owns the drag so rows don't
@@ -222,24 +224,32 @@ struct LiveChatPanel: View {
             .scrollBounceBehavior(.always, axes: .vertical)
             .onAppear {
                 isPinnedToBottom = true
-                scrollToBottom(proxy: proxy, animated: false)
+                scheduleFollowScroll(proxy: proxy, force: true)
             }
             .onChange(of: model.messageRevision) { _, _ in
-                scheduleFollowScroll(proxy: proxy)
+                scheduleFollowScroll(proxy: proxy, force: false)
+            }
+            .onChange(of: expansionProgress) { _, newValue in
+                // Re-pin after expand/collapse so layout height changes don't leave rows
+                // scrolled past the new viewport.
+                guard newValue > 0.95 || newValue < 0.05 else { return }
+                scheduleFollowScroll(proxy: proxy, force: true)
             }
         }
     }
 
-    private func scheduleFollowScroll(proxy: ScrollViewProxy) {
-        guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
+    private func scheduleFollowScroll(proxy: ScrollViewProxy, force: Bool) {
+        guard force || isPinnedToBottom else { return }
+        guard !isDraggingListSheet, !isDismissing else { return }
         followScrollTask?.cancel()
         followScrollTask = Task { @MainActor in
             // Let LazyVStack commit inserted rows, then scroll; a second pass catches late layout.
             await Task.yield()
-            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet else { return }
-            scrollToBottom(proxy: proxy, animated: !reduceMotion)
-            try? await Task.sleep(for: .milliseconds(32))
-            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet else { return }
+            guard !Task.isCancelled, !isDraggingListSheet else { return }
+            guard force || isPinnedToBottom else { return }
+            scrollToBottom(proxy: proxy, animated: !force && !reduceMotion)
+            try? await Task.sleep(for: .milliseconds(48))
+            guard !Task.isCancelled, force || isPinnedToBottom, !isDraggingListSheet else { return }
             scrollToBottom(proxy: proxy, animated: false)
         }
     }
@@ -248,21 +258,22 @@ struct LiveChatPanel: View {
         isProgrammaticScroll = true
         isPinnedToBottom = true
         let scroll = {
+            // Prefer the last real row so we don't overshoot into empty bottom padding.
             if let lastID = model.messages.last?.id {
                 proxy.scrollTo(lastID, anchor: .bottom)
+            } else {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
             }
-            proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
-        // Avoid wrapping scrollTo in withAnimation — it often no-ops on LazyVStack inserts.
         if animated, !reduceMotion {
-            withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.92)) {
+            withAnimation(.easeOut(duration: 0.2)) {
                 scroll()
             }
         } else {
             scroll()
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(animated ? 320 : 24))
+            try? await Task.sleep(for: .milliseconds(animated ? 240 : 24))
             isProgrammaticScroll = false
         }
     }
