@@ -1,12 +1,12 @@
 import SwiftUI
 import Kingfisher
 
-/// Native bottom sheet with channel identity, stats, about, and local subscribe / open actions.
+/// Compact native bottom sheet with channel identity, stats, about, and local actions.
 @available(iOS 17.0, *)
 struct ChannelPreviewSheet: View {
     let request: ChannelPreviewRequest
-    let onOpenChannel: () -> Void
 
+    @Environment(PlayerStateManager.self) private var player
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,57 +22,30 @@ struct ChannelPreviewSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    identity
-                    stats
-                    actions
-                    about
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 28)
-            }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                }
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            headerRow
+            aboutSection
+            actionRow
         }
-        .presentationDetents([.medium, .large])
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 18)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .presentationDetents([.height(268), .medium])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(28)
+        .presentationCornerRadius(24)
         .task(id: request.id) {
-            await metadata.loadIfNeeded(for: seed)
+            await metadata.preparePreview(for: seed)
         }
     }
 
-    private var identity: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle().fill(MediaStyle.placeholderFill)
-                Text(details.name.prefix(1).uppercased())
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                KFImage(details.thumbnailURL)
-                    .thumbnail(size: CGSize(width: 96, height: 96)) { Color.clear }
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 96, height: 96)
-            }
-            .frame(width: 96, height: 96)
-            .clipShape(Circle())
-            .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-            .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
+    private var headerRow: some View {
+        HStack(alignment: .top, spacing: 14) {
+            avatar
 
-            VStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(verbatim: details.name)
-                    .appFont(.title2, weight: .bold)
-                    .multilineTextAlignment(.center)
+                    .appFont(.headline, weight: .semibold)
                     .lineLimit(2)
                 if let handle = details.handle, !handle.isEmpty {
                     Text(verbatim: handle)
@@ -80,63 +53,91 @@ struct ChannelPreviewSheet: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                statsLine
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.top, 4)
+    }
+
+    private var avatar: some View {
+        ZStack {
+            Circle().fill(MediaStyle.placeholderFill)
+            Text(details.name.prefix(1).uppercased())
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
+            KFImage(details.thumbnailURL)
+                .thumbnail(size: CGSize(width: 56, height: 56)) { Color.clear }
+                .resizable()
+                .scaledToFill()
+                .frame(width: 56, height: 56)
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
-    private var stats: some View {
-        if details.subscriberCount != nil || details.videoCount != nil {
-            HStack(spacing: 0) {
-                if let count = details.subscriberCount {
-                    statCell(
-                        value: count.formatted(.number.notation(.compactName)),
-                        label: String(localized: "Subscribers")
-                    )
-                }
-                if details.subscriberCount != nil, details.videoCount != nil {
-                    Divider()
-                        .frame(height: 36)
-                }
-                if let count = details.videoCount {
-                    statCell(
-                        value: count.formatted(.number.notation(.compactName)),
-                        label: String(localized: "Videos")
-                    )
-                }
+    private var statsLine: some View {
+        let parts = statsParts
+        if parts.isEmpty {
+            if metadata.isLoading(request.id) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityLabel("Loading channel details")
             }
-            .padding(.vertical, 14)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        } else if metadata.isLoading(request.id) {
-            ProgressView()
-                .controlSize(.regular)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .accessibilityLabel("Loading channel details")
-        }
-    }
-
-    private func statCell(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(verbatim: value)
-                .appFont(.title3, weight: .semibold)
-                .monospacedDigit()
-            Text(label)
+        } else {
+            Text(verbatim: parts.joined(separator: " · "))
                 .appFont(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
     }
 
-    private var actions: some View {
-        VStack(spacing: 10) {
+    private var statsParts: [String] {
+        var parts: [String] = []
+        if let count = details.subscriberCount {
+            let compact = count.formatted(.number.notation(.compactName))
+            parts.append(String(localized: "\(compact) subscribers"))
+        }
+        if let count = details.videoCount {
+            let compact = count.formatted(.number.notation(.compactName))
+            parts.append(String(localized: "\(compact) videos"))
+        }
+        return parts
+    }
+
+    @ViewBuilder
+    private var aboutSection: some View {
+        let description = details.descriptionText?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !description.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: description)
+                    .appFont(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(isDescriptionExpanded ? 8 : 3)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if description.count > 140 {
+                    Button(isDescriptionExpanded ? "Show Less" : "More") {
+                        withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
+                            isDescriptionExpanded.toggle()
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+            }
+        }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 10) {
             Button(action: toggleSubscribe) {
                 Text(details.isSubscribed ? "Subscribed" : "Subscribe")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .foregroundStyle(details.isSubscribed
                         ? Color.primary
                         : (colorScheme == .dark ? Color.black : Color.white))
@@ -150,50 +151,14 @@ struct ChannelPreviewSheet: View {
             .buttonStyle(ResponsiveButtonStyle())
             .animation(reduceMotion ? nil : InterfaceMotion.quick, value: details.isSubscribed)
 
-            Button {
-                dismiss()
-                // Let the sheet finish dismissing before collapsing the player for navigation.
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(220))
-                    onOpenChannel()
-                }
-            } label: {
+            Button(action: openChannel) {
                 Text("Go to Channel")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .foregroundStyle(.primary)
                     .background(Color.primary.opacity(0.08), in: Capsule())
             }
             .buttonStyle(ResponsiveButtonStyle())
-        }
-    }
-
-    @ViewBuilder
-    private var about: some View {
-        let description = details.descriptionText?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !description.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("About")
-                    .appFont(.headline, weight: .semibold)
-                Text(verbatim: description)
-                    .appFont(.body)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(isDescriptionExpanded ? nil : 5)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if description.count > 220 || description.split(separator: "\n").count > 5 {
-                    Button(isDescriptionExpanded ? "Show Less" : "More") {
-                        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                            isDescriptionExpanded.toggle()
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -203,5 +168,14 @@ struct ChannelPreviewSheet: View {
         } else {
             subscriptions.add(details.withSubscribed(true))
         }
+    }
+
+    /// Collapse and navigate immediately — do not wait for the player spring completion.
+    /// Logs showed multi-second stalls when Go to Channel waited on `finishPlayerCollapse`.
+    private func openChannel() {
+        let channelID = request.id
+        metadata.prefetchChannelPage(id: channelID)
+        dismiss()
+        MediaContextNavigation.open(.freetubeOpenChannel, id: channelID, player: player)
     }
 }

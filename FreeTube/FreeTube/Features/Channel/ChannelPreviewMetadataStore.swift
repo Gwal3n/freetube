@@ -14,10 +14,16 @@ final class ChannelPreviewMetadataStore {
 
     private var entries: [String: Entry] = [:]
     private var inFlight: [String: Task<Channel?, Never>] = [:]
+    private var pageInFlight: [String: Task<Void, Never>] = [:]
     private let service: any ChannelServicing
+    private let pageCache: ChannelDetailsCache
 
-    private init(service: any ChannelServicing = ChannelService()) {
+    private init(
+        service: any ChannelServicing = ChannelService(),
+        pageCache: ChannelDetailsCache = .shared
+    ) {
         self.service = service
+        self.pageCache = pageCache
     }
 
     func enriched(_ original: Channel) -> Channel {
@@ -42,6 +48,13 @@ final class ChannelPreviewMetadataStore {
         inFlight[channelID] != nil
     }
 
+    /// Header-only fetch for the compact preview sheet, plus a background full channel page
+    /// so "Go to Channel" can paint from `ChannelDetailsCache` immediately.
+    func preparePreview(for channel: Channel) async {
+        prefetchChannelPage(id: channel.id)
+        await loadIfNeeded(for: channel)
+    }
+
     func loadIfNeeded(for channel: Channel) async {
         guard !channel.id.isEmpty else { return }
         guard channel.subscriberCount == nil || channel.videoCount == nil
@@ -58,9 +71,33 @@ final class ChannelPreviewMetadataStore {
         inFlight[channel.id] = task
         let fetched = await task.value
         inFlight[channel.id] = nil
-        entries[channel.id] = Entry(
-            channel: fetched,
-            expiresAt: .now.addingTimeInterval(fetched == nil ? 5 * 60 : 30 * 60)
+        storeMetadata(fetched, for: channel.id)
+    }
+
+    /// Warm the channel screen cache while the preview sheet is open.
+    func prefetchChannelPage(id: String) {
+        let channelID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !channelID.isEmpty else { return }
+        if pageCache.details(for: channelID) != nil { return }
+        if pageInFlight[channelID] != nil { return }
+
+        let task = Task { [service, pageCache] in
+            defer { self.pageInFlight[channelID] = nil }
+            do {
+                let details = try await service.fetchChannel(id: channelID)
+                pageCache.store(details, for: channelID)
+                self.storeMetadata(details.channel, for: channelID)
+            } catch {
+                // Preview still works from metadata; the channel screen will retry on open.
+            }
+        }
+        pageInFlight[channelID] = task
+    }
+
+    private func storeMetadata(_ channel: Channel?, for channelID: String) {
+        entries[channelID] = Entry(
+            channel: channel,
+            expiresAt: .now.addingTimeInterval(channel == nil ? 5 * 60 : 30 * 60)
         )
         if entries.count > 64,
            let oldestKey = entries.min(by: { $0.value.expiresAt < $1.value.expiresAt })?.key {
