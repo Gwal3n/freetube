@@ -7,7 +7,10 @@ import SwiftUI
 struct LiveChatPanel: View {
     /// Same threshold as chapters — past the player-bottom edge by this much dismisses.
     private static let dismissalThreshold: CGFloat = 42
-    private static let pinToBottomSlack: CGFloat = 120
+    /// Distance from the live edge that counts as "still following".
+    private static let pinToBottomSlack: CGFloat = 80
+    /// Must be snugly at the bottom before follow re-engages after reading history.
+    private static let pinReengageDistance: CGFloat = 28
     private static let bottomAnchorID = "liveChatBottomAnchor"
 
     @Environment(PlayerStateManager.self) private var player
@@ -26,12 +29,11 @@ struct LiveChatPanel: View {
     @State private var listScrollOffset: CGFloat = 0
     @State private var listOverscroll: CGFloat = 0
     @State private var listDismissOrigin: CGFloat = 0
-    @State private var listDragStartExpansion: CGFloat = 0
     @State private var listDragStartDismiss: CGFloat = 0
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
     @State private var headerDragStartDismiss: CGFloat = 0
-    /// Sticky follow: cleared only when the user scrolls upward away from live.
+    /// Sticky follow: cleared when the user scrolls away from the live edge.
     @State private var isPinnedToBottom = true
     @State private var isProgrammaticScroll = false
     @State private var followScrollTask: Task<Void, Never>?
@@ -142,6 +144,7 @@ struct LiveChatPanel: View {
                 .controlSize(.regular)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("Loading live chat")
+                .simultaneousGesture(listDismissOnlyGesture)
         } else if model.messages.isEmpty {
             emptyState(
                 title: model.chatEnded ? "Live chat has ended" : "Waiting for messages",
@@ -162,23 +165,20 @@ struct LiveChatPanel: View {
                         overscroll: max(0, -scrolled),
                         distanceFromBottom: remaining
                     )
-                } action: { old, sample in
+                } action: { _, sample in
                     listScrollOffset = sample.topOffset
                     listOverscroll = sample.overscroll
                     if !isProgrammaticScroll {
-                        if sample.distanceFromBottom < Self.pinToBottomSlack {
-                            isPinnedToBottom = true
-                        } else if sample.topOffset + 1.5 < old.topOffset {
-                            // Only an upward user scroll clears the pin — not content growth below.
-                            isPinnedToBottom = false
-                        }
+                        updatePinState(distanceFromBottom: sample.distanceFromBottom)
                     }
                     if isDraggingListSheet, listDismissOrigin == 0, sample.overscroll <= 0.5 {
                         isDraggingListSheet = false
                     }
                 }
-                .simultaneousGesture(listHandoffDismissGesture)
+                .simultaneousGesture(listDismissOnlyGesture)
         } else {
+            // iOS 17 has no scroll-geometry signal, so list dismiss would steal every downward
+            // drag — match chapters and keep dismiss/expand on the grabber only.
             chatRows
         }
     }
@@ -214,19 +214,14 @@ struct LiveChatPanel: View {
             }
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.always, axes: .vertical)
+            // Always apply the same modifier chain — toggling modifiers remounts the scroll view
+            // and jumps the offset to the top.
             .modifier(LiveChatBottomScrollAnchor(isPinned: isPinnedToBottom))
-            // Grow rows gently while pinned so size-change anchoring doesn't stutter.
-            .animation(
-                isPinnedToBottom && !reduceMotion ? .easeOut(duration: 0.18) : nil,
-                value: model.messageRevision
-            )
             .onAppear {
                 isPinnedToBottom = true
-                // Initial layout only — ongoing follow uses the size-change anchor on iOS 18+.
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: model.messageRevision) { _, _ in
-                // iOS 18 size-change anchor keeps pinned follow smooth; only nudge on older OS.
                 guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
                 if #unavailable(iOS 18.0) {
                     scheduleFollowScroll(proxy: proxy)
@@ -247,6 +242,16 @@ struct LiveChatPanel: View {
             description: Text(description)
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Empty body is always "at the top" — pull down dismisses like chapters overscroll.
+        .simultaneousGesture(listDismissOnlyGesture)
+    }
+
+    private func updatePinState(distanceFromBottom: CGFloat) {
+        if distanceFromBottom > Self.pinToBottomSlack {
+            isPinnedToBottom = false
+        } else if distanceFromBottom < Self.pinReengageDistance {
+            isPinnedToBottom = true
+        }
     }
 
     private func scheduleFollowScroll(proxy: ScrollViewProxy) {
@@ -321,7 +326,9 @@ struct LiveChatPanel: View {
         }
     }
 
-    private var listHandoffDismissGesture: some Gesture {
+    /// List scrolling never expands the sheet. At the top, continued downward travel only
+    /// dismisses; reverse flicks snap the sheet back instead of leaping to fullscreen.
+    private var listDismissOnlyGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
                 guard !isLandscape, !isDismissing else { return }
@@ -330,26 +337,31 @@ struct LiveChatPanel: View {
                 guard downward else { return }
 
                 if !isDraggingListSheet {
+                    // Empty/loading bodies leave offset at 0, so they dismiss like top overscroll.
                     guard listScrollOffset <= 1 else { return }
                     listDismissOrigin = value.translation.height
-                    listDragStartExpansion = expansionProgress
                     listDragStartDismiss = dismissTranslation
                     isDraggingListSheet = true
                 }
-                applyDrag(
-                    startExpansion: listDragStartExpansion,
-                    startDismiss: listDragStartDismiss,
-                    translationHeight: value.translation.height - listDismissOrigin
-                )
+                let travel = max(0, value.translation.height - listDismissOrigin)
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    dismissTranslation = listDragStartDismiss + travel
+                }
             }
             .onEnded { value in
                 guard !isLandscape, !isDismissing else { return }
                 if isDraggingListSheet {
-                    settleSheet(
-                        startExpansion: listDragStartExpansion,
-                        startDismiss: listDragStartDismiss,
-                        predictedTranslation: value.predictedEndTranslation.height - listDismissOrigin
-                    )
+                    let projected = value.predictedEndTranslation.height - listDismissOrigin
+                    let projectedDismiss = listDragStartDismiss + projected
+                    if projectedDismiss >= Self.dismissalThreshold {
+                        dismissFromDrag()
+                    } else {
+                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                            dismissTranslation = 0
+                        }
+                    }
                 }
                 listDismissOrigin = 0
                 if listOverscroll <= 0.5 {
@@ -358,20 +370,28 @@ struct LiveChatPanel: View {
             }
     }
 
+    /// Grabber/title only — the sole path that can expand over the video.
     private var headerDragGesture: some Gesture {
-        DragGesture(minimumDistance: 4, coordinateSpace: .global)
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
                 guard !isLandscape, !isDismissing else { return }
-                guard abs(value.translation.height) > abs(value.translation.width) * 0.6 else { return }
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
                 if headerDragStartExpansion == nil {
                     headerDragStartExpansion = expansionProgress
                     headerDragStartDismiss = dismissTranslation
                 }
-                applyDrag(
+                let position = PlayerSheetDragMath.position(
                     startExpansion: headerDragStartExpansion ?? expansionProgress,
                     startDismiss: headerDragStartDismiss,
-                    translationHeight: value.translation.height
+                    translationHeight: value.translation.height,
+                    expansionTravel: expansionTravel
                 )
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    expansionProgress = position.expansion
+                    dismissTranslation = position.dismiss
+                }
             }
             .onEnded { value in
                 guard !isLandscape, !isDismissing else { return }
@@ -379,7 +399,7 @@ struct LiveChatPanel: View {
                 let startDismiss = headerDragStartDismiss
                 headerDragStartExpansion = nil
                 headerDragStartDismiss = 0
-                settleSheet(
+                settleHeader(
                     startExpansion: start,
                     startDismiss: startDismiss,
                     predictedTranslation: value.predictedEndTranslation.height
@@ -387,32 +407,11 @@ struct LiveChatPanel: View {
             }
     }
 
-    /// Finger-following updates without animation so the grabber stays 1:1 with the touch.
-    private func applyDrag(
-        startExpansion: CGFloat,
-        startDismiss: CGFloat,
-        translationHeight: CGFloat
-    ) {
-        let position = PlayerSheetDragMath.position(
-            startExpansion: startExpansion,
-            startDismiss: startDismiss,
-            translationHeight: translationHeight,
-            expansionTravel: expansionTravel
-        )
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            expansionProgress = position.expansion
-            dismissTranslation = position.dismiss
-        }
-    }
-
-    private func settleSheet(
+    private func settleHeader(
         startExpansion: CGFloat,
         startDismiss: CGFloat,
         predictedTranslation: CGFloat
     ) {
-        // Same detents as chapters: expanded (over video), collapsed (player bottom), or dismiss.
         let settlement = PlayerSheetDragMath.settlement(
             startExpansion: startExpansion,
             startDismiss: startDismiss,
@@ -444,18 +443,17 @@ private struct ScrollPinSample: Equatable {
     var distanceFromBottom: CGFloat
 }
 
-/// Keeps the viewport glued to the bottom as rows arrive, without per-message scrollTo jumps.
+/// Keeps follow glued to the live edge without remounting the ScrollView when pin toggles.
+/// Branching to a bare `content` when unpinned reset the offset to the top.
 @available(iOS 17.0, *)
 private struct LiveChatBottomScrollAnchor: ViewModifier {
     let isPinned: Bool
 
     func body(content: Content) -> some View {
-        if isPinned {
-            if #available(iOS 18.0, *) {
-                content.defaultScrollAnchor(.bottom, for: .sizeChanges)
-            } else {
-                content.defaultScrollAnchor(.bottom)
-            }
+        if #available(iOS 18.0, *) {
+            // Same modifier always: bottom while following, top while reading history so new
+            // rows append below without yanking the viewport.
+            content.defaultScrollAnchor(isPinned ? .bottom : .top, for: .sizeChanges)
         } else {
             content
         }
