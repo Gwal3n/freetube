@@ -9,6 +9,8 @@ import Observation
 final class LiveChatViewModel {
     let videoID: String
     private(set) var messages: [LiveChatMessage] = []
+    /// Bumps on every accepted append so the sheet can follow even when the capped count is flat.
+    private(set) var messageRevision: Int = 0
     private(set) var isLoading = false
     private(set) var isPolling = false
     private(set) var chatUnavailable = false
@@ -103,6 +105,7 @@ final class LiveChatViewModel {
             for message in removed { knownIDs.remove(message.id) }
             messages.removeFirst(overflow)
         }
+        messageRevision &+= 1
     }
 
     private func handle(_ error: YouTubeServiceError) {

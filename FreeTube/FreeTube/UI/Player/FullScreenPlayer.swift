@@ -455,19 +455,25 @@ struct FullScreenPlayer: View {
             if !isFloating, player.liveChatPresented, player.currentVideo?.isLive == true,
                let liveVideoID = player.currentVideo?.id, !usesPortraitFullscreen {
                 let chatTop = surfaceHeight * (1 - liveChatPanelExpansion)
-                PlayerLiveChatOverlay(
-                    videoID: liveVideoID,
-                    isLandscape: isLandscape,
-                    expansionProgress: $liveChatPanelExpansion,
-                    expansionTravel: surfaceHeight
-                )
-                .frame(
-                    width: isLandscape ? sidePanelWidth : proxy.size.width,
-                    height: isLandscape ? proxy.size.height : max(0, proxy.size.height - chatTop)
-                )
-                .offset(y: isLandscape ? 0 : chatTop)
-                .transition(isLandscape ? .identity : .move(edge: .bottom))
-                .zIndex(5)
+                let chatWidth = isLandscape ? sidePanelWidth : proxy.size.width
+                // Stable full-column height + offset (clipped). Shrinking height while dragging
+                // relaid out the message list every touch sample and made the grabber feel sticky.
+                Color.clear
+                    .frame(width: chatWidth, height: proxy.size.height)
+                    .overlay(alignment: .top) {
+                        PlayerLiveChatOverlay(
+                            videoID: liveVideoID,
+                            isLandscape: isLandscape,
+                            expansionProgress: $liveChatPanelExpansion,
+                            expansionTravel: surfaceHeight,
+                            containerHeight: proxy.size.height
+                        )
+                        .frame(width: chatWidth, height: proxy.size.height)
+                        .offset(y: isLandscape ? 0 : chatTop)
+                    }
+                    .clipped()
+                    .transition(isLandscape ? .identity : .move(edge: .bottom))
+                    .zIndex(5)
             }
 
             if !isFloating {

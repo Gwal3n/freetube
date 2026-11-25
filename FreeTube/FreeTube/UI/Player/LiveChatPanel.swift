@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Non-modal live chat browser. Portrait: sheet below the video with chapter-style drag dismiss.
+/// Non-modal live chat browser. Portrait: sheet below the video with continuous drag dismiss.
 /// Landscape: trailing column beside the video. The view model is owned by the player so messages
 /// survive sheet dismiss.
 @available(iOS 17.0, *)
 struct LiveChatPanel: View {
-    private static let dismissalThreshold: CGFloat = 42
-    /// Keep following new messages while the user is roughly at the latest row.
-    private static let pinToBottomSlack: CGFloat = 96
+    /// Past the player-bottom edge by this much commits a full dismiss (no collapsed detent).
+    private static let dismissalThreshold: CGFloat = 28
+    private static let pinToBottomSlack: CGFloat = 120
     private static let bottomAnchorID = "liveChatBottomAnchor"
 
     @Environment(PlayerStateManager.self) private var player
@@ -15,7 +15,11 @@ struct LiveChatPanel: View {
     @Bindable var model: LiveChatViewModel
     let isLandscape: Bool
     @Binding var expansionProgress: CGFloat
+    /// Video-surface height — distance from expanded top to the player-bottom edge.
     let expansionTravel: CGFloat
+    /// Full player-column height. Used so dismiss travel clears the sheet even when the feed
+    /// strip is taller than the video.
+    let containerHeight: CGFloat
     let onDismiss: () -> Void
 
     @State private var dismissTranslation: CGFloat = 0
@@ -27,7 +31,7 @@ struct LiveChatPanel: View {
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
     @State private var headerDragStartDismiss: CGFloat = 0
-    /// Sticky follow flag: only clears when the user deliberately scrolls away from live.
+    /// Sticky follow: cleared only when the user scrolls upward away from live.
     @State private var isPinnedToBottom = true
     @State private var isProgrammaticScroll = false
     @State private var followScrollTask: Task<Void, Never>?
@@ -35,50 +39,13 @@ struct LiveChatPanel: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private var bottomContentInset: CGFloat {
-        // Clear the home indicator and the sheet's bottom corner radius.
         max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8) + 20
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                if !isLandscape {
-                    Capsule()
-                        .fill(.secondary.opacity(0.55))
-                        .frame(width: 36, height: 5)
-                        .padding(.top, 7)
-                        .padding(.bottom, 1)
-                        .accessibilityHidden(true)
-                }
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Live chat")
-                            .font(.headline)
-                        Text(statusSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button {
-                        dismissAnimated()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.subheadline.weight(.bold))
-                            .frame(width: 30, height: 30)
-                            .background(.quaternary, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(.interaction, Rectangle().inset(by: -7))
-                    .accessibilityLabel("Close live chat")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .contentShape(Rectangle())
-            .simultaneousGesture(headerDragGesture)
-
+            header
             Divider().opacity(0.45)
-
             chatScrollView
         }
         .background(Color(uiColor: .systemBackground))
@@ -89,8 +56,6 @@ struct LiveChatPanel: View {
                 .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
         }
         .shadow(color: .black.opacity(0.28), radius: 14)
-        // Move the complete sheet after background/clipping so the material travels with the drag
-        // instead of leaving a parked rectangle over the feed (same as chapters).
         .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
         .errorToast(Bindable(model).errorState)
         .task(id: model.videoID) {
@@ -104,9 +69,48 @@ struct LiveChatPanel: View {
             }
         }
         .onDisappear {
-            // Pause the poller while the sheet is gone; keep messages and continuation.
+            followScrollTask?.cancel()
+            followScrollTask = nil
             model.stopPolling()
         }
+    }
+
+    private var header: some View {
+        VStack(spacing: 0) {
+            if !isLandscape {
+                Capsule()
+                    .fill(.secondary.opacity(0.55))
+                    .frame(width: 36, height: 5)
+                    .padding(.top, 7)
+                    .padding(.bottom, 1)
+                    .accessibilityHidden(true)
+            }
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Live chat")
+                        .font(.headline)
+                    Text(statusSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    dismissAnimated()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.subheadline.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(.quaternary, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .contentShape(.interaction, Rectangle().inset(by: -7))
+                .accessibilityLabel("Close live chat")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .contentShape(Rectangle())
+        .simultaneousGesture(headerDragGesture)
     }
 
     private var statusSubtitle: String {
@@ -135,18 +139,12 @@ struct LiveChatPanel: View {
                     return ScrollPinSample(
                         topOffset: max(0, scrolled),
                         overscroll: max(0, -scrolled),
-                        isNearBottom: remaining < Self.pinToBottomSlack
+                        distanceFromBottom: remaining
                     )
-                } action: { _, sample in
+                } action: { old, sample in
                     listScrollOffset = sample.topOffset
                     listOverscroll = sample.overscroll
-                    if sample.isNearBottom {
-                        isPinnedToBottom = true
-                    } else if !isProgrammaticScroll {
-                        isPinnedToBottom = false
-                    }
-                    // After a cancelled pull, retain compensation until the ScrollView finishes
-                    // its own snap-back; dropping it at touch-up would create a one-frame gap.
+                    updatePinState(from: old, to: sample)
                     if isDraggingListSheet, listDismissOrigin == 0, sample.overscroll <= 0.5 {
                         isDraggingListSheet = false
                     }
@@ -160,54 +158,57 @@ struct LiveChatPanel: View {
     private var chatRows: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
-                    if model.chatUnavailable {
-                        ContentUnavailableView(
-                            "Live chat unavailable",
-                            systemImage: "bubble.left.and.bubble.right",
-                            description: Text("Chat isn’t available for this stream.")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 48)
-                    } else if model.isLoading && model.messages.isEmpty {
-                        ProgressView()
-                            .controlSize(.regular)
+                VStack(spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if model.chatUnavailable {
+                            ContentUnavailableView(
+                                "Live chat unavailable",
+                                systemImage: "bubble.left.and.bubble.right",
+                                description: Text("Chat isn’t available for this stream.")
+                            )
                             .frame(maxWidth: .infinity)
-                            .padding(.top, 36)
-                            .padding(.bottom, 24)
-                            .accessibilityLabel("Loading live chat")
-                    } else if model.messages.isEmpty {
-                        ContentUnavailableView(
-                            model.chatEnded ? "Live chat has ended" : "Waiting for messages",
-                            systemImage: "text.bubble",
-                            description: Text(model.chatEnded
-                                ? "This stream’s chat is no longer updating."
-                                : "New messages will appear here.")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 48)
-                    } else {
-                        ForEach(model.messages) { message in
-                            LiveChatRow(message: message) { channelID in
-                                player.presentChannelPreview(
-                                    id: channelID,
-                                    name: message.authorName
-                                )
+                            .padding(.vertical, 48)
+                        } else if model.isLoading && model.messages.isEmpty {
+                            ProgressView()
+                                .controlSize(.regular)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 36)
+                                .padding(.bottom, 24)
+                                .accessibilityLabel("Loading live chat")
+                        } else if model.messages.isEmpty {
+                            ContentUnavailableView(
+                                model.chatEnded ? "Live chat has ended" : "Waiting for messages",
+                                systemImage: "text.bubble",
+                                description: Text(model.chatEnded
+                                    ? "This stream’s chat is no longer updating."
+                                    : "New messages will appear here.")
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 48)
+                        } else {
+                            ForEach(model.messages) { message in
+                                LiveChatRow(message: message) { channelID in
+                                    player.presentChannelPreview(
+                                        id: channelID,
+                                        name: message.authorName
+                                    )
+                                }
+                                .id(message.id)
                             }
-                            .id(message.id)
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+
+                    // Outside LazyVStack so the anchor is always realized for scrollTo.
                     Color.clear
                         .frame(height: 1)
                         .id(Self.bottomAnchorID)
+                        .padding(.bottom, bottomContentInset)
                         .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-                .padding(.bottom, bottomContentInset)
-                // Once the gesture hands off, the complete panel already follows the finger. Cancel
-                // the ScrollView's simultaneous visual rubber-band so the rows retain a constant
-                // distance from the header instead of appearing to travel twice as fast.
+                // Cancel the ScrollView rubber-band once the sheet owns the drag so rows don't
+                // travel twice as fast as the header.
                 .offset(y: isDraggingListSheet ? -listOverscroll : 0)
             }
             .scrollIndicators(.visible)
@@ -216,27 +217,37 @@ struct LiveChatPanel: View {
                 isPinnedToBottom = true
                 scrollToBottom(proxy: proxy, animated: false)
             }
-            .onChange(of: model.messages.count) { _, _ in
+            .onChange(of: model.messageRevision) { _, _ in
                 scheduleFollowScroll(proxy: proxy)
-            }
-            .onChange(of: model.messages.last?.id) { _, _ in
-                scheduleFollowScroll(proxy: proxy)
-            }
-            .onDisappear {
-                followScrollTask?.cancel()
-                followScrollTask = nil
             }
         }
     }
 
-    /// Coalesce rapid poll batches so one smooth settle follows the latest layout pass.
+    /// Content growth below the viewport must not clear the pin — only an upward user scroll does.
+    private func updatePinState(from old: ScrollPinSample, to sample: ScrollPinSample) {
+        if isProgrammaticScroll { return }
+        if sample.distanceFromBottom < Self.pinToBottomSlack {
+            isPinnedToBottom = true
+            return
+        }
+        // User dragged content upward (reading history). Stable/increased offset with a larger
+        // distanceFromBottom means new rows arrived below while we stayed put — stay pinned.
+        if sample.topOffset + 1.5 < old.topOffset {
+            isPinnedToBottom = false
+        }
+    }
+
     private func scheduleFollowScroll(proxy: ScrollViewProxy) {
         guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
         followScrollTask?.cancel()
         followScrollTask = Task { @MainActor in
+            // Let LazyVStack commit inserted rows, then scroll; a second pass catches late layout.
             await Task.yield()
-            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
-            scrollToBottom(proxy: proxy, animated: true)
+            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet else { return }
+            scrollToBottom(proxy: proxy, animated: !reduceMotion)
+            try? await Task.sleep(for: .milliseconds(32))
+            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet else { return }
+            scrollToBottom(proxy: proxy, animated: false)
         }
     }
 
@@ -244,50 +255,40 @@ struct LiveChatPanel: View {
         isProgrammaticScroll = true
         isPinnedToBottom = true
         let scroll = {
-            // Prefer the last row for LazyVStack reliability, then the sentinel so new height
-            // after insert still lands flush with the bottom inset.
             if let lastID = model.messages.last?.id {
                 proxy.scrollTo(lastID, anchor: .bottom)
             }
             proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
+        // Avoid wrapping scrollTo in withAnimation — it often no-ops on LazyVStack inserts.
         if animated, !reduceMotion {
-            withAnimation(.easeOut(duration: 0.28)) {
+            withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.92)) {
                 scroll()
             }
         } else {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                scroll()
-            }
+            scroll()
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(animated ? 300 : 16))
+            try? await Task.sleep(for: .milliseconds(animated ? 320 : 24))
             isProgrammaticScroll = false
         }
     }
 
     private func dismissAnimated() {
         guard !isDismissing else { return }
-        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-            onDismiss()
-        }
-    }
-
-    /// Finish a drag-dismiss from the current finger position without snapping back first.
-    private func dismissFromDrag() {
-        guard !isDismissing else { return }
         isDismissing = true
-        // Keep the current expansion so the sheet slides away as one piece. Zeroing expansion
-        // here collapses onto the player-bottom "Live chat" detent mid-exit.
-        let clearDistance = expansionTravel * max(expansionProgress, 0) + expansionTravel
-        let offscreen = dismissTranslation + max(clearDistance, expansionTravel)
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) {
+        // Drive the sheet fully off-screen from its current top, then drop presentation.
+        let currentTop = PlayerSheetDragMath.Position.top(
+            expansion: expansionProgress,
+            dismiss: dismissTranslation,
+            travel: expansionTravel
+        )
+        let offscreen = dismissTranslation + max(containerHeight - currentTop, expansionTravel) + 40
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.30)) {
             dismissTranslation = offscreen
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 290))
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 310))
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
@@ -296,8 +297,29 @@ struct LiveChatPanel: View {
         }
     }
 
-    /// The list owns the gesture while it has content above it. As soon as it reaches the top,
-    /// continued downward travel is measured from that exact handoff point and moves the sheet.
+    private func dismissFromDrag() {
+        guard !isDismissing else { return }
+        isDismissing = true
+        let currentTop = PlayerSheetDragMath.Position.top(
+            expansion: expansionProgress,
+            dismiss: dismissTranslation,
+            travel: expansionTravel
+        )
+        // Clear the remaining visible span — feed can be taller than the video travel distance.
+        let offscreen = dismissTranslation + max(containerHeight - currentTop, 1) + 40
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.30)) {
+            dismissTranslation = offscreen
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 310))
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                onDismiss()
+            }
+        }
+    }
+
     private var listHandoffDismissGesture: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { value in
@@ -313,15 +335,11 @@ struct LiveChatPanel: View {
                     listDragStartDismiss = dismissTranslation
                     isDraggingListSheet = true
                 }
-                let travel = value.translation.height - listDismissOrigin
-                let position = PlayerSheetDragMath.position(
+                applyDrag(
                     startExpansion: listDragStartExpansion,
                     startDismiss: listDragStartDismiss,
-                    translationHeight: travel,
-                    expansionTravel: expansionTravel
+                    translationHeight: value.translation.height - listDismissOrigin
                 )
-                expansionProgress = position.expansion
-                dismissTranslation = position.dismiss
             }
             .onEnded { value in
                 guard !isLandscape, !isDismissing else { return }
@@ -339,27 +357,20 @@ struct LiveChatPanel: View {
             }
     }
 
-    /// The header is outside the ScrollView, so this recognizer never competes with list scrolling.
     private var headerDragGesture: some Gesture {
-        // Measure against the screen rather than the moving panel. A local-space gesture changes
-        // its own coordinate system as `.offset` moves the sheet, producing visible oscillation.
-        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
                 guard !isLandscape, !isDismissing else { return }
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                guard abs(value.translation.height) > abs(value.translation.width) * 0.6 else { return }
                 if headerDragStartExpansion == nil {
                     headerDragStartExpansion = expansionProgress
                     headerDragStartDismiss = dismissTranslation
                 }
-                let start = headerDragStartExpansion ?? 0
-                let position = PlayerSheetDragMath.position(
-                    startExpansion: start,
+                applyDrag(
+                    startExpansion: headerDragStartExpansion ?? expansionProgress,
                     startDismiss: headerDragStartDismiss,
-                    translationHeight: value.translation.height,
-                    expansionTravel: expansionTravel
+                    translationHeight: value.translation.height
                 )
-                expansionProgress = position.expansion
-                dismissTranslation = position.dismiss
             }
             .onEnded { value in
                 guard !isLandscape, !isDismissing else { return }
@@ -375,31 +386,46 @@ struct LiveChatPanel: View {
             }
     }
 
+    /// Finger-following updates without animation so the grabber stays 1:1 with the touch.
+    private func applyDrag(
+        startExpansion: CGFloat,
+        startDismiss: CGFloat,
+        translationHeight: CGFloat
+    ) {
+        let position = PlayerSheetDragMath.position(
+            startExpansion: startExpansion,
+            startDismiss: startDismiss,
+            translationHeight: translationHeight,
+            expansionTravel: expansionTravel
+        )
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            expansionProgress = position.expansion
+            dismissTranslation = position.dismiss
+        }
+    }
+
     private func settleSheet(
         startExpansion: CGFloat,
         startDismiss: CGFloat,
         predictedTranslation: CGFloat
     ) {
-        let settlement = PlayerSheetDragMath.settlement(
-            startExpansion: startExpansion,
-            startDismiss: startDismiss,
-            predictedTranslationHeight: predictedTranslation,
-            expansionTravel: expansionTravel,
-            dismissThreshold: Self.dismissalThreshold
+        let travel = max(1, expansionTravel)
+        let startTop = PlayerSheetDragMath.Position.top(
+            expansion: startExpansion,
+            dismiss: startDismiss,
+            travel: travel
         )
-        switch settlement {
-        case .dismiss:
+        let projectedTop = max(0, startTop + predictedTranslation)
+        // No collapsed detent — past the player-bottom edge dismisses fully; otherwise expand.
+        if projectedTop >= travel + Self.dismissalThreshold {
             dismissFromDrag()
-        case .expanded:
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
-                expansionProgress = 1
-                dismissTranslation = 0
-            }
-        case .collapsed:
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
-                expansionProgress = 0
-                dismissTranslation = 0
-            }
+            return
+        }
+        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
+            expansionProgress = 1
+            dismissTranslation = 0
         }
     }
 }
@@ -408,5 +434,5 @@ struct LiveChatPanel: View {
 private struct ScrollPinSample: Equatable {
     var topOffset: CGFloat
     var overscroll: CGFloat
-    var isNearBottom: Bool
+    var distanceFromBottom: CGFloat
 }

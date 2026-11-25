@@ -9,6 +9,7 @@ struct PlayerLiveChatOverlay: View {
     let isLandscape: Bool
     @Binding var expansionProgress: CGFloat
     let expansionTravel: CGFloat
+    let containerHeight: CGFloat
 
     var body: some View {
         LiveChatPanel(
@@ -16,9 +17,9 @@ struct PlayerLiveChatOverlay: View {
             isLandscape: isLandscape,
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
+            containerHeight: containerHeight,
             onDismiss: {
-                // Match chapters: only flip presentation. Zeroing expansion here collapses the
-                // sheet onto the player-bottom detent and fights `.move(edge: .bottom)`.
+                // Only flip presentation. Expansion resets in FullScreenPlayer after removal.
                 player.liveChatPresented = false
             }
         )
