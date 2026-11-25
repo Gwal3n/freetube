@@ -13,6 +13,7 @@ struct ChannelPreviewSheet: View {
     @State private var metadata = ChannelPreviewMetadataStore.shared
     @State private var subscriptions = LocalSubscriptionStore.shared
     @State private var isDescriptionExpanded = false
+    @State private var fittedHeight: CGFloat = 188
 
     private var seed: Channel { request.seedChannel }
 
@@ -21,29 +22,67 @@ struct ChannelPreviewSheet: View {
         return enriched.withSubscribed(subscriptions.contains(enriched.id))
     }
 
+    private var aboutText: String {
+        details.descriptionText?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    /// Only offer a taller detent when there is a longer about to read.
+    private var canExpand: Bool { aboutText.count > 120 }
+
+    private var latestTitle: String? {
+        metadata.latestVideoTitle(for: request.id)
+    }
+
+    private var detents: Set<PresentationDetent> {
+        var set: Set<PresentationDetent> = [.height(max(fittedHeight, 1))]
+        if canExpand {
+            set.insert(.medium)
+        }
+        return set
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             headerRow
+            if let latestTitle {
+                latestUploadRow(latestTitle)
+            }
             aboutSection
             actionRow
         }
         .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .presentationDetents([.height(268), .medium])
+        .fixedSize(horizontal: false, vertical: true)
+        .background {
+            GeometryReader { proxy in
+                // Detent height is the full sheet chrome; include the bottom safe area so the
+                // measured stack is not clipped above the home indicator.
+                Color.clear.preference(
+                    key: ChannelPreviewHeightKey.self,
+                    value: proxy.size.height + proxy.safeAreaInsets.bottom
+                )
+            }
+        }
+        .onPreferenceChange(ChannelPreviewHeightKey.self) { height in
+            guard height > 1, abs(height - fittedHeight) > 1 else { return }
+            fittedHeight = height
+        }
+        .presentationDetents(detents)
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
+        // Leave corner radius to the system so Liquid Glass / device bezels stay matched.
         .task(id: request.id) {
             await metadata.preparePreview(for: seed)
         }
     }
 
     private var headerRow: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             avatar
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: details.name)
                     .appFont(.headline, weight: .semibold)
                     .lineLimit(2)
@@ -63,15 +102,15 @@ struct ChannelPreviewSheet: View {
         ZStack {
             Circle().fill(MediaStyle.placeholderFill)
             Text(details.name.prefix(1).uppercased())
-                .font(.title3.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.secondary)
             KFImage(details.thumbnailURL)
-                .thumbnail(size: CGSize(width: 56, height: 56)) { Color.clear }
+                .thumbnail(size: CGSize(width: 48, height: 48)) { Color.clear }
                 .resizable()
                 .scaledToFill()
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: 48)
         }
-        .frame(width: 56, height: 56)
+        .frame(width: 48, height: 48)
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
         .accessibilityHidden(true)
@@ -98,29 +137,44 @@ struct ChannelPreviewSheet: View {
     private var statsParts: [String] {
         var parts: [String] = []
         if let count = details.subscriberCount {
-            let compact = count.formatted(.number.notation(.compactName))
-            parts.append(String(localized: "\(compact) subscribers"))
+            parts.append(subscriberCountLabel(count))
         }
         if let count = details.videoCount {
-            let compact = count.formatted(.number.notation(.compactName))
-            parts.append(String(localized: "\(compact) videos"))
+            parts.append(videoCountLabel(count))
         }
         return parts
     }
 
+    private func latestUploadRow(_ title: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("Latest")
+                .appFont(.caption, weight: .semibold)
+                .foregroundStyle(.secondary)
+            Text(verbatim: title)
+                .appFont(.caption)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "Latest upload: \(title)"))
+    }
+
+    private var aboutLineLimit: Int {
+        if !canExpand { return 3 }
+        return isDescriptionExpanded ? 10 : 2
+    }
+
     @ViewBuilder
     private var aboutSection: some View {
-        let description = details.descriptionText?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !description.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(verbatim: description)
+        if !aboutText.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: aboutText)
                     .appFont(.footnote)
                     .foregroundStyle(.secondary)
-                    .lineLimit(isDescriptionExpanded ? 8 : 3)
+                    .lineLimit(aboutLineLimit)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if description.count > 140 {
+                if canExpand {
                     Button(isDescriptionExpanded ? "Show Less" : "More") {
                         withAnimation(reduceMotion ? nil : InterfaceMotion.quick) {
                             isDescriptionExpanded.toggle()
@@ -137,7 +191,7 @@ struct ChannelPreviewSheet: View {
             Button(action: toggleSubscribe) {
                 Text(details.isSubscribed ? "Subscribed" : "Subscribe")
                     .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 40)
                     .foregroundStyle(details.isSubscribed
                         ? Color.primary
                         : (colorScheme == .dark ? Color.black : Color.white))
@@ -154,7 +208,7 @@ struct ChannelPreviewSheet: View {
             Button(action: openChannel) {
                 Text("Go to Channel")
                     .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 40)
                     .foregroundStyle(.primary)
                     .background(Color.primary.opacity(0.08), in: Capsule())
             }
@@ -184,5 +238,33 @@ struct ChannelPreviewSheet: View {
                 .info("Channel preview posting channel navigation")
             NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
         }
+    }
+
+    /// Uses the integer plural catalog for small counts; abbreviated counts stay plural prose.
+    private func videoCountLabel(_ count: Int) -> String {
+        if abs(count) >= 1_000 {
+            let compact = count.formatted(.number.notation(.compactName))
+            return String(localized: "\(compact) videos")
+        }
+        return String(localized: "\(count) videos")
+    }
+
+    private func subscriberCountLabel(_ count: Int) -> String {
+        if abs(count) >= 1_000 {
+            let compact = count.formatted(.number.notation(.compactName))
+            return String(localized: "\(compact) subscribers")
+        }
+        if count == 1 {
+            return String(localized: "1 subscriber")
+        }
+        return String(localized: "\(count) subscribers")
+    }
+}
+
+@available(iOS 17.0, *)
+private struct ChannelPreviewHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
