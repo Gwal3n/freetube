@@ -540,9 +540,7 @@ struct FullScreenPlayer: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: Bindable(player).channelPreviewRequest) { request in
-            ChannelPreviewSheet(request: request) {
-                openChannel(request.id)
-            }
+            ChannelPreviewSheet(request: request)
         }
         .confirmationDialog(
             "Delete downloaded video?",
