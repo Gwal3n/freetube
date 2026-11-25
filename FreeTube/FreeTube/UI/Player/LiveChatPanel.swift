@@ -159,9 +159,7 @@ struct LiveChatPanel: View {
             emptyState(
                 title: model.chatEnded ? "Live chat has ended" : "Waiting for messages",
                 systemImage: "text.bubble",
-                description: model.chatEnded
-                    ? "This stream’s chat is no longer updating."
-                    : "New messages will appear here."
+                description: model.chatEnded ? "This stream’s chat is no longer updating." : nil
             )
         } else if #available(iOS 18.0, *) {
             chatRows
@@ -245,12 +243,18 @@ struct LiveChatPanel: View {
         }
     }
 
-    private func emptyState(title: String, systemImage: String, description: String) -> some View {
-        ContentUnavailableView(
-            title,
-            systemImage: systemImage,
-            description: Text(description)
-        )
+    private func emptyState(title: String, systemImage: String, description: String? = nil) -> some View {
+        Group {
+            if let description {
+                ContentUnavailableView(
+                    title,
+                    systemImage: systemImage,
+                    description: Text(description)
+                )
+            } else {
+                ContentUnavailableView(title, systemImage: systemImage)
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Empty body is always "at the top" — pull down dismisses like chapters overscroll.
         .simultaneousGesture(listDismissOnlyGesture)
