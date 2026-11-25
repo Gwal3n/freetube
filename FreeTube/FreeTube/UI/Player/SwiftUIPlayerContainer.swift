@@ -556,10 +556,12 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func animateCollapse(in size: CGSize) {
-        player.chapterListPresented = false
-        player.liveChatPresented = false
         player.channelPreviewRequest = nil
+        // Keep chapter / live-chat mounted through the collapse so they can fade with
+        // `collapseProgress` like the details column, instead of vanishing on frame one.
         guard !reduceMotion else {
+            player.chapterListPresented = false
+            player.liveChatPresented = false
             player.fullScreenPresented = false
             presentationTranslation = 0
             player.finishPlayerCollapse()
@@ -581,6 +583,8 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             // At progress 1 the live video already has the floating window's exact frame.
             // Swap the presentation mode without a second animation or a return to full size.
             withTransaction(Transaction(animation: nil)) {
+                player.chapterListPresented = false
+                player.liveChatPresented = false
                 player.fullScreenPresented = false
                 presentationTranslation = 0
             }

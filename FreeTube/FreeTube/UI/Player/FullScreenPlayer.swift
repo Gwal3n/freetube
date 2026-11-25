@@ -331,19 +331,26 @@ struct FullScreenPlayer: View {
                     )
                 )
                 .onAppear { showPlayerControls() }
-                .onChange(of: surfaceHeight, initial: true) { _, height in
-                    guard !isFloating, collapseProgress == 0 else { return }
-                    player.expandedPlayerSurfaceHeight = max(
-                        0,
-                        height * (isPlaylistPanelPresented ? 1 - playlistPanelExpansion : 1)
-                    )
+                .onChange(of: surfaceHeight, initial: true) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
                 }
-                .onChange(of: playlistPanelExpansion) { _, expansion in
-                    guard !isFloating, collapseProgress == 0 else { return }
-                    player.expandedPlayerSurfaceHeight = max(
-                        0,
-                        surfaceHeight * (isPlaylistPanelPresented ? 1 - expansion : 1)
-                    )
+                .onChange(of: playlistPanelExpansion) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
+                .onChange(of: chapterPanelExpansion) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
+                .onChange(of: liveChatPanelExpansion) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
+                .onChange(of: isPlaylistPanelPresented) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
+                .onChange(of: player.chapterListPresented) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
+                }
+                .onChange(of: player.liveChatPresented) { _, _ in
+                    publishUncoveredVideoHeight(surfaceHeight: surfaceHeight)
                 }
                 .onDisappear { controlsVisibility.cancelAutoHide() }
                 .task(id: isHoldingForSpeed) {
@@ -444,6 +451,9 @@ struct FullScreenPlayer: View {
                     height: isLandscape ? proxy.size.height : max(0, proxy.size.height - chapterTop)
                 )
                 .offset(y: isLandscape ? 0 : chapterTop)
+                // Same fade as the details column while the expanded player collapses.
+                .opacity(max(0, 1 - collapseProgress * 2.5))
+                .allowsHitTesting(collapseProgress < 0.05)
                 // Moving the landscape material sidebar while simultaneously widening the player
                 // leaves a stale strip at the trailing edge for one render pass. Remove it
                 // atomically and let the underlying column resize; portrait retains its sheet
@@ -473,6 +483,8 @@ struct FullScreenPlayer: View {
                 )
                 .clipped()
                 .offset(y: isLandscape ? 0 : chatTop)
+                .opacity(max(0, 1 - collapseProgress * 2.5))
+                .allowsHitTesting(collapseProgress < 0.05)
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
                 .zIndex(5)
             }
@@ -1105,6 +1117,24 @@ struct FullScreenPlayer: View {
         if player.playerPanelAtTop != isAtTop {
             player.playerPanelAtTop = isAtTop
         }
+    }
+
+    /// Shrinks the collapse hit-target to the video still above a raised playlist / chapters /
+    /// live-chat sheet. A fully expanded sheet reports ~0 so drags there dismiss the sheet,
+    /// not the player.
+    private func publishUncoveredVideoHeight(surfaceHeight: CGFloat) {
+        guard !isFloating, collapseProgress == 0 else { return }
+        let coveredFraction: CGFloat
+        if isPlaylistPanelPresented {
+            coveredFraction = playlistPanelExpansion
+        } else if player.chapterListPresented {
+            coveredFraction = chapterPanelExpansion
+        } else if player.liveChatPresented {
+            coveredFraction = liveChatPanelExpansion
+        } else {
+            coveredFraction = 0
+        }
+        player.expandedPlayerSurfaceHeight = max(0, surfaceHeight * (1 - coveredFraction))
     }
 
     private func finishCommentsCollapseIfReady() {
