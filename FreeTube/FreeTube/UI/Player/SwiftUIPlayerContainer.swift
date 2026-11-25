@@ -497,23 +497,24 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard !expandedDragBlockedByHold else { return }
                 guard player.fullScreenPresented,
                       verticalSizeClass != .compact,
-                      player.playerPresentationGestureEnabled else { return }
+                      player.playerPresentationGestureEnabled,
+                      // Chapters own every vertical drag while open — sharing the collapse
+                      // gesture froze sheet dismiss mid-travel.
+                      !player.chapterListPresented else { return }
                 let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
                 if directionWasUndetermined {
                     expandedDragStartedDown = value.translation.height > 0
                     let expandedTopInset = verticalSizeClass == .compact ? 0 : PlayerLayoutMetrics.safeAreaInsets.top
+                    // Leave a few points above a raised live-chat / playlist sheet so the
+                    // grabber is not treated as uncovered video.
+                    let uncoveredBottom = expandedTopInset + player.expandedPlayerSurfaceHeight
                     let startedOnVideo = value.startLocation.y >= expandedTopInset
-                        && value.startLocation.y <= expandedTopInset + player.expandedPlayerSurfaceHeight
-                    // Playlist / chapters / live chat may cover the lower player. Their own
-                    // scrolling and dismissal retain ownership; only a drag on the uncovered
-                    // video collapses the player while a sheet is open.
-                    let sideSheetPresented = player.playlistPanelPresented
-                        || player.chapterListPresented
-                        || player.liveChatPresented
+                        && value.startLocation.y < uncoveredBottom - 12
+                    let sheetOwnsLowerPlayer = player.playlistPanelPresented || player.liveChatPresented
                     expandedDragCanCollapse = startedOnVideo
-                        || (!sideSheetPresented && player.playerPanelAtTop)
+                        || (!sheetOwnsLowerPlayer && player.playerPanelAtTop)
                 }
                 guard expandedDragStartedDown, expandedDragCanCollapse else { return }
                 player.playerPresentationGestureActive = true
@@ -556,11 +557,11 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     }
 
     private func animateCollapse(in size: CGSize) {
+        // Chapters close immediately (their prior behavior). Live chat stays mounted so it can
+        // fade with collapseProgress instead of vanishing on frame one.
+        player.chapterListPresented = false
         player.channelPreviewRequest = nil
-        // Keep chapter / live-chat mounted through the collapse so they can fade with
-        // `collapseProgress` like the details column, instead of vanishing on frame one.
         guard !reduceMotion else {
-            player.chapterListPresented = false
             player.liveChatPresented = false
             player.fullScreenPresented = false
             presentationTranslation = 0
@@ -583,7 +584,6 @@ struct SwiftUIPlayerContainer<Content: View>: View {
             // At progress 1 the live video already has the floating window's exact frame.
             // Swap the presentation mode without a second animation or a return to full size.
             withTransaction(Transaction(animation: nil)) {
-                player.chapterListPresented = false
                 player.liveChatPresented = false
                 player.fullScreenPresented = false
                 presentationTranslation = 0
