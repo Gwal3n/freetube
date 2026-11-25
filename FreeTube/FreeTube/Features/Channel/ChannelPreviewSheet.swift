@@ -34,13 +34,6 @@ struct ChannelPreviewSheet: View {
         metadata.pageInfo(for: request.id)
     }
 
-    private var contentPresenceParts: [String] {
-        var parts: [String] = []
-        if pageInfo.hasShorts { parts.append(ChannelProfileTab.shorts.title) }
-        if pageInfo.hasLive { parts.append(ChannelProfileTab.live.title) }
-        return parts
-    }
-
     private var detents: Set<PresentationDetent> {
         var set: Set<PresentationDetent> = [.height(max(fittedHeight, 1))]
         if canExpand {
@@ -50,29 +43,33 @@ struct ChannelPreviewSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             headerRow
             if let title = pageInfo.latestTitle {
-                latestUploadRow(title: title, relative: pageInfo.latestRelative)
-            }
-            if !contentPresenceParts.isEmpty {
-                contentPresenceRow
+                latestUploadRow(
+                    title: title,
+                    relative: pageInfo.latestRelative,
+                    viewCount: pageInfo.latestViewCount
+                )
             }
             aboutSection
+
+            // Pull actions off the header block and keep the sheet height fitted to content
+            // so leftover chrome doesn't pool as empty space under the buttons.
             actionRow
+                .padding(.top, 14)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 14)
+        // Keep bottom padding modest — oversizing the detent left empty chrome under the buttons.
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .fixedSize(horizontal: false, vertical: true)
         .background {
             GeometryReader { proxy in
-                // Detent height is the full sheet chrome; include the bottom safe area so the
-                // measured stack is not clipped above the home indicator.
                 Color.clear.preference(
                     key: ChannelPreviewHeightKey.self,
-                    value: proxy.size.height + proxy.safeAreaInsets.bottom
+                    value: proxy.size.height
                 )
             }
         }
@@ -155,46 +152,49 @@ struct ChannelPreviewSheet: View {
         return parts
     }
 
-    private func latestUploadRow(title: String, relative: String?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("Latest")
-                .appFont(.caption, weight: .semibold)
-                .foregroundStyle(.secondary)
-            Text(verbatim: title)
-                .appFont(.caption)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            if let relative, !relative.isEmpty {
-                Text(verbatim: "·")
+    private func latestUploadRow(title: String, relative: String?, viewCount: Int?) -> some View {
+        let metaParts = latestMetaParts(relative: relative, viewCount: viewCount)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Latest")
+                    .appFont(.caption, weight: .semibold)
+                    .foregroundStyle(.secondary)
+                Text(verbatim: title)
                     .appFont(.caption)
-                    .foregroundStyle(.tertiary)
-                Text(verbatim: relative)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+            if !metaParts.isEmpty {
+                Text(verbatim: metaParts.joined(separator: " · "))
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .layoutPriority(1)
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(latestAccessibilityLabel(title: title, relative: relative))
+        .accessibilityLabel(latestAccessibilityLabel(title: title, relative: relative, viewCount: viewCount))
     }
 
-    private var contentPresenceRow: some View {
-        Text(verbatim: contentPresenceParts.joined(separator: " · "))
-            .appFont(.caption, weight: .medium)
-            .foregroundStyle(.secondary)
-            .accessibilityLabel(contentPresenceAccessibilityLabel)
-    }
-
-    private func latestAccessibilityLabel(title: String, relative: String?) -> String {
-        if let relative, !relative.isEmpty {
-            return String(localized: "Latest upload: \(title), \(relative)")
+    private func latestMetaParts(relative: String?, viewCount: Int?) -> [String] {
+        var parts: [String] = []
+        if let viewCount, viewCount > 0 {
+            parts.append(Video.viewCountLabel(viewCount))
         }
-        return String(localized: "Latest upload: \(title)")
+        if let relative, !relative.isEmpty {
+            parts.append(relative)
+        }
+        return parts
     }
 
-    private var contentPresenceAccessibilityLabel: String {
-        contentPresenceParts.joined(separator: ", ")
+    private func latestAccessibilityLabel(title: String, relative: String?, viewCount: Int?) -> String {
+        var parts = [String(localized: "Latest upload: \(title)")]
+        if let viewCount, viewCount > 0 {
+            parts.append(Video.viewCountLabel(viewCount))
+        }
+        if let relative, !relative.isEmpty {
+            parts.append(relative)
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var aboutLineLimit: Int {
