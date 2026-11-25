@@ -5,6 +5,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerChapterOverlay: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let isLandscape: Bool
     @Binding var expansionProgress: CGFloat
@@ -26,8 +27,9 @@ struct PlayerChapterOverlay: View {
                 onInteraction()
             },
             onDismiss: {
-                // Animation is owned by the panel (X button vs drag-dismiss paths).
-                player.chapterListPresented = false
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    player.chapterListPresented = false
+                }
             }
         )
     }

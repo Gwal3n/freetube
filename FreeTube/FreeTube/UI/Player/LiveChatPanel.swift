@@ -35,7 +35,6 @@ struct LiveChatPanel: View {
     @State private var isPinnedToBottom = true
     @State private var isProgrammaticScroll = false
     @State private var followScrollTask: Task<Void, Never>?
-    @State private var isDismissing = false
     @Environment(\.scenePhase) private var scenePhase
 
     /// Modest pad above the home indicator — large insets plus scrollTo were parking the
@@ -99,9 +98,7 @@ struct LiveChatPanel: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button {
-                    dismissAnimated()
-                } label: {
+                Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.subheadline.weight(.bold))
                         .frame(width: 30, height: 30)
@@ -228,7 +225,7 @@ struct LiveChatPanel: View {
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: model.messageRevision) { _, _ in
-                guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
+                guard isPinnedToBottom, !isDraggingListSheet else { return }
                 if #unavailable(iOS 18.0) {
                     scheduleFollowScroll(proxy: proxy)
                 }
@@ -267,7 +264,7 @@ struct LiveChatPanel: View {
     }
 
     private func scheduleFollowScroll(proxy: ScrollViewProxy) {
-        guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
+        guard isPinnedToBottom, !isDraggingListSheet else { return }
         followScrollTask?.cancel()
         followScrollTask = Task { @MainActor in
             // Coalesce several paced reveals into one unanimated settle.
@@ -289,33 +286,6 @@ struct LiveChatPanel: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(24))
             isProgrammaticScroll = false
-        }
-    }
-
-    /// Same dismiss path as chapters: flip presentation and let the overlay transition clear it.
-    private func dismissAnimated() {
-        guard !isDismissing else { return }
-        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-            onDismiss()
-        }
-    }
-
-    /// Continue from the finger position instead of snapping back before the leave transition.
-    private func dismissFromDrag() {
-        guard !isDismissing else { return }
-        isDismissing = true
-        let offscreen = max(dismissTranslation, expansionTravel)
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
-            expansionProgress = 0
-            dismissTranslation = offscreen
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 270))
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                onDismiss()
-            }
         }
     }
 
@@ -411,7 +381,11 @@ struct LiveChatPanel: View {
         )
         switch settlement {
         case .dismiss:
-            dismissFromDrag()
+            // Same as chapters: clear local offset and flip presentation so the overlay's
+            // `.move(edge: .bottom)` transition finishes the leave — do not animate expansion
+            // to 0 first, which parks the sheet at the player-bottom detent halfway down.
+            dismissTranslation = 0
+            onDismiss()
         case .expanded:
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
                 expansionProgress = 1

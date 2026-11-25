@@ -41,7 +41,6 @@ struct ChapterListPanel: View {
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
     @State private var headerDragStartDismiss: CGFloat = 0
-    @State private var isDismissing = false
     @State private var suppressChapterSelection = false
     @State private var selectionSuppressionGeneration = 0
     @State private var pinnedChapterID: VideoChapter.ID?
@@ -74,9 +73,7 @@ struct ChapterListPanel: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button {
-                        dismissAnimated()
-                    } label: {
+                    Button(action: onDismiss) {
                         Image(systemName: "xmark")
                             .font(.subheadline.weight(.bold))
                             .frame(width: 30, height: 30)
@@ -281,7 +278,8 @@ struct ChapterListPanel: View {
         )
         switch settlement {
         case .dismiss:
-            dismissFromDrag()
+            dismissTranslation = 0
+            onDismiss()
         case .expanded:
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
                 expansionProgress = 1
@@ -291,32 +289,6 @@ struct ChapterListPanel: View {
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
                 expansionProgress = 0
                 dismissTranslation = 0
-            }
-        }
-    }
-
-    private func dismissAnimated() {
-        guard !isDismissing else { return }
-        withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-            onDismiss()
-        }
-    }
-
-    /// Continue from the finger position instead of snapping back before the leave transition.
-    private func dismissFromDrag() {
-        guard !isDismissing else { return }
-        isDismissing = true
-        let offscreen = max(dismissTranslation, expansionTravel)
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.26)) {
-            expansionProgress = 0
-            dismissTranslation = offscreen
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 10 : 270))
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                onDismiss()
             }
         }
     }

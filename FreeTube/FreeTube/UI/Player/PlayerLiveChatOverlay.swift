@@ -4,6 +4,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct PlayerLiveChatOverlay: View {
     @Environment(PlayerStateManager.self) private var player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let videoID: String
     let isLandscape: Bool
@@ -17,8 +18,9 @@ struct PlayerLiveChatOverlay: View {
             expansionProgress: $expansionProgress,
             expansionTravel: expansionTravel,
             onDismiss: {
-                // Only flip presentation. Expansion resets in FullScreenPlayer after removal.
-                player.liveChatPresented = false
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    player.liveChatPresented = false
+                }
             }
         )
     }
