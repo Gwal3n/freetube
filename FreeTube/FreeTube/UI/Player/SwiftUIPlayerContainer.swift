@@ -497,23 +497,22 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard !expandedDragBlockedByHold else { return }
                 guard player.fullScreenPresented,
                       verticalSizeClass != .compact,
-                      player.playerPresentationGestureEnabled else { return }
+                      player.playerPresentationGestureEnabled,
+                      !player.chapterListPresented,
+                      !player.liveChatPresented else { return }
                 let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
                 if directionWasUndetermined {
                     expandedDragStartedDown = value.translation.height > 0
                     let expandedTopInset = verticalSizeClass == .compact ? 0 : PlayerLayoutMetrics.safeAreaInsets.top
-                    // Strictly above a raised sheet — the grabber sits on the sheet top edge and
-                    // must not count as uncovered video, or sheet dismiss fights player collapse.
-                    let uncoveredBottom = expandedTopInset + player.expandedPlayerSurfaceHeight
-                    let startedOnUncoveredVideo = value.startLocation.y >= expandedTopInset
-                        && value.startLocation.y < uncoveredBottom - 12
-                    let sideSheetPresented = player.playlistPanelPresented
-                        || player.chapterListPresented
-                        || player.liveChatPresented
-                    expandedDragCanCollapse = startedOnUncoveredVideo
-                        || (!sideSheetPresented && player.playerPanelAtTop)
+                    let startedOnVideo = value.startLocation.y >= expandedTopInset
+                        && value.startLocation.y <= expandedTopInset + player.expandedPlayerSurfaceHeight
+                    // A playlist sheet may cover the lower part of the video. Its own scrolling
+                    // and dismissal retain ownership; only a drag on the uncovered video can
+                    // collapse the player while the sheet is open.
+                    expandedDragCanCollapse = startedOnVideo
+                        || (!player.playlistPanelPresented && player.playerPanelAtTop)
                 }
                 guard expandedDragStartedDown, expandedDragCanCollapse else { return }
                 player.playerPresentationGestureActive = true
