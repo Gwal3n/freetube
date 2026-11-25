@@ -222,6 +222,7 @@ struct LiveChatPanel: View {
             }
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.always, axes: .vertical)
+            .modifier(LiveChatBottomScrollAnchor(isPinned: isPinnedToBottom))
             .onAppear {
                 isPinnedToBottom = true
                 scheduleFollowScroll(proxy: proxy, force: true)
@@ -241,13 +242,14 @@ struct LiveChatPanel: View {
         guard !isDraggingListSheet, !isDismissing else { return }
         followScrollTask?.cancel()
         followScrollTask = Task { @MainActor in
+            // Coalesce a couple of paced reveals into one settle.
+            if !force {
+                try? await Task.sleep(for: .milliseconds(90))
+            }
             await Task.yield()
             guard !Task.isCancelled, !isDraggingListSheet else { return }
             guard force || isPinnedToBottom else { return }
             scrollToBottom(proxy: proxy, animated: !force && !reduceMotion)
-            try? await Task.sleep(for: .milliseconds(48))
-            guard !Task.isCancelled, force || isPinnedToBottom, !isDraggingListSheet else { return }
-            scrollToBottom(proxy: proxy, animated: false)
         }
     }
 
@@ -258,14 +260,19 @@ struct LiveChatPanel: View {
             proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
         if animated, !reduceMotion {
-            withAnimation(.easeOut(duration: 0.2)) {
+            // Soft settle — the old easeOut + immediate unanimated follow-up felt like a jump.
+            withAnimation(.smooth(duration: 0.34)) {
                 scroll()
             }
         } else {
-            scroll()
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                scroll()
+            }
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(animated ? 240 : 24))
+            try? await Task.sleep(for: .milliseconds(animated ? 360 : 24))
             isProgrammaticScroll = false
         }
     }
@@ -437,4 +444,18 @@ private struct ScrollPinSample: Equatable {
     var topOffset: CGFloat
     var overscroll: CGFloat
     var distanceFromBottom: CGFloat
+}
+
+/// Applies a bottom scroll anchor only while following live, so reading history isn't yanked.
+@available(iOS 17.0, *)
+private struct LiveChatBottomScrollAnchor: ViewModifier {
+    let isPinned: Bool
+
+    func body(content: Content) -> some View {
+        if isPinned {
+            content.defaultScrollAnchor(.bottom)
+        } else {
+            content
+        }
+    }
 }
