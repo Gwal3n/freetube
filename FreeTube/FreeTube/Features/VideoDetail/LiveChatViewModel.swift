@@ -20,6 +20,8 @@ final class LiveChatViewModel {
     private let service: any LiveChatServicing
     private let log = AppLog(subsystem: "com.leshko.freetube", category: "LiveChat")
     private var pollTask: Task<Void, Never>?
+    private var revealTask: Task<Void, Never>?
+    private var pendingReveal: [LiveChatMessage] = []
     private var knownIDs = Set<String>()
     private var continuation: String?
     private var apiKey: String?
@@ -37,12 +39,16 @@ final class LiveChatViewModel {
         pollTask = Task { [weak self] in
             await self?.runPollingLoop()
         }
+        startRevealIfNeeded()
     }
 
     func stopPolling() {
         pollTask?.cancel()
         pollTask = nil
         isPolling = false
+        // Keep pendingReveal; draining resumes with the next startPolling.
+        revealTask?.cancel()
+        revealTask = nil
     }
 
     private func runPollingLoop() async {
@@ -72,9 +78,11 @@ final class LiveChatViewModel {
                 )
                 guard !Task.isCancelled else { return }
                 isLoading = false
-                append(page.messages)
+                enqueue(page.messages)
                 if page.chatEnded || page.continuation == nil {
                     chatEnded = true
+                    // Flush anything still queued so the final lines aren't stranded.
+                    flushPendingReveal()
                     log.info("Live chat ended for \(self.videoID, privacy: .public)")
                     return
                 }
@@ -91,14 +99,64 @@ final class LiveChatViewModel {
         }
     }
 
-    private func append(_ batch: [LiveChatMessage]) {
+    /// Deduplicate and either show immediately (cold start) or pace into the list.
+    private func enqueue(_ batch: [LiveChatMessage]) {
         guard !batch.isEmpty else { return }
         var added: [LiveChatMessage] = []
         for message in batch where knownIDs.insert(message.id).inserted {
             added.append(message)
         }
         guard !added.isEmpty else { return }
-        messages.append(contentsOf: added)
+
+        // First paint should fill the sheet at once; live traffic is revealed steadily.
+        if messages.isEmpty {
+            commit(added)
+            return
+        }
+
+        pendingReveal.append(contentsOf: added)
+        startRevealIfNeeded()
+    }
+
+    private func startRevealIfNeeded() {
+        guard revealTask == nil, !pendingReveal.isEmpty else { return }
+        revealTask = Task { [weak self] in
+            await self?.drainPendingReveal()
+        }
+    }
+
+    private func drainPendingReveal() async {
+        defer { revealTask = nil }
+        while !Task.isCancelled {
+            guard !pendingReveal.isEmpty else { return }
+            let next = pendingReveal.removeFirst()
+            commit([next])
+            let backlog = pendingReveal.count
+            // Faster when a backlog builds so reconnect dumps don't take forever; slower when
+            // quiet so poll batches don't land as one visual spike.
+            let delayMs: Int
+            switch backlog {
+            case 40...: delayMs = 35
+            case 20..<40: delayMs = 55
+            case 8..<20: delayMs = 80
+            default: delayMs = 110
+            }
+            try? await Task.sleep(for: .milliseconds(delayMs))
+        }
+    }
+
+    private func flushPendingReveal() {
+        revealTask?.cancel()
+        revealTask = nil
+        guard !pendingReveal.isEmpty else { return }
+        let leftover = pendingReveal
+        pendingReveal.removeAll(keepingCapacity: true)
+        commit(leftover)
+    }
+
+    private func commit(_ batch: [LiveChatMessage]) {
+        guard !batch.isEmpty else { return }
+        messages.append(contentsOf: batch)
         if messages.count > Self.messageLimit {
             let overflow = messages.count - Self.messageLimit
             let removed = messages.prefix(overflow)

@@ -456,24 +456,24 @@ struct FullScreenPlayer: View {
                let liveVideoID = player.currentVideo?.id, !usesPortraitFullscreen {
                 let chatTop = surfaceHeight * (1 - liveChatPanelExpansion)
                 let chatWidth = isLandscape ? sidePanelWidth : proxy.size.width
-                // Stable full-column height + offset (clipped). Shrinking height while dragging
-                // relaid out the message list every touch sample and made the grabber feel sticky.
-                Color.clear
-                    .frame(width: chatWidth, height: proxy.size.height)
-                    .overlay(alignment: .top) {
-                        PlayerLiveChatOverlay(
-                            videoID: liveVideoID,
-                            isLandscape: isLandscape,
-                            expansionProgress: $liveChatPanelExpansion,
-                            expansionTravel: surfaceHeight,
-                            containerHeight: proxy.size.height
-                        )
-                        .frame(width: chatWidth, height: proxy.size.height)
-                        .offset(y: isLandscape ? 0 : chatTop)
-                    }
-                    .clipped()
-                    .transition(isLandscape ? .identity : .move(edge: .bottom))
-                    .zIndex(5)
+                // Bottom stays flush with the player column; only the top edge moves with expansion.
+                // Drag updates already disable animation so height changes stay 1:1 with the finger.
+                PlayerLiveChatOverlay(
+                    videoID: liveVideoID,
+                    isLandscape: isLandscape,
+                    expansionProgress: $liveChatPanelExpansion,
+                    expansionTravel: surfaceHeight,
+                    containerHeight: proxy.size.height
+                )
+                .frame(
+                    width: chatWidth,
+                    height: isLandscape
+                        ? proxy.size.height
+                        : max(0, proxy.size.height - chatTop)
+                )
+                .offset(y: isLandscape ? 0 : chatTop)
+                .transition(isLandscape ? .identity : .move(edge: .bottom))
+                .zIndex(5)
             }
 
             if !isFloating {
