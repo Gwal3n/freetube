@@ -170,12 +170,19 @@ struct ChannelPreviewSheet: View {
         }
     }
 
-    /// Collapse and navigate immediately — do not wait for the player spring completion.
-    /// Logs showed multi-second stalls when Go to Channel waited on `finishPlayerCollapse`.
     private func openChannel() {
         let channelID = request.id
         metadata.prefetchChannelPage(id: channelID)
         dismiss()
-        MediaContextNavigation.open(.freetubeOpenChannel, id: channelID, player: player)
+        // Same collapse-then-navigate path as the uploader control. Collapse completion is
+        // deadline-backed so a competing sheet dismiss cannot stall the push.
+        AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+            .info("Channel preview Go to channel; collapsing player")
+        player.channelPreviewRequest = nil
+        player.requestPlayerCollapse {
+            AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
+                .info("Channel preview posting channel navigation")
+            NotificationCenter.default.post(name: .freetubeOpenChannel, object: channelID)
+        }
     }
 }
