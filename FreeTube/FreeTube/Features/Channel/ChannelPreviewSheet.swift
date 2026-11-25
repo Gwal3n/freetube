@@ -30,8 +30,15 @@ struct ChannelPreviewSheet: View {
     /// Only offer a taller detent when there is a longer about to read.
     private var canExpand: Bool { aboutText.count > 120 }
 
-    private var latestTitle: String? {
-        metadata.latestVideoTitle(for: request.id)
+    private var pageInfo: ChannelPreviewPageInfo {
+        metadata.pageInfo(for: request.id)
+    }
+
+    private var contentPresenceParts: [String] {
+        var parts: [String] = []
+        if pageInfo.hasShorts { parts.append(ChannelProfileTab.shorts.title) }
+        if pageInfo.hasLive { parts.append(ChannelProfileTab.live.title) }
+        return parts
     }
 
     private var detents: Set<PresentationDetent> {
@@ -45,8 +52,11 @@ struct ChannelPreviewSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerRow
-            if let latestTitle {
-                latestUploadRow(latestTitle)
+            if let title = pageInfo.latestTitle {
+                latestUploadRow(title: title, relative: pageInfo.latestRelative)
+            }
+            if !contentPresenceParts.isEmpty {
+                contentPresenceRow
             }
             aboutSection
             actionRow
@@ -145,7 +155,7 @@ struct ChannelPreviewSheet: View {
         return parts
     }
 
-    private func latestUploadRow(_ title: String) -> some View {
+    private func latestUploadRow(title: String, relative: String?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text("Latest")
                 .appFont(.caption, weight: .semibold)
@@ -154,9 +164,37 @@ struct ChannelPreviewSheet: View {
                 .appFont(.caption)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
+            if let relative, !relative.isEmpty {
+                Text(verbatim: "·")
+                    .appFont(.caption)
+                    .foregroundStyle(.tertiary)
+                Text(verbatim: relative)
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+            }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Latest upload: \(title)"))
+        .accessibilityLabel(latestAccessibilityLabel(title: title, relative: relative))
+    }
+
+    private var contentPresenceRow: some View {
+        Text(verbatim: contentPresenceParts.joined(separator: " · "))
+            .appFont(.caption, weight: .medium)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(contentPresenceAccessibilityLabel)
+    }
+
+    private func latestAccessibilityLabel(title: String, relative: String?) -> String {
+        if let relative, !relative.isEmpty {
+            return String(localized: "Latest upload: \(title), \(relative)")
+        }
+        return String(localized: "Latest upload: \(title)")
+    }
+
+    private var contentPresenceAccessibilityLabel: String {
+        contentPresenceParts.joined(separator: ", ")
     }
 
     private var aboutLineLimit: Int {
