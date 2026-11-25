@@ -18,21 +18,26 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
 
     static func from(_ details: ChannelDetails, now: Date = .now) -> ChannelPreviewPageInfo {
         let latest = details.videos.items.first
-        let title = latest?.title
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfEmpty
-        let relative = latest?.publishedText(relativeTo: now)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfEmpty
-            ?? latest?.publishedRelative?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfEmpty
         return ChannelPreviewPageInfo(
-            latestTitle: title,
-            latestRelative: relative,
+            latestTitle: Self.nonEmpty(latest?.title),
+            latestRelative: Self.relativeAge(for: latest, now: now),
             hasShorts: !details.shorts.items.isEmpty || details.shorts.continuationToken != nil,
             hasLive: !details.directs.items.isEmpty || details.directs.continuationToken != nil
         )
+    }
+
+    private static func relativeAge(for video: Video?, now: Date) -> String? {
+        guard let video else { return nil }
+        if let text = nonEmpty(video.publishedText(relativeTo: now)) {
+            return text
+        }
+        return nonEmpty(video.publishedRelative)
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 }
 
@@ -86,7 +91,7 @@ final class ChannelPreviewMetadataStore {
             return entry.pageInfo
         }
         if let cached = pageCache.details(for: channelID) {
-            return .from(cached)
+            return ChannelPreviewPageInfo.from(cached)
         }
         return entries[channelID]?.pageInfo ?? .empty
     }
@@ -126,7 +131,7 @@ final class ChannelPreviewMetadataStore {
         let channelID = id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !channelID.isEmpty else { return }
         if let cached = pageCache.details(for: channelID) {
-            storeMetadata(cached.channel, pageInfo: .from(cached), for: channelID)
+            storeMetadata(cached.channel, pageInfo: ChannelPreviewPageInfo.from(cached), for: channelID)
             return
         }
         if pageInFlight[channelID] != nil { return }
@@ -136,7 +141,11 @@ final class ChannelPreviewMetadataStore {
             do {
                 let details = try await service.fetchChannel(id: channelID)
                 pageCache.store(details, for: channelID)
-                self.storeMetadata(details.channel, pageInfo: .from(details), for: channelID)
+                self.storeMetadata(
+                    details.channel,
+                    pageInfo: ChannelPreviewPageInfo.from(details),
+                    for: channelID
+                )
             } catch {
                 // Preview still works from metadata; the channel screen will retry on open.
             }
@@ -150,10 +159,16 @@ final class ChannelPreviewMetadataStore {
         for channelID: String
     ) {
         let existing = entries[channelID]
-        let resolvedPage = pageInfo
-            ?? existing?.pageInfo
-            ?? pageCache.details(for: channelID).map(ChannelPreviewPageInfo.from)
-            ?? .empty
+        let resolvedPage: ChannelPreviewPageInfo
+        if let pageInfo {
+            resolvedPage = pageInfo
+        } else if let existingPage = existing?.pageInfo, existingPage != .empty {
+            resolvedPage = existingPage
+        } else if let cached = pageCache.details(for: channelID) {
+            resolvedPage = ChannelPreviewPageInfo.from(cached)
+        } else {
+            resolvedPage = existing?.pageInfo ?? .empty
+        }
         entries[channelID] = Entry(
             channel: channel ?? existing?.channel,
             pageInfo: resolvedPage,
@@ -163,11 +178,5 @@ final class ChannelPreviewMetadataStore {
            let oldestKey = entries.min(by: { $0.value.expiresAt < $1.value.expiresAt })?.key {
             entries.removeValue(forKey: oldestKey)
         }
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
     }
 }
