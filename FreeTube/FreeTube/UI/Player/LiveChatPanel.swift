@@ -144,7 +144,14 @@ struct LiveChatPanel: View {
                 } action: { old, sample in
                     listScrollOffset = sample.topOffset
                     listOverscroll = sample.overscroll
-                    updatePinState(from: old, to: sample)
+                    if !isProgrammaticScroll {
+                        if sample.distanceFromBottom < Self.pinToBottomSlack {
+                            isPinnedToBottom = true
+                        } else if sample.topOffset + 1.5 < old.topOffset {
+                            // Only an upward user scroll clears the pin — not content growth below.
+                            isPinnedToBottom = false
+                        }
+                    }
                     if isDraggingListSheet, listDismissOrigin == 0, sample.overscroll <= 0.5 {
                         isDraggingListSheet = false
                     }
@@ -220,20 +227,6 @@ struct LiveChatPanel: View {
             .onChange(of: model.messageRevision) { _, _ in
                 scheduleFollowScroll(proxy: proxy)
             }
-        }
-    }
-
-    /// Content growth below the viewport must not clear the pin — only an upward user scroll does.
-    private func updatePinState(from old: ScrollPinSample, to sample: ScrollPinSample) {
-        if isProgrammaticScroll { return }
-        if sample.distanceFromBottom < Self.pinToBottomSlack {
-            isPinnedToBottom = true
-            return
-        }
-        // User dragged content upward (reading history). Stable/increased offset with a larger
-        // distanceFromBottom means new rows arrived below while we stayed put — stay pinned.
-        if sample.topOffset + 1.5 < old.topOffset {
-            isPinnedToBottom = false
         }
     }
 
