@@ -471,6 +471,7 @@ struct FullScreenPlayer: View {
                         ? proxy.size.height
                         : max(0, proxy.size.height - chatTop)
                 )
+                .clipped()
                 .offset(y: isLandscape ? 0 : chatTop)
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
                 .zIndex(5)

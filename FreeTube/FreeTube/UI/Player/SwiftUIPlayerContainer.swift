@@ -497,9 +497,7 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                 guard !expandedDragBlockedByHold else { return }
                 guard player.fullScreenPresented,
                       verticalSizeClass != .compact,
-                      player.playerPresentationGestureEnabled,
-                      !player.chapterListPresented,
-                      !player.liveChatPresented else { return }
+                      player.playerPresentationGestureEnabled else { return }
                 let directionWasUndetermined = dragIsVertical == nil
                 establishAxis(for: value.translation)
                 guard dragIsVertical == true else { return }
@@ -508,11 +506,14 @@ struct SwiftUIPlayerContainer<Content: View>: View {
                     let expandedTopInset = verticalSizeClass == .compact ? 0 : PlayerLayoutMetrics.safeAreaInsets.top
                     let startedOnVideo = value.startLocation.y >= expandedTopInset
                         && value.startLocation.y <= expandedTopInset + player.expandedPlayerSurfaceHeight
-                    // A playlist sheet may cover the lower part of the video. Its own scrolling
-                    // and dismissal retain ownership; only a drag on the uncovered video can
-                    // collapse the player while the sheet is open.
+                    // Playlist / chapters / live chat may cover the lower player. Their own
+                    // scrolling and dismissal retain ownership; only a drag on the uncovered
+                    // video collapses the player while a sheet is open.
+                    let sideSheetPresented = player.playlistPanelPresented
+                        || player.chapterListPresented
+                        || player.liveChatPresented
                     expandedDragCanCollapse = startedOnVideo
-                        || (!player.playlistPanelPresented && player.playerPanelAtTop)
+                        || (!sideSheetPresented && player.playerPanelAtTop)
                 }
                 guard expandedDragStartedDown, expandedDragCanCollapse else { return }
                 player.playerPresentationGestureActive = true

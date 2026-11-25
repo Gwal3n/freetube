@@ -59,6 +59,9 @@ struct LiveChatPanel: View {
                 .fill(Color.primary.opacity(0.12))
                 .frame(width: isLandscape ? 0.5 : nil, height: isLandscape ? nil : 0.5)
         }
+        // Flatten UIKit-backed ProgressView into this layer so entrance/expand motion moves the
+        // spinner with the sheet instead of leaving it parked on screen.
+        .compositingGroup()
         .shadow(color: .black.opacity(0.28), radius: 14)
         .offset(y: isLandscape ? 0 : max(0, dismissTranslation))
         .errorToast(Bindable(model).errorState)
@@ -140,11 +143,18 @@ struct LiveChatPanel: View {
                 description: "Chat isn’t available for this stream."
             )
         } else if model.isLoading && model.messages.isEmpty {
-            ProgressView()
-                .controlSize(.regular)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel("Loading live chat")
-                .simultaneousGesture(listDismissOnlyGesture)
+            // Sit under the header like other sheet content — a vertically-centered spinner in
+            // a growing frame looks glued to the screen while the grabber rises around it.
+            VStack(spacing: 0) {
+                ProgressView()
+                    .controlSize(.regular)
+                    .padding(.top, 36)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Loading live chat")
+            .simultaneousGesture(listDismissOnlyGesture)
         } else if model.messages.isEmpty {
             emptyState(
                 title: model.chatEnded ? "Live chat has ended" : "Waiting for messages",

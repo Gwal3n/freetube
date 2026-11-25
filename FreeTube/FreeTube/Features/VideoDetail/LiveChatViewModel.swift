@@ -11,7 +11,9 @@ final class LiveChatViewModel {
     private(set) var messages: [LiveChatMessage] = []
     /// Bumps on every accepted append so the sheet can follow even when the capped count is flat.
     private(set) var messageRevision: Int = 0
-    private(set) var isLoading = false
+    /// Starts true so the sheet entrance transition already includes the loading spinner
+    /// instead of popping one in after bootstrap begins.
+    private(set) var isLoading = true
     private(set) var isPolling = false
     private(set) var chatUnavailable = false
     private(set) var chatEnded = false
@@ -43,6 +45,10 @@ final class LiveChatViewModel {
 
     func startPolling() {
         guard pollTask == nil, !chatUnavailable, !chatEnded else { return }
+        // Synchronous so the first painted sheet frame already owns the spinner.
+        if messages.isEmpty {
+            isLoading = true
+        }
         pollTask = Task { [weak self] in
             await self?.runPollingLoop()
         }
