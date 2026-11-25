@@ -60,7 +60,8 @@ struct ChannelPreviewSheet: View {
                 .padding(.top, 14)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 8)
+        // Leave room below the grabber so the header isn't flush with the sheet edge.
+        .padding(.top, 18)
         // Keep bottom padding modest — oversizing the detent left empty chrome under the buttons.
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
