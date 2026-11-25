@@ -1,19 +1,17 @@
 import Foundation
 import Observation
 
-/// Page-derived extras for the compact channel preview (latest upload + tab presence).
+/// Page-derived extras for the compact channel preview's latest-upload row.
 @available(iOS 17.0, *)
 struct ChannelPreviewPageInfo: Equatable, Sendable {
     let latestTitle: String?
     let latestRelative: String?
-    let hasShorts: Bool
-    let hasLive: Bool
+    let latestViewCount: Int?
 
     static let empty = ChannelPreviewPageInfo(
         latestTitle: nil,
         latestRelative: nil,
-        hasShorts: false,
-        hasLive: false
+        latestViewCount: nil
     )
 
     static func from(_ details: ChannelDetails, now: Date = .now) -> ChannelPreviewPageInfo {
@@ -21,8 +19,7 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
         return ChannelPreviewPageInfo(
             latestTitle: Self.nonEmpty(latest?.title),
             latestRelative: Self.relativeAge(for: latest, now: now),
-            hasShorts: !details.shorts.items.isEmpty || details.shorts.continuationToken != nil,
-            hasLive: !details.directs.items.isEmpty || details.directs.continuationToken != nil
+            latestViewCount: latest?.viewCount
         )
     }
 
