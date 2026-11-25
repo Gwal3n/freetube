@@ -20,13 +20,28 @@ extension PlayerStateManager {
         launchSourceFrame = nil
     }
 
+    /// Asks the SwiftUI container to collapse the expanded player. Optional `completion` runs
+    /// after collapse — but never only on the animation callback. Device logs showed
+    /// `.logicallyComplete` stalling for ~10s when a sheet dismiss competed with the spring,
+    /// leaving the browse surface up with navigation still pending.
     func requestPlayerCollapse(then completion: (() -> Void)? = nil) {
         guard fullScreenPresented else {
             completion?()
             return
         }
         if let completion {
-            pendingCollapseCompletion = (playbackSessionID, completion)
+            let sessionID = playbackSessionID
+            pendingCollapseCompletion = (sessionID, completion)
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(550))
+                guard let pending = pendingCollapseCompletion,
+                      pending.sessionID == sessionID else { return }
+                log.notice("Player collapse completion timed out; forcing navigation handoff")
+                if fullScreenPresented {
+                    fullScreenPresented = false
+                }
+                finishPlayerCollapse()
+            }
         }
         playerCollapseRequest &+= 1
     }
@@ -34,9 +49,11 @@ extension PlayerStateManager {
     func finishPlayerCollapse() {
         let completion = pendingCollapseCompletion
         pendingCollapseCompletion = nil
-        if let completion, completion.sessionID == playbackSessionID, miniPlayerVisible {
-            completion.action()
-        }
+        guard let completion, completion.sessionID == playbackSessionID else { return }
+        // Do not require `miniPlayerVisible`. Dropping the callback when the mini-player was
+        // briefly torn down mid-collapse stranded channel/playlist navigation with a frozen
+        // browse surface and no destination push.
+        completion.action()
     }
 
     func resizeFloatingMiniPlayer(to width: CGFloat) {

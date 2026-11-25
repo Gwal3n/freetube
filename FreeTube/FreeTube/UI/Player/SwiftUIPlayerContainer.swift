@@ -557,21 +557,24 @@ struct SwiftUIPlayerContainer<Content: View>: View {
     private func animateCollapse(in size: CGSize) {
         player.chapterListPresented = false
         player.liveChatPresented = false
+        player.channelPreviewRequest = nil
         guard !reduceMotion else {
             player.fullScreenPresented = false
             presentationTranslation = 0
             player.finishPlayerCollapse()
             return
         }
-        withAnimation(
-            .spring(duration: 0.42, bounce: 0.08),
-            completionCriteria: .logicallyComplete
-        ) {
-            presentationTranslation = collapseTravel(in: size)
-        } completion: {
-            guard player.fullScreenPresented else {
+        let travel = collapseTravel(in: size)
+        // Drive the spring for visuals, but finish on a deadline — not `.logicallyComplete`.
+        // When a channel-preview sheet was dismissing at the same time, that completion could
+        // stall for many seconds while `fullScreenPresented` stayed true and navigation waited.
+        withAnimation(.spring(duration: 0.42, bounce: 0.08)) {
+            presentationTranslation = travel
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(420))
+            guard player.fullScreenPresented || player.pendingCollapseCompletion != nil else {
                 presentationTranslation = 0
-                player.finishPlayerCollapse()
                 return
             }
             // At progress 1 the live video already has the floating window's exact frame.

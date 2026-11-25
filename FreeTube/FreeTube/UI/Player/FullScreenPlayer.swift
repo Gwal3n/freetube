@@ -1376,12 +1376,13 @@ struct FullScreenPlayer: View {
         }
     }
 
-    /// Finish the same collapse used by the player control before pushing a destination behind it.
-    /// Navigation waits for the container's interactive-style collapse to reach the mini frame.
+    /// Collapse the expanded player, then push a destination. Completion is deadline-backed in
+    /// `requestPlayerCollapse` so a stalled spring cannot freeze navigation.
     private func collapseForNavigation(_ navigate: @escaping () -> Void) {
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             player.chapterListPresented = false
             player.liveChatPresented = false
+            player.channelPreviewRequest = nil
             isPlaylistPanelPresented = false
         }
         player.requestPlayerCollapse(then: navigate)
