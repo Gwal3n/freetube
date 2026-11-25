@@ -131,7 +131,26 @@ struct LiveChatPanel: View {
 
     @ViewBuilder
     private var chatScrollView: some View {
-        if #available(iOS 18.0, *) {
+        if model.chatUnavailable {
+            emptyState(
+                title: "Live chat unavailable",
+                systemImage: "bubble.left.and.bubble.right",
+                description: "Chat isn’t available for this stream."
+            )
+        } else if model.isLoading && model.messages.isEmpty {
+            ProgressView()
+                .controlSize(.regular)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel("Loading live chat")
+        } else if model.messages.isEmpty {
+            emptyState(
+                title: model.chatEnded ? "Live chat has ended" : "Waiting for messages",
+                systemImage: "text.bubble",
+                description: model.chatEnded
+                    ? "This stream’s chat is no longer updating."
+                    : "New messages will appear here."
+            )
+        } else if #available(iOS 18.0, *) {
             chatRows
                 .onScrollGeometryChange(for: ScrollPinSample.self) { geometry in
                     let scrolled = geometry.contentOffset.y + geometry.contentInsets.top
@@ -169,41 +188,14 @@ struct LiveChatPanel: View {
             ScrollView {
                 VStack(spacing: 0) {
                     LazyVStack(alignment: .leading, spacing: 4) {
-                        if model.chatUnavailable {
-                            ContentUnavailableView(
-                                "Live chat unavailable",
-                                systemImage: "bubble.left.and.bubble.right",
-                                description: Text("Chat isn’t available for this stream.")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 48)
-                        } else if model.isLoading && model.messages.isEmpty {
-                            ProgressView()
-                                .controlSize(.regular)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 36)
-                                .padding(.bottom, 24)
-                                .accessibilityLabel("Loading live chat")
-                        } else if model.messages.isEmpty {
-                            ContentUnavailableView(
-                                model.chatEnded ? "Live chat has ended" : "Waiting for messages",
-                                systemImage: "text.bubble",
-                                description: Text(model.chatEnded
-                                    ? "This stream’s chat is no longer updating."
-                                    : "New messages will appear here.")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 48)
-                        } else {
-                            ForEach(model.messages) { message in
-                                LiveChatRow(message: message) { channelID in
-                                    player.presentChannelPreview(
-                                        id: channelID,
-                                        name: message.authorName
-                                    )
-                                }
-                                .id(message.id)
+                        ForEach(model.messages) { message in
+                            LiveChatRow(message: message) { channelID in
+                                player.presentChannelPreview(
+                                    id: channelID,
+                                    name: message.authorName
+                                )
                             }
+                            .id(message.id)
                         }
                     }
                     .padding(.horizontal, 8)
@@ -223,56 +215,62 @@ struct LiveChatPanel: View {
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.always, axes: .vertical)
             .modifier(LiveChatBottomScrollAnchor(isPinned: isPinnedToBottom))
+            // Grow rows gently while pinned so size-change anchoring doesn't stutter.
+            .animation(
+                isPinnedToBottom && !reduceMotion ? .easeOut(duration: 0.18) : nil,
+                value: model.messageRevision
+            )
             .onAppear {
                 isPinnedToBottom = true
-                scheduleFollowScroll(proxy: proxy, force: true)
+                // Initial layout only — ongoing follow uses the size-change anchor on iOS 18+.
+                scrollToBottom(proxy: proxy)
             }
             .onChange(of: model.messageRevision) { _, _ in
-                scheduleFollowScroll(proxy: proxy, force: false)
+                // iOS 18 size-change anchor keeps pinned follow smooth; only nudge on older OS.
+                guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
+                if #unavailable(iOS 18.0) {
+                    scheduleFollowScroll(proxy: proxy)
+                }
             }
             .onChange(of: expansionProgress) { _, newValue in
                 guard newValue > 0.95 || newValue < 0.05 else { return }
-                scheduleFollowScroll(proxy: proxy, force: true)
+                guard isPinnedToBottom else { return }
+                scrollToBottom(proxy: proxy)
             }
         }
     }
 
-    private func scheduleFollowScroll(proxy: ScrollViewProxy, force: Bool) {
-        guard force || isPinnedToBottom else { return }
-        guard !isDraggingListSheet, !isDismissing else { return }
+    private func emptyState(title: String, systemImage: String, description: String) -> some View {
+        ContentUnavailableView(
+            title,
+            systemImage: systemImage,
+            description: Text(description)
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func scheduleFollowScroll(proxy: ScrollViewProxy) {
+        guard isPinnedToBottom, !isDraggingListSheet, !isDismissing else { return }
         followScrollTask?.cancel()
         followScrollTask = Task { @MainActor in
-            // Coalesce a couple of paced reveals into one settle.
-            if !force {
-                try? await Task.sleep(for: .milliseconds(90))
-            }
-            await Task.yield()
-            guard !Task.isCancelled, !isDraggingListSheet else { return }
-            guard force || isPinnedToBottom else { return }
-            scrollToBottom(proxy: proxy, animated: !force && !reduceMotion)
+            // Coalesce several paced reveals into one unanimated settle.
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled, isPinnedToBottom, !isDraggingListSheet else { return }
+            scrollToBottom(proxy: proxy)
         }
     }
 
-    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+    private func scrollToBottom(proxy: ScrollViewProxy) {
         isProgrammaticScroll = true
         isPinnedToBottom = true
-        let scroll = {
+        // Unanimated — animated scrollTo against a growing list is what felt jumpy.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
-        if animated, !reduceMotion {
-            // Soft settle — the old easeOut + immediate unanimated follow-up felt like a jump.
-            withAnimation(.smooth(duration: 0.34)) {
-                scroll()
-            }
-        } else {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                scroll()
-            }
-        }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(animated ? 360 : 24))
+            try? await Task.sleep(for: .milliseconds(24))
             isProgrammaticScroll = false
         }
     }
@@ -446,14 +444,18 @@ private struct ScrollPinSample: Equatable {
     var distanceFromBottom: CGFloat
 }
 
-/// Applies a bottom scroll anchor only while following live, so reading history isn't yanked.
+/// Keeps the viewport glued to the bottom as rows arrive, without per-message scrollTo jumps.
 @available(iOS 17.0, *)
 private struct LiveChatBottomScrollAnchor: ViewModifier {
     let isPinned: Bool
 
     func body(content: Content) -> some View {
         if isPinned {
-            content.defaultScrollAnchor(.bottom)
+            if #available(iOS 18.0, *) {
+                content.defaultScrollAnchor(.bottom, for: .sizeChanges)
+            } else {
+                content.defaultScrollAnchor(.bottom)
+            }
         } else {
             content
         }
