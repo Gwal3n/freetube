@@ -7,14 +7,7 @@ struct LiveChatRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            if message.kind != .system {
-                authorLabel
-            }
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(message.kind == .system ? .secondary : .primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+            messageContent
             if let amount = message.amountText, !amount.isEmpty {
                 Text(verbatim: amount)
                     .font(.caption.weight(.semibold))
@@ -32,23 +25,44 @@ struct LiveChatRow: View {
     }
 
     @ViewBuilder
-    private var authorLabel: some View {
-        let name = Text(verbatim: message.authorName)
+    private var messageContent: some View {
+        if message.kind == .system {
+            Text(message.text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        } else {
+            // Single flowing paragraph: wrapped lines start at the leading edge, not under a
+            // trailing text column beside the author name.
+            (authorText + Text(verbatim: " \(message.text)")
+                .font(.subheadline)
+                .foregroundStyle(.primary))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+                .overlay(alignment: .topLeading) {
+                    authorHitTarget
+                }
+        }
+    }
+
+    private var authorText: Text {
+        Text(verbatim: message.authorName)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(authorColor)
-            .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var authorHitTarget: some View {
         if let channelID = message.authorChannelID,
            !channelID.isEmpty,
            let onOpenChannel {
-            Button {
-                onOpenChannel(channelID)
-            } label: {
-                name
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens channel")
-        } else {
-            name
+            Text(verbatim: message.authorName)
+                .font(.subheadline.weight(.semibold))
+                .opacity(0.01)
+                .onTapGesture { onOpenChannel(channelID) }
+                .accessibilityHidden(true)
         }
     }
 
