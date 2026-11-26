@@ -456,6 +456,8 @@ struct FullScreenPlayer: View {
                 // atomically and let the underlying column resize; portrait retains its sheet
                 // transition because its geometry does not change horizontally.
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
+                .opacity(max(0, 1 - collapseProgress * 2.5))
+                .allowsHitTesting(collapseProgress < 0.05)
                 .zIndex(5)
             }
 
@@ -474,6 +476,8 @@ struct FullScreenPlayer: View {
                 )
                 .offset(y: isLandscape ? 0 : chatTop)
                 .transition(isLandscape ? .identity : .move(edge: .bottom))
+                .opacity(max(0, 1 - collapseProgress * 2.5))
+                .allowsHitTesting(collapseProgress < 0.05)
                 .zIndex(5)
             }
 
