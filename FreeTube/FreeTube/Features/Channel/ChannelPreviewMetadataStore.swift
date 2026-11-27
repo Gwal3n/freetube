@@ -1,31 +1,44 @@
 import Foundation
 import Observation
 
-/// Page-derived extras for the compact channel preview's latest-upload row.
+/// Page-derived extras for the compact channel preview's latest-upload row and join date.
 @available(iOS 17.0, *)
 struct ChannelPreviewPageInfo: Equatable, Sendable {
     let latestTitle: String?
     let latestRelative: String?
     let latestViewCount: Int?
-    /// Absolute or reconstructed upload time for the latest video; drives the 12-month cutoff.
+    /// Absolute or reconstructed upload time for the latest video; drives the 1-month cutoff.
     let latestPublishedAt: Date?
+    /// About-tab join label, e.g. "Joined Dec 12, 2014".
+    let joinedText: String?
 
     static let empty = ChannelPreviewPageInfo(
         latestTitle: nil,
         latestRelative: nil,
         latestViewCount: nil,
-        latestPublishedAt: nil
+        latestPublishedAt: nil,
+        joinedText: nil
     )
 
-    /// Recent enough to show the video title in the compact preview.
+    /// Recent enough to show the video title in the compact preview (< 1 month).
     var showsLatestTitle: Bool {
         guard let latestPublishedAt else {
-            return Self.relativeSuggestsUnderOneYear(latestRelative)
+            return Self.relativeSuggestsUnderOneMonth(latestRelative)
         }
-        return Date.now.timeIntervalSince(latestPublishedAt) < Self.oneYear
+        return Date.now.timeIntervalSince(latestPublishedAt) < Self.oneMonth
     }
 
-    private static let oneYear: TimeInterval = 365.25 * 24 * 60 * 60
+    private static let oneMonth: TimeInterval = 30 * 24 * 60 * 60
+
+    func withJoinedText(_ text: String?) -> ChannelPreviewPageInfo {
+        ChannelPreviewPageInfo(
+            latestTitle: latestTitle,
+            latestRelative: latestRelative,
+            latestViewCount: latestViewCount,
+            latestPublishedAt: latestPublishedAt,
+            joinedText: text
+        )
+    }
 
     static func from(_ details: ChannelDetails, now: Date = .now) -> ChannelPreviewPageInfo {
         let latest = details.videos.items.first
@@ -33,19 +46,19 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
             latestTitle: Self.nonEmpty(latest?.title),
             latestRelative: Self.relativeAge(for: latest, now: now),
             latestViewCount: latest?.viewCount,
-            latestPublishedAt: latest?.estimatedPublishedAt(relativeTo: now)
+            latestPublishedAt: latest?.estimatedPublishedAt(relativeTo: now),
+            joinedText: nil
         )
     }
 
-    private static func relativeSuggestsUnderOneYear(_ relative: String?) -> Bool {
+    private static func relativeSuggestsUnderOneMonth(_ relative: String?) -> Bool {
         guard let text = relative?.lowercased(), !text.isEmpty else { return false }
-        if text.contains("year") { return false }
+        if text.contains("year") || text.contains("month") { return false }
         return text.contains("second")
             || text.contains("minute")
             || text.contains("hour")
             || text.contains("day")
             || text.contains("week")
-            || text.contains("month")
     }
 
     private static func relativeAge(for video: Video?, now: Date) -> String? {
@@ -78,6 +91,7 @@ final class ChannelPreviewMetadataStore {
     private var entries: [String: Entry] = [:]
     private var inFlight: [String: Task<Channel?, Never>] = [:]
     private var pageInFlight: [String: Task<Void, Never>] = [:]
+    private var joinedInFlight: Set<String> = []
     private let service: any ChannelServicing
     private let pageCache: ChannelDetailsCache
 
@@ -113,7 +127,11 @@ final class ChannelPreviewMetadataStore {
             return entry.pageInfo
         }
         if let cached = pageCache.details(for: channelID) {
-            return ChannelPreviewPageInfo.from(cached)
+            let fromCache = ChannelPreviewPageInfo.from(cached)
+            if let joined = entries[channelID]?.pageInfo.joinedText {
+                return fromCache.withJoinedText(joined)
+            }
+            return fromCache
         }
         return entries[channelID]?.pageInfo ?? .empty
     }
@@ -126,6 +144,7 @@ final class ChannelPreviewMetadataStore {
     /// so opening the channel can paint from `ChannelDetailsCache` immediately.
     func preparePreview(for channel: Channel) async {
         prefetchChannelPage(id: channel.id)
+        prefetchJoinedText(channelID: channel.id)
         await loadIfNeeded(for: channel)
     }
 
@@ -154,6 +173,7 @@ final class ChannelPreviewMetadataStore {
         guard !channelID.isEmpty else { return }
         if let cached = pageCache.details(for: channelID) {
             storeMetadata(cached.channel, pageInfo: ChannelPreviewPageInfo.from(cached), for: channelID)
+            prefetchJoinedText(channelID: channelID)
             return
         }
         if pageInFlight[channelID] != nil { return }
@@ -171,8 +191,26 @@ final class ChannelPreviewMetadataStore {
             } catch {
                 // Preview still works from metadata; the channel screen will retry on open.
             }
+            self.prefetchJoinedText(channelID: channelID)
         }
         pageInFlight[channelID] = task
+    }
+
+    private func prefetchJoinedText(channelID: String) {
+        if let existing = entries[channelID]?.pageInfo.joinedText, !existing.isEmpty { return }
+        guard !joinedInFlight.contains(channelID) else { return }
+        joinedInFlight.insert(channelID)
+        Task {
+            defer { self.joinedInFlight.remove(channelID) }
+            guard let text = await ChannelJoinedDateFetcher.fetch(channelID: channelID) else { return }
+            self.mergeJoinedText(text, for: channelID)
+        }
+    }
+
+    private func mergeJoinedText(_ text: String, for channelID: String) {
+        let existing = entries[channelID]
+        let base = existing?.pageInfo ?? .empty
+        storeMetadata(existing?.channel, pageInfo: base.withJoinedText(text), for: channelID)
     }
 
     private func storeMetadata(
@@ -183,11 +221,16 @@ final class ChannelPreviewMetadataStore {
         let existing = entries[channelID]
         let resolvedPage: ChannelPreviewPageInfo
         if let pageInfo {
-            resolvedPage = pageInfo
+            if pageInfo.joinedText == nil, let kept = existing?.pageInfo.joinedText {
+                resolvedPage = pageInfo.withJoinedText(kept)
+            } else {
+                resolvedPage = pageInfo
+            }
         } else if let existingPage = existing?.pageInfo, existingPage != .empty {
             resolvedPage = existingPage
         } else if let cached = pageCache.details(for: channelID) {
-            resolvedPage = ChannelPreviewPageInfo.from(cached)
+            let fromCache = ChannelPreviewPageInfo.from(cached)
+            resolvedPage = fromCache.withJoinedText(existing?.pageInfo.joinedText)
         } else {
             resolvedPage = existing?.pageInfo ?? .empty
         }
