@@ -6,18 +6,21 @@ import SwiftUI
 struct FeaturedCommentPreview: View {
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hiddenAuthors = HiddenCommentAuthorsStore.shared
 
     let model: CommentsViewModel
     let onlyNearPlayback: Bool
     let onOpen: (String?) -> Void
 
     var body: some View {
+        _ = hiddenAuthors.revision
         let timed = model.featuredComment(near: player.elapsed)
-        let excerpt = timed?.comment.bodyText ?? (onlyNearPlayback ? nil : model.teaserText) ?? ""
+        let timedVisible = timed.flatMap { hiddenAuthors.hides($0.comment) ? nil : $0 }
+        let excerpt = timedVisible?.comment.bodyText ?? (onlyNearPlayback ? nil : model.teaserText) ?? ""
         Group {
             if !excerpt.isEmpty {
                 Button {
-                    onOpen(timed?.comment.id)
+                    onOpen(timedVisible?.comment.id)
                 } label: {
                     HStack(alignment: .top, spacing: 8) {
                         Text(excerpt)
@@ -25,8 +28,8 @@ struct FeaturedCommentPreview: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        if let timed {
-                            Text(formattedTime(timed.time))
+                        if let timedVisible {
+                            Text(formattedTime(timedVisible.time))
                                 .font(.caption2.monospacedDigit())
                                 .foregroundStyle(.tertiary)
                                 .fixedSize()
@@ -42,7 +45,7 @@ struct FeaturedCommentPreview: View {
                 .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : InterfaceMotion.content, value: timed?.comment.id)
+        .animation(reduceMotion ? nil : InterfaceMotion.content, value: timedVisible?.comment.id)
     }
 
     private func formattedTime(_ seconds: TimeInterval) -> String {

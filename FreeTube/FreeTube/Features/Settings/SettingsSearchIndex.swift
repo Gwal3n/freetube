@@ -251,7 +251,10 @@ enum SettingsSearchIndex {
             "Incognito", "Don't save searches", "Don't save watch history",
             "Don't save watch progress", "Hide watch progress bars", "Hide Feed tab", "Hide Library tab"
         ]),
-        Group(destination: .blockedContent, titles: ["Blocked content", "Hide Shorts", "Blocked keywords", "Blocked channels"]),
+        Group(destination: .blockedContent, titles: [
+            "Blocked content", "Hide Shorts", "Blocked keywords", "Blocked channels",
+            "Hidden comment authors"
+        ]),
         Group(destination: .community, titles: [
             "SponsorBlock & DeArrow", "SponsorBlock", "Segment colors", "Channel whitelist",
             "Full-video label under seek bar",

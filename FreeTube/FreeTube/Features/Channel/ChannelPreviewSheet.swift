@@ -8,10 +8,10 @@ struct ChannelPreviewSheet: View {
 
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var metadata = ChannelPreviewMetadataStore.shared
     @State private var subscriptions = LocalSubscriptionStore.shared
+    @State private var hiddenAuthors = HiddenCommentAuthorsStore.shared
     @State private var isDescriptionExpanded = false
     @State private var fittedHeight: CGFloat = 188
 
@@ -34,6 +34,10 @@ struct ChannelPreviewSheet: View {
         metadata.pageInfo(for: request.id)
     }
 
+    private var commentsHidden: Bool {
+        hiddenAuthors.isHidden(channelID: request.id)
+    }
+
     private var detents: Set<PresentationDetent> {
         var set: Set<PresentationDetent> = [.height(max(fittedHeight, 1))]
         if canExpand {
@@ -45,24 +49,12 @@ struct ChannelPreviewSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             headerRow
-            if let title = pageInfo.latestTitle {
-                latestUploadRow(
-                    title: title,
-                    relative: pageInfo.latestRelative,
-                    viewCount: pageInfo.latestViewCount
-                )
-            }
+            activitySection
             aboutSection
-
-            // Pull actions off the header block and keep the sheet height fitted to content
-            // so leftover chrome doesn't pool as empty space under the buttons.
-            actionRow
-                .padding(.top, 14)
         }
         .padding(.horizontal, 20)
         // Leave room below the grabber so the header isn't flush with the sheet edge.
         .padding(.top, 18)
-        // Keep bottom padding modest — oversizing the detent left empty chrome under the buttons.
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .fixedSize(horizontal: false, vertical: true)
@@ -87,22 +79,63 @@ struct ChannelPreviewSheet: View {
     }
 
     private var headerRow: some View {
-        HStack(alignment: .center, spacing: 12) {
-            avatar
+        HStack(alignment: .center, spacing: 10) {
+            Button(action: openChannel) {
+                HStack(alignment: .center, spacing: 12) {
+                    avatar
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(verbatim: details.name)
-                    .appFont(.headline, weight: .semibold)
-                    .lineLimit(2)
-                if let handle = details.handle, !handle.isEmpty {
-                    Text(verbatim: handle)
-                        .appFont(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(verbatim: details.name)
+                                .appFont(.headline, weight: .semibold)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            if details.isSubscribed {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityLabel("Subscribed")
+                            }
+                        }
+                        if let handle = details.handle, !handle.isEmpty {
+                            Text(verbatim: handle)
+                                .appFont(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        statsLine
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
-                statsLine
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Go to \(details.name)")
+            .accessibilityHint("Opens the channel")
+
+            Menu {
+                if commentsHidden {
+                    Button("Show comments from this channel") {
+                        hiddenAuthors.unhide(channelID: request.id)
+                    }
+                } else {
+                    Button("Hide comments from this channel", role: .destructive) {
+                        hiddenAuthors.hide(channelID: request.id, name: details.name)
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Channel actions")
         }
     }
 
@@ -151,6 +184,39 @@ struct ChannelPreviewSheet: View {
             parts.append(videoCountLabel(count))
         }
         return parts
+    }
+
+    @ViewBuilder
+    private var activitySection: some View {
+        if pageInfo.latestTitle != nil || pageInfo.latestRelative != nil
+            || pageInfo.latestPublishedAt != nil {
+            if pageInfo.showsLatestTitle, let title = pageInfo.latestTitle {
+                latestUploadRow(
+                    title: title,
+                    relative: pageInfo.latestRelative,
+                    viewCount: pageInfo.latestViewCount
+                )
+            } else if let age = lastUploadAgeText {
+                Text(age)
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(age)
+            }
+        }
+    }
+
+    private var lastUploadAgeText: String? {
+        if let relative = pageInfo.latestRelative, !relative.isEmpty {
+            return String(localized: "Last upload \(relative)")
+        }
+        if let date = pageInfo.latestPublishedAt {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.dateTimeStyle = .named
+            formatter.unitsStyle = .full
+            let relative = formatter.localizedString(for: min(date, .now), relativeTo: .now)
+            return String(localized: "Last upload \(relative)")
+        }
+        return nil
     }
 
     private func latestUploadRow(title: String, relative: String?, viewCount: Int?) -> some View {
@@ -225,44 +291,6 @@ struct ChannelPreviewSheet: View {
         }
     }
 
-    private var actionRow: some View {
-        HStack(spacing: 10) {
-            Button(action: toggleSubscribe) {
-                Text(details.isSubscribed ? "Subscribed" : "Subscribe")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .foregroundStyle(details.isSubscribed
-                        ? Color.primary
-                        : (colorScheme == .dark ? Color.black : Color.white))
-                    .background(
-                        details.isSubscribed
-                            ? AnyShapeStyle(Color.primary.opacity(0.10))
-                            : AnyShapeStyle(colorScheme == .dark ? Color.white : Color.black),
-                        in: Capsule()
-                    )
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-            .animation(reduceMotion ? nil : InterfaceMotion.quick, value: details.isSubscribed)
-
-            Button(action: openChannel) {
-                Text("Go to Channel")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .foregroundStyle(.primary)
-                    .background(Color.primary.opacity(0.08), in: Capsule())
-            }
-            .buttonStyle(ResponsiveButtonStyle())
-        }
-    }
-
-    private func toggleSubscribe() {
-        if subscriptions.contains(details.id) {
-            subscriptions.remove(channelID: details.id)
-        } else {
-            subscriptions.add(details.withSubscribed(true))
-        }
-    }
-
     private func openChannel() {
         let channelID = request.id
         metadata.prefetchChannelPage(id: channelID)
@@ -270,7 +298,7 @@ struct ChannelPreviewSheet: View {
         // Same collapse-then-navigate path as the uploader control. Collapse completion is
         // deadline-backed so a competing sheet dismiss cannot stall the push.
         AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
-            .info("Channel preview Go to channel; collapsing player")
+            .info("Channel preview opening channel; collapsing player")
         player.channelPreviewRequest = nil
         player.requestPlayerCollapse {
             AppLog(subsystem: "com.leshko.freetube", category: "Navigation")

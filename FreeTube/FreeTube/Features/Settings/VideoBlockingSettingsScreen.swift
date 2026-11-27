@@ -4,6 +4,7 @@ import SwiftUI
 struct VideoBlockingSettingsScreen: View {
     @Environment(\.settingsToggleTint) private var settingsToggleTint
     @State private var blocklist = VideoBlocklist.shared
+    @State private var hiddenAuthors = HiddenCommentAuthorsStore.shared
     @State private var keywordInput = ""
     @State private var channelInput = ""
 
@@ -71,6 +72,35 @@ struct VideoBlockingSettingsScreen: View {
                 }
             } header: {
                 Text("Blocked channels")
+            }
+
+            Section {
+                if hiddenAuthors.entries.isEmpty {
+                    Text("No hidden authors")
+                        .foregroundStyle(.secondary)
+                        .settingsSearchRow("Hidden comment authors")
+                } else {
+                    ForEach(hiddenAuthors.entries) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: entry.name)
+                            if entry.channelID != entry.name {
+                                Text(verbatim: entry.channelID)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .settingsSearchRow("Hidden comment authors")
+                    }
+                    .onDelete { offsets in
+                        for index in offsets.sorted(by: >) {
+                            hiddenAuthors.remove(hiddenAuthors.entries[index])
+                        }
+                    }
+                }
+            } header: {
+                Text("Hidden comment authors")
+            } footer: {
+                Text("Authors hidden from the channel preview menu. Their comments stay out of the player list.")
             }
         }
         .scrollToSearchedSetting()

@@ -103,6 +103,7 @@ final class AppBackupService {
         }
         restoreSettings(backup.settings)
         VideoBlocklist.shared.reload()
+        HiddenCommentAuthorsStore.shared.reload()
     }
 
     private func replaceSwiftData(_ backup: AppBackup) {
@@ -158,6 +159,7 @@ final class AppBackupService {
         "automaticFeedRefreshEnabled", "automaticFeedRefreshInterval", "automaticFeedViewCountsEnabled", "automaticFeedViewCountInterval", "autoLoadMoreFeedItems", "autoLoadMoreSearchItems", "autoLoadMoreComments", "cacheRecentVideoContent", "cellularPlaybackQuality",
         "spaceSubscriptionFeedVideos", "feedChannelSpacing", "feedGroupSpacing", "feedSpacingMaximumShiftHours", "feedSuggestionsEnabled", "feedSuggestionDensity", "feedVideoFilter",
         "com.leshko.freetube.videoBlocklist.v1",
+        "com.leshko.freetube.hiddenCommentAuthors.v1",
         "appearanceMode", "useAccentTheme", "accentNavigationOnly", "appCustomAccentHex", "tabBarOrder", "showTabBarLabels", "showLibraryTab", "showDownloadsTab", "showSearchTab", "showSettingsTab", "autoplayNext", "cacheRecentChannelContent", "captionBackgroundEnabled", "captionTextScale",
         "verticalSwipeFullscreen", "verticalSwipeAdjustments",
         "concurrentFragments", "customDoubleTapSeekSeconds", "customPlaybackSpeeds", "playbackSpeedChoices", "sleepTimerMinuteChoices", "defaultDownloadQuality", "defaultPlaybackRate", "doubleTapSeekSeconds", "centerTapPlayPauseEnabled", "formattedCaptions",

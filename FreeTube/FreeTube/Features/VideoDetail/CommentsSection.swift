@@ -19,6 +19,7 @@ struct CommentsSection: View {
     @AppStorage("autoLoadMoreComments") private var autoLoadMoreComments = true
     @AppStorage("openCommentAuthorChannels") private var openCommentAuthorChannels = false
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
+    @State private var hiddenAuthors = HiddenCommentAuthorsStore.shared
 
     init(
         videoID: String,
@@ -119,7 +120,7 @@ struct CommentsSection: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 } else {
-                    ForEach(model.commentsForDisplay) { comment in
+                    ForEach(visibleComments) { comment in
                         // One stable child per comment keeps the lazy stack from expanding
                         // every reply branch merely to count its rows.
                         VStack(alignment: .leading, spacing: 8) {
@@ -266,7 +267,8 @@ struct CommentsSection: View {
                             .controlSize(.small)
                             .padding(.leading, 32)
                     } else {
-                        let replies = model.repliesByCommentID[comment.id] ?? []
+                        let replies = (model.repliesByCommentID[comment.id] ?? [])
+                            .filter { !hiddenAuthors.hides($0) }
                         ForEach(orderedReplies(parent: comment, replies: replies)) { item in
                             HStack(alignment: .top, spacing: 8) {
                                 HStack(spacing: 5) {
@@ -313,6 +315,12 @@ struct CommentsSection: View {
                 )
             }
         }
+    }
+
+    private var visibleComments: [Comment] {
+        // Read revision so hiding an author from the preview sheet refreshes this list.
+        _ = hiddenAuthors.revision
+        return model.commentsForDisplay.filter { !hiddenAuthors.hides($0) }
     }
 
     private func authorAction(for comment: Comment) -> (() -> Void)? {

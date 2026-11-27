@@ -7,20 +7,45 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
     let latestTitle: String?
     let latestRelative: String?
     let latestViewCount: Int?
+    /// Absolute or reconstructed upload time for the latest video; drives the 12-month cutoff.
+    let latestPublishedAt: Date?
 
     static let empty = ChannelPreviewPageInfo(
         latestTitle: nil,
         latestRelative: nil,
-        latestViewCount: nil
+        latestViewCount: nil,
+        latestPublishedAt: nil
     )
+
+    /// Recent enough to show the video title in the compact preview.
+    var showsLatestTitle: Bool {
+        guard let latestPublishedAt else {
+            return Self.relativeSuggestsUnderOneYear(latestRelative)
+        }
+        return Date.now.timeIntervalSince(latestPublishedAt) < Self.oneYear
+    }
+
+    private static let oneYear: TimeInterval = 365.25 * 24 * 60 * 60
 
     static func from(_ details: ChannelDetails, now: Date = .now) -> ChannelPreviewPageInfo {
         let latest = details.videos.items.first
         return ChannelPreviewPageInfo(
             latestTitle: Self.nonEmpty(latest?.title),
             latestRelative: Self.relativeAge(for: latest, now: now),
-            latestViewCount: latest?.viewCount
+            latestViewCount: latest?.viewCount,
+            latestPublishedAt: latest?.estimatedPublishedAt(relativeTo: now)
         )
+    }
+
+    private static func relativeSuggestsUnderOneYear(_ relative: String?) -> Bool {
+        guard let text = relative?.lowercased(), !text.isEmpty else { return false }
+        if text.contains("year") { return false }
+        return text.contains("second")
+            || text.contains("minute")
+            || text.contains("hour")
+            || text.contains("day")
+            || text.contains("week")
+            || text.contains("month")
     }
 
     private static func relativeAge(for video: Video?, now: Date) -> String? {
@@ -98,7 +123,7 @@ final class ChannelPreviewMetadataStore {
     }
 
     /// Header-only fetch for the compact preview sheet, plus a background full channel page
-    /// so "Go to Channel" can paint from `ChannelDetailsCache` immediately.
+    /// so opening the channel can paint from `ChannelDetailsCache` immediately.
     func preparePreview(for channel: Channel) async {
         prefetchChannelPage(id: channel.id)
         await loadIfNeeded(for: channel)
