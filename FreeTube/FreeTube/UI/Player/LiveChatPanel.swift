@@ -31,9 +31,8 @@ struct LiveChatPanel: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private var bottomContentInset: CGFloat {
-        // Home indicator (or a floor) plus breathing room so the newest line isn't flush with
-        // the sheet's bottom corner / home-indicator zone.
-        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 12) + 40
+        // System home-indicator inset only — no extra fabricated padding.
+        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8)
     }
 
     var body: some View {
