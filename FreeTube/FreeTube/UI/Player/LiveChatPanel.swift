@@ -31,8 +31,9 @@ struct LiveChatPanel: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private var bottomContentInset: CGFloat {
-        // System home-indicator inset only — no extra fabricated padding.
-        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8)
+        // Home indicator plus a standard 16pt content margin so the last lines clear the
+        // device corner radius without a large empty band.
+        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8) + 16
     }
 
     var body: some View {
