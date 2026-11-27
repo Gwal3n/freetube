@@ -344,7 +344,7 @@ struct ChannelScreen: View {
         case .playlists:
             playlistRows(details.playlists.items)
         case .about:
-            aboutSection(details.channel)
+            aboutSection(details.channel, joinedText: model.joinedText)
         }
     }
 
@@ -456,7 +456,7 @@ struct ChannelScreen: View {
         }
     }
 
-    private func aboutSection(_ channel: Channel) -> some View {
+    private func aboutSection(_ channel: Channel, joinedText: String?) -> some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("About").appFont(.title3, weight: .semibold)
@@ -475,10 +475,25 @@ struct ChannelScreen: View {
                 if let videos = channel.videoCount {
                     aboutRow(title: "Videos", value: formattedCount(videos), systemImage: "play.rectangle")
                 }
+                if let joined = joinedDateValue(joinedText) {
+                    aboutRow(title: "Joined", value: joined, systemImage: "calendar")
+                }
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// About rows use a "Joined" label, so strip a leading "Joined" from the raw panel string.
+    private func joinedDateValue(_ text: String?) -> String? {
+        guard let raw = text?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        if let range = raw.range(of: #"^Joined\s+"#, options: [.regularExpression, .caseInsensitive]) {
+            let remainder = raw[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+            return remainder.isEmpty ? raw : remainder
+        }
+        return raw
     }
 
     private func aboutRow(title: String, value: String, systemImage: String) -> some View {

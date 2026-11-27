@@ -14,6 +14,9 @@ final class ChannelViewModel {
 
     let channelID: String
     private(set) var details: ChannelDetails?
+    /// Full about-panel join label, e.g. "Joined Mar 21, 2008". Loaded independently of the
+    /// tabbed channel page because YouTube only exposes it on the engagement-panel continuation.
+    private(set) var joinedText: String?
     // The screen schedules its initial load on appearance. Reserve loading geometry from the
     // first frame, rather than briefly showing the idle/retry state before `.task` starts.
     private(set) var isLoading: Bool = true
@@ -113,6 +116,7 @@ final class ChannelViewModel {
             details = cached.replacingChannel(cached.channel.withSubscribed(subscribed))
             videoTabs[.newest] = details?.videos
             isLoading = false
+            Task { [weak self] in await self?.hydrateJoinedDateIfNeeded() }
         }
         do {
             var loadedDetails = try await service.fetchChannel(id: channelID)
@@ -133,11 +137,25 @@ final class ChannelViewModel {
             if loadedDetails.channel.thumbnailURL == nil {
                 Task { [weak self] in await self?.hydrateAvatarIfNeeded() }
             }
+            Task { [weak self] in await self?.hydrateJoinedDateIfNeeded() }
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
             initialLoadFailed = details == nil
             errorState = ErrorState(from: error)
         }
+    }
+
+    private func hydrateJoinedDateIfNeeded() async {
+        if let existing = joinedText, !existing.isEmpty { return }
+        if let cached = ChannelPreviewMetadataStore.shared.pageInfo(for: channelID).joinedText,
+           !cached.isEmpty {
+            joinedText = cached
+            return
+        }
+        guard let fetched = await ChannelJoinedDateFetcher.fetch(channelID: channelID),
+              !fetched.isEmpty else { return }
+        joinedText = fetched
+        ChannelPreviewMetadataStore.shared.adoptJoinedText(fetched, for: channelID)
     }
 
     /// Continuations need the service state that only a completed request restores, so a page

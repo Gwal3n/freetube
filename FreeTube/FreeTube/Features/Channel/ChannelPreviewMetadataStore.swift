@@ -221,6 +221,13 @@ final class ChannelPreviewMetadataStore {
         }
     }
 
+    /// Lets the channel About screen share a join date it already resolved.
+    func adoptJoinedText(_ text: String, for channelID: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        mergeJoinedText(trimmed, for: channelID)
+    }
+
     private func mergeJoinedText(_ text: String, for channelID: String) {
         let existing = entries[channelID]
         let base = existing?.pageInfo ?? .empty
