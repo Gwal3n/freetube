@@ -6,8 +6,10 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct LiveChatPanel: View {
     private static let dismissalThreshold: CGFloat = 42
+    /// Stable pin target below the newest row so LazyVStack layout catch-up never undershoots.
+    private static let bottomAnchorID = "liveChatBottomAnchor"
     /// Keep following new messages while the user is roughly at the latest row.
-    private static let pinToBottomSlack: CGFloat = 96
+    private static let pinToBottomSlack: CGFloat = 120
 
     @Environment(PlayerStateManager.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -25,11 +27,13 @@ struct LiveChatPanel: View {
     @State private var isDraggingListSheet = false
     @State private var headerDragStartExpansion: CGFloat?
     @State private var isNearBottom = true
+    @State private var followBottomTask: Task<Void, Never>?
     @Environment(\.scenePhase) private var scenePhase
 
     private var bottomContentInset: CGFloat {
-        // Clear the home indicator and the sheet's bottom corner radius.
-        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 8) + 20
+        // Home indicator (or a floor) plus breathing room so the newest line isn't flush with
+        // the sheet's bottom corner / home-indicator zone.
+        max(PlayerLayoutMetrics.safeAreaInsets.bottom, 12) + 40
     }
 
     var body: some View {
@@ -184,10 +188,14 @@ struct LiveChatPanel: View {
                             .id(message.id)
                         }
                     }
+
+                    Color.clear
+                        .frame(height: bottomContentInset)
+                        .id(Self.bottomAnchorID)
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
-                .padding(.bottom, bottomContentInset)
                 // Once the gesture hands off, the complete panel already follows the finger. Cancel
                 // the ScrollView's simultaneous visual rubber-band so the rows retain a constant
                 // distance from the header instead of appearing to travel twice as fast.
@@ -196,15 +204,44 @@ struct LiveChatPanel: View {
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.always, axes: .vertical)
             .onAppear {
-                guard let id = model.messages.last?.id else { return }
-                proxy.scrollTo(id, anchor: .bottom)
                 isNearBottom = true
+                pinToBottom(proxy: proxy, animated: false)
             }
-            .onChange(of: model.messages.last?.id) { _, id in
-                guard let id, !isDraggingListSheet, isNearBottom else { return }
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.35)) {
-                    proxy.scrollTo(id, anchor: .bottom)
-                }
+            .onChange(of: model.messageRevision) { _, _ in
+                guard !model.messages.isEmpty else { return }
+                scheduleFollowBottom(proxy: proxy)
+            }
+            .onDisappear {
+                followBottomTask?.cancel()
+                followBottomTask = nil
+            }
+        }
+    }
+
+    /// Coalesce drip ticks onto one post-layout pin so competing scroll animations do not stutter.
+    private func scheduleFollowBottom(proxy: ScrollViewProxy) {
+        guard !isDraggingListSheet, isNearBottom else { return }
+        followBottomTask?.cancel()
+        followBottomTask = Task { @MainActor in
+            // Let LazyVStack measure the newly revealed row before scrolling.
+            await Task.yield()
+            guard !Task.isCancelled, !isDraggingListSheet, isNearBottom else { return }
+            pinToBottom(proxy: proxy, animated: !reduceMotion)
+        }
+    }
+
+    private func pinToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        // Short ease-out matches one-message height deltas from the smoothed drip. Longer
+        // springs were restarted on every append and read as hang-then-jump.
+        if animated {
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.animation = nil
+            withTransaction(transaction) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
             }
         }
     }
