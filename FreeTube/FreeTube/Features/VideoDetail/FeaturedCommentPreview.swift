@@ -13,7 +13,8 @@ struct FeaturedCommentPreview: View {
     let onOpen: (String?) -> Void
 
     var body: some View {
-        _ = hiddenAuthors.revision
+        // Bind revision so hiding an author from the preview sheet refreshes this leaf.
+        let revision = hiddenAuthors.revision
         let timed = model.featuredComment(near: player.elapsed)
         let timedVisible = timed.flatMap { hiddenAuthors.hides($0.comment) ? nil : $0 }
         let excerpt = timedVisible?.comment.bodyText ?? (onlyNearPlayback ? nil : model.teaserText) ?? ""
@@ -45,7 +46,7 @@ struct FeaturedCommentPreview: View {
                 .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : InterfaceMotion.content, value: timedVisible?.comment.id)
+        .animation(reduceMotion ? nil : InterfaceMotion.content, value: "\(revision)-\(timedVisible?.comment.id ?? excerpt)")
     }
 
     private func formattedTime(_ seconds: TimeInterval) -> String {
