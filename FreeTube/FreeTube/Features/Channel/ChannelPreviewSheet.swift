@@ -1,7 +1,7 @@
 import SwiftUI
 import Kingfisher
 
-/// Compact native bottom sheet with channel identity, stats, about, and local actions.
+/// Compact native bottom sheet with channel identity and optional latest/about info.
 @available(iOS 17.0, *)
 struct ChannelPreviewSheet: View {
     let request: ChannelPreviewRequest
@@ -10,8 +10,7 @@ struct ChannelPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var metadata = ChannelPreviewMetadataStore.shared
     @State private var subscriptions = LocalSubscriptionStore.shared
-    @State private var hiddenAuthors = HiddenCommentAuthorsStore.shared
-    @State private var fittedHeight: CGFloat = 188
+    @State private var fittedHeight: CGFloat = 160
 
     private var seed: Channel { request.seedChannel }
 
@@ -29,25 +28,56 @@ struct ChannelPreviewSheet: View {
         metadata.pageInfo(for: request.id)
     }
 
-    private var commentsHidden: Bool {
-        hiddenAuthors.isHidden(channelID: request.id)
+    private var showsLatest: Bool {
+        pageInfo.showsLatestTitle && !(pageInfo.latestTitle?.isEmpty ?? true)
     }
 
-    private var fittedDetent: PresentationDetent {
-        .height(max(fittedHeight, 1))
+    private var showsAbout: Bool { !aboutText.isEmpty }
+
+    private var showsInfoGroup: Bool { showsLatest || showsAbout }
+
+    private var joinedYearLabel: String? { pageInfo.joinedYearLabel }
+
+    private var coreStatsParts: [String] {
+        var parts: [String] = []
+        if let count = details.subscriberCount {
+            parts.append(subscriberCountLabel(count))
+        }
+        if let count = details.videoCount {
+            parts.append(videoCountLabel(count))
+        }
+        if details.isSubscribed {
+            parts.append(String(localized: "Subscribed"))
+        }
+        return parts
+    }
+
+    private var statsPartsIncludingJoin: [String] {
+        var parts = coreStatsParts
+        if let joinedYearLabel {
+            // Keep join before Subscribed when both are present.
+            if details.isSubscribed, let subscribed = parts.last {
+                parts.removeLast()
+                parts.append(joinedYearLabel)
+                parts.append(subscribed)
+            } else {
+                parts.append(joinedYearLabel)
+            }
+        }
+        return parts
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            headerRow
-            activitySection
-            aboutSection
-            footerRow
+        VStack(alignment: .leading, spacing: 16) {
+            identityGroup
+            if showsInfoGroup {
+                infoGroup
+            }
         }
         .padding(.horizontal, 20)
-        // Leave room below the grabber so the header isn't flush with the sheet edge.
-        .padding(.top, 18)
-        .padding(.bottom, 12)
+        // Clearance under the system drag indicator; keep the bottom tight to content.
+        .padding(.top, 14)
+        .padding(.bottom, 10)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .fixedSize(horizontal: false, vertical: true)
         .background {
@@ -59,26 +89,28 @@ struct ChannelPreviewSheet: View {
             }
         }
         .onPreferenceChange(ChannelPreviewHeightKey.self) { height in
-            guard height > 1, abs(height - fittedHeight) > 1 else { return }
+            guard height > 1, abs(height - fittedHeight) > 0.5 else { return }
             fittedHeight = height
         }
-        // Single height detent keeps the sheet fixed to content — no medium/large resize.
-        .presentationDetents([fittedDetent])
+        // One content-height detent only — native chrome stays; the sheet does not resize to medium/large.
+        .presentationDetents([.height(max(fittedHeight, 1))])
         .presentationDragIndicator(.visible)
-        // Leave corner radius to the system so Liquid Glass / device bezels stay matched.
         .task(id: request.id) {
             await metadata.preparePreview(for: seed)
         }
     }
 
-    private var headerRow: some View {
+    // MARK: - Identity
+
+    private var identityGroup: some View {
         Button(action: openChannel) {
             HStack(alignment: .center, spacing: 12) {
                 avatar
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(verbatim: details.name)
                         .appFont(.headline, weight: .semibold)
+                        .foregroundStyle(.primary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     if let handle = details.handle, !handle.isEmpty {
@@ -87,13 +119,13 @@ struct ChannelPreviewSheet: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    statsLine
+                    statsBlock
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
@@ -122,96 +154,77 @@ struct ChannelPreviewSheet: View {
     }
 
     @ViewBuilder
-    private var statsLine: some View {
-        let parts = statsParts
-        if parts.isEmpty {
+    private var statsBlock: some View {
+        let core = coreStatsParts
+        let joined = joinedYearLabel
+        if core.isEmpty && joined == nil {
             if metadata.isLoading(request.id) {
                 ProgressView()
                     .controlSize(.mini)
+                    .tint(.secondary)
                     .accessibilityLabel("Loading channel details")
             }
-        } else {
-            Text(verbatim: parts.joined(separator: " · "))
-                .appFont(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
+        } else if let joined {
+            // Prefer one line; if join makes it too wide, drop join onto its own gray line.
+            ViewThatFits(in: .horizontal) {
+                statsText(statsPartsIncludingJoin)
+                    .fixedSize(horizontal: true, vertical: false)
 
-    private var statsParts: [String] {
-        var parts: [String] = []
-        if let count = details.subscriberCount {
-            parts.append(subscriberCountLabel(count))
-        }
-        if let count = details.videoCount {
-            parts.append(videoCountLabel(count))
-        }
-        if details.isSubscribed {
-            parts.append(String(localized: "Subscribed"))
-        }
-        return parts
-    }
-
-    @ViewBuilder
-    private var activitySection: some View {
-        if pageInfo.showsLatestTitle, let title = pageInfo.latestTitle {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("Latest")
-                    .appFont(.caption, weight: .semibold)
-                    .foregroundStyle(.secondary)
-                Text(verbatim: title)
-                    .appFont(.caption)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "Latest upload: \(title)"))
-        }
-    }
-
-    @ViewBuilder
-    private var aboutSection: some View {
-        if !aboutText.isEmpty {
-            Text(verbatim: aboutText)
-                .appFont(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var footerRow: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            if let joined = pageInfo.joinedText, !joined.isEmpty {
-                Text(verbatim: joined)
-                    .appFont(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-            Button {
-                if commentsHidden {
-                    hiddenAuthors.unhide(channelID: request.id)
-                } else {
-                    hiddenAuthors.hide(channelID: request.id, name: details.name)
+                VStack(alignment: .leading, spacing: 4) {
+                    if !core.isEmpty {
+                        statsText(core)
+                    }
+                    Text(verbatim: joined)
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-            } label: {
-                Text(commentsHidden ? "Show user" : "Hide user")
-                    .appFont(.caption, weight: .semibold)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(commentsHidden ? .secondary : .primary)
-            .accessibilityLabel(commentsHidden ? "Show comments from this channel" : "Hide comments from this channel")
+        } else {
+            statsText(core)
         }
     }
+
+    private func statsText(_ parts: [String]) -> some View {
+        Text(verbatim: parts.joined(separator: " · "))
+            .appFont(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+
+    // MARK: - Info
+
+    private var infoGroup: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if showsLatest, let title = pageInfo.latestTitle {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Latest")
+                        .appFont(.caption, weight: .semibold)
+                        .foregroundStyle(.secondary)
+                    Text(verbatim: title)
+                        .appFont(.caption)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(String(localized: "Latest upload: \(title)"))
+            }
+            if showsAbout {
+                Text(verbatim: aboutText)
+                    .appFont(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    // MARK: - Actions
 
     private func openChannel() {
         let channelID = request.id
         metadata.prefetchChannelPage(id: channelID)
         dismiss()
-        // Same collapse-then-navigate path as the uploader control. Collapse completion is
-        // deadline-backed so a competing sheet dismiss cannot stall the push.
         AppLog(subsystem: "com.leshko.freetube", category: "Navigation")
             .info("Channel preview opening channel; collapsing player")
         player.channelPreviewRequest = nil
@@ -222,7 +235,6 @@ struct ChannelPreviewSheet: View {
         }
     }
 
-    /// Uses the integer plural catalog for small counts; abbreviated counts stay plural prose.
     private func videoCountLabel(_ count: Int) -> String {
         if abs(count) >= 1_000 {
             let compact = count.formatted(.number.notation(.compactName))

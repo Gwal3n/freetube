@@ -7,7 +7,7 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
     let latestTitle: String?
     let latestRelative: String?
     let latestViewCount: Int?
-    /// Absolute or reconstructed upload time for the latest video; drives the 1-month cutoff.
+    /// Absolute or reconstructed upload time for the latest video; drives the 12-month cutoff.
     let latestPublishedAt: Date?
     /// About-tab join label, e.g. "Joined Dec 12, 2014".
     let joinedText: String?
@@ -20,15 +20,21 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
         joinedText: nil
     )
 
-    /// Recent enough to show the video title in the compact preview (< 1 month).
+    /// Recent enough to show the video title in the compact preview (< ~12 months).
     var showsLatestTitle: Bool {
         guard let latestPublishedAt else {
-            return Self.relativeSuggestsUnderOneMonth(latestRelative)
+            return Self.relativeSuggestsUnderOneYear(latestRelative)
         }
-        return Date.now.timeIntervalSince(latestPublishedAt) < Self.oneMonth
+        return Date.now.timeIntervalSince(latestPublishedAt) < Self.oneYear
     }
 
-    private static let oneMonth: TimeInterval = 30 * 24 * 60 * 60
+    /// Year-only join label for the stats line, e.g. "Joined 2014".
+    var joinedYearLabel: String? {
+        guard let joinedText, let year = Self.year(in: joinedText) else { return nil }
+        return String(localized: "Joined \(year)")
+    }
+
+    private static let oneYear: TimeInterval = 365.25 * 24 * 60 * 60
 
     func withJoinedText(_ text: String?) -> ChannelPreviewPageInfo {
         ChannelPreviewPageInfo(
@@ -51,14 +57,22 @@ struct ChannelPreviewPageInfo: Equatable, Sendable {
         )
     }
 
-    private static func relativeSuggestsUnderOneMonth(_ relative: String?) -> Bool {
+    private static func relativeSuggestsUnderOneYear(_ relative: String?) -> Bool {
         guard let text = relative?.lowercased(), !text.isEmpty else { return false }
-        if text.contains("year") || text.contains("month") { return false }
+        if text.contains("year") { return false }
         return text.contains("second")
             || text.contains("minute")
             || text.contains("hour")
             || text.contains("day")
             || text.contains("week")
+            || text.contains("month")
+    }
+
+    private static func year(in text: String) -> Int? {
+        guard let match = text.range(of: #"\b(19|20)\d{2}\b"#, options: .regularExpression) else {
+            return nil
+        }
+        return Int(text[match])
     }
 
     private static func relativeAge(for video: Video?, now: Date) -> String? {
