@@ -278,16 +278,7 @@ struct CommentsSection: View {
                         let replies = (model.repliesByCommentID[comment.id] ?? [])
                             .filter { !hiddenAuthors.hides($0) }
                         ForEach(replyTreeItems(parent: comment, replies: replies)) { item in
-                            switch item {
-                            case .reply(let node):
-                                replyTreeRow(node)
-                            case .readMore(let parentID, let remaining, let ancestorContinues):
-                                branchReadMoreRow(
-                                    parentID: parentID,
-                                    remaining: remaining,
-                                    ancestorContinues: ancestorContinues
-                                )
-                            }
+                            replyTreeItemRow(item)
                         }
 
                         if model.loadingReplyCommentIDs.contains(comment.id) {
@@ -317,9 +308,23 @@ struct CommentsSection: View {
                 )
                 .animation(
                     reduceMotion ? nil : InterfaceMotion.content,
-                    value: expandedBranchParentIDs
+                    value: expandedBranchParentIDs.count
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    private func replyTreeItemRow(_ item: ReplyTreeItem) -> some View {
+        switch item {
+        case .reply(let node):
+            replyTreeRow(node)
+        case .readMore(let parentID, let remaining, let ancestorContinues):
+            branchReadMoreRow(
+                parentID: parentID,
+                remaining: remaining,
+                ancestorContinues: ancestorContinues
+            )
         }
     }
 
@@ -402,9 +407,11 @@ struct CommentsSection: View {
                 expandedReplyCommentIDs.remove(comment.id)
                 // Drop branch reveals under this thread so the next open starts compact again.
                 let replyIDs = Set((model.repliesByCommentID[comment.id] ?? []).map(\.id))
-                expandedBranchParentIDs = expandedBranchParentIDs.filter {
-                    $0 != comment.id && !replyIDs.contains($0)
-                }
+                expandedBranchParentIDs = Set(
+                    expandedBranchParentIDs.filter {
+                        $0 != comment.id && !replyIDs.contains($0)
+                    }
+                )
             } else {
                 expandedReplyCommentIDs.insert(comment.id)
                 Task { await model.loadReplies(for: comment) }
