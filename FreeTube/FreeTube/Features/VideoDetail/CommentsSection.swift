@@ -11,6 +11,8 @@ struct CommentsSection: View {
     @State private var isExpanded = false
     @State private var collapseAfterScroll = false
     @State private var expandedReplyCommentIDs: Set<String> = []
+    /// Parent comment IDs whose child list is fully revealed past `branchPreviewLimit`.
+    @State private var expandedBranchParentIDs: Set<String> = []
     @State private var isHeadingPinned = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PlayerStateManager.self) private var player
@@ -20,6 +22,11 @@ struct CommentsSection: View {
     @AppStorage("openCommentAuthorChannels") private var openCommentAuthorChannels = false
     @AppStorage("pinCommentsHeading") private var pinCommentsHeading = false
     @State private var hiddenAuthors = HiddenCommentAuthorsStore.shared
+
+    /// How many direct children of one parent show before that branch's own Read more.
+    private let branchPreviewLimit = 3
+    private let replyAvatarSize: CGFloat = 24
+    private let treeGuideWidth: CGFloat = 14
 
     init(
         videoID: String,
@@ -200,6 +207,7 @@ struct CommentsSection: View {
                 ForEach(model.sortingModes) { mode in
                     Button {
                         expandedReplyCommentIDs.removeAll()
+                        expandedBranchParentIDs.removeAll()
                         Task { await model.selectSortingMode(mode) }
                     } label: {
                         if mode.isSelected {
@@ -269,23 +277,17 @@ struct CommentsSection: View {
                     } else {
                         let replies = (model.repliesByCommentID[comment.id] ?? [])
                             .filter { !hiddenAuthors.hides($0) }
-                        ForEach(orderedReplies(parent: comment, replies: replies)) { item in
-                            HStack(alignment: .top, spacing: 8) {
-                                HStack(spacing: 5) {
-                                    ForEach(0..<item.depth, id: \.self) { _ in
-                                        Capsule()
-                                            .fill(Color.secondary.opacity(0.20))
-                                            .frame(width: 2)
-                                    }
-                                }
-                                CommentRow(
-                                    comment: item.comment,
-                                    isReply: true,
-                                    onSeek: { player.seek(to: $0) },
-                                    onOpenAuthor: authorAction(for: item.comment)
+                        ForEach(replyTreeItems(parent: comment, replies: replies)) { item in
+                            switch item {
+                            case .reply(let node):
+                                replyTreeRow(node)
+                            case .readMore(let parentID, let remaining, let ancestorContinues):
+                                branchReadMoreRow(
+                                    parentID: parentID,
+                                    remaining: remaining,
+                                    ancestorContinues: ancestorContinues
                                 )
                             }
-                            .padding(.leading, 20)
                         }
 
                         if model.loadingReplyCommentIDs.contains(comment.id) {
@@ -313,8 +315,66 @@ struct CommentsSection: View {
                     reduceMotion ? nil : InterfaceMotion.content,
                     value: model.repliesByCommentID[comment.id]?.count ?? 0
                 )
+                .animation(
+                    reduceMotion ? nil : InterfaceMotion.content,
+                    value: expandedBranchParentIDs
+                )
             }
         }
+    }
+
+    private func replyTreeRow(_ node: PresentedReply) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            CommentTreeGuide(
+                ancestorContinues: node.ancestorContinues,
+                hasMoreSiblings: node.hasMoreSiblings,
+                guideWidth: treeGuideWidth,
+                avatarCenterY: replyAvatarSize / 2 + 4
+            )
+            CommentRow(
+                comment: node.comment,
+                isReply: true,
+                horizontalPadding: 0,
+                onSeek: { player.seek(to: $0) },
+                onOpenAuthor: authorAction(for: node.comment)
+            )
+            .padding(.trailing, 16)
+        }
+        .padding(.leading, 20)
+    }
+
+    private func branchReadMoreRow(
+        parentID: String,
+        remaining: Int,
+        ancestorContinues: [Bool]
+    ) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            CommentTreeGuide(
+                ancestorContinues: ancestorContinues,
+                hasMoreSiblings: false,
+                guideWidth: treeGuideWidth,
+                avatarCenterY: 10
+            )
+            Button {
+                withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
+                    expandedBranchParentIDs.insert(parentID)
+                }
+            } label: {
+                Text(
+                    remaining == 1
+                        ? String(localized: "Read more")
+                        : String(localized: "Read more (\(remaining))")
+                )
+                .appFont(.caption, weight: .semibold)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 16)
+        }
+        .padding(.leading, 20)
+        .accessibilityLabel("Read more replies")
     }
 
     private var visibleComments: [Comment] {
@@ -340,6 +400,11 @@ struct CommentsSection: View {
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             if expandedReplyCommentIDs.contains(comment.id) {
                 expandedReplyCommentIDs.remove(comment.id)
+                // Drop branch reveals under this thread so the next open starts compact again.
+                let replyIDs = Set((model.repliesByCommentID[comment.id] ?? []).map(\.id))
+                expandedBranchParentIDs = expandedBranchParentIDs.filter {
+                    $0 != comment.id && !replyIDs.contains($0)
+                }
             } else {
                 expandedReplyCommentIDs.insert(comment.id)
                 Task { await model.loadReplies(for: comment) }
@@ -350,12 +415,29 @@ struct CommentsSection: View {
     private struct PresentedReply: Identifiable {
         let comment: Comment
         let depth: Int
+        let ancestorContinues: [Bool]
+        let hasMoreSiblings: Bool
         var id: String { comment.id }
     }
 
+    private enum ReplyTreeItem: Identifiable {
+        case reply(PresentedReply)
+        case readMore(parentID: String, remaining: Int, ancestorContinues: [Bool])
+
+        var id: String {
+            switch self {
+            case .reply(let node):
+                return "reply-\(node.id)"
+            case .readMore(let parentID, _, _):
+                return "more-\(parentID)"
+            }
+        }
+    }
+
     /// Reconstruct a conservative tree from leading mentions, then emit every child directly
-    /// beneath its parent. The endpoint itself supplies only a flat reply array.
-    private func orderedReplies(parent: Comment, replies: [Comment]) -> [PresentedReply] {
+    /// beneath its parent. Long sibling lists collapse behind a per-branch Read more.
+    /// The endpoint itself supplies only a flat reply array.
+    private func replyTreeItems(parent: Comment, replies: [Comment]) -> [ReplyTreeItem] {
         let rootID = parent.id
         var latestCommentIDByAuthor = [normalizedAuthor(parent.authorName): rootID]
         var children: [String: [Comment]] = [:]
@@ -369,14 +451,53 @@ struct CommentsSection: View {
             latestCommentIDByAuthor[normalizedAuthor(reply.authorName)] = reply.id
         }
 
-        var ordered: [PresentedReply] = []
-        func appendChildren(of parentID: String, depth: Int) {
-            for reply in children[parentID] ?? [] {
-                ordered.append(PresentedReply(comment: reply, depth: min(5, depth)))
-                appendChildren(of: reply.id, depth: depth + 1)
+        var ordered: [ReplyTreeItem] = []
+        func appendChildren(of parentID: String, depth: Int, ancestorContinues: [Bool]) {
+            let kids = children[parentID] ?? []
+            guard !kids.isEmpty else { return }
+            let revealAll = expandedBranchParentIDs.contains(parentID)
+                || kids.count <= branchPreviewLimit
+            let visible = revealAll ? kids : Array(kids.prefix(branchPreviewLimit))
+            let remaining = kids.count - visible.count
+
+            for (index, reply) in visible.enumerated() {
+                let isLastVisible = index == visible.count - 1
+                let hasMoreSiblings = !isLastVisible || remaining > 0
+                let clampedDepth = min(5, depth)
+                let guides = Array(ancestorContinues.prefix(max(clampedDepth - 1, 0)))
+                ordered.append(
+                    .reply(
+                        PresentedReply(
+                            comment: reply,
+                            depth: clampedDepth,
+                            ancestorContinues: guides,
+                            hasMoreSiblings: hasMoreSiblings
+                        )
+                    )
+                )
+                var nextAncestors = guides
+                if clampedDepth >= 1 {
+                    nextAncestors.append(hasMoreSiblings)
+                }
+                // Cap visual nesting at 5; deeper replies still render at that indent.
+                appendChildren(
+                    of: reply.id,
+                    depth: depth + 1,
+                    ancestorContinues: nextAncestors
+                )
+            }
+
+            if remaining > 0 {
+                ordered.append(
+                    .readMore(
+                        parentID: parentID,
+                        remaining: remaining,
+                        ancestorContinues: ancestorContinues
+                    )
+                )
             }
         }
-        appendChildren(of: rootID, depth: 1)
+        appendChildren(of: rootID, depth: 1, ancestorContinues: [])
         return ordered
     }
 

@@ -7,6 +7,8 @@ struct CommentRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let comment: Comment
     var isReply = false
+    /// Zero when the row sits inside a `CommentTreeGuide` branch so the elbow meets the avatar.
+    var horizontalPadding: CGFloat = 16
     var repliesTitle: String? = nil
     var repliesExpanded = false
     var onToggleReplies: (() -> Void)? = nil
@@ -88,7 +90,7 @@ struct CommentRow: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, horizontalPadding)
         // Top-level threads get a consistent gap between them; replies stay tight under their parent.
         .padding(.vertical, isReply ? 4 : 10)
     }
