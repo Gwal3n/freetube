@@ -362,7 +362,7 @@ struct CommentsSection: View {
             )
             Button {
                 withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
-                    expandedBranchParentIDs.insert(parentID)
+                    _ = expandedBranchParentIDs.insert(parentID)
                 }
             } label: {
                 Text(
@@ -404,7 +404,7 @@ struct CommentsSection: View {
     private func toggleReplies(for comment: Comment) {
         withAnimation(reduceMotion ? nil : InterfaceMotion.content) {
             if expandedReplyCommentIDs.contains(comment.id) {
-                expandedReplyCommentIDs.remove(comment.id)
+                _ = expandedReplyCommentIDs.remove(comment.id)
                 // Drop branch reveals under this thread so the next open starts compact again.
                 let replyIDs = Set((model.repliesByCommentID[comment.id] ?? []).map(\.id))
                 expandedBranchParentIDs = Set(
@@ -413,7 +413,7 @@ struct CommentsSection: View {
                     }
                 )
             } else {
-                expandedReplyCommentIDs.insert(comment.id)
+                _ = expandedReplyCommentIDs.insert(comment.id)
                 Task { await model.loadReplies(for: comment) }
             }
         }
